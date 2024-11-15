@@ -253,7 +253,7 @@ func (a *Arguments) checkStreamX() error {
 		// set TTHeader Streaming by default
 		a.Protocol = transport.TTHeader.String()
 	}
-	// todo: process pb and gRPC
+	// todo(DMwangnima): process pb and gRPC
 	return nil
 }
 

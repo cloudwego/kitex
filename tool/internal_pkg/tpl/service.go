@@ -58,21 +58,43 @@ var serviceMethods = map[string]kitex.MethodInfo{
 					 {{- else -}} kitex.StreamingNone
 					 {{- end -}}
 				{{- end}}),
+            {{- if and .StreamX .Streaming.IsStreaming}}
+            kitex.WithMethodExtra("streamx", "true"),
+            {{- end}}
 		),
 	{{- end}}
 }
 
+{{- if and .StreamX .HasStreaming}}
+var {{LowerFirst .ServiceName}}ServiceInfo = NewServiceInfo()
+{{- else}}
 var (
 	{{LowerFirst .ServiceName}}ServiceInfo = NewServiceInfo()
 	{{LowerFirst .ServiceName}}ServiceInfoForClient = NewServiceInfoForClient()
 	{{LowerFirst .ServiceName}}ServiceInfoForStreamClient = NewServiceInfoForStreamClient()
 )
+{{- end}} {{- /* if and .StreamX .HasStreaming end */}}
 
 // for server
 func serviceInfo() *kitex.ServiceInfo {
 	return {{LowerFirst .ServiceName}}ServiceInfo
 }
 
+{{- if and .StreamX .HasStreaming}}
+// NewServiceInfo creates a new ServiceInfo containing all methods
+{{- /* It's for the Server (providing both streaming/non-streaming APIs), or for the grpc client */}}
+func NewServiceInfo() *kitex.ServiceInfo {
+	return newServiceInfo()
+}
+
+func newServiceInfo() *kitex.ServiceInfo {
+    return &kitex.ServiceInfo{
+        ServiceName: "{{.RawServiceName}}",
+        PayloadCodec: kitex.Thrift,
+        Methods: serviceMethods,
+    }
+}
+{{- else}} {{- /* old streaming interface */}}
 // for stream client
 func serviceInfoForStreamClient() *kitex.ServiceInfo {
 	return {{LowerFirst .ServiceName}}ServiceInfoForStreamClient
@@ -140,15 +162,24 @@ func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreami
 	}
 	return svcInfo
 }
+{{- end}}{{- /* if and .StreamX .HasStreaming end */}}
 
 {{range .AllMethods}}
 {{- $isStreaming := or .ClientStreaming .ServerStreaming}}
+{{- $streamingUnary := (eq .Streaming.Mode "unary")}}
 {{- $unary := and (not .ServerStreaming) (not .ClientStreaming)}}
 {{- $clientSide := and .ClientStreaming (not .ServerStreaming)}}
 {{- $serverSide := and (not .ClientStreaming) .ServerStreaming}}
 {{- $bidiSide := and .ClientStreaming .ServerStreaming}}
-{{- $arg := "" }}
-{{- if or (eq $.Codec "protobuf") ($isStreaming) }}
+{{- $arg := ""}}
+{{- $handlerFunc := ""}}
+{{- $mode := ""}}
+    {{- if $streamingUnary -}} {{- $mode = "serviceinfo.StreamingUnary" }} {{- $handlerFunc = "InvokeUnaryHandler" }}
+    {{- else if $serverSide -}} {{- $mode = "serviceinfo.StreamingServer" }} {{- $handlerFunc = "InvokeServerStreamHandler" }}
+    {{- else if $clientSide -}} {{- $mode = "serviceinfo.StreamingClient" }} {{- $handlerFunc = "InvokeClientStreamHandler" }}
+    {{- else if $bidiSide -}} {{- $mode = "serviceinfo.StreamingBidirectional" }} {{- $handlerFunc = "InvokeBidiStreamHandler" }}
+    {{- end}}
+{{- if or (eq $.Codec "protobuf") ($isStreaming) (.Streaming.IsStreaming) }}
 {{- $arg = index .Args 0}}{{/* streaming api only supports exactly one argument */}}
 {{- end}}
 
@@ -194,8 +225,23 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 		return handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}({{if $serverSide}}req, {{end}}stream)
 	{{- end}} {{/* $unary end */}}
 	{{- else}} {{/* thrift logic */}}
+    {{- if and .StreamX .Streaming.IsStreaming}}
+    return streamxserver.{{$handlerFunc}}[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
+        ctx, arg.(streamx.StreamReqArgs), result.(streamx.StreamResArgs),
+        {{- if $streamingUnary }}func(ctx context.Context, req {{$arg.Type}}) ({{.Resp.Type}}, error) {
+            return handler.({{.ServiceName}}).{{.Name}}(ctx, req)
+        {{- else if $clientSide }}func(ctx context.Context, stream streamx.ClientStreamingServer[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}]) ({{.Resp.Type}}, error) {
+            return handler.({{.ServiceName}}).{{.Name}}(ctx, stream)
+        {{- else if $serverSide }}func(ctx context.Context, req {{$arg.Type}}, stream streamx.ServerStreamingServer[{{NotPtr .Resp.Type}}]) error {
+            return handler.({{.ServiceName}}).{{.Name}}(ctx, req, stream)
+        {{- else if $bidiSide }}func(ctx context.Context, stream streamx.BidiStreamingServer[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}]) error {
+            return handler.({{.ServiceName}}).{{.Name}}(ctx, stream)
+        {{- end}}
+        },
+    )
+    {{- else}}{{/* old interface generation code */}}
 	{{- if $unary}} {{/* unary logic */}}
-	{{- if eq .Streaming.Mode "unary"}}
+	{{- if $streamingUnary}}
 	if streaming.GetStream(ctx) == nil {
 		return errors.New("{{.ServiceName}}.{{.Name}} is a thrift streaming unary method, please call with Kitex StreamClient or remove the annotation streaming.mode")
 	}
@@ -244,10 +290,12 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 	}
 	return handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(req, stream)
 		{{- end}} {{/* $serverSide end*/}}
-	{{- end}} {{/* thrift end */}}
+    {{- end}}
+    {{- end}}
 	{{- end}} {{/* protobuf end */}}
 }
 
+{{- if not .StreamX }}
 {{- /* define streaming struct */}}
 {{- if $isStreaming}}
 type {{LowerFirst .ServiceName}}{{.RawName}}Client struct {
@@ -311,6 +359,7 @@ func (x *{{LowerFirst .ServiceName}}{{.RawName}}Server) Recv() ({{$arg.Type}}, e
 
 {{- end}}
 {{- /* define streaming struct end */}}
+{{- end}}{{- /* if not .StreamX end*/}}
 func new{{.ArgStructName}}() interface{} {
 	return {{if not .GenArgResultStruct}}{{.PkgRefName}}.New{{.ArgStructName}}(){{else}}&{{.ArgStructName}}{}{{end}}
 }
@@ -449,17 +498,64 @@ func (p *{{.ResStructName}}) GetResult() interface{} {
 
 type kClient struct {
 	c client.Client
+    {{- if and .StreamX .HasStreaming}}
+    streamer client.StreamX
+    {{- end}}
 }
 
 func newServiceClient(c client.Client) *kClient {
 	return &kClient{
 		c: c,
+        {{- if and .StreamX .HasStreaming}}
+        streamer: c.(client.StreamX),
+        {{- end}}
 	}
 }
 
 {{range .AllMethods}}
-{{- if or .ClientStreaming .ServerStreaming}}
 {{- /* streaming logic */}}
+{{- if and .StreamX .Streaming.IsStreaming}}
+{{- $streamingUnary := (eq .Streaming.Mode "unary")}}
+{{- $clientSide := (eq .Streaming.Mode "client")}}
+{{- $serverSide := (eq .Streaming.Mode "server")}}
+{{- $bidiSide := (eq .Streaming.Mode "bidirectional")}}
+{{- $mode := ""}}
+	{{- if $bidiSide -}} {{- $mode = "kitex.StreamingBidirectional" }}
+	{{- else if $serverSide -}} {{- $mode = "kitex.StreamingServer" }}
+	{{- else if $clientSide -}} {{- $mode = "kitex.StreamingClient" }}
+	{{- else if $streamingUnary -}} {{- $mode = "kitex.StreamingUnary" }}
+    {{- end}}
+{{- $arg := index .Args 0}}
+func (p *kClient) {{.Name}}{{- if $streamingUnary}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) ({{.Resp.Type}}, error) {
+    res := new({{NotPtr .Resp.Type}})
+    _, _, err := streamxclient.InvokeStream[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
+        ctx, p.streamer, {{$mode}}, "{{.RawName}}", req, res, callOptions...)
+    if err != nil {
+        return nil, err
+    }
+    return res, nil
+}
+{{- else if $clientSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
+    context.Context, streamx.ClientStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error,
+) {
+    return streamxclient.InvokeStream[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
+        ctx, p.streamer, {{$mode}}, "{{.RawName}}", nil, nil, callOptions...)
+}
+{{- else if $serverSide}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (
+    context.Context, streamx.ServerStreamingClient[{{NotPtr .Resp.Type}}], error,
+) {
+    return streamxclient.InvokeStream[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
+        ctx, p.streamer, {{$mode}}, "{{.RawName}}", req, nil, callOptions...)
+}
+{{- else if $bidiSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
+    context.Context, streamx.BidiStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error,
+) {
+    return streamxclient.InvokeStream[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
+        ctx, p.streamer, {{$mode}}, "{{.RawName}}", nil, nil, callOptions...)
+}
+{{- end}}{{/* if $streamingUnary end */}}
+{{- else}}{{- /* old streaming interface */}}
+{{- if or .ClientStreaming .ServerStreaming}}
 func (p *kClient) {{.Name}}(ctx context.Context{{if not .ClientStreaming}}{{range .Args}}, {{LowerFirst .Name}} {{.Type}}{{end}}{{end}}) ({{.ServiceName}}_{{.RawName}}Client, error) {
 	streamClient, ok := p.c.(client.Streaming)
 	if !ok {
@@ -525,6 +621,7 @@ func (p *kClient) {{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{
 {{end -}}
 }
 {{- end}}
+{{- end}}{{/* if and .StreamX .Streaming.IsStreaming end */}}
 {{end}}
 
 {{- if .FrugalPretouch}}

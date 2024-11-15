@@ -26,7 +26,6 @@ import (
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/tpl"
-	"github.com/cloudwego/kitex/tool/internal_pkg/tpl/streamx"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -303,9 +302,6 @@ func (c *Config) ApplyExtension() error {
 }
 
 func (c *Config) IsUsingMultipleServicesTpl() bool {
-	if c.StreamX {
-		return true
-	}
 	for _, part := range c.BuiltinTpl {
 		if part == MultipleServicesTpl {
 			return true
@@ -436,19 +432,10 @@ func (g *generator) generateHandler(pkg *PackageInfo, svc *ServiceInfo, handlerF
 		return f, nil
 	}
 
-	var task Task
-	if g.StreamX && svc.HasStreaming {
-		task = Task{
-			Name: HandlerFileName,
-			Path: handlerFilePath,
-			Text: tpl.HandlerTpl + "\n" + streamx.HandlerMethodsTpl,
-		}
-	} else {
-		task = Task{
-			Name: HandlerFileName,
-			Path: handlerFilePath,
-			Text: tpl.HandlerTpl + "\n" + tpl.HandlerMethodsTpl,
-		}
+	task := Task{
+		Name: HandlerFileName,
+		Path: handlerFilePath,
+		Text: tpl.HandlerTpl + "\n" + tpl.HandlerMethodsTpl,
 	}
 	g.setImports(task.Name, pkg)
 	handle := func(task *Task, pkg *PackageInfo) (*File, error) {
@@ -487,11 +474,6 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 		Name: ServiceFileName,
 		Path: util.JoinPath(output, svcPkg+".go"),
 		Text: tpl.ServiceTpl,
-	}
-	if g.StreamX && pkg.ServiceInfo.HasStreaming {
-		cliTask.Text = streamx.ClientTpl
-		svrTask.Text = streamx.ServerTpl
-		svcTask.Text = streamx.ServiceTpl
 	}
 	tasks := []*Task{cliTask, svrTask, svcTask}
 
@@ -562,30 +544,27 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 	pkg.Imports = make(map[string]map[string]bool)
 	switch name {
 	case ClientFileName:
-		if g.StreamX && pkg.HasStreaming {
-			g.setStreamXClientImports(pkg)
-		} else {
-			pkg.AddImports("client")
-			if pkg.HasStreaming {
-				pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
-				pkg.AddImport("transport", "github.com/cloudwego/kitex/transport")
+		pkg.AddImports("client")
+		if !g.StreamX && pkg.HasStreaming {
+			pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
+			pkg.AddImport("transport", "github.com/cloudwego/kitex/transport")
+		}
+		if len(pkg.AllMethods()) > 0 {
+			if needCallOpt(pkg) {
+				pkg.AddImports("callopt")
 			}
-			if len(pkg.AllMethods()) > 0 {
-				if needCallOpt(pkg) {
-					pkg.AddImports("callopt")
-				}
-				pkg.AddImports("context")
-			}
+			pkg.AddImports("context")
 		}
 		fallthrough
 	case HandlerFileName:
-		if g.StreamX && pkg.HasStreaming {
-			g.setStreamXHandlerImports(pkg)
-			return
-		}
 		for _, m := range pkg.ServiceInfo.AllMethods() {
-			if !m.ServerStreaming && !m.ClientStreaming {
+			// for StreamX interface, every method in handler has ctx argument
+			// for old interface, streaming method in handler does not have ctx argument
+			if g.StreamX || (!m.ServerStreaming && !m.ClientStreaming) {
 				pkg.AddImports("context")
+			}
+			if g.StreamX && m.Streaming.IsStreaming {
+				pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
 			}
 			for _, a := range m.Args {
 				for _, dep := range a.Deps {
@@ -599,19 +578,20 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 			}
 		}
 	case ServerFileName, InvokerFileName:
-		if g.StreamX && pkg.HasStreaming {
-			g.setStreamXServerImports(pkg)
-			return
+		// for StreamX, if there is streaming method, generate Server Interface in server.go
+		if g.StreamX {
+			for _, method := range pkg.AllMethods() {
+				if method.Streaming.IsStreaming {
+					pkg.AddImports("context")
+					pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
+				}
+			}
 		}
 		if len(pkg.CombineServices) == 0 {
 			pkg.AddImport(pkg.ServiceInfo.PkgRefName, pkg.ServiceInfo.ImportPath)
 		}
 		pkg.AddImports("server")
 	case ServiceFileName:
-		if g.StreamX && pkg.HasStreaming {
-			g.setStreamXServiceImports(pkg)
-			return
-		}
 		pkg.AddImports("errors")
 		pkg.AddImports("client")
 		pkg.AddImport("kitex", "github.com/cloudwego/kitex/pkg/serviceinfo")
@@ -620,9 +600,6 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 			pkg.AddImports("context")
 		}
 		for _, m := range pkg.ServiceInfo.AllMethods() {
-			if m.ClientStreaming || m.ServerStreaming {
-				pkg.AddImports("fmt")
-			}
 			if m.GenArgResultStruct {
 				pkg.AddImports("proto")
 			} else {
@@ -634,9 +611,22 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 					pkg.AddImport(dep.PkgRefName, dep.ImportPath)
 				}
 			}
-			if m.Streaming.IsStreaming || pkg.Codec == "protobuf" {
-				// protobuf handler support both PingPong and Unary (streaming) requests
-				pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
+			// streaming imports
+			if !g.StreamX {
+				if m.Streaming.IsStreaming || pkg.Codec == "protobuf" {
+					// protobuf handler support both PingPong and Unary (streaming) requests
+					pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
+				}
+				if m.ClientStreaming || m.ServerStreaming {
+					pkg.AddImports("fmt")
+				}
+			} else {
+				if m.Streaming.IsStreaming {
+					pkg.AddImports("github.com/cloudwego/kitex/client/streamxclient")
+					pkg.AddImports("github.com/cloudwego/kitex/client/streamxclient/streamxcallopt")
+					pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
+					pkg.AddImports("github.com/cloudwego/kitex/server/streamxserver")
+				}
 			}
 			if !m.Void && m.Resp != nil {
 				for _, dep := range m.Resp.Deps {
@@ -684,79 +674,4 @@ func needCallOpt(pkg *PackageInfo) bool {
 		needCallOpt = true
 	}
 	return needCallOpt
-}
-
-func (g *generator) setStreamXClientImports(pkg *PackageInfo) {
-	pkg.AddImports("client")
-	pkg.AddImports("github.com/cloudwego/kitex/client/streamxclient")
-	if len(pkg.AllMethods()) > 0 {
-		pkg.AddImports("context")
-		pkg.AddImports("github.com/cloudwego/kitex/client/streamxclient/streamxcallopt")
-		pkg.AddImports("github.com/cloudwego/kitex/pkg/serviceinfo")
-	}
-	pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
-	if g.IDLType == "thrift" {
-		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx/provider/" + streamxTTHeaderRef)
-	}
-}
-
-func (g *generator) setStreamXServerImports(pkg *PackageInfo) {
-	pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
-	pkg.AddImports("server")
-	pkg.AddImports("github.com/cloudwego/kitex/server/streamxserver")
-	if g.IDLType == "thrift" {
-		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx/provider/" + streamxTTHeaderRef)
-	}
-	for _, m := range pkg.AllMethods() {
-		pkg.AddImports("context")
-		for _, a := range m.Args {
-			for _, dep := range a.Deps {
-				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
-			}
-		}
-		if !m.Void && m.Resp != nil {
-			for _, dep := range m.Resp.Deps {
-				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
-			}
-		}
-	}
-}
-
-func (g *generator) setStreamXServiceImports(pkg *PackageInfo) {
-	pkg.AddImports("github.com/cloudwego/kitex/pkg/serviceinfo")
-	for _, m := range pkg.AllMethods() {
-		pkg.AddImports("context")
-		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
-		pkg.AddImports("github.com/cloudwego/kitex/server/streamxserver")
-		for _, a := range m.Args {
-			for _, dep := range a.Deps {
-				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
-			}
-		}
-		if !m.Void && m.Resp != nil {
-			for _, dep := range m.Resp.Deps {
-				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
-			}
-		}
-	}
-}
-
-func (g *generator) setStreamXHandlerImports(pkg *PackageInfo) {
-	for _, m := range pkg.ServiceInfo.AllMethods() {
-		pkg.AddImports("context")
-		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
-		if g.IDLType == "thrift" {
-			pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx/provider/" + streamxTTHeaderRef)
-		}
-		for _, a := range m.Args {
-			for _, dep := range a.Deps {
-				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
-			}
-		}
-		if !m.Void && m.Resp != nil {
-			for _, dep := range m.Resp.Deps {
-				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
-			}
-		}
-	}
 }
