@@ -23,6 +23,7 @@ import (
 	"net"
 	"sync/atomic"
 
+	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -85,7 +86,7 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	if tags == nil {
 		tags = make(map[string]interface{})
 	}
-	tags[codec.HeaderFlagsKey] = codec.HeaderFlagSupportOutOfOrder
+	tags[codec.HeaderFlagsKey] = ttheader.HeaderFlagSupportOutOfOrder
 
 	// encode
 	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)

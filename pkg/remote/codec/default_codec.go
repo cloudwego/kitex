@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -332,7 +333,7 @@ func (c *defaultCodec) encodePayload(ctx context.Context, message remote.Message
  * +------------------------------------------------------------+
  */
 func IsTTHeader(flagBuf []byte) bool {
-	return binary.BigEndian.Uint32(flagBuf[Size32:])&MagicMask == TTHeaderMagic
+	return binary.BigEndian.Uint32(flagBuf[Size32:])&MagicMask == ttheader.TTHeaderMagic
 }
 
 /**
@@ -343,7 +344,7 @@ func IsTTHeader(flagBuf []byte) bool {
  * +----------------------------------------+
  */
 func isMeshHeader(flagBuf []byte) bool {
-	return binary.BigEndian.Uint32(flagBuf[:Size32])&MagicMask == MeshHeaderMagic
+	return binary.BigEndian.Uint32(flagBuf[:Size32])&MagicMask == ttheader.MeshHeaderMagic
 }
 
 /**
