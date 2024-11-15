@@ -3,7 +3,6 @@ module github.com/cloudwego/kitex
 go 1.18
 
 require (
-	github.com/apache/thrift v0.13.0
 	github.com/bytedance/gopkg v0.1.1
 	github.com/bytedance/sonic v1.12.2
 	github.com/cloudwego/configmanager v0.2.2
