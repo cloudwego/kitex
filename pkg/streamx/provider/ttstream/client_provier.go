@@ -71,8 +71,11 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	}
+	if intHeader == nil {
 		intHeader = IntHeader{}
+	}
+	if strHeader == nil {
 		strHeader = map[string]string{}
 	}
 	strHeader[ttheader.HeaderIDLServiceName] = c.sinfo.ServiceName
