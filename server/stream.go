@@ -34,10 +34,10 @@ func (s *server) initStreamMiddlewares(ctx context.Context) {
 	ehandler := s.opt.TracerCtl.GetStreamEventHandler()
 	if ehandler != nil {
 		s.opt.StreamX.StreamRecvMiddlewares = append(
-			s.opt.StreamX.StreamRecvMiddlewares, streamx.NewStreamRecvStatMiddleware(ehandler),
+			s.opt.StreamX.StreamRecvMiddlewares, streamx.NewStreamRecvStatMiddleware(nil, ehandler),
 		)
 		s.opt.StreamX.StreamSendMiddlewares = append(
-			s.opt.StreamX.StreamSendMiddlewares, streamx.NewStreamSendStatMiddleware(ehandler),
+			s.opt.StreamX.StreamSendMiddlewares, streamx.NewStreamSendStatMiddleware(nil, ehandler),
 		)
 	}
 }
