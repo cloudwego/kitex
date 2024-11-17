@@ -286,7 +286,7 @@ func TestRetryPolicyFailure(t *testing.T) {
 	test.Assert(t, fr.policy.Equals(p.FailurePolicy))
 }
 
-// test policy equal
+// test policy not equal
 func TestPolicyNotEqual(t *testing.T) {
 	var p, policy Policy
 

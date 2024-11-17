@@ -173,29 +173,27 @@ func (r *backupRetryer) Prepare(ctx context.Context, prevRI, retryRI rpcinfo.RPC
 
 // UpdatePolicy implements the Retryer interface.
 func (r *backupRetryer) UpdatePolicy(rp Policy) (err error) {
+	r.Lock()
+	defer r.Unlock()
 	if !rp.Enable {
-		r.Lock()
 		r.enable = rp.Enable
-		r.Unlock()
 		return nil
 	}
 	if rp.BackupPolicy == nil || rp.Type != BackupType {
 		err = errors.New("BackupPolicy is nil or retry type not match, cannot do update in backupRetryer")
-	}
-	if err == nil && rp.BackupPolicy.RetryDelayMS == 0 {
-		err = errors.New("invalid retry delay duration in backupRetryer")
-	}
-	if err == nil {
-		err = checkStopPolicy(&rp.BackupPolicy.StopPolicy, maxBackupRetryTimes, r)
-	}
-
-	r.Lock()
-	defer r.Unlock()
-	r.enable = rp.Enable
-	if err != nil {
 		r.errMsg = err.Error()
 		return err
 	}
+	if rp.BackupPolicy.RetryDelayMS == 0 {
+		err = errors.New("invalid retry delay duration in backupRetryer")
+		r.errMsg = err.Error()
+		return err
+	}
+	if err = checkStopPolicy(&rp.BackupPolicy.StopPolicy, maxBackupRetryTimes, r); err != nil {
+		r.errMsg = err.Error()
+		return err
+	}
+	r.enable = rp.Enable
 	r.policy = rp.BackupPolicy
 	r.retryDelay = time.Duration(rp.BackupPolicy.RetryDelayMS) * time.Millisecond
 	return nil
