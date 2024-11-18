@@ -32,6 +32,7 @@ import (
 )
 
 // NOTE: this is a temporary adjustment for ci check. remove it after fully completing the generic streaming support
+
 var (
 	_ clientStreaming        = nil
 	_ serverStreaming        = nil
@@ -162,8 +163,9 @@ func newServerStreaming(ctx context.Context, genericCli Client, method string, r
 	if err != nil {
 		return nil, err
 	}
-	ss := &serverStreamingClient{stream, gCli.svcInfo.MethodInfo(method)}
-	_args := gCli.svcInfo.MethodInfo(method).NewArgs().(*generic.Args)
+	mtInfo := gCli.svcInfo.MethodInfo(method)
+	ss := &serverStreamingClient{stream, mtInfo}
+	_args := mtInfo.NewArgs().(*generic.Args)
 	_args.Method = method
 	_args.Request = req
 	if err = ss.Stream.SendMsg(_args); err != nil {
