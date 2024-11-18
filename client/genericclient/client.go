@@ -37,9 +37,6 @@ func NewClient(destService string, g generic.Generic, opts ...client.Option) (Cl
 
 // NewClientWithServiceInfo create a generic client with serviceInfo
 func NewClientWithServiceInfo(destService string, g generic.Generic, svcInfo *serviceinfo.ServiceInfo, opts ...client.Option) (Client, error) {
-	if isDeprecated, ok := svcInfo.Extra[generic.DeprecatedGenericServiceInfoAPIKey].(bool); ok && isDeprecated {
-		svcInfo.Methods, svcInfo.ServiceName = generic.GetMethodInfo(g.MessageReaderWriter(), g.IDLServiceName())
-	}
 	var options []client.Option
 	options = append(options, client.WithGeneric(g))
 	options = append(options, client.WithDestService(destService))
