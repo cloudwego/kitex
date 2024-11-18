@@ -31,23 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
-<<<<<<< HEAD
 type ClientStreaming interface {
-=======
-// NOTE: this is a temporary adjustment for ci check. remove it after fully completing the generic streaming support
-
-var (
-	_ clientStreaming        = nil
-	_ serverStreaming        = nil
-	_ bidirectionalStreaming = nil
-	_                        = newStreamingClient
-	_                        = newClientStreaming
-	_                        = newServerStreaming
-	_                        = newBidirectionalStreaming
-)
-
-type clientStreaming interface {
->>>>>>> 8e9df9aa (feat(generic): support thrift streaming for json generic client (#1467))
 	streaming.Stream
 	Send(req interface{}) error
 	CloseAndRecv() (resp interface{}, err error)

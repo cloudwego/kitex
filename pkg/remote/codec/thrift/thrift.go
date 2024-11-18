@@ -167,7 +167,6 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	return errEncodeMismatchMsgType
 }
 
-<<<<<<< HEAD
 // encodeFastThrift encode with the FastCodec way
 func encodeFastThrift(out bufiox.Writer, methodName string, msgType remote.MessageType, seqID int32, msg thrift.FastCodec) error {
 	nw, _ := out.(remote.NocopyWrite)
