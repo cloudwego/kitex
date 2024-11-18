@@ -29,10 +29,6 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
-	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
-	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
-
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -46,7 +42,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/bound"
 	"github.com/cloudwego/kitex/pkg/remote/remotesvr"
-	streamxstrans "github.com/cloudwego/kitex/pkg/remote/trans/streamx"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -546,21 +541,6 @@ func doAddBoundHandler(h remote.BoundHandler, opt *remote.ServerOption) {
 
 func (s *server) newSvrTransHandler() (handler remote.ServerTransHandler, err error) {
 	transHdlrFactory := s.opt.RemoteOpt.SvrHandlerFactory
-	if transHdlrFactory == nil {
-		candidateFactories := make([]remote.ServerTransHandlerFactory, 0)
-		if s.opt.StreamX.Provider != nil {
-			candidateFactories = append(candidateFactories,
-				streamxstrans.NewSvrTransHandlerFactory(s.opt.StreamX.Provider),
-			)
-		}
-		candidateFactories = append(candidateFactories,
-			nphttp2.NewSvrTransHandlerFactory(),
-		)
-		transHdlrFactory = detection.NewSvrTransHandlerFactory(
-			netpoll.NewSvrTransHandlerFactory(),
-			candidateFactories...,
-		)
-	}
 	transHdlr, err := transHdlrFactory.NewTransHandler(s.opt.RemoteOpt)
 	if err != nil {
 		return nil, err
