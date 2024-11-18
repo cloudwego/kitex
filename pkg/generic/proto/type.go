@@ -18,22 +18,9 @@ package proto
 
 import (
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
 )
 
 type (
 	ServiceDescriptor = *desc.ServiceDescriptor
 	MessageDescriptor = *desc.MessageDescriptor
 )
-
-// Deprecated: this interface will be removed in v0.12.0
-type Message interface {
-	Marshal() ([]byte, error)
-	TryGetFieldByNumber(fieldNumber int) (interface{}, error)
-	TrySetFieldByNumber(fieldNumber int, val interface{}) error
-}
-
-// Deprecated: this API will be removed in v0.12.0
-func NewMessage(descriptor MessageDescriptor) Message {
-	return dynamic.NewMessage(descriptor)
-}
