@@ -539,6 +539,7 @@ func (t *http2Client) CloseStream(s *Stream, err error) {
 }
 
 func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.ErrCode, st *status.Status, mdata map[string][]string, eosReceived bool) {
+	klog.CtxErrorf(s.ctx, "closeStream result, err: %v, rst: %v, rstCode: %v, status: %v, mdata: %v", err, rst, rstCode, st, mdata)
 	// Set stream status to done.
 	if s.swapState(streamDone) == streamDone {
 		// If it was already done, return.  If multiple closeStream calls

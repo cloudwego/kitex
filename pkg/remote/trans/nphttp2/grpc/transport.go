@@ -35,6 +35,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
@@ -167,6 +168,7 @@ func (r *recvBufferReader) Read(p []byte) (n int, err error) {
 	} else {
 		n, r.err = r.read(p)
 	}
+	klog.Errorf("recvBufferReader.Read n:%d, err:%v", n, r.err)
 	return n, r.err
 }
 

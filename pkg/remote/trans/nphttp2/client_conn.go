@@ -27,6 +27,7 @@ import (
 
 	"github.com/bytedance/gopkg/lang/dirtmake"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
@@ -54,14 +55,16 @@ var _ GRPCConn = (*clientConn)(nil)
 
 func (c *clientConn) ReadFrame() (hdr, data []byte, err error) {
 	hdr = dirtmake.Bytes(5, 5)
-	_, err = c.Read(hdr)
+	num, err := c.Read(hdr)
 	if err != nil {
+		klog.Errorf("ReadFrame: reader header failed: %v, num: %d", err, num)
 		return nil, nil, err
 	}
 	dLen := int(binary.BigEndian.Uint32(hdr[1:]))
 	data = dirtmake.Bytes(dLen, dLen)
-	_, err = c.Read(data)
+	num, err = c.Read(data)
 	if err != nil {
+		klog.Errorf("ReadFrame: reader data failed: %v, num: %d", err, num)
 		return nil, nil, err
 	}
 	return hdr, data, nil
@@ -139,6 +142,8 @@ func (c *clientConn) Read(b []byte) (n int, err error) {
 				err = status.Err()
 			}
 		}
+	} else if err != nil {
+		klog.Errorf("clientConn.Read failed: %v, n: %d, len: %d", err, n, len(b))
 	}
 	return n, err
 }

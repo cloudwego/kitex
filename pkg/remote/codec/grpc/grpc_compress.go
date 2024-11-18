@@ -24,6 +24,7 @@ import (
 	"io"
 
 	"github.com/cloudwego/kitex/internal/utils/safemcache"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -42,12 +43,14 @@ func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) 
 	}
 	hdr, err := in.Next(5)
 	if err != nil {
+		klog.Errorf("decodeGRPCFrame: reader header failed: %v, hdr: %v", err, hdr)
 		return nil, err
 	}
 	compressFlag := hdr[0]
 	dLen := int(binary.BigEndian.Uint32(hdr[1:]))
 	d, err := in.Next(dLen)
 	if err != nil {
+		klog.Errorf("decodeGRPCFrame: reader data failed: %v, dLen: %d, real dataLen: %d", err, dLen, len(d))
 		return nil, err
 	}
 	if compressFlag == 1 {
