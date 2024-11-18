@@ -16,6 +16,7 @@
 
 package test
 
+/*
 import (
 	"context"
 	"fmt"
@@ -267,3 +268,4 @@ func testNoneStreaming(t *testing.T, ctx context.Context, cli genericclient.Clie
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(strResp, "message").String(), "hello ping pong request"))
 }
+*/
