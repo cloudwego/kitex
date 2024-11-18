@@ -31,7 +31,23 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
+<<<<<<< HEAD
 type ClientStreaming interface {
+=======
+// NOTE: this is a temporary adjustment for ci check. remove it after fully completing the generic streaming support
+
+var (
+	_ clientStreaming        = nil
+	_ serverStreaming        = nil
+	_ bidirectionalStreaming = nil
+	_                        = newStreamingClient
+	_                        = newClientStreaming
+	_                        = newServerStreaming
+	_                        = newBidirectionalStreaming
+)
+
+type clientStreaming interface {
+>>>>>>> 8e9df9aa (feat(generic): support thrift streaming for json generic client (#1467))
 	streaming.Stream
 	Send(req interface{}) error
 	CloseAndRecv() (resp interface{}, err error)
@@ -151,8 +167,9 @@ func NewServerStreaming(ctx context.Context, genericCli Client, method string, r
 	if err != nil {
 		return nil, err
 	}
-	ss := &serverStreamingClient{stream, gCli.svcInfo.MethodInfo(method)}
-	_args := gCli.svcInfo.MethodInfo(method).NewArgs().(*generic.Args)
+	mtInfo := gCli.svcInfo.MethodInfo(method)
+	ss := &serverStreamingClient{stream, mtInfo}
+	_args := mtInfo.NewArgs().(*generic.Args)
 	_args.Method = method
 	_args.Request = req
 	if err = ss.Stream.SendMsg(_args); err != nil {

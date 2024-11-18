@@ -153,82 +153,26 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 	mode := streamingMode(st)
 	// only support single argument
 	field := fn.Arguments[0]
-	req := &descriptor.TypeDescriptor{
-		Type: descriptor.STRUCT,
-		Struct: &descriptor.StructDescriptor{
-			FieldsByID:   map[int32]*descriptor.FieldDescriptor{},
-			FieldsByName: map[string]*descriptor.FieldDescriptor{},
-		},
-	}
 
-	var reqType *descriptor.TypeDescriptor
-	reqType, err = parseType(field.Type, tree, structsCache, initRecursionDepth, opts)
+	isStream := mode != serviceinfo.StreamingNone && mode != serviceinfo.StreamingUnary
+
+	req, hasRequestBase, err := parseRequest(isStream, field, tree, structsCache, opts)
 	if err != nil {
 		return err
 	}
-	hasRequestBase := false
-	if reqType.Type == descriptor.STRUCT {
-		for _, f := range reqType.Struct.FieldsByName {
-			if f.Type.IsRequestBase {
-				hasRequestBase = true
-				break
-			}
-		}
-	}
-	reqField := &descriptor.FieldDescriptor{
-		Name:     field.Name,
-		ID:       field.ID,
-		Type:     reqType,
-		GoTagOpt: opts.goTag,
-	}
-	req.Struct.FieldsByID[field.ID] = reqField
-	req.Struct.FieldsByName[field.Name] = reqField
-	// parse response filed
-	resp := &descriptor.TypeDescriptor{
-		Type: descriptor.STRUCT,
-		Struct: &descriptor.StructDescriptor{
-			FieldsByID:   map[int32]*descriptor.FieldDescriptor{},
-			FieldsByName: map[string]*descriptor.FieldDescriptor{},
-		},
-	}
-	var respType *descriptor.TypeDescriptor
-	respType, err = parseType(fn.FunctionType, tree, structsCache, initRecursionDepth, opts)
+	resp, err := parseResponse(isStream, fn, tree, structsCache, opts)
 	if err != nil {
 		return err
 	}
-	respField := &descriptor.FieldDescriptor{
-		Type:     respType,
-		GoTagOpt: opts.goTag,
-	}
-	// response has no name or id
-	resp.Struct.FieldsByID[0] = respField
-	resp.Struct.FieldsByName[""] = respField
 
-	if len(fn.Throws) > 0 {
-		// only support single exception
-		field := fn.Throws[0]
-		var exceptionType *descriptor.TypeDescriptor
-		exceptionType, err = parseType(field.Type, tree, structsCache, initRecursionDepth, opts)
-		if err != nil {
-			return err
-		}
-		exceptionField := &descriptor.FieldDescriptor{
-			Name:        field.Name,
-			ID:          field.ID,
-			IsException: true,
-			Type:        exceptionType,
-			GoTagOpt:    opts.goTag,
-		}
-		resp.Struct.FieldsByID[field.ID] = exceptionField
-		resp.Struct.FieldsByName[field.Name] = exceptionField
-	}
 	fnDsc := &descriptor.FunctionDescriptor{
-		Name:           fn.Name,
-		Oneway:         fn.Oneway,
-		Request:        req,
-		Response:       resp,
-		HasRequestBase: hasRequestBase,
-		StreamingMode:  mode,
+		Name:              fn.Name,
+		Oneway:            fn.Oneway,
+		Request:           req,
+		Response:          resp,
+		HasRequestBase:    hasRequestBase,
+		IsWithoutWrapping: isStream,
+		StreamingMode:     mode,
 	}
 	defer func() {
 		if ret := recover(); ret != nil {
@@ -264,6 +208,91 @@ func streamingMode(st *streaming.Streaming) serviceinfo.StreamingMode {
 		return serviceinfo.StreamingUnary
 	}
 	return serviceinfo.StreamingNone
+}
+
+func parseRequest(isStream bool, field *parser.Field, tree *parser.Thrift, structsCache map[string]*descriptor.TypeDescriptor, opts *parseOptions) (req *descriptor.TypeDescriptor, hasRequestBase bool, err error) {
+	reqType, err := parseType(field.Type, tree, structsCache, initRecursionDepth, opts)
+	if err != nil {
+		return nil, hasRequestBase, err
+	}
+	if reqType.Type == descriptor.STRUCT {
+		for _, f := range reqType.Struct.FieldsByName {
+			if f.Type.IsRequestBase {
+				hasRequestBase = true
+				break
+			}
+		}
+	}
+
+	if isStream {
+		return reqType, hasRequestBase, nil
+	}
+
+	// wrap with a struct
+	wrappedTyDsc := &descriptor.TypeDescriptor{
+		Type: descriptor.STRUCT,
+		Struct: &descriptor.StructDescriptor{
+			FieldsByID:   map[int32]*descriptor.FieldDescriptor{},
+			FieldsByName: map[string]*descriptor.FieldDescriptor{},
+		},
+	}
+	reqField := &descriptor.FieldDescriptor{
+		Name:     field.Name,
+		ID:       field.ID,
+		Type:     reqType,
+		GoTagOpt: opts.goTag,
+	}
+	wrappedTyDsc.Struct.FieldsByID[field.ID] = reqField
+	wrappedTyDsc.Struct.FieldsByName[field.Name] = reqField
+
+	return wrappedTyDsc, hasRequestBase, nil
+}
+
+func parseResponse(isStream bool, fn *parser.Function, tree *parser.Thrift, structsCache map[string]*descriptor.TypeDescriptor, opts *parseOptions) (*descriptor.TypeDescriptor, error) {
+	respType, err := parseType(fn.FunctionType, tree, structsCache, initRecursionDepth, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	if isStream {
+		return respType, nil
+	}
+
+	// wrap with a struct
+	wrappedResp := &descriptor.TypeDescriptor{
+		Type: descriptor.STRUCT,
+		Struct: &descriptor.StructDescriptor{
+			FieldsByID:   map[int32]*descriptor.FieldDescriptor{},
+			FieldsByName: map[string]*descriptor.FieldDescriptor{},
+		},
+	}
+	respField := &descriptor.FieldDescriptor{
+		Type:     respType,
+		GoTagOpt: opts.goTag,
+	}
+	// response has no name or id
+	wrappedResp.Struct.FieldsByID[0] = respField
+	wrappedResp.Struct.FieldsByName[""] = respField
+
+	if len(fn.Throws) > 0 {
+		// only support single exception
+		field := fn.Throws[0]
+		var exceptionType *descriptor.TypeDescriptor
+		exceptionType, err = parseType(field.Type, tree, structsCache, initRecursionDepth, opts)
+		if err != nil {
+			return nil, err
+		}
+		exceptionField := &descriptor.FieldDescriptor{
+			Name:        field.Name,
+			ID:          field.ID,
+			IsException: true,
+			Type:        exceptionType,
+			GoTagOpt:    opts.goTag,
+		}
+		wrappedResp.Struct.FieldsByID[field.ID] = exceptionField
+		wrappedResp.Struct.FieldsByName[field.Name] = exceptionField
+	}
+	return wrappedResp, nil
 }
 
 // reuse builtin types

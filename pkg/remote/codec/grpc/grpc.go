@@ -23,8 +23,10 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/fastpb"
+	"github.com/cloudwego/gopkg/bufiox"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/cloudwego/kitex/internal/generic"
 	"github.com/cloudwego/kitex/internal/utils/safemcache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -100,7 +102,24 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 
 	switch message.ProtocolInfo().CodecType {
 	case serviceinfo.Thrift:
-		payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
+		switch msg := message.Data().(type) {
+		case generic.ThriftWriter:
+			methodName := message.RPCInfo().Invocation().MethodName()
+			if methodName == "" {
+				return errors.New("empty methodName in grpc generic streaming Encode")
+			}
+			var bs []byte
+			bw := bufiox.NewBytesWriter(&bs)
+			if err = msg.Write(ctx, methodName, bw); err != nil {
+				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("generic thrift streaming marshal, Write failed: %s", err.Error()))
+			}
+			if err = bw.Flush(); err != nil {
+				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("generic thrift streaming marshal, Flush failed: %s", err.Error()))
+			}
+			payload = bs
+		default:
+			payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
+		}
 	case serviceinfo.Protobuf:
 		switch t := message.Data().(type) {
 		case fastpb.Writer:
@@ -187,7 +206,16 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 	data := message.Data()
 	switch message.ProtocolInfo().CodecType {
 	case serviceinfo.Thrift:
-		return thrift.UnmarshalThriftData(ctx, c.ThriftCodec, "", d, message.Data())
+		switch t := data.(type) {
+		case generic.ThriftReader:
+			methodName := message.RPCInfo().Invocation().MethodName()
+			if methodName == "" {
+				return errors.New("empty methodName in grpc Decode")
+			}
+			return t.Read(ctx, methodName, len(d), remote.NewReaderBuffer(d))
+		default:
+			return thrift.UnmarshalThriftData(ctx, c.ThriftCodec, "", d, message.Data())
+		}
 	case serviceinfo.Protobuf:
 		if t, ok := data.(fastpb.Reader); ok {
 			if len(d) == 0 {
