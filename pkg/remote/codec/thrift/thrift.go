@@ -24,6 +24,7 @@ import (
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 
+	"github.com/cloudwego/kitex/internal/generic"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -144,7 +145,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	}
 
 	// generic call
-	if msg, ok := data.(genericWriter); ok {
+	if msg, ok := data.(generic.ThriftWriter); ok {
 		return encodeGenericThrift(out, ctx, methodName, msgType, seqID, msg)
 	}
 
@@ -166,7 +167,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	return errEncodeMismatchMsgType
 }
 
-func encodeGenericThrift(out bufiox.Writer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, msg genericWriter) error {
+func encodeGenericThrift(out bufiox.Writer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, msg generic.ThriftWriter) error {
 	binaryWriter := thrift.NewBufferWriter(out)
 	if err := binaryWriter.WriteMessageBegin(method, thrift.TMessageType(msgType), seqID); err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
@@ -211,7 +212,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 
 	ri := message.RPCInfo()
 	rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
-	if msg, ok := data.(genericReader); ok {
+	if msg, ok := data.(generic.ThriftReader); ok {
 		err = msg.Read(ctx, methodName, dataLen, in)
 		if err != nil {
 			err = remote.NewTransError(remote.ProtocolError, err)
@@ -247,12 +248,4 @@ func validateMessageBeforeDecode(message remote.Message, seqID int32, methodName
 // Name implements the remote.PayloadCodec interface.
 func (c thriftCodec) Name() string {
 	return serviceinfo.Thrift.String()
-}
-
-type genericWriter interface { // used by pkg/generic
-	Write(ctx context.Context, method string, w bufiox.Writer) error
-}
-
-type genericReader interface { // used by pkg/generic
-	Read(ctx context.Context, method string, dataLen int, r bufiox.Reader) error
 }

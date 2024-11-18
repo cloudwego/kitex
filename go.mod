@@ -6,7 +6,7 @@ require (
 	github.com/bytedance/gopkg v0.1.1
 	github.com/bytedance/sonic v1.12.2
 	github.com/cloudwego/configmanager v0.2.2
-	github.com/cloudwego/dynamicgo v0.4.4
+	github.com/cloudwego/dynamicgo v0.4.6-0.20241115162834-0e99bc39b128
 	github.com/cloudwego/fastpb v0.0.5
 	github.com/cloudwego/frugal v0.2.0
 	github.com/cloudwego/gopkg v0.1.2
@@ -17,7 +17,6 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8
 	github.com/jhump/protoreflect v1.8.2
-	github.com/json-iterator/go v1.1.12
 	github.com/tidwall/gjson v1.17.3
 	golang.org/x/net v0.24.0
 	golang.org/x/sync v0.8.0
@@ -38,7 +37,6 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/iancoleman/strcase v0.2.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
-	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
 	github.com/modern-go/gls v0.0.0-20220109145502-612d0167dce5 // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
