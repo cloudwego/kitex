@@ -29,9 +29,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-// TODO(marina.sakai): remove in v0.12.0
-const DeprecatedGenericServiceInfoAPIKey = "deprecated_generic_service_info_api"
-
 // Service generic service interface
 type Service interface {
 	// GenericCall handle the generic call
@@ -41,7 +38,7 @@ type Service interface {
 // ServiceInfoWithGeneric create a generic ServiceInfo
 func ServiceInfoWithGeneric(g Generic) *serviceinfo.ServiceInfo {
 	isCombinedServices := getIsCombinedServices(g)
-	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName(), isCombinedServices, true)
+	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName(), isCombinedServices)
 }
 
 func getIsCombinedServices(g Generic) bool {
@@ -53,14 +50,7 @@ func getIsCombinedServices(g Generic) bool {
 	return false
 }
 
-// Deprecated: Replaced by ServiceInfoWithGeneric, this method will be removed in v0.12.0
-// ServiceInfo create a generic ServiceInfo
-// TODO(marina.sakai): remove in v0.12.0
-func ServiceInfo(pcType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
-	return newServiceInfo(pcType, nil, "", false, false)
-}
-
-func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interface{}, serviceName string, isCombinedServices, withGeneric bool) *serviceinfo.ServiceInfo {
+func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interface{}, serviceName string, isCombinedServices bool) *serviceinfo.ServiceInfo {
 	handlerType := (*Service)(nil)
 
 	methods, svcName := GetMethodInfo(messageReaderWriter, serviceName)
@@ -75,10 +65,6 @@ func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interfa
 	svcInfo.Extra["generic"] = true
 	if isCombinedServices {
 		svcInfo.Extra["combine_service"] = true
-	}
-	// TODO(marina.sakai): remove in v0.12.0
-	if !withGeneric {
-		svcInfo.Extra[DeprecatedGenericServiceInfoAPIKey] = true
 	}
 	return svcInfo
 }
