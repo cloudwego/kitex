@@ -37,9 +37,6 @@ func NewClient(destService string, g generic.Generic, opts ...client.Option) (Cl
 
 // NewClientWithServiceInfo create a generic client with serviceInfo
 func NewClientWithServiceInfo(destService string, g generic.Generic, svcInfo *serviceinfo.ServiceInfo, opts ...client.Option) (Client, error) {
-	if isDeprecated, ok := svcInfo.Extra[generic.DeprecatedGenericServiceInfoAPIKey].(bool); ok && isDeprecated {
-		svcInfo.Methods, svcInfo.ServiceName = generic.GetMethodInfo(g.MessageReaderWriter(), g.IDLServiceName())
-	}
 	var options []client.Option
 	options = append(options, client.WithGeneric(g))
 	options = append(options, client.WithDestService(destService))
@@ -97,7 +94,8 @@ type genericServiceClient struct {
 
 func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, request interface{}, callOptions ...callopt.Option) (response interface{}, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	_args := gc.svcInfo.MethodInfo(method).NewArgs().(*generic.Args)
+	mtInfo := gc.svcInfo.MethodInfo(method)
+	_args := mtInfo.NewArgs().(*generic.Args)
 	_args.Method = method
 	_args.Request = request
 
@@ -109,7 +107,7 @@ func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, 
 		return nil, gc.kClient.Call(ctx, mt.Name, _args, nil)
 	}
 
-	_result := gc.svcInfo.MethodInfo(method).NewResult().(*generic.Result)
+	_result := mtInfo.NewResult().(*generic.Result)
 	if err = gc.kClient.Call(ctx, mt.Name, _args, _result); err != nil {
 		return
 	}

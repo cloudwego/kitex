@@ -136,6 +136,9 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Generate streaming code with streamx interface",
 	)
 
+	f.BoolVar(&a.GenFrugal, "gen_frugal", false, `Gen frugal codec for those structs with (go.codec="frugal")`)
+	f.Var(&a.FrugalStruct, "frugal_struct", "Gen frugal codec for given struct")
+
 	a.RecordCmd = os.Args
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,

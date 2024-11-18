@@ -1,5 +1,5 @@
-//go:build amd64 && go1.16
-// +build amd64,go1.16
+//go:build amd64
+// +build amd64
 
 /*
  * Copyright 2023 CloudWeGo Authors
@@ -70,7 +70,7 @@ func (m *WriteJSON) Write(ctx context.Context, out bufiox.Writer, msg interface{
 
 	// msg is void or nil
 	if _, ok := msg.(descriptor.Void); ok || msg == nil {
-		return m.writeFields(ctx, out, dynamicgoTypeDsc, nil, nil, isClient)
+		return writeFields(ctx, out, dynamicgoTypeDsc, nil, nil, isClient)
 	}
 
 	// msg is string
@@ -80,12 +80,16 @@ func (m *WriteJSON) Write(ctx context.Context, out bufiox.Writer, msg interface{
 	}
 	transBuff := utils.StringToSliceByte(s)
 
-	return m.writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient)
+	if fnDsc.IsWithoutWrapping() {
+		return writeUnwrappedFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff)
+	} else {
+		return writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient)
+	}
 }
 
 type MsgType int
 
-func (m *WriteJSON) writeFields(ctx context.Context, out bufiox.Writer, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte, isClient bool) error {
+func writeFields(ctx context.Context, out bufiox.Writer, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte, isClient bool) error {
 	dbuf := mcache.Malloc(len(transBuff))[0:0]
 	defer mcache.Free(dbuf)
 
@@ -123,4 +127,21 @@ func (m *WriteJSON) writeFields(ctx context.Context, out bufiox.Writer, dynamicg
 		}
 	}
 	return bw.WriteFieldStop()
+}
+
+func writeUnwrappedFields(ctx context.Context, out bufiox.Writer, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte) error {
+	dbuf := mcache.Malloc(len(transBuff))[0:0]
+	defer mcache.Free(dbuf)
+
+	if err := cv.DoInto(ctx, dynamicgoTypeDsc, transBuff, &dbuf); err != nil {
+		return err
+	}
+
+	if wb, err := out.Malloc(len(dbuf)); err != nil {
+		return err
+	} else {
+		copy(wb, dbuf)
+	}
+	dbuf = dbuf[:0]
+	return nil
 }

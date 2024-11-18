@@ -23,13 +23,9 @@ import (
 	"testing"
 
 	"github.com/cloudwego/gopkg/bufiox"
-	"github.com/cloudwego/gopkg/protocol/thrift"
-
-	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 
 	mocks "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 var (
@@ -123,21 +119,4 @@ func TestThriftCodec_unmarshalThriftData(t *testing.T) {
 		test.Assert(t, err != nil, err)
 		test.Assert(t, strings.Contains(err.Error(), "caught in FastCodec using SkipDecoder Buffer"))
 	})
-}
-
-func TestUnmarshalThriftException(t *testing.T) {
-	// prepare exception thrift binary
-	errMessage := "test: invalid protocol"
-	exc := thrift.NewApplicationException(thrift.INVALID_PROTOCOL, errMessage)
-	b := make([]byte, exc.BLength())
-	n := exc.FastWrite(b)
-	test.Assert(t, n == len(b), n)
-
-	// unmarshal
-	tProtRead := athrift.NewBinaryProtocol(bufiox.NewBytesReader(b), nil)
-	err := UnmarshalThriftException(tProtRead)
-	transErr, ok := err.(*remote.TransError)
-	test.Assert(t, ok, err)
-	test.Assert(t, transErr.TypeID() == thrift.INVALID_PROTOCOL, transErr)
-	test.Assert(t, transErr.Error() == errMessage, transErr)
 }

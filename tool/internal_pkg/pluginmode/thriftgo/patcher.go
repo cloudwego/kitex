@@ -61,8 +61,32 @@ type patcher struct {
 	protocol              string
 	handlerReturnKeepResp bool
 
+	genFrugal    bool
+	frugalStruct []string
+
 	fileTpl *template.Template
 	libs    map[string]string
+}
+
+func (p *patcher) UseFrugalForStruct(st *golang.StructLike) bool {
+	if len(p.frugalStruct) > 0 {
+		for _, structName := range p.frugalStruct {
+			if st.GetName() == structName {
+				return true
+			}
+		}
+		return false
+	} else {
+		if !p.genFrugal {
+			return false
+		}
+		for _, anno := range st.Annotations {
+			if anno.GetKey() == "go.codec" && len(anno.GetValues()) > 0 && anno.GetValues()[0] == "frugal" {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 func (p *patcher) UseLib(path, alias string) string {
@@ -77,6 +101,7 @@ func (p *patcher) buildTemplates() (err error) {
 	m := p.utils.BuildFuncMap()
 	m["PrintImports"] = util.PrintlImports
 	m["UseLib"] = p.UseLib
+	m["UseFrugalForStruct"] = p.UseFrugalForStruct
 	m["ZeroWriter"] = ZeroWriter
 	m["ZeroBLength"] = ZeroBLength
 	m["ReorderStructFields"] = p.reorderStructFields

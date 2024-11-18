@@ -147,8 +147,12 @@ type Config struct {
 	NoDependencyCheck bool
 	Rapid             bool
 	LocalThriftgo     bool
-	BuiltinTpl        util.StringSlice // specify the built-in template to use
-	StreamX           bool
+
+	GenFrugal    bool
+	FrugalStruct util.StringSlice
+
+	BuiltinTpl util.StringSlice // specify the built-in template to use
+  StreamX    bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.

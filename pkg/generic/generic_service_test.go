@@ -28,7 +28,6 @@ import (
 	mocksn "github.com/cloudwego/kitex/internal/mocks"
 	mocks "github.com/cloudwego/kitex/internal/mocks/generic"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -124,14 +123,11 @@ func TestGenericService(t *testing.T) {
 }
 
 func TestServiceInfo(t *testing.T) {
-	s := ServiceInfo(serviceinfo.Thrift)
-	test.Assert(t, s.ServiceName == "$GenericService")
-
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 	g, err := JSONThriftGeneric(p)
 	test.Assert(t, err == nil)
-	s = ServiceInfoWithGeneric(g)
+	s := ServiceInfoWithGeneric(g)
 	test.Assert(t, s.ServiceName == "Mock")
 }
 
