@@ -9,7 +9,8 @@ require (
 	github.com/cloudwego/dynamicgo v0.4.6-0.20241115162834-0e99bc39b128
 	github.com/cloudwego/fastpb v0.0.5
 	github.com/cloudwego/frugal v0.2.0
-	github.com/cloudwego/gopkg v0.1.2-0.20240919030844-cb7123236682
+	github.com/cloudwego/gopkg v0.1.3-0.20241118053554-db5d7d475e7e
+	github.com/cloudwego/kitex/pkg/protocol/bthrift v0.0.0-20241118052042-8e9df9aa3d9d
 	github.com/cloudwego/localsession v0.1.1
 	github.com/cloudwego/netpoll v0.6.5-0.20240911104114-8a1f5597a920
 	github.com/cloudwego/runtimex v0.1.0
@@ -28,6 +29,7 @@ require (
 )
 
 require (
+	github.com/apache/thrift v0.13.0 // indirect
 	github.com/bytedance/sonic/loader v0.2.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect

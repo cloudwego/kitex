@@ -120,11 +120,11 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		}
 		wg.Add(1)
 		// stream level goroutine
-		streamWorkerPool.GoCtx(ctx, func() {
+		streamWorkerPool.GoCtx(nctx, func() {
 			defer wg.Done()
 			err := t.OnStream(nctx, conn, ss)
 			if err != nil && !errors.Is(err, io.EOF) {
-				klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", err)
+				klog.CtxErrorf(nctx, "KITEX: stream ReadStream failed: err=%v", err)
 			}
 		})
 	}
