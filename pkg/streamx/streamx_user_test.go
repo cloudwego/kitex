@@ -141,7 +141,6 @@ func TestStreamingBasic(t *testing.T) {
 						return err
 					}
 				}),
-
 				streamxserver.WithProvider(tc.ServerProvider),
 				streamxserver.WithStreamRecvMiddleware(func(next streamx.StreamRecvEndpoint) streamx.StreamRecvEndpoint {
 					return func(ctx context.Context, stream streamx.Stream, res any) (err error) {
@@ -338,14 +337,14 @@ func TestStreamingBasic(t *testing.T) {
 			}
 			waitServerStreamDone(concurrency)
 			wg.Wait()
-			test.DeepEqual(t, atomic.LoadInt32(&serverMiddlewareCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientMiddlewareCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&serverStreamCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientStreamCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientRecvCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientSendCount), int32(concurrency))
+			untilEqual(t, &serverMiddlewareCount, int32(concurrency), time.Second)
+			untilEqual(t, &clientMiddlewareCount, int32(concurrency), time.Second)
+			untilEqual(t, &serverStreamCount, int32(concurrency), time.Second)
+			untilEqual(t, &clientStreamCount, int32(concurrency), time.Second)
+			untilEqual(t, &serverRecvCount, int32(concurrency), time.Second)
+			untilEqual(t, &clientRecvCount, int32(concurrency), time.Second)
+			untilEqual(t, &serverSendCount, int32(concurrency), time.Second)
+			untilEqual(t, &clientSendCount, int32(concurrency), time.Second)
 			resetServerCount()
 			resetClientCount()
 
@@ -372,15 +371,14 @@ func TestStreamingBasic(t *testing.T) {
 			}
 			waitServerStreamDone(concurrency)
 			wg.Wait()
+			untilEqual(t, &serverMiddlewareCount, int32(concurrency), time.Second)
+			untilEqual(t, &clientMiddlewareCount, int32(concurrency), time.Second)
 			untilEqual(t, &serverStreamCount, int32(concurrency), time.Second)
-			test.DeepEqual(t, atomic.LoadInt32(&serverMiddlewareCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientMiddlewareCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&serverStreamCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientStreamCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(round*concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientRecvCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientSendCount), int32(round*concurrency))
+			untilEqual(t, &clientStreamCount, int32(concurrency), time.Second)
+			untilEqual(t, &serverRecvCount, int32(round*concurrency), time.Second)
+			untilEqual(t, &clientRecvCount, int32(concurrency), time.Second)
+			untilEqual(t, &serverSendCount, int32(concurrency), time.Second)
+			untilEqual(t, &clientSendCount, int32(round*concurrency), time.Second)
 			resetServerCount()
 			resetClientCount()
 
@@ -409,15 +407,14 @@ func TestStreamingBasic(t *testing.T) {
 			}
 			waitServerStreamDone(concurrency)
 			wg.Wait()
+			untilEqual(t, &serverMiddlewareCount, int32(concurrency), time.Second)
+			untilEqual(t, &clientMiddlewareCount, int32(concurrency), time.Second)
 			untilEqual(t, &serverStreamCount, int32(concurrency), time.Second)
-			test.DeepEqual(t, atomic.LoadInt32(&serverMiddlewareCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientMiddlewareCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&serverStreamCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientStreamCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientRecvCount), int32(round*concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(round*concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientSendCount), int32(concurrency))
+			untilEqual(t, &clientStreamCount, int32(concurrency), time.Second)
+			untilEqual(t, &serverRecvCount, int32(concurrency), time.Second)
+			untilEqual(t, &clientRecvCount, int32(round*concurrency), time.Second)
+			untilEqual(t, &serverSendCount, int32(round*concurrency), time.Second)
+			untilEqual(t, &clientSendCount, int32(concurrency), time.Second)
 			resetServerCount()
 			resetClientCount()
 
@@ -460,16 +457,14 @@ func TestStreamingBasic(t *testing.T) {
 			}
 			waitServerStreamDone(concurrency)
 			wg.Wait()
+			untilEqual(t, &serverMiddlewareCount, int32(concurrency), time.Second)
+			untilEqual(t, &clientMiddlewareCount, int32(concurrency), time.Second)
 			untilEqual(t, &serverStreamCount, int32(concurrency), time.Second)
 			untilEqual(t, &clientStreamCount, int32(concurrency), time.Second)
-			test.DeepEqual(t, atomic.LoadInt32(&serverMiddlewareCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientMiddlewareCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&serverStreamCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientStreamCount), int32(concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(round*concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientRecvCount), int32(round*concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(round*concurrency))
-			test.DeepEqual(t, atomic.LoadInt32(&clientSendCount), int32(round*concurrency))
+			untilEqual(t, &serverRecvCount, int32(round*concurrency), time.Second)
+			untilEqual(t, &clientRecvCount, int32(round*concurrency), time.Second)
+			untilEqual(t, &serverSendCount, int32(round*concurrency), time.Second)
+			untilEqual(t, &clientSendCount, int32(round*concurrency), time.Second)
 			resetServerCount()
 			resetClientCount()
 
