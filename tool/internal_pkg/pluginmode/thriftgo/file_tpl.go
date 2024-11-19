@@ -31,7 +31,7 @@ var (
 	_ = reflect.Type(nil) {{- UseStdLibrary "reflect"}}
 	_ = thrift.TProtocol(nil) {{- UseStdLibrary "thrift"}}
 	{{- if GenerateFastAPIs}}
-	_ = bthrift.BinaryWriter(nil)  {{- UseLib "github.com/cloudwego/kitex/pkg/protocol/bthrift" ""}}
+	_ = bthrift.BinaryWriter(nil)
 	{{- end}}
 	{{- if and (and GenerateArgsResultTypes Features.KeepUnknownFields) (ne (len .Scope.Services) 0)}}
 	{{- UseStdLibrary "unknown"}}
@@ -49,6 +49,9 @@ var (
 const Imports = `
 {{define "imports"}}
 import (
+	{{if GenerateFastAPIs}}
+	"{{ImportPathTo "pkg/protocol/bthrift"}}"
+	{{- end}}
 	{{PrintImports .Imports}}
 )
 {{end}}{{/* define "imports" */}}
