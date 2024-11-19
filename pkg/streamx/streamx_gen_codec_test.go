@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 )
 
 // unused protection
@@ -32,7 +31,6 @@ var (
 	_ = (*bytes.Buffer)(nil)
 	_ = (*strings.Builder)(nil)
 	_ = reflect.Type(nil)
-	_ = bthrift.BinaryWriter(nil)
 )
 
 var fieldIDToName_Request = map[int16]string{
