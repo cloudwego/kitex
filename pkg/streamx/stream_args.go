@@ -21,15 +21,14 @@ import (
 	"errors"
 )
 
-type StreamCtxKey struct{}
+type streamCtxKey struct{}
 
 func WithStreamArgsContext(ctx context.Context, args StreamArgs) context.Context {
-	ctx = context.WithValue(ctx, StreamCtxKey{}, args)
-	return ctx
+	return context.WithValue(ctx, streamCtxKey{}, args)
 }
 
 func GetStreamArgsFromContext(ctx context.Context) (args StreamArgs) {
-	val := ctx.Value(StreamCtxKey{})
+	val := ctx.Value(streamCtxKey{})
 	if val == nil {
 		return nil
 	}
