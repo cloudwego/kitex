@@ -152,7 +152,7 @@ type Config struct {
 	FrugalStruct util.StringSlice
 
 	BuiltinTpl util.StringSlice // specify the built-in template to use
-  StreamX    bool
+	StreamX    bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
