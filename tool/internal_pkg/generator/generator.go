@@ -575,7 +575,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 	case ServiceFileName:
 		// pkg.AddImports("errors")
 		pkg.AddImports("client")
-		pkg.AddImport("kitex", "github.com/cloudwego/kitex/pkg/serviceinfo")
+		pkg.AddImport("kitex", ImportPathTo("pkg/serviceinfo"))
 		pkg.AddImport(pkg.ServiceInfo.PkgRefName, pkg.ServiceInfo.ImportPath)
 		if len(pkg.AllMethods()) > 0 {
 			pkg.AddImports("context")
