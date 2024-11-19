@@ -93,7 +93,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.BoolVar(&a.Verbose, "v", false, "") // short for -verbose
 	f.BoolVar(&a.Verbose, "verbose", false,
 		"Turn on verbose mode.")
-	f.BoolVar(&a.GenerateInvoker, "invoker", false,
+	f.BoolVar(&a.GenerateInvoker, "invoker", true,
 		"Generate invoker side codes when service name is specified.")
 	f.StringVar(&a.IDLType, "type", "unknown", "Specify the type of IDL: 'thrift' or 'protobuf'.")
 	f.Var(&a.Includes, "I", "Add an IDL search path for includes.")
@@ -124,7 +124,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Generate codes with injecting deep copy method.")
 	f.StringVar(&a.Protocol, "protocol", "",
 		"Specify a protocol for codec")
-	f.BoolVar(&a.NoDependencyCheck, "no-dependency-check", false,
+	f.BoolVar(&a.NoDependencyCheck, "no-dependency-check", true,
 		"Skip dependency checking.")
 	f.BoolVar(&a.Rapid, "rapid", false,
 		"Try some experimental features to generate code faster.")
@@ -145,7 +145,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"compatible_names",
 		"frugal_tag",
 		"thrift_streaming",
-		"no_processor",
+		//"no_processor",
 	)
 
 	f.Usage = func() {
@@ -338,8 +338,8 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 		a.ThriftOptions = append(a.ThriftOptions, "package_prefix="+a.PackagePrefix)
 
 		// see README.md in `bthrift`
-		a.ThriftOptions = append(a.ThriftOptions,
-			"thrift_import_path=github.com/cloudwego/kitex/pkg/protocol/bthrift/apache")
+		// a.ThriftOptions = append(a.ThriftOptions,
+		//	"thrift_import_path=github.com/cloudwego/kitex/pkg/protocol/bthrift/apache")
 
 		gas := "go:" + strings.Join(a.ThriftOptions, ",")
 		if a.Verbose {

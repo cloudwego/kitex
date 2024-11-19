@@ -356,20 +356,20 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 		},
 	}
 	if !g.Config.GenerateInvoker {
-		if !g.Config.IsUsingMultipleServicesTpl() {
-			tasks = append(tasks, &Task{
-				Name: MainFileName,
-				Path: util.JoinPath(g.OutputPath, MainFileName),
-				Text: tpl.MainTpl,
-			})
-		} else {
-			// using multiple services main.go template
-			tasks = append(tasks, &Task{
-				Name: MainFileName,
-				Path: util.JoinPath(g.OutputPath, MainFileName),
-				Text: tpl.MainMultipleServicesTpl,
-			})
-		}
+		// if !g.Config.IsUsingMultipleServicesTpl() {
+		tasks = append(tasks, &Task{
+			Name: MainFileName,
+			Path: util.JoinPath(g.OutputPath, MainFileName),
+			Text: tpl.MainTpl,
+		})
+		//} else {
+		//	// using multiple services main.go template
+		//	tasks = append(tasks, &Task{
+		//		Name: MainFileName,
+		//		Path: util.JoinPath(g.OutputPath, MainFileName),
+		//		Text: tpl.MainMultipleServicesTpl,
+		//	})
+		//}
 	}
 	for _, t := range tasks {
 		if util.Exists(t.Path) {
@@ -573,7 +573,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		}
 		pkg.AddImports("server")
 	case ServiceFileName:
-		pkg.AddImports("errors")
+		// pkg.AddImports("errors")
 		pkg.AddImports("client")
 		pkg.AddImport("kitex", "github.com/cloudwego/kitex/pkg/serviceinfo")
 		pkg.AddImport(pkg.ServiceInfo.PkgRefName, pkg.ServiceInfo.ImportPath)

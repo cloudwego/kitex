@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"text/template"
@@ -112,6 +113,21 @@ func (p *patcher) buildTemplates() (err error) {
 	m["GenerateDeepCopyAPIs"] = func() bool { return p.deepCopyAPI }
 	m["GenerateArgsResultTypes"] = func() bool { return p.utils.Template() == "slim" }
 	m["ImportPathTo"] = generator.ImportPathTo
+	m["ToPackageNames"] = func(includes []util.Import) (res []string) {
+		imports := map[string]string{}
+		for _, include := range includes {
+			imports[include.Path] = include.Alias
+		}
+		for pth, alias := range imports {
+			if alias != "" {
+				res = append(res, alias)
+			} else {
+				res = append(res, strings.ToLower(filepath.Base(pth)))
+			}
+		}
+		sort.Strings(res)
+		return
+	}
 	m["Str"] = func(id int32) string {
 		if id < 0 {
 			return "_" + strconv.Itoa(-int(id))
@@ -146,68 +162,44 @@ func (p *patcher) buildTemplates() (err error) {
 		allTemplates = append(allTemplates, slim.StructLike,
 			templates.StructLikeDefault,
 			templates.FieldGetOrSet,
-			templates.FieldIsSet,
-			StructLikeDeepEqualEmpty,
-			StructLikeDeepCopy,
-			FieldDeepCopy,
-			FieldDeepCopyStructLike,
-			FieldDeepCopyContainer,
-			FieldDeepCopyMap,
-			FieldDeepCopyList,
-			FieldDeepCopySet,
-			FieldDeepCopyBaseType,
-			StructLikeCodec,
-			StructLikeProtocol,
-			JavaClassName,
-			Processor,
-		)
+			templates.FieldIsSet)
 	} else {
-		allTemplates = append(allTemplates, StructLikeCodec,
-			StructLikeFastReadField,
-			StructLikeDeepCopy,
-			StructLikeFastWrite,
-			StructLikeFastRead,
-			StructLikeFastWriteNocopy,
-			StructLikeLength,
-			StructLikeFastWriteField,
-			StructLikeFieldLength,
-			StructLikeProtocol,
-			JavaClassName,
-			FieldFastRead,
-			FieldFastReadStructLike,
-			FieldFastReadBaseType,
-			FieldFastReadContainer,
-			FieldFastReadMap,
-			FieldFastReadSet,
-			FieldFastReadList,
-			FieldDeepCopy,
-			FieldDeepCopyStructLike,
-			FieldDeepCopyContainer,
-			FieldDeepCopyMap,
-			FieldDeepCopyList,
-			FieldDeepCopySet,
-			FieldDeepCopyBaseType,
-			FieldFastWrite,
-			FieldLength,
-			FieldFastWriteStructLike,
-			FieldStructLikeLength,
-			FieldFastWriteBaseType,
-			FieldBaseTypeLength,
-			FieldFixedLengthTypeLength,
-			FieldFastWriteContainer,
-			FieldContainerLength,
-			FieldFastWriteMap,
-			FieldMapLength,
-			FieldFastWriteSet,
-			FieldSetLength,
-			FieldFastWriteList,
-			FieldListLength,
+		allTemplates = append(allTemplates, structLikeCodec,
+			structLikeFastRead,
+			structLikeFastReadField,
+			structLikeFastWrite,
+			structLikeFastWriteNocopy,
+			structLikeLength,
+			structLikeFastWriteField,
+			structLikeFieldLength,
+			fieldFastRead,
+			fieldFastReadStructLike,
+			fieldFastReadBaseType,
+			fieldFastReadContainer,
+			fieldFastReadMap,
+			fieldFastReadSet,
+			fieldFastReadList,
+			fieldFastWrite,
+			fieldLength,
+			fieldFastWriteStructLike,
+			fieldStructLikeLength,
+			fieldFastWriteBaseType,
+			fieldBaseTypeLength,
+			fieldFixedLengthTypeLength,
+			fieldFastWriteContainer,
+			fieldContainerLength,
+			fieldFastWriteMap,
+			fieldMapLength,
+			fieldFastWriteSet,
+			fieldSetLength,
+			fieldFastWriteList,
+			fieldListLength,
 			templates.FieldDeepEqual,
 			templates.FieldDeepEqualBase,
 			templates.FieldDeepEqualStructLike,
 			templates.FieldDeepEqualContainer,
-			ValidateSet,
-			Processor,
+			validateSet,
+			processor,
 		)
 	}
 	for i, txt := range allTemplates {
@@ -309,7 +301,15 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			Imports  []util.Import
 			Includes []util.Import
 		}{Scope: scope, PkgName: pkgName}
-
+		imps, err := scope.ResolveImports()
+		if err != nil {
+			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
+		}
+		for path, alias := range p.libs {
+			imps[path] = alias
+		}
+		data.Imports = util.SortImports(imps, p.module)
+		data.Includes = p.extractLocalLibs(data.Imports)
 		if err = p.fileTpl.ExecuteTemplate(&buf, "file", data); err != nil {
 			return nil, fmt.Errorf("%q: %w", ast.Filename, err)
 		}
@@ -321,7 +321,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			delete(p.libs, "github.com/cloudwego/kitex/pkg/utils")
 		}
 
-		imps, err := scope.ResolveImports()
+		imps, err = scope.ResolveImports()
 		if err != nil {
 			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
 		}

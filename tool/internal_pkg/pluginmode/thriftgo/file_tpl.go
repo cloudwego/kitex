@@ -29,12 +29,15 @@ var (
 	_ = (*bytes.Buffer)(nil) {{- UseStdLibrary "bytes"}}
 	_ = (*strings.Builder)(nil) {{- UseStdLibrary "strings"}}
 	_ = reflect.Type(nil) {{- UseStdLibrary "reflect"}}
-	_ = thrift.STOP {{- UseLib "github.com/cloudwego/gopkg/protocol/thrift" ""}}
-	{{- if GenerateDeepCopyAPIs}}
-	{{- UseLib "github.com/cloudwego/kitex/pkg/utils" "kutils"}}
+	_ = thrift.TProtocol(nil) {{- UseStdLibrary "thrift"}}
+	{{- if GenerateFastAPIs}}
+	_ = bthrift.BinaryWriter(nil)  {{- UseLib "github.com/cloudwego/kitex/pkg/protocol/bthrift" ""}}
 	{{- end}}
 	{{- if and (and GenerateArgsResultTypes Features.KeepUnknownFields) (ne (len .Scope.Services) 0)}}
 	{{- UseStdLibrary "unknown"}}
+	{{- end}}
+	{{- range .Includes | ToPackageNames }}
+	_ = {{.}}.KitexUnusedProtection
 	{{- end}}
 )
 
@@ -48,14 +51,6 @@ const Imports = `
 import (
 	{{PrintImports .Imports}}
 )
-
-{{- if gt (len .Includes) 0}}
-var (
-	{{- range .Includes }}
-	_ = {{.PackageName}}.KitexUnusedProtection
-	{{- end}}
-)
-{{- end}}
 {{end}}{{/* define "imports" */}}
 `
 
