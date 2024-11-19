@@ -76,7 +76,6 @@ func (p ServerPingPongResult) GetSuccess() *Response {
 }
 
 func (p *Request) FastRead(buf []byte) (int, error) {
-
 	var err error
 	var offset int
 	var l int
@@ -234,7 +233,6 @@ func (p *Request) field2Length() int {
 }
 
 func (p *Response) FastRead(buf []byte) (int, error) {
-
 	var err error
 	var offset int
 	var l int
