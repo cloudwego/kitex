@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/frugal"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	kutils "github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -34,7 +34,7 @@ func (p *testRequest) FastRead(buf []byte) (int, error) {
 	return frugal.DecodeObject(buf, p)
 }
 
-func (p *testRequest) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *testRequest) FastWriteNocopy(buf []byte, binaryWriter thrift.NocopyWriter) int {
 	n, _ := frugal.EncodeObject(buf, binaryWriter, p)
 	return n
 }

@@ -28,10 +28,10 @@ func NewStreamRecvStatMiddleware(traceCtx context.Context, ehandler EventHandler
 			err = next(ctx, stream, res)
 			// if traceCtx is nil, using the current ctx
 			// otherwise, we should use the original trace ctx instead
-			if traceCtx == nil {
-				traceCtx = ctx
+			if traceCtx != nil {
+				ctx = traceCtx
 			}
-			ehandler(traceCtx, stats.StreamRecv, err)
+			ehandler(ctx, stats.StreamRecv, err)
 			return err
 		}
 	}
@@ -43,10 +43,10 @@ func NewStreamSendStatMiddleware(traceCtx context.Context, ehandler EventHandler
 			err = next(ctx, stream, res)
 			// if traceCtx is nil, using the current ctx
 			// otherwise, we should use the original trace ctx instead
-			if traceCtx == nil {
-				traceCtx = ctx
+			if traceCtx != nil {
+				ctx = traceCtx
 			}
-			ehandler(traceCtx, stats.StreamSend, err)
+			ehandler(ctx, stats.StreamSend, err)
 			return err
 		}
 	}
