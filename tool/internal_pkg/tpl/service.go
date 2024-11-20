@@ -498,17 +498,11 @@ func (p *{{.ResStructName}}) GetResult() interface{} {
 
 type kClient struct {
 	c client.Client
-    {{- if and .StreamX .HasStreaming}}
-    streamer client.StreamX
-    {{- end}}
 }
 
 func newServiceClient(c client.Client) *kClient {
 	return &kClient{
 		c: c,
-        {{- if and .StreamX .HasStreaming}}
-        streamer: c.(client.StreamX),
-        {{- end}}
 	}
 }
 
@@ -529,7 +523,7 @@ func newServiceClient(c client.Client) *kClient {
 func (p *kClient) {{.Name}}{{- if $streamingUnary}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) ({{.Resp.Type}}, error) {
     res := new({{NotPtr .Resp.Type}})
     _, _, err := streamxclient.InvokeStream[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
-        ctx, p.streamer, {{$mode}}, "{{.RawName}}", req, res, callOptions...)
+        ctx, p.c, {{$mode}}, "{{.RawName}}", req, res, callOptions...)
     if err != nil {
         return nil, err
     }
@@ -539,19 +533,19 @@ func (p *kClient) {{.Name}}{{- if $streamingUnary}}(ctx context.Context, req {{$
     context.Context, streamx.ClientStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error,
 ) {
     return streamxclient.InvokeStream[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
-        ctx, p.streamer, {{$mode}}, "{{.RawName}}", nil, nil, callOptions...)
+        ctx, p.c, {{$mode}}, "{{.RawName}}", nil, nil, callOptions...)
 }
 {{- else if $serverSide}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (
     context.Context, streamx.ServerStreamingClient[{{NotPtr .Resp.Type}}], error,
 ) {
     return streamxclient.InvokeStream[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
-        ctx, p.streamer, {{$mode}}, "{{.RawName}}", req, nil, callOptions...)
+        ctx, p.c, {{$mode}}, "{{.RawName}}", req, nil, callOptions...)
 }
 {{- else if $bidiSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
     context.Context, streamx.BidiStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error,
 ) {
     return streamxclient.InvokeStream[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
-        ctx, p.streamer, {{$mode}}, "{{.RawName}}", nil, nil, callOptions...)
+        ctx, p.c, {{$mode}}, "{{.RawName}}", nil, nil, callOptions...)
 }
 {{- end}}{{/* if $streamingUnary end */}}
 {{- else}}{{- /* old streaming interface */}}
