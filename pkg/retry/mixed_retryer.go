@@ -201,28 +201,27 @@ func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpci
 
 // UpdatePolicy implements the Retryer interface.
 func (r *mixedRetryer) UpdatePolicy(rp Policy) (err error) {
+	r.Lock()
+	defer r.Unlock()
 	if !rp.Enable {
-		r.Lock()
 		r.enable = rp.Enable
-		r.Unlock()
 		return nil
 	}
 	if rp.MixedPolicy == nil || rp.Type != MixedType {
-		err = errors.New("MixedPolicy is nil or retry type not match, cannot do update in mixedRetryer")
-	}
-	if err == nil && rp.MixedPolicy.RetryDelayMS == 0 {
-		err = errors.New("invalid retry delay duration in mixedRetryer")
-	}
-	if err == nil {
-		err = checkStopPolicy(&rp.MixedPolicy.StopPolicy, maxMixRetryTimes, r)
-	}
-	r.Lock()
-	defer r.Unlock()
-	r.enable = rp.Enable
-	if err != nil {
+		err = fmt.Errorf("MixedPolicy is nil or retry type not match(type=%v), cannot do update in mixedRetryer", rp.Type)
 		r.errMsg = err.Error()
 		return err
 	}
+	if rp.MixedPolicy.RetryDelayMS == 0 {
+		err = errors.New("invalid retry delay duration in mixedRetryer")
+		r.errMsg = err.Error()
+		return err
+	}
+	if err = checkStopPolicy(&rp.MixedPolicy.StopPolicy, maxMixRetryTimes, r); err != nil {
+		r.errMsg = err.Error()
+		return err
+	}
+	r.enable = rp.Enable
 	r.policy = rp.MixedPolicy
 	r.retryDelay = time.Duration(rp.MixedPolicy.RetryDelayMS) * time.Millisecond
 	r.setSpecifiedResultRetryIfNeeded(r.specifiedResultRetry, &r.policy.FailurePolicy)
