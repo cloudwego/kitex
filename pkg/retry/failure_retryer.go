@@ -149,7 +149,7 @@ func (r *failureRetryer) UpdatePolicy(rp Policy) (err error) {
 		return nil
 	}
 	if rp.FailurePolicy == nil || rp.Type != FailureType {
-		err = errors.New("FailurePolicy is nil or retry type not match, cannot do update in failureRetryer")
+		err = fmt.Errorf("FailurePolicy is nil or retry type not match(type=%v), cannot do update in failureRetryer", rp.Type)
 		r.errMsg = err.Error()
 		return err
 	}

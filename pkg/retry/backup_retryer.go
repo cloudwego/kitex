@@ -180,7 +180,7 @@ func (r *backupRetryer) UpdatePolicy(rp Policy) (err error) {
 		return nil
 	}
 	if rp.BackupPolicy == nil || rp.Type != BackupType {
-		err = errors.New("BackupPolicy is nil or retry type not match, cannot do update in backupRetryer")
+		err = fmt.Errorf("BackupPolicy is nil or retry type not match(type=%v), cannot do update in backupRetryer", rp.Type)
 		r.errMsg = err.Error()
 		return err
 	}

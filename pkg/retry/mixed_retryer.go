@@ -208,7 +208,7 @@ func (r *mixedRetryer) UpdatePolicy(rp Policy) (err error) {
 		return nil
 	}
 	if rp.MixedPolicy == nil || rp.Type != MixedType {
-		err = errors.New("MixedPolicy is nil or retry type not match, cannot do update in mixedRetryer")
+		err = fmt.Errorf("MixedPolicy is nil or retry type not match(type=%v), cannot do update in mixedRetryer", rp.Type)
 		r.errMsg = err.Error()
 		return err
 	}
