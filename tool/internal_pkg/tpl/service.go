@@ -65,36 +65,17 @@ var serviceMethods = map[string]kitex.MethodInfo{
 	{{- end}}
 }
 
-{{- if and .StreamX .HasStreaming}}
-var {{LowerFirst .ServiceName}}ServiceInfo = NewServiceInfo()
-{{- else}}
 var (
 	{{LowerFirst .ServiceName}}ServiceInfo = NewServiceInfo()
 	{{LowerFirst .ServiceName}}ServiceInfoForClient = NewServiceInfoForClient()
 	{{LowerFirst .ServiceName}}ServiceInfoForStreamClient = NewServiceInfoForStreamClient()
 )
-{{- end}} {{- /* if and .StreamX .HasStreaming end */}}
 
 // for server
 func serviceInfo() *kitex.ServiceInfo {
 	return {{LowerFirst .ServiceName}}ServiceInfo
 }
 
-{{- if and .StreamX .HasStreaming}}
-// NewServiceInfo creates a new ServiceInfo containing all methods
-{{- /* It's for the Server (providing both streaming/non-streaming APIs), or for the grpc client */}}
-func NewServiceInfo() *kitex.ServiceInfo {
-	return newServiceInfo()
-}
-
-func newServiceInfo() *kitex.ServiceInfo {
-    return &kitex.ServiceInfo{
-        ServiceName: "{{.RawServiceName}}",
-        PayloadCodec: kitex.Thrift,
-        Methods: serviceMethods,
-    }
-}
-{{- else}} {{- /* old streaming interface */}}
 // for stream client
 func serviceInfoForStreamClient() *kitex.ServiceInfo {
 	return {{LowerFirst .ServiceName}}ServiceInfoForStreamClient
@@ -108,7 +89,7 @@ func serviceInfoForClient() *kitex.ServiceInfo {
 // NewServiceInfo creates a new ServiceInfo containing all methods
 {{- /* It's for the Server (providing both streaming/non-streaming APIs), or for the grpc client */}}
 func NewServiceInfo() *kitex.ServiceInfo {
-	return newServiceInfo({{- if .HasStreaming}}true{{else}}false{{end}}, true, true)
+	return newServiceInfo({{- .HasStreaming }}, true, true)
 }
 
 // NewServiceInfo creates a new ServiceInfo containing non-streaming methods
@@ -162,7 +143,6 @@ func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreami
 	}
 	return svcInfo
 }
-{{- end}}{{- /* if and .StreamX .HasStreaming end */}}
 
 {{range .AllMethods}}
 {{- $isStreaming := or .ClientStreaming .ServerStreaming}}
