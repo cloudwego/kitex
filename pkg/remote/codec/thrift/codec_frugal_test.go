@@ -76,21 +76,6 @@ func initFrugalTagRecvMsg() remote.Message {
 	return msg
 }
 
-func TestHyperCodecCheck(t *testing.T) {
-	// test hyperMarshal check
-	test.Assert(t, hyperMarshalAvailable(&MockNoTagArgs{}) == false)
-	test.Assert(t, hyperMarshalAvailable(&MockFrugalTagArgs{}) == true)
-
-	// test hyperMessageUnmarshal check
-	msg := initFrugalTagRecvMsg()
-	msg.SetPayloadLen(0)
-	codec := &thriftCodec{FrugalRead}
-	test.Assert(t, codec.hyperMessageUnmarshalAvailable(&MockNoTagArgs{}, msg.PayloadLen()) == false)
-	test.Assert(t, codec.hyperMessageUnmarshalAvailable(&MockFrugalTagArgs{}, msg.PayloadLen()) == false)
-	msg.SetPayloadLen(1)
-	test.Assert(t, codec.hyperMessageUnmarshalAvailable(&MockFrugalTagArgs{}, msg.PayloadLen()) == true)
-}
-
 func TestFrugalCodec(t *testing.T) {
 	for _, tb := range transportBuffers {
 		t.Run(tb.Name, func(t *testing.T) {
@@ -256,18 +241,4 @@ func TestThriftCodec_unmarshalThriftDataFrugal(t *testing.T) {
 		test.Assert(t, err != nil, err)
 		test.Assert(t, strings.Contains(err.Error(), "caught in Frugal using SkipDecoder Buffer"))
 	})
-}
-
-func Test_verifyMarshalThriftDataFrugal(t *testing.T) {
-	err := verifyMarshalBasicThriftDataType(&MockFrugalTagArgs{})
-	test.Assert(t, err == errEncodeMismatchMsgType, err)
-	err = verifyMarshalBasicThriftDataType(&MockNoTagArgs{})
-	test.Assert(t, err == errEncodeMismatchMsgType, err)
-}
-
-func Test_verifyUnmarshalThriftDataFrugal(t *testing.T) {
-	err := verifyUnmarshalBasicThriftDataType(&MockFrugalTagArgs{})
-	test.Assert(t, err == errDecodeMismatchMsgType, err)
-	err = verifyUnmarshalBasicThriftDataType(&MockNoTagArgs{})
-	test.Assert(t, err == errDecodeMismatchMsgType, err)
 }

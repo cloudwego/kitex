@@ -16,7 +16,11 @@
 
 package descriptor
 
-import "github.com/cloudwego/gopkg/protocol/thrift"
+import (
+	"reflect"
+
+	"github.com/cloudwego/gopkg/protocol/thrift"
+)
 
 // Type constants in the Thrift protocol
 type Type byte
@@ -71,13 +75,27 @@ func (p Type) String() string {
 }
 
 // ToThriftTType convert to thrift.TType
+//
+// Deprecated: use thrift.TType(t) directly
 func (p Type) ToThriftTType() thrift.TType {
 	return thrift.TType(p)
 }
 
 // FromThriftTType ...
-func FromThriftTType(t thrift.TType) Type {
-	return Type(t)
+//
+// This func was used to convert apache thrift.Type to descriptor.Type.
+// We should use descriptor.Type(t) directly without binding apache thrift
+//
+// Deprecated: use descriptor.Type(t)
+func FromThriftTType(v interface{}) Type {
+	rv := reflect.ValueOf(v)
+	if rv.CanUint() { // byte
+		return Type(rv.Uint())
+	}
+	if rv.CanInt() { // int8
+		return Type(rv.Int())
+	}
+	panic(rv.Type().String())
 }
 
 // Void use empty struct as void instead of `nil`, because sometimes `nil` was used as optional none

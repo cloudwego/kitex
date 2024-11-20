@@ -22,8 +22,6 @@ import (
 
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
-
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
 /*
@@ -309,7 +307,7 @@ func (p *BinaryProtocol) ReadBinary() ([]byte, error) {
 func (p *BinaryProtocol) Flush(ctx context.Context) (err error) {
 	err = p.bw.Flush()
 	if err != nil {
-		return perrors.NewProtocolError(err)
+		return thrift.NewProtocolExceptionWithErr(err)
 	}
 	return nil
 }

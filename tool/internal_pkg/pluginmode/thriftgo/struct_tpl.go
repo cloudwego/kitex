@@ -42,6 +42,11 @@ const StructLikeFastRead = `
 {{define "StructLikeFastRead"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
+{{- if UseFrugalForStruct .}}
+	{{- UseLib "github.com/cloudwego/frugal" "frugal"}}
+	return frugal.DecodeObject(buf, p)
+{{- else}}
+
 	var err error
 	var offset int
 	var l int
@@ -138,6 +143,7 @@ SkipFieldError:
 RequiredFieldNotSetError:
 	return offset, thrift.NewProtocolException(thrift.INVALID_DATA, fmt.Sprintf("required field %s is not set", fieldIDToName_{{$TypeName}}[fieldId]))
 {{- end}}{{/* if $NeedRequiredFieldNotSetError */}}
+{{- end}}{{/* frugal */}}
 }
 {{- end}}{{/* define "StructLikeFastRead" */}}
 `
@@ -208,9 +214,8 @@ func (p *{{$TypeName}}) DeepCopy(s interface{}) error {
 const StructLikeFastWrite = `
 {{define "StructLikeFastWrite"}}
 {{- $TypeName := .GoName}}
-// for compatibility
 func (p *{{$TypeName}}) FastWrite(buf []byte) int {
-	return 0
+	return p.FastWriteNocopy(buf, nil)
 }
 {{- end}}{{/* define "StructLikeFastWrite" */}}
 `
@@ -219,6 +224,14 @@ const StructLikeFastWriteNocopy = `
 {{define "StructLikeFastWriteNocopy"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
+{{- if UseFrugalForStruct .}}
+	{{- UseLib "github.com/cloudwego/frugal" "frugal"}}
+	n, err := frugal.EncodeObject(buf, w, p)
+	if err != nil {
+		return -1
+	}
+	return n
+{{- else}}
 	offset := 0
 	{{- if eq .Category "union"}}
 	var c int
@@ -243,6 +256,7 @@ func (p *{{$TypeName}}) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 CountSetFieldsError:
 	panic(fmt.Errorf("%T write union: exactly one field must be set (%d set).", p, c))
 {{- end}}
+{{- end}}{{/* frugal */}}
 }
 {{- end}}{{/* define "StructLikeFastWriteNocopy" */}}
 `
@@ -714,16 +728,17 @@ const FieldDeepCopyBaseType = `
 	{{- if .IsPointer}}
 		if {{$Src}} != nil {
 			{{- if IsGoStringType .TypeName}}
+			var tmp string
 			if *{{$Src}} != "" {
-				tmp := kutils.StringDeepCopy(*{{$Src}})
-				{{.Target}} = &tmp
+				tmp = kutils.StringDeepCopy(*{{$Src}})
 			}
+			{{.Target}} = &tmp
 			{{- else if .Type.Category.IsBinary}}
+			tmp := make([]byte, len(*{{$Src}}))
 			if len(*{{$Src}}) != 0 {
-				tmp := make([]byte, len(*{{$Src}}))
 				copy(tmp, *{{$Src}})
-				{{.Target}} = &tmp
 			}
+			{{.Target}} = &tmp
 			{{- else}}
 			tmp := *{{$Src}}
 			{{.Target}} = &tmp

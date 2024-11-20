@@ -27,26 +27,28 @@ import (
 )
 
 func TestConnectionLimiter(t *testing.T) {
-	connLimit := 50
+	const (
+		concurrency = 10
+		connLimit   = 1000
+	)
 	ctx := context.Background()
 	lim := NewConnectionLimiter(connLimit)
 
 	var wg sync.WaitGroup
 	var connCount int32
-	for i := 0; i < 100; i++ {
+	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for j := 0; j < 10; j++ {
+			time.Sleep(4 * time.Millisecond) // wait other goroutines ready to start
+			for j := 0; j < connLimit; j++ {
 				if lim.Acquire(ctx) {
 					atomic.AddInt32(&connCount, 1)
-					time.Sleep(time.Millisecond)
 				} else {
 					lim.Release(ctx)
-					time.Sleep(time.Millisecond)
 				}
 				_, curr := lim.Status(ctx)
-				test.Assert(t, curr <= 60, curr)
+				test.Assert(t, curr <= connLimit+concurrency, curr)
 			}
 		}()
 	}

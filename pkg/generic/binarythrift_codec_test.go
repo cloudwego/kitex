@@ -89,7 +89,7 @@ func TestBinaryThriftCodec(t *testing.T) {
 			return wl
 		},
 		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return ServiceInfo(serviceinfo.Thrift)
+			return ServiceInfoWithGeneric(BinaryThriftGeneric())
 		},
 	}
 	err = btc.Unmarshal(context.Background(), svrMsg, bb)

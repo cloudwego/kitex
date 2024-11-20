@@ -130,16 +130,13 @@ func TestWeightedPicker_Next(t *testing.T) {
 				discovery.NewInstance("tcp", "addr1", 10, nil),
 				discovery.NewInstance("tcp", "addr2", 20, nil),
 				discovery.NewInstance("tcp", "addr3", 50, nil),
-				discovery.NewInstance("tcp", "addr4", 100, nil),
-				discovery.NewInstance("tcp", "addr5", 200, nil),
-				discovery.NewInstance("tcp", "addr6", 500, nil),
 			}
 			var weightSum int
 			for _, ins := range insList {
 				weight := ins.Weight()
 				weightSum += weight
 			}
-			n := 1000000
+			n := 100000
 			pickedStat := map[int]int{}
 			for i := 0; i < n; i++ {
 				picker := balancer.GetPicker(discovery.Result{

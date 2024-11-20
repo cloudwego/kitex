@@ -68,6 +68,7 @@ func TestHTTPPbThriftCodec(t *testing.T) {
 	test.Assert(t, method.Name == "Echo")
 	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, htc.svcName == "ExampleService")
+	test.Assert(t, htc.extra[CombineServiceKey] == "false")
 
 	rw := htc.getMessageReaderWriter()
 	_, ok := rw.(thrift.MessageWriter)

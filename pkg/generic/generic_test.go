@@ -22,9 +22,11 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cloudwego/dynamicgo/meta"
 	dproto "github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -36,6 +38,8 @@ func TestBinaryThriftGeneric(t *testing.T) {
 	test.Assert(t, g.PayloadCodec().Name() == "RawThriftBinary")
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
 	test.Assert(t, g.MessageReaderWriter() == nil)
+	_, ok := g.(ExtraProvider)
+	test.Assert(t, !ok)
 
 	method, err := g.GetMethod(nil, "Test")
 	test.Assert(t, err == nil)
@@ -56,6 +60,9 @@ func TestMapThriftGeneric(t *testing.T) {
 
 	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "Mock")
+	extra, ok := g.(ExtraProvider)
+	test.Assert(t, ok)
+	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
 
 	err = SetBinaryWithBase64(g, true)
 	test.Assert(t, err == nil)
@@ -87,6 +94,9 @@ func TestMapThriftGenericForJSON(t *testing.T) {
 
 	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "Mock")
+	extra, ok := g.(ExtraProvider)
+	test.Assert(t, ok)
+	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
 
 	err = SetBinaryWithBase64(g, true)
 	test.Assert(t, err == nil)
@@ -115,6 +125,9 @@ func TestHTTPThriftGeneric(t *testing.T) {
 
 	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "ExampleService")
+	extra, ok := g.(ExtraProvider)
+	test.Assert(t, ok)
+	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
 
 	test.Assert(t, !hg.codec.dynamicgoEnabled)
 	test.Assert(t, hg.codec.useRawBodyForHTTPResp)
@@ -162,6 +175,9 @@ func TestHTTPThriftGenericWithDynamicGo(t *testing.T) {
 
 	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "ExampleService")
+	extra, ok := g.(ExtraProvider)
+	test.Assert(t, ok)
+	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
 
 	test.Assert(t, hg.codec.dynamicgoEnabled)
 	test.Assert(t, !hg.codec.useRawBodyForHTTPResp)
@@ -209,6 +225,9 @@ func TestJSONThriftGeneric(t *testing.T) {
 
 	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "Mock")
+	extra, ok := g.(ExtraProvider)
+	test.Assert(t, ok)
+	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
 
 	test.Assert(t, !jg.codec.dynamicgoEnabled)
 	test.Assert(t, jg.codec.binaryWithBase64)
@@ -243,6 +262,9 @@ func TestJSONThriftGenericWithDynamicGo(t *testing.T) {
 
 	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "Mock")
+	extra, ok := g.(ExtraProvider)
+	test.Assert(t, ok)
+	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
 
 	test.Assert(t, jg.codec.dynamicgoEnabled)
 	test.Assert(t, jg.codec.binaryWithBase64)
@@ -280,6 +302,9 @@ func TestJSONPbGeneric(t *testing.T) {
 
 	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "Echo")
+	extra, ok := g.(ExtraProvider)
+	test.Assert(t, ok)
+	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Protobuf)
 
@@ -294,4 +319,51 @@ func TestJSONPbGeneric(t *testing.T) {
 	method, err := g.GetMethod(nil, "Echo")
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Echo")
+}
+
+func TestIsCombinedServices(t *testing.T) {
+	path := "./json_test/idl/example_multi_service.thrift"
+
+	// normal thrift
+	opts := []ThriftIDLProviderOption{WithParseMode(thrift.CombineServices)}
+	p, err := NewThriftFileProviderWithOption(path, opts)
+	test.Assert(t, err == nil)
+
+	g, err := JSONThriftGeneric(p)
+	test.Assert(t, err == nil)
+	g.Close()
+
+	extra, ok := g.(ExtraProvider)
+	test.Assert(t, ok)
+	test.Assert(t, extra.GetExtra(CombineServiceKey) == "true")
+
+	// thrift with dynamicgo
+	p, err = NewThriftFileProviderWithDynamicgoWithOption(path, opts)
+	test.Assert(t, err == nil)
+
+	g, err = JSONThriftGeneric(p)
+	test.Assert(t, err == nil)
+	g.Close()
+
+	extra, ok = g.(ExtraProvider)
+	test.Assert(t, ok)
+	test.Assert(t, extra.GetExtra(CombineServiceKey) == "true")
+
+	// pb with dynamicgo
+	pbp, err := NewPbFileProviderWithDynamicGo(
+		"./grpcjsonpb_test/idl/pbapi_multi_service.proto",
+		context.Background(),
+		dproto.Options{ParseServiceMode: meta.CombineServices},
+	)
+	test.Assert(t, err == nil)
+
+	g, err = JSONPbGeneric(pbp)
+	test.Assert(t, err == nil)
+	g.Close()
+
+	extra, ok = g.(ExtraProvider)
+	test.Assert(t, ok)
+	test.Assert(t, extra.GetExtra(CombineServiceKey) == "true")
+
+	// TODO: test pb after supporting parse mode
 }

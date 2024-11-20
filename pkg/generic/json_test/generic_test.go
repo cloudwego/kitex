@@ -71,6 +71,7 @@ func testThrift(t *testing.T) {
 	respStr, ok := resp.(string)
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), gjson.Get(respStr, "Msg").String())
+	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "I8").String(), "8"), gjson.Get(respStr, "I8").String())
 
 	// extend method
 	resp, err = cli.GenericCall(context.Background(), "ExtendMethod", reqExtendMsg, callopt.WithRPCTimeout(100*time.Second))
@@ -94,6 +95,7 @@ func testThriftWithDynamicGo(t *testing.T) {
 	respStr, ok := resp.(string)
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), gjson.Get(respStr, "Msg").String())
+	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "I8").String(), "8"), gjson.Get(respStr, "I8").String())
 
 	// client without dynamicgo
 

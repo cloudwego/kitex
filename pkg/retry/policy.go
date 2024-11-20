@@ -203,6 +203,9 @@ func (p Policy) Equals(np Policy) bool {
 	if !p.BackupPolicy.Equals(np.BackupPolicy) {
 		return false
 	}
+	if !p.MixedPolicy.Equals(np.MixedPolicy) {
+		return false
+	}
 	return true
 }
 

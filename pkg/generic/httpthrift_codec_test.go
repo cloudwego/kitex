@@ -65,6 +65,7 @@ func TestHttpThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
 	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, htc.svcName == "ExampleService")
+	test.Assert(t, htc.extra[CombineServiceKey] == "false")
 
 	rw := htc.getMessageReaderWriter()
 	_, ok := rw.(error)
@@ -101,6 +102,7 @@ func TestHttpThriftCodecWithDynamicGo(t *testing.T) {
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
 	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, htc.svcName == "ExampleService")
+	test.Assert(t, htc.extra[CombineServiceKey] == "false")
 
 	rw := htc.getMessageReaderWriter()
 	_, ok := rw.(thrift.MessageWriter)

@@ -4,13 +4,14 @@ on: [ push, pull_request ]
 
 jobs:
   unit-scenario-test:
-    runs-on: ubuntu-latest
+    runs-on: [ self-hosted, X64 ]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: stable
+          cache: false
       - name: Scenario Tests
         run: |
           cd ..
@@ -47,7 +48,7 @@ jobs:
           go-version: ${{ matrix.go }}
           cache: false # don't use cache for self-hosted runners
       - name: Unit Test
-        run: go test -race -covermode=atomic ./...
+        run: go test -race ./...
 
   codegen-test:
     runs-on: ubuntu-latest
@@ -63,11 +64,12 @@ jobs:
           go install ./tool/cmd/kitex
           LOCAL_REPO=$(pwd)
           cd ..
-          git clone https://github.com/cloudwego/kitex-tests.git 
+          git clone https://github.com/cloudwego/kitex-tests.git
           cd kitex-tests/codegen
           go mod init codegen-test
           go mod edit -replace=github.com/apache/thrift=github.com/apache/thrift@v0.13.0
           go mod edit -replace github.com/cloudwego/kitex=${LOCAL_REPO}
+          go mod edit -replace github.com/cloudwego/kitex/pkg/protocol/bthrift=${LOCAL_REPO}/pkg/protocol/bthrift
           go mod tidy
           bash -version
           bash ./codegen_install_check.sh
@@ -79,6 +81,9 @@ jobs:
 
   windows-test:
     runs-on: windows-latest
+    env: # Fixes https://github.com/actions/setup-go/issues/240
+      GOMODCACHE: 'D:\go\pkg\mod'
+      GOCACHE: 'D:\go\go-build'
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go

@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"errors"
+	"log"
 	"net"
 	"os"
 	"reflect"
@@ -72,16 +73,41 @@ func NewTestServer(ops ...Option) (Server, net.Addr) {
 	return svr, addr
 }
 
+// WaitServer waits utils its listener is ready
+func WaitServer(s Server) {
+	// sleep 5ms, and likely it's up
+	time.Sleep(5 * time.Millisecond)
+	// wait at most 100*10ms ~ 1s or panic
+	for i := 0; i < 100; i++ {
+		svr := s.(*server)
+		svr.Lock()
+		remotesvr := svr.svr
+		svr.Unlock()
+		if remotesvr == nil || remotesvr.Address() == nil {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		a := remotesvr.Address()
+		log.Printf("[WaitServer] %s/%s is up", a.Network(), a.String())
+		return
+	}
+	panic("server " + s.(*server).svr.Address().String() + " not ready")
+}
+
+func goWaitAndStop(t *testing.T, s Server) {
+	go func() {
+		WaitServer(s)
+		// give more time for server to init other stuffs after listener is ready
+		time.Sleep(10 * time.Millisecond)
+		err := s.Stop()
+		test.Assert(t, err == nil, err)
+	}()
+}
+
 func TestServerRun(t *testing.T) {
 	var opts []Option
 	opts = append(opts, WithMetaHandler(noopMetahandler{}))
 	svr, _ := NewTestServer(opts...)
-
-	time.AfterFunc(time.Millisecond*500, func() {
-		err := svr.Stop()
-		test.Assert(t, err == nil, err)
-	})
-
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -93,6 +119,8 @@ func TestServerRun(t *testing.T) {
 	RegisterShutdownHook(func() {
 		atomic.AddInt32(&shutdownHook, 1)
 	})
+
+	goWaitAndStop(t, svr)
 	err = svr.Run()
 	test.Assert(t, err == nil, err)
 
@@ -262,6 +290,8 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 }
 
 func TestServiceRegisterFailed(t *testing.T) {
+	t.Parallel() // slow test, use Parallel
+
 	mockRegErr := errors.New("mock register error")
 	var rCount int
 	var drCount int
@@ -288,6 +318,8 @@ func TestServiceRegisterFailed(t *testing.T) {
 }
 
 func TestServiceDeregisterFailed(t *testing.T) {
+	t.Parallel() // slow test, use Parallel
+
 	mockDeregErr := errors.New("mock deregister error")
 	var rCount int
 	var drCount int
@@ -317,6 +349,8 @@ func TestServiceDeregisterFailed(t *testing.T) {
 }
 
 func TestServiceRegistryInfo(t *testing.T) {
+	t.Parallel() // slow test, use Parallel
+
 	registryInfo := &registry.Info{
 		Weight: 100,
 		Tags:   map[string]string{"aa": "bb"},
@@ -359,6 +393,8 @@ func TestServiceRegistryInfo(t *testing.T) {
 }
 
 func TestServiceRegistryNoInitInfo(t *testing.T) {
+	t.Parallel() // slow test, use Parallel
+
 	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
 	}
@@ -395,6 +431,8 @@ func TestServiceRegistryNoInitInfo(t *testing.T) {
 // TestServiceRegistryInfoWithNilTags is to check the Tags val. If Tags of RegistryInfo is nil,
 // the Tags of ServerBasicInfo will be assigned to Tags of RegistryInfo
 func TestServiceRegistryInfoWithNilTags(t *testing.T) {
+	t.Parallel() // slow test, use Parallel
+
 	registryInfo := &registry.Info{
 		Weight: 100,
 	}
@@ -438,6 +476,8 @@ func TestServiceRegistryInfoWithNilTags(t *testing.T) {
 }
 
 func TestServiceRegistryInfoWithSkipListenAddr(t *testing.T) {
+	t.Parallel() // slow test, use Parallel
+
 	realAddr, _ := net.ResolveTCPAddr("tcp", test.GetLocalAddress())
 	registryInfo := &registry.Info{
 		Weight:         100,
@@ -481,6 +521,8 @@ func TestServiceRegistryInfoWithSkipListenAddr(t *testing.T) {
 }
 
 func TestServiceRegistryInfoWithoutSkipListenAddr(t *testing.T) {
+	t.Parallel() // slow test, use Parallel
+
 	realAddr, _ := net.ResolveTCPAddr("tcp", test.GetLocalAddress())
 	registryInfo := &registry.Info{
 		Weight: 100,
@@ -533,10 +575,7 @@ func TestGRPCServerMultipleServices(t *testing.T) {
 
 	test.DeepEqual(t, svr.(*server).svcs.SearchService("", mocks.MockMethod, false), mocks.ServiceInfo())
 	test.DeepEqual(t, svr.(*server).svcs.SearchService("", mocks.Mock2Method, false), mocks.Service2Info())
-	time.AfterFunc(1000*time.Millisecond, func() {
-		err := svr.Stop()
-		test.Assert(t, err == nil, err)
-	})
+	goWaitAndStop(t, svr)
 	err = svr.Run()
 	test.Assert(t, err == nil, err)
 }
@@ -686,20 +725,19 @@ func TestServerBoundHandler(t *testing.T) {
 	for _, tcase := range cases {
 		opts := append(tcase.opts, WithExitWaitTime(time.Millisecond*10))
 		svr, _ := NewTestServer(opts...)
-
-		time.AfterFunc(100*time.Millisecond, func() {
-			err := svr.Stop()
-			test.Assert(t, err == nil, err)
-		})
 		err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 		test.Assert(t, err == nil)
+
+		goWaitAndStop(t, svr)
 		err = svr.Run()
 		test.Assert(t, err == nil, err)
 
+		// may have data race issue. make sure will NOT have any connection in this case.
+		// Read: DeepEqual
+		// Write: OnActive/OnInactive
 		iSvr := svr.(*server)
 		test.Assert(t, inboundDeepEqual(iSvr.opt.RemoteOpt.Inbounds, tcase.wantInbounds))
 		test.Assert(t, reflect.DeepEqual(iSvr.opt.RemoteOpt.Outbounds, tcase.wantOutbounds))
-		svr.Stop()
 	}
 }
 

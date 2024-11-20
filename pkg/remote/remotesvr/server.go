@@ -97,6 +97,8 @@ func (s *server) Stop() (err error) {
 }
 
 func (s *server) Address() net.Addr {
+	s.Lock()
+	defer s.Unlock()
 	if s.listener != nil {
 		return s.listener.Addr()
 	}

@@ -90,16 +90,20 @@ var prefaceReadAtMost = func() int {
 	return grpcTransport.ClientPrefaceLen
 }()
 
-func (t *svrTransHandler) ProtocolMatch(ctx context.Context, conn net.Conn) (err error) {
+func (t *svrTransHandler) ProtocolMatch(ctx context.Context, conn net.Conn) error {
 	// Check the validity of client preface.
-	npReader := conn.(interface{ Reader() netpoll.Reader }).Reader()
-	// read at most avoid block
-	preface, err := npReader.Peek(prefaceReadAtMost)
-	if err != nil {
-		return err
-	}
-	if bytes.Equal(preface[:prefaceReadAtMost], grpcTransport.ClientPreface[:prefaceReadAtMost]) {
-		return nil
+	// FIXME: should not rely on netpoll.Reader
+	if withReader, ok := conn.(interface{ Reader() netpoll.Reader }); ok {
+		if npReader := withReader.Reader(); npReader != nil {
+			// read at most avoid block
+			preface, err := npReader.Peek(prefaceReadAtMost)
+			if err != nil {
+				return err
+			}
+			if len(preface) >= prefaceReadAtMost && bytes.Equal(preface[:prefaceReadAtMost], grpcTransport.ClientPreface[:prefaceReadAtMost]) {
+				return nil
+			}
+		}
 	}
 	return errors.New("error protocol not match")
 }

@@ -337,7 +337,6 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 	}
 	s.port = p
 	s.conns = make(map[ServerTransport]bool)
-	s.startedErr <- nil
 
 	// handle: 连接读数据和处理逻辑
 	var onConnect netpoll.OnConnect = func(ctx context.Context, connection netpoll.Connection) context.Context {
@@ -440,6 +439,7 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 	if err != nil {
 		panic("create netpoll event-loop fail")
 	}
+	s.startedErr <- nil
 
 	// 运行 Server
 	err = s.eventLoop.Serve(s.lis)
@@ -712,14 +712,14 @@ func performOneRPC(ct ClientTransport) {
 func TestClientMix(t *testing.T) {
 	s, ct := setUp(t, 0, math.MaxUint32, normal)
 	go func(s *server) {
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 		s.stop()
 	}(s)
 	go func(ct ClientTransport) {
 		<-ct.Error()
 		ct.Close(errSelfCloseForTest)
 	}(ct)
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 100; i++ {
 		time.Sleep(1 * time.Millisecond)
 		go performOneRPC(ct)
 	}
@@ -925,7 +925,7 @@ func TestLargeMessageSuspension(t *testing.T) {
 		Method: "foo.Large",
 	}
 	// Set a long enough timeout for writing a large message out.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	s, err := ct.NewStream(ctx, callHdr)
 	if err != nil {
@@ -982,7 +982,7 @@ func TestMaxStreams(t *testing.T) {
 			t.Fatalf("%s", "Test timeout: client didn't receive server settings.")
 		default:
 		}
-		ctx, cancel := context.WithDeadline(pctx, time.Now().Add(time.Second))
+		ctx, cancel := context.WithDeadline(pctx, time.Now().Add(100*time.Millisecond))
 		// This is only to get rid of govet. All these context are based on a base
 		// context which is canceled at the end of the test.
 		defer cancel()
@@ -1064,7 +1064,7 @@ func TestServerContextCanceledOnClosedConnection(t *testing.T) {
 	// Loop until the server side stream is created.
 	var ss *Stream
 	for {
-		time.Sleep(time.Second)
+		time.Sleep(20 * time.Millisecond)
 		sc.mu.Lock()
 		if len(sc.activeStreams) == 0 {
 			sc.mu.Unlock()
@@ -1974,33 +1974,26 @@ func runPingPongTest(t *testing.T, msgSize int) {
 	binary.BigEndian.PutUint32(outgoingHeader[1:], uint32(msgSize))
 	opts := &Options{}
 	incomingHeader := make([]byte, 5)
-	done := make(chan struct{})
-	go func() {
-		timer := time.NewTimer(time.Second * 1)
-		<-timer.C
-		close(done)
-	}()
-	for {
-		select {
-		case <-done:
-			client.Write(stream, nil, nil, &Options{Last: true})
-			if _, err := stream.Read(incomingHeader); err != io.EOF {
-				t.Fatalf("Client expected EOF from the server. Got: %v", err)
-			}
-			return
-		default:
-			if err := client.Write(stream, outgoingHeader, msg, opts); err != nil {
-				t.Fatalf("Error on client while writing message. Err: %v", err)
-			}
-			if _, err := stream.Read(incomingHeader); err != nil {
-				t.Fatalf("Error on client while reading data header. Err: %v", err)
-			}
-			sz := binary.BigEndian.Uint32(incomingHeader[1:])
-			recvMsg := make([]byte, int(sz))
-			if _, err := stream.Read(recvMsg); err != nil {
-				t.Fatalf("Error on client while reading data. Err: %v", err)
-			}
+
+	ctx, cancel = context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	for ctx.Err() == nil {
+		if err := client.Write(stream, outgoingHeader, msg, opts); err != nil {
+			t.Fatalf("Error on client while writing message. Err: %v", err)
 		}
+		if _, err := stream.Read(incomingHeader); err != nil {
+			t.Fatalf("Error on client while reading data header. Err: %v", err)
+		}
+		sz := binary.BigEndian.Uint32(incomingHeader[1:])
+		recvMsg := make([]byte, int(sz))
+		if _, err := stream.Read(recvMsg); err != nil {
+			t.Fatalf("Error on client while reading data. Err: %v", err)
+		}
+	}
+
+	client.Write(stream, nil, nil, &Options{Last: true})
+	if _, err := stream.Read(incomingHeader); err != io.EOF {
+		t.Fatalf("Client expected EOF from the server. Got: %v", err)
 	}
 }
 

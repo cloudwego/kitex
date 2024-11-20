@@ -32,7 +32,10 @@ import (
 )
 
 // Task is the function that the worker will execute.
-type Task func()
+type Task struct {
+	ctx context.Context
+	f   func()
+}
 
 // Pool is a worker pool bind with some idle goroutines.
 type Pool struct {
@@ -61,54 +64,68 @@ func (p *Pool) Size() int32 {
 }
 
 // Go creates/reuses a worker to run task.
-func (p *Pool) Go(task Task) {
-	p.GoCtx(context.Background(), task)
+func (p *Pool) Go(f func()) {
+	p.GoCtx(context.Background(), f)
 }
 
 // GoCtx creates/reuses a worker to run task.
-func (p *Pool) GoCtx(ctx context.Context, task Task) {
+func (p *Pool) GoCtx(ctx context.Context, f func()) {
+	t := Task{ctx: ctx, f: f}
 	select {
-	case p.tasks <- task:
+	case p.tasks <- t:
 		// reuse exist worker
 		return
 	default:
 	}
 
-	// create new worker
-	atomic.AddInt32(&p.size, 1)
-	go func() {
+	// single shot if p.size > p.maxIdle
+	if atomic.AddInt32(&p.size, 1) > p.maxIdle {
+		go func(t Task) {
+			defer func() {
+				if r := recover(); r != nil {
+					klog.Errorf("panic in wpool: error=%v: stack=%s", r, debug.Stack())
+				}
+				atomic.AddInt32(&p.size, -1)
+			}()
+			if profiler.IsEnabled(t.ctx) {
+				profiler.Tag(t.ctx)
+				t.f()
+				profiler.Untag(t.ctx)
+			} else {
+				t.f()
+			}
+		}(t)
+		return
+	}
+
+	// background goroutines for consuming tasks
+	go func(t Task) {
 		defer func() {
 			if r := recover(); r != nil {
 				klog.Errorf("panic in wpool: error=%v: stack=%s", r, debug.Stack())
 			}
 			atomic.AddInt32(&p.size, -1)
 		}()
-
-		profiler.Tag(ctx)
-		task()
-		profiler.Untag(ctx)
-
-		if atomic.LoadInt32(&p.size) > p.maxIdle {
-			return
-		}
-
 		// waiting for new task
 		idleTimer := time.NewTimer(p.maxIdleTime)
 		for {
+			if profiler.IsEnabled(t.ctx) {
+				profiler.Tag(t.ctx)
+				t.f()
+				profiler.Untag(t.ctx)
+			} else {
+				t.f()
+			}
+			idleTimer.Reset(p.maxIdleTime)
 			select {
-			case task = <-p.tasks:
-				profiler.Tag(ctx)
-				task()
-				profiler.Untag(ctx)
+			case t = <-p.tasks:
 			case <-idleTimer.C:
 				// worker exits
 				return
 			}
-
 			if !idleTimer.Stop() {
 				<-idleTimer.C
 			}
-			idleTimer.Reset(p.maxIdleTime)
 		}
-	}()
+	}(t)
 }

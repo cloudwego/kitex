@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -74,7 +75,7 @@ func mockHeader(seqID int32, body string) *netpoll.LinkBuffer {
 	// length
 	binary.BigEndian.PutUint32(buf[:codec.Size32], uint32(len(body))+(2*codec.Size32))
 	// TTHeader
-	binary.BigEndian.PutUint32(buf[codec.Size32:2*codec.Size32], codec.TTHeaderMagic)
+	binary.BigEndian.PutUint32(buf[codec.Size32:2*codec.Size32], ttheader.TTHeaderMagic)
 	// seqID
 	binary.BigEndian.PutUint32(buf[2*codec.Size32:3*codec.Size32], uint32(seqID))
 	reader.WriteString(body)
