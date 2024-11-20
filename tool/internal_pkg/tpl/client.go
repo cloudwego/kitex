@@ -29,14 +29,14 @@ import (
 		{{- end}}
 	{{- end}}
 	{{- if .HasStreaming}}
-    {{- if not .StreamX}}
+	{{- if not .StreamX}}
 	"github.com/cloudwego/kitex/client/streamclient"
 	"github.com/cloudwego/kitex/client/callopt/streamcall"
-    {{- else}}
-    "github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
-    "github.com/cloudwego/kitex/pkg/streamx"
-    {{- end}}{{- /* if not .StreamX end */}}
-    {{- end}}
+	{{- else}}
+	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
+	"github.com/cloudwego/kitex/pkg/streamx"
+	{{- end}}{{- /* if not .StreamX end */}}
+	{{- end}}
 )
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {
@@ -107,13 +107,9 @@ func NewClient(destService string, opts ...client.Option) (Client, error) {
 	{{end}}
 	options = append(options, opts...)
 
-    {{- if and .StreamX .HasStreaming}}
-	kc, err := client.NewClient(serviceInfo(), options...)
-    {{- else}}
     kc, err := client.NewClient(
         {{- if eq $.Codec "protobuf"}}serviceInfo(){{else}}serviceInfoForClient(){{end -}}
         , options...)
-    {{- end}}{{/* if .StreamX .HasStreaming end */}}
 	if err != nil {
 		return nil, err
 	}
