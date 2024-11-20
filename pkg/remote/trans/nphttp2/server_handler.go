@@ -381,6 +381,9 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 
 func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	klog.Info("KITEX: gRPC GracefulShutdown starts")
+	defer func() {
+		klog.Info("KITEX: gRPC GracefulShutdown ends")
+	}()
 	t.mu.Lock()
 	for elem := t.li.Front(); elem != nil; elem = elem.Next() {
 		svrTrans := elem.Value.(*SvrTrans)
@@ -392,7 +395,6 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	defer graceTimer.Stop()
 	pollTick := time.NewTicker(pollTime)
 	defer pollTick.Stop()
-Loop:
 	for {
 		select {
 		case <-pollTick.C:
@@ -411,7 +413,7 @@ Loop:
 			// all active handlers have exited
 			if t.li.Len() <= 0 {
 				t.mu.Unlock()
-				break Loop
+				return nil
 			}
 			t.mu.Unlock()
 		case <-graceTimer.C:
@@ -422,15 +424,12 @@ Loop:
 				svrTrans.tr.Close()
 			}
 			t.mu.Unlock()
-			break Loop
+			return nil
 		}
 	}
-	klog.Info("KITEX: gRPC GracefulShutdown ends")
-
-	return nil
 }
 
-func parseGraceAndPollTime(ctx context.Context) (graceTime time.Duration, pollTime time.Duration) {
+func parseGraceAndPollTime(ctx context.Context) (graceTime, pollTime time.Duration) {
 	graceTime = defaultGraceTime
 	deadline, ok := ctx.Deadline()
 	if ok {

@@ -22,6 +22,7 @@ package grpc
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"runtime"
 	"sync"
@@ -452,19 +453,20 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 		select {
 		case <-c.ch:
 		case <-c.done:
-			c.finish()
-			return nil, ErrConnClosing
+			return nil, c.finish(ErrConnClosing)
 		}
 	}
 }
 
-func (c *controlBuffer) finish() {
+func (c *controlBuffer) finish(err error) (rErr error) {
 	c.mu.Lock()
 	if c.err != nil {
+		rErr = c.err
 		c.mu.Unlock()
 		return
 	}
-	c.err = ErrConnClosing
+	c.err = err
+	rErr = err
 	// There may be headers for streams in the control buffer.
 	// These streams need to be cleaned out since the transport
 	// is still not aware of these yet.
@@ -474,10 +476,11 @@ func (c *controlBuffer) finish() {
 			continue
 		}
 		if hdr.onOrphaned != nil { // It will be nil on the server-side.
-			hdr.onOrphaned(ErrConnClosing)
+			hdr.onOrphaned(err)
 		}
 	}
 	c.mu.Unlock()
+	return
 }
 
 type side int
@@ -564,6 +567,10 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 			// 3. A graceful close of connection.
 			klog.Debugf("KITEX: grpc transport loopyWriter.run returning, error=%v, remoteAddr=%s", err, remoteAddr)
 			err = nil
+		}
+		// make sure the Graceful Shutdown behaviour triggered
+		if errors.Is(err, errGracefulShutdown) {
+			l.framer.writer.Flush()
 		}
 	}()
 	for {

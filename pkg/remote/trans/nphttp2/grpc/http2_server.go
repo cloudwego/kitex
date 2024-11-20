@@ -123,9 +123,11 @@ type http2Server struct {
 	// During this time we don't want to write another first GoAway(with ID 2^31 -1) frame.
 	// Thus call to drain(...) will be a no-op if drainChan is already initialized since draining is
 	// already underway.
-	drainChan     chan struct{}
-	state         transportState
-	activeStreams map[uint32]*Stream
+	drainChan chan struct{}
+	// denote that drainChan has been closed to prevent remote side sending more ping Ack with goAway
+	drainChanClosed bool
+	state           transportState
+	activeStreams   map[uint32]*Stream
 	// idle is the time instant when the connection went idle.
 	// This is either the beginning of the connection or when the number of
 	// RPCs go down to 0.
@@ -287,12 +289,9 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 	gofunc.RecoverGoFuncWithInfo(ctx, func() {
 		t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst)
 		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
-		if err := t.loopy.run(conn.RemoteAddr().String()); err != nil {
-			klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v", err)
-		}
-		// ensure that the remaining frames can be sent out when underlying connection still works
-		if !(err == io.EOF || err == io.ErrUnexpectedEOF || errors.Is(err, netpoll.ErrEOF)) {
-			t.framer.writer.Flush()
+		runErr := t.loopy.run(conn.RemoteAddr().String())
+		if runErr != nil {
+			klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v", runErr)
 		}
 		t.conn.Close()
 		close(t.writerDone)
@@ -642,9 +641,13 @@ const (
 
 func (t *http2Server) handlePing(f *http2.PingFrame) {
 	if f.IsAck() {
-		if f.Data == goAwayPing.data && t.drainChan != nil {
-			close(t.drainChan)
-			return
+		if f.Data == goAwayPing.data {
+			t.mu.Lock()
+			if !t.drainChanClosed {
+				close(t.drainChan)
+				t.drainChanClosed = true
+			}
+			t.mu.Unlock()
 		}
 		// Maybe it's a BDP ping.
 		if t.bdpEst != nil {
@@ -926,12 +929,12 @@ func (t *http2Server) keepalive() {
 			if val <= 0 {
 				// The connection has been idle for a duration of keepalive.MaxConnectionIdle or more.
 				// Gracefully close the connection.
-				t.drain(http2.ErrCodeNo, []byte{})
+				t.drain(http2.ErrCodeNo, []byte("idleTimeout"))
 				return
 			}
 			idleTimer.Reset(val)
 		case <-ageTimer.C:
-			t.drain(http2.ErrCodeNo, []byte{})
+			t.drain(http2.ErrCodeNo, []byte("ageTimeout"))
 			ageTimer.Reset(t.kp.MaxConnectionAgeGrace)
 			select {
 			case <-ageTimer.C:
@@ -989,36 +992,35 @@ func (t *http2Server) Close() error {
 	t.activeStreams = nil
 	t.mu.Unlock()
 
+	finishErr := errGracefulShutdown
 	finishCh := make(chan struct{}, 1)
-	activeNums := t.rstActiveStreams(streams, errGracefulShutdown, gracefulShutdownCode, finishCh)
+	activeNums := t.rstActiveStreams(streams, finishErr, gracefulShutdownCode, finishCh)
 	if activeNums == 0 {
-		t.closeLoopyWriter()
+		t.closeLoopyWriter(finishErr)
 		return nil
 	}
-Loop:
 	for {
 		select {
 		// wait for all the RstStream Frames to be written
 		case <-finishCh:
 			activeNums--
 			if activeNums == 0 {
-				break Loop
+				t.closeLoopyWriter(finishErr)
+				return nil
 			}
 		// loopyWriter has quited, there is no chance to write the RstStream Frame
 		case <-t.writerDone:
-			break Loop
+			t.closeLoopyWriter(finishErr)
+			return nil
 		}
 	}
-	// the underlying loopyWriter must be closed after all RstStream frames have been written.
-	t.closeLoopyWriter()
-	// make use of loopyWriter.run returning to close the connection
-	// there is no need to close the connection manually
-	return nil
 }
 
-func (t *http2Server) closeLoopyWriter() {
-	t.controlBuf.finish()
+func (t *http2Server) closeLoopyWriter(err error) {
+	t.controlBuf.finish(err)
 	close(t.done)
+	// make use of loopyWriter.run returning to close the connection
+	// there is no need to close the connection manually
 	<-t.writerDone
 }
 
@@ -1057,7 +1059,7 @@ func (t *http2Server) closeWithErr(reason error) error {
 	streams := t.activeStreams
 	t.activeStreams = nil
 	t.mu.Unlock()
-	t.controlBuf.finish()
+	t.controlBuf.finish(reason)
 	close(t.done)
 	err := t.conn.Close()
 
@@ -1131,16 +1133,19 @@ func (t *http2Server) LocalAddr() net.Addr {
 }
 
 func (t *http2Server) Drain() {
-	t.drain(http2.ErrCodeNo, []byte{})
+	t.drain(http2.ErrCodeNo, []byte(gracefulShutdownMsg))
 }
 
 func (t *http2Server) drain(code http2.ErrCode, debugData []byte) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if t.drainChan != nil {
+		t.mu.Unlock()
 		return
 	}
 	t.drainChan = make(chan struct{})
+	t.mu.Unlock()
+	// drain successfully
+	// should release lock before access controlBuf
 	t.controlBuf.put(&goAway{code: code, debugData: debugData, headsUp: true})
 }
 

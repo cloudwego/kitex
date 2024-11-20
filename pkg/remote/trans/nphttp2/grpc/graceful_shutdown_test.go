@@ -28,11 +28,10 @@ import (
 
 func TestGracefulShutdown(t *testing.T) {
 	onGoAwayCh := make(chan struct{})
-	srv, cli := setUpWithOnGoAway(t, 0, &ServerConfig{MaxStreams: math.MaxUint32}, gracefulShutdown, ConnectOptions{}, func(reason GoAwayReason) {
+	srv, cli := setUpWithOnGoAway(t, 10000, &ServerConfig{MaxStreams: math.MaxUint32}, gracefulShutdown, ConnectOptions{}, func(reason GoAwayReason) {
 		close(onGoAwayCh)
 	})
 	defer cli.Close(errSelfCloseForTest)
-	defer srv.stop()
 
 	stream, err := cli.NewStream(context.Background(), &CallHdr{})
 	test.Assert(t, err == nil, err)

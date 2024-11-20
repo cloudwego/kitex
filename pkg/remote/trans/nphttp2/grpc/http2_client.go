@@ -624,7 +624,7 @@ func (t *http2Client) Close(err error) error {
 		t.kpDormancyCond.Signal()
 	}
 	t.mu.Unlock()
-	t.controlBuf.finish()
+	t.controlBuf.finish(err)
 	t.cancel()
 	cErr := t.conn.Close()
 
