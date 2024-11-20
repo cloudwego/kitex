@@ -107,13 +107,9 @@ func NewClient(destService string, opts ...client.Option) (Client, error) {
 	{{end}}
 	options = append(options, opts...)
 
-    {{- if and .StreamX .HasStreaming}}
-	kc, err := client.NewClient(serviceInfo(), options...)
-    {{- else}}
     kc, err := client.NewClient(
         {{- if eq $.Codec "protobuf"}}serviceInfo(){{else}}serviceInfoForClient(){{end -}}
         , options...)
-    {{- end}}{{/* if .StreamX .HasStreaming end */}}
 	if err != nil {
 		return nil, err
 	}
