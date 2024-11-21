@@ -124,9 +124,7 @@ func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, netwo
 			// remove connection from the pool.
 			// we do not need to close this grpc transport manually
 			// since grpc client is responsible for doing this.
-			if _, ok := p.conns.Load(address); ok {
-				p.conns.Delete(address)
-			}
+			p.conns.Delete(address)
 		},
 		func() {
 			// do nothing

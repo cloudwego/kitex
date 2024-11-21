@@ -21,7 +21,6 @@ import (
 	"errors"
 	"math"
 	"testing"
-	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
@@ -36,7 +35,8 @@ func TestGracefulShutdown(t *testing.T) {
 	stream, err := cli.NewStream(context.Background(), &CallHdr{})
 	test.Assert(t, err == nil, err)
 	<-srv.srvReady
-	go srv.gracefulShutdown()
+	finishCh := make(chan struct{})
+	go srv.gracefulShutdown(finishCh)
 	err = cli.Write(stream, nil, []byte("hello"), &Options{})
 	test.Assert(t, err == nil, err)
 	msg := make([]byte, 5)
@@ -49,7 +49,7 @@ func TestGracefulShutdown(t *testing.T) {
 	_, err = cli.NewStream(context.Background(), &CallHdr{})
 	test.Assert(t, errors.Is(err, errStreamDrain), err)
 	// wait for the server transport to be closed
-	time.Sleep(1 * time.Second)
+	<-finishCh
 	err = cli.Write(stream, nil, []byte("hello"), &Options{})
 	test.Assert(t, err != nil, err)
 	_, err = stream.Read(msg)

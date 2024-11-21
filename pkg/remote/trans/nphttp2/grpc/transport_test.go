@@ -474,8 +474,8 @@ func (s *server) stop() {
 	}
 }
 
-func (s *server) gracefulShutdown() {
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+func (s *server) gracefulShutdown(finishCh chan struct{}) {
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	s.lis.Close()
 	s.mu.Lock()
@@ -502,6 +502,7 @@ func (s *server) gracefulShutdown() {
 	s.hdlWG.Wait()
 	s.transWG.Wait()
 	close(exitCh)
+	close(finishCh)
 }
 
 func (s *server) addr() string {

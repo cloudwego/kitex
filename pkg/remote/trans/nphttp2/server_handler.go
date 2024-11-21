@@ -311,7 +311,8 @@ const (
 	// align with default exitWaitTime
 	defaultGraceTime time.Duration = 5 * time.Second
 	// max poll time to check whether all the transports have finished
-	defaultPollTime = 500 * time.Millisecond
+	// A smaller poll time will not affect performance and will speed up our unit tests
+	defaultMaxPollTime = 50 * time.Millisecond
 )
 
 type SvrTrans struct {
@@ -398,24 +399,16 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	for {
 		select {
 		case <-pollTick.C:
+			var activeNums int32
 			t.mu.Lock()
-			for elem := t.li.Front(); elem != nil; {
+			for elem := t.li.Front(); elem != nil; elem = elem.Next() {
 				svrTrans := elem.Value.(*SvrTrans)
-				// remove the svrTrans from list if no active handlers
-				if atomic.LoadInt32(&svrTrans.handlerNum) == 0 {
-					next := elem.Next()
-					t.li.Remove(elem)
-					elem = next
-				} else {
-					elem = elem.Next()
-				}
-			}
-			// all active handlers have exited
-			if t.li.Len() <= 0 {
-				t.mu.Unlock()
-				return nil
+				activeNums += atomic.LoadInt32(&svrTrans.handlerNum)
 			}
 			t.mu.Unlock()
+			if activeNums == 0 {
+				return nil
+			}
 		case <-graceTimer.C:
 			klog.Info("KITEX: gRPC triggers Close")
 			t.mu.Lock()
@@ -439,8 +432,8 @@ func parseGraceAndPollTime(ctx context.Context) (graceTime, pollTime time.Durati
 	}
 
 	pollTime = graceTime / 10
-	if pollTime > defaultPollTime {
-		pollTime = defaultPollTime
+	if pollTime > defaultMaxPollTime {
+		pollTime = defaultMaxPollTime
 	}
 	return
 }
