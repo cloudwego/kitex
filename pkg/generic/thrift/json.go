@@ -22,21 +22,19 @@ import (
 	"strconv"
 
 	"github.com/bytedance/gopkg/lang/dirtmake"
-	"github.com/bytedance/sonic"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
-
-var jsonSonic = sonic.Config{EscapeHTML: true}.Froze()
 
 type JSONReaderWriter struct {
 	*ReadJSON
@@ -257,7 +255,8 @@ func (m *ReadJSON) originalRead(ctx context.Context, method string, isClient boo
 	}
 
 	// resp is map
-	respNode, err := jsonSonic.Marshal(resp)
+	// note: use json-iterator since sonic doesn't support map[interface{}]interface{}
+	respNode, err := jsoniter.Marshal(resp)
 	if err != nil {
 		return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("response marshal failed. err:%#v", err))
 	}
@@ -289,7 +288,8 @@ func structReader(ctx context.Context, typeDesc *descriptor.TypeDescriptor, opt 
 	if err != nil {
 		return nil, err
 	}
-	respNode, err := jsonSonic.Marshal(resp)
+	// note: use json-iterator since sonic doesn't support map[interface{}]interface{}
+	respNode, err := jsoniter.Marshal(resp)
 	if err != nil {
 		return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("streaming response marshal failed. err:%#v", err))
 	}
