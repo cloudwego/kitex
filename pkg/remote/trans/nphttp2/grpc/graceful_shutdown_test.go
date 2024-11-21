@@ -20,9 +20,11 @@ import (
 	"context"
 	"errors"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 )
 
 func TestGracefulShutdown(t *testing.T) {
@@ -50,8 +52,9 @@ func TestGracefulShutdown(t *testing.T) {
 	test.Assert(t, errors.Is(err, errStreamDrain), err)
 	// wait for the server transport to be closed
 	<-finishCh
-	err = cli.Write(stream, nil, []byte("hello"), &Options{})
-	test.Assert(t, err != nil, err)
 	_, err = stream.Read(msg)
 	test.Assert(t, err != nil, err)
+	st := stream.Status()
+	test.Assert(t, strings.Contains(st.Message(), gracefulShutdownMsg), st.Message())
+	test.Assert(t, st.Code() == codes.Unavailable, st.Code())
 }
