@@ -19,11 +19,14 @@ package ttstream
 import (
 	"bytes"
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/generic"
 )
 
 func TestFrameCodec(t *testing.T) {
@@ -55,11 +58,11 @@ func TestFrameCodec(t *testing.T) {
 func TestFrameWithoutPayloadCodec(t *testing.T) {
 	rmsg := new(testRequest)
 	rmsg.A = 1
-	payload, err := EncodePayload(context.Background(), rmsg)
+	payload, err := EncodePayload(context.Background(), rmsg, "")
 	test.Assert(t, err == nil, err)
 
 	wmsg := new(testRequest)
-	err = DecodePayload(context.Background(), payload, wmsg)
+	err = DecodePayload(context.Background(), payload, wmsg, "")
 	test.Assert(t, err == nil, err)
 	test.DeepEqual(t, wmsg, rmsg)
 }
@@ -68,11 +71,45 @@ func TestPayloadCodec(t *testing.T) {
 	rmsg := new(testRequest)
 	rmsg.A = 1
 	rmsg.B = "hello world"
-	payload, err := EncodePayload(context.Background(), rmsg)
+	payload, err := EncodePayload(context.Background(), rmsg, "")
 	test.Assert(t, err == nil, err)
 
 	wmsg := new(testRequest)
-	err = DecodePayload(context.Background(), payload, wmsg)
+	err = DecodePayload(context.Background(), payload, wmsg, "")
 	test.Assert(t, err == nil, err)
 	test.DeepEqual(t, wmsg, rmsg)
+}
+
+func TestGenericPayloadCodec(t *testing.T) {
+	idlContent := `
+		struct testRequest {
+			1: i32 A,
+			2: string B,
+		}
+		
+		service Test {
+			testRequest Bidi(1: testRequest request) (streaming.mode="bidirectional"),
+		}
+	`
+	p, err := generic.NewThriftContentProvider(idlContent, nil)
+	test.Assert(t, err == nil, err)
+	g, err := generic.JSONThriftGeneric(p)
+
+	req := `{"A":1, "B":"hello world"}`
+	args := &generic.Args{
+		Request: req,
+		Method:  "Bidi",
+	}
+	args.SetCodec(g.MessageReaderWriter())
+	payload, err := EncodePayload(context.Background(), args, "Bidi")
+	test.Assert(t, err == nil, err)
+
+	result := &generic.Result{}
+	result.SetCodec(g.MessageReaderWriter())
+	err = DecodePayload(context.Background(), payload, result, "Bidi")
+	test.Assert(t, err == nil, err)
+	resp, ok := result.Success.(string)
+	test.Assert(t, ok)
+	test.Assert(t, reflect.DeepEqual(gjson.Get(resp, "A").String(), "1"))
+	test.Assert(t, reflect.DeepEqual(gjson.Get(resp, "B").String(), "hello world"))
 }

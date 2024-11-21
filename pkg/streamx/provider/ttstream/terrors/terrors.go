@@ -30,6 +30,7 @@ var (
 	ErrIllegalFrame         = newErrType("illegal frame")
 	ErrIllegalOperation     = newErrType("illegal operation")
 	ErrTransport            = newErrType("transport is closing")
+	ErrInvalidPayload       = newErrType("invalid payload")
 )
 
 type errType struct {

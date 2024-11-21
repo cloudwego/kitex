@@ -29,8 +29,8 @@ import (
 	gopkgthrift "github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
+	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/remote"
-
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 )
@@ -178,17 +178,57 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	return fr, nil
 }
 
-func EncodePayload(ctx context.Context, msg any) ([]byte, error) {
-	payload := gopkgthrift.FastMarshal(msg.(gopkgthrift.FastCodec))
-	return payload, nil
+func EncodePayload(ctx context.Context, msg any, method string) ([]byte, error) {
+	switch msg.(type) {
+	case *generic.Args:
+		return EncodeGenericPayload(ctx, msg, method)
+	default:
+		payload := gopkgthrift.FastMarshal(msg.(gopkgthrift.FastCodec))
+		return payload, nil
+	}
 }
 
-func EncodeGenericPayload(ctx context.Context, msg any) ([]byte, error) {
-	return nil, nil
+func EncodeGenericPayload(ctx context.Context, msg any, method string) (payload []byte, err error) {
+	switch m := msg.(type) {
+	case *generic.Args:
+		if method == "" {
+			return nil, terrors.ErrIllegalFrame.WithCause(errors.New("empty methodName in ttheader generic Encode"))
+		}
+		bw := bufiox.NewBytesWriter(&payload)
+		if err = m.Write(ctx, m.Method, bw); err != nil {
+			return nil, terrors.ErrInvalidPayload.WithCause(err)
+		}
+		if err = bw.Flush(); err != nil {
+			return nil, terrors.ErrInvalidPayload.WithCause(err)
+		}
+		return
+	default:
+		return nil, terrors.ErrInvalidPayload.WithCause(fmt.Errorf("unsupported type: %v", m))
+	}
 }
 
-func DecodePayload(ctx context.Context, payload []byte, msg any) error {
-	return gopkgthrift.FastUnmarshal(payload, msg.(gopkgthrift.FastCodec))
+func DecodePayload(ctx context.Context, payload []byte, msg any, method string) error {
+	switch msg.(type) {
+	case *generic.Result:
+		return DecodeGenericPayload(ctx, method, payload, msg)
+	default:
+		return gopkgthrift.FastUnmarshal(payload, msg.(gopkgthrift.FastCodec))
+	}
+}
+
+func DecodeGenericPayload(ctx context.Context, method string, payload []byte, msg any) error {
+	switch m := msg.(type) {
+	case *generic.Result:
+		if method == "" {
+			return terrors.ErrIllegalFrame.WithCause(errors.New("empty methodName in ttheader generic Decode"))
+		}
+		if err := m.Read(ctx, method, len(payload), remote.NewReaderBuffer(payload)); err != nil {
+			return terrors.ErrInvalidPayload.WithCause(err)
+		}
+		return nil
+	default:
+		return terrors.ErrInvalidPayload.WithCause(fmt.Errorf("unsupported type: %v", m))
+	}
 }
 
 func EncodeException(ctx context.Context, method string, seq int32, ex error) ([]byte, error) {

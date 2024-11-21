@@ -120,7 +120,7 @@ func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
 		return terrors.ErrIllegalOperation.WithCause(errors.New("stream is closed send"))
 	}
 	// encode payload
-	payload, err := EncodePayload(ctx, msg)
+	payload, err := EncodePayload(ctx, msg, s.method)
 	if err != nil {
 		return err
 	}
@@ -145,7 +145,7 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 	if err != nil {
 		return err
 	}
-	err = DecodePayload(context.Background(), payload, data)
+	err = DecodePayload(context.Background(), payload, data, s.method)
 	// payload will not be access after decode
 	mcache.Free(payload)
 
