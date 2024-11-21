@@ -162,7 +162,10 @@ func (p *patcher) buildTemplates() (err error) {
 		allTemplates = append(allTemplates, slim.StructLike,
 			templates.StructLikeDefault,
 			templates.FieldGetOrSet,
-			templates.FieldIsSet)
+			templates.FieldIsSet,
+			SlimStructLikeDeepEqual,
+			SlimStructLikeDeepEqualField,
+		)
 	} else {
 		allTemplates = append(allTemplates, structLikeCodec,
 			structLikeFastRead,

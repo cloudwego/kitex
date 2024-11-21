@@ -60,6 +60,7 @@ import (
 const Body = `
 {{define "body"}}
 
+{{if GenerateFastAPIs}}
 {{- range .Scope.StructLikes}}
 {{template "StructLikeCodec" .}}
 {{- end}}
@@ -67,6 +68,7 @@ const Body = `
 {{- range .Scope.Services}}
 {{template "Processor" .}}
 {{- end}}
+{{- end}}{{/* if GenerateFastAPIs */}}
 
 {{template "ArgsAndResult" .}}
 
@@ -115,3 +117,15 @@ var basicTemplates = []string{
 	Body,
 	RegisterHessian,
 }
+
+// SlimStructLikeDeepEqual
+var SlimStructLikeDeepEqual = `
+{{define "StructLikeDeepEqual"}}
+{{- end}}{{/* "StructLikeDeepEqual" */}}
+`
+
+// SlimStructLikeDeepEqualField
+var SlimStructLikeDeepEqualField = `
+{{define "StructLikeDeepEqualField"}}
+{{- end}}{{/* "StructLikeDeepEqualField" */}}
+`
