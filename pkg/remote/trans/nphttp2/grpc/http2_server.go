@@ -617,7 +617,7 @@ func (t *http2Server) handleRSTStream(f *http2.RSTStreamFrame) {
 	if s, ok := t.getStream(f); ok {
 		mappingErr, stCode := getMappingErrAndStatusCode(s.ctx, f.ErrCode, serverSide)
 		stErr := newStatusf(stCode, mappingErr, "transport: RSTStream Frame received with error code: %d [triggered by %s]", f.ErrCode, s.sourceService).Err()
-		klog.CtxInfof(s.ctx, "transport: http2Server.handleRSTStream received RSTStream Frame with error code: %v", f.ErrCode)
+		klog.CtxInfof(s.ctx, "transport: http2Server.handleRSTStream received RSTStream Frame with error code: %d", f.ErrCode)
 		t.closeStream(s, stErr, false, 0, false)
 		return
 	}
