@@ -147,6 +147,7 @@ func Test_getMappingErrAndStatusCode(t *testing.T) {
 				http2.ErrCode(1010),
 				http2.ErrCode(1011),
 				http2.ErrCode(1012),
+				http2.ErrCode(1013),
 			},
 			want: []struct {
 				err    error
@@ -204,6 +205,10 @@ func Test_getMappingErrAndStatusCode(t *testing.T) {
 					err:    kerrors.ErrMetaSizeExceeded,
 					stCode: codes.Canceled,
 				},
+				{
+					err:    errRecvDownStreamGracefulShutdown,
+					stCode: codes.Canceled,
+				},
 			},
 			clean: customClean,
 		},
@@ -255,13 +260,13 @@ func Test_getStatusCode(t *testing.T) {
 			input: []error{
 				kerrors.ErrGracefulShutdown, kerrors.ErrBizCanceled, kerrors.ErrServerStreamFinished, kerrors.ErrStreamingCanceled,
 				kerrors.ErrStreamTimeout, kerrors.ErrMetaSizeExceeded,
-				errHTTP2Stream, errClosedWithoutTrailer, errMiddleHeader, errDecodeHeader, errRecvDownStreamRstStream, errRecvUpstreamRstStream, errStreamDrain, errStreamFlowControl, errIllegalHeaderWrite, errStreamIsDone, errMaxStreamExceeded,
+				errHTTP2Stream, errClosedWithoutTrailer, errMiddleHeader, errDecodeHeader, errRecvDownStreamRstStream, errRecvUpstreamRstStream, errStreamDrain, errStreamFlowControl, errIllegalHeaderWrite, errStreamIsDone, errMaxStreamExceeded, errRecvDownStreamGracefulShutdown,
 				errHTTP2Connection, errEstablishConnection, errHandleGoAway, errKeepAlive, errOperateHeaders, errNoActiveStream, errControlBufFinished, errNotReachable, errConnectionIsClosing,
 			},
 			want: []codes.Code{
 				codes.Code(200), codes.Code(201), codes.Code(202), codes.Code(203),
 				codes.Code(204), codes.Code(205),
-				codes.Code(10000), codes.Code(10001), codes.Code(10002), codes.Code(10003), codes.Code(10004), codes.Code(10005), codes.Code(10006), codes.Code(10007), codes.Code(10008), codes.Code(10009), codes.Code(10010),
+				codes.Code(10000), codes.Code(10001), codes.Code(10002), codes.Code(10003), codes.Code(10004), codes.Code(10005), codes.Code(10006), codes.Code(10007), codes.Code(10008), codes.Code(10009), codes.Code(10010), codes.Code(10011),
 				codes.Code(11000), codes.Code(11001), codes.Code(11002), codes.Code(11003), codes.Code(11004), codes.Code(11005), codes.Code(11006), codes.Code(11007), codes.Code(11008),
 			},
 			setup: customSetup,

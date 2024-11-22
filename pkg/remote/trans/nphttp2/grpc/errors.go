@@ -37,17 +37,18 @@ import (
 // This file contains all the errors suitable for Kitex errors model.
 var (
 	// stream error
-	errHTTP2Stream             = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "HTTP2Stream err when parsing HTTP2 frame")
-	errClosedWithoutTrailer    = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "client received Data frame with END_STREAM flag")
-	errMiddleHeader            = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "Headers frame appeared in the middle of a stream")
-	errDecodeHeader            = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "decoded Headers frame failed")
-	errRecvDownStreamRstStream = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "received RstStream frame from downstream")
-	errRecvUpstreamRstStream   = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "receive RstStream frame fron upstream")
-	errStreamDrain             = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "stream rejected by draining connection")
-	errStreamFlowControl       = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "stream-level flow control")
-	errIllegalHeaderWrite      = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "Headers frame has been already sent by server")
-	errStreamIsDone            = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "stream is done")
-	errMaxStreamExceeded       = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "max stream exceeded")
+	errHTTP2Stream                    = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "HTTP2Stream err when parsing HTTP2 frame")
+	errClosedWithoutTrailer           = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "client received Data frame with END_STREAM flag")
+	errMiddleHeader                   = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "Headers frame appeared in the middle of a stream")
+	errDecodeHeader                   = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "decoded Headers frame failed")
+	errRecvDownStreamRstStream        = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "received RstStream frame from downstream")
+	errRecvUpstreamRstStream          = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "receive RstStream frame fron upstream")
+	errStreamDrain                    = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "stream rejected by draining connection")
+	errStreamFlowControl              = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "stream-level flow control")
+	errIllegalHeaderWrite             = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "Headers frame has been already sent by server")
+	errStreamIsDone                   = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "stream is done")
+	errMaxStreamExceeded              = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "max stream exceeded")
+	errRecvDownStreamGracefulShutdown = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "received graceful shutdown from downstream")
 
 	// connection error
 	errHTTP2Connection     = fmt.Errorf("%w - %s", kerrors.ErrStreamingProtocol, "HTTP2Connection err when parsing HTTP2 frame")
@@ -75,22 +76,24 @@ var rstCode2ErrMap = map[http2.ErrCode]error{
 	http2.ErrCode(1010): errClosedWithoutTrailer,
 	http2.ErrCode(1011): errStreamFlowControl,
 	http2.ErrCode(1012): kerrors.ErrMetaSizeExceeded,
+	http2.ErrCode(1013): errRecvDownStreamGracefulShutdown,
 }
 
 var err2RstCodeMap = map[error]http2.ErrCode{
-	kerrors.ErrGracefulShutdown:     http2.ErrCode(1000),
-	kerrors.ErrBizCanceled:          http2.ErrCode(1001),
-	kerrors.ErrServerStreamFinished: http2.ErrCode(1002),
-	kerrors.ErrStreamingCanceled:    http2.ErrCode(1003),
-	errRecvDownStreamRstStream:      http2.ErrCode(1004),
-	errRecvUpstreamRstStream:        http2.ErrCode(1005),
-	kerrors.ErrStreamTimeout:        http2.ErrCode(1006),
-	errMiddleHeader:                 http2.ErrCode(1007),
-	errDecodeHeader:                 http2.ErrCode(1008),
-	errHTTP2Stream:                  http2.ErrCode(1009),
-	errClosedWithoutTrailer:         http2.ErrCode(1010),
-	errStreamFlowControl:            http2.ErrCode(1011),
-	kerrors.ErrMetaSizeExceeded:     http2.ErrCode(1012),
+	kerrors.ErrGracefulShutdown:       http2.ErrCode(1000),
+	kerrors.ErrBizCanceled:            http2.ErrCode(1001),
+	kerrors.ErrServerStreamFinished:   http2.ErrCode(1002),
+	kerrors.ErrStreamingCanceled:      http2.ErrCode(1003),
+	errRecvDownStreamRstStream:        http2.ErrCode(1004),
+	errRecvUpstreamRstStream:          http2.ErrCode(1005),
+	kerrors.ErrStreamTimeout:          http2.ErrCode(1006),
+	errMiddleHeader:                   http2.ErrCode(1007),
+	errDecodeHeader:                   http2.ErrCode(1008),
+	errHTTP2Stream:                    http2.ErrCode(1009),
+	errClosedWithoutTrailer:           http2.ErrCode(1010),
+	errStreamFlowControl:              http2.ErrCode(1011),
+	kerrors.ErrMetaSizeExceeded:       http2.ErrCode(1012),
+	errRecvDownStreamGracefulShutdown: http2.ErrCode(1013),
 }
 
 // err2StatusCodeMap contains the custom status code mapping for the error.
@@ -103,17 +106,18 @@ var err2StatusCodeMap = map[error]codes.Code{
 	kerrors.ErrStreamTimeout:        codes.Code(204),
 	kerrors.ErrMetaSizeExceeded:     codes.Code(205),
 	// stream error
-	errHTTP2Stream:             codes.Code(10000),
-	errClosedWithoutTrailer:    codes.Code(10001),
-	errMiddleHeader:            codes.Code(10002),
-	errDecodeHeader:            codes.Code(10003),
-	errRecvDownStreamRstStream: codes.Code(10004),
-	errRecvUpstreamRstStream:   codes.Code(10005),
-	errStreamDrain:             codes.Code(10006),
-	errStreamFlowControl:       codes.Code(10007),
-	errIllegalHeaderWrite:      codes.Code(10008),
-	errStreamIsDone:            codes.Code(10009),
-	errMaxStreamExceeded:       codes.Code(10010),
+	errHTTP2Stream:                    codes.Code(10000),
+	errClosedWithoutTrailer:           codes.Code(10001),
+	errMiddleHeader:                   codes.Code(10002),
+	errDecodeHeader:                   codes.Code(10003),
+	errRecvDownStreamRstStream:        codes.Code(10004),
+	errRecvUpstreamRstStream:          codes.Code(10005),
+	errStreamDrain:                    codes.Code(10006),
+	errStreamFlowControl:              codes.Code(10007),
+	errIllegalHeaderWrite:             codes.Code(10008),
+	errStreamIsDone:                   codes.Code(10009),
+	errMaxStreamExceeded:              codes.Code(10010),
+	errRecvDownStreamGracefulShutdown: codes.Code(10011),
 	// connection error
 	errHTTP2Connection:     codes.Code(11000),
 	errEstablishConnection: codes.Code(11001),
