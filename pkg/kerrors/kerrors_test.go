@@ -47,6 +47,17 @@ func TestIsKitexError(t *testing.T) {
 		ErrNoMoreInstance,
 		ErrConnOverLimit,
 		ErrQPSOverLimit,
+		// streaming errors
+		errStreaming,
+		ErrStreamingProtocol,
+		errStreamingTimeout,
+		ErrStreamTimeout,
+		ErrStreamingCanceled,
+		ErrBizCanceled,
+		ErrGracefulShutdown,
+		ErrServerStreamFinished,
+		errStreamingMeta,
+		ErrMetaSizeExceeded,
 	}
 	for _, e := range errs {
 		test.Assert(t, IsKitexError(e))
@@ -76,7 +87,7 @@ func TestIs(t *testing.T) {
 func TestError(t *testing.T) {
 	basic := "basic"
 	extra := "extra"
-	be := &basicError{basic}
+	be := &basicError{message: basic}
 	test.Assert(t, be.Error() == basic)
 	detailedMsg := appendErrMsg(basic, extra)
 	test.Assert(t, (&DetailedError{basic: be, extraMsg: extra}).Error() == detailedMsg)
@@ -84,7 +95,7 @@ func TestError(t *testing.T) {
 
 func TestWithCause(t *testing.T) {
 	ae := errors.New("any error")
-	be := &basicError{"basic"}
+	be := &basicError{message: "basic"}
 	de := be.WithCause(ae)
 
 	test.Assert(t, be.Error() == "basic")
@@ -102,7 +113,7 @@ func TestWithCause(t *testing.T) {
 
 func TestWithCauseAndStack(t *testing.T) {
 	ae := errors.New("any error")
-	be := &basicError{"basic"}
+	be := &basicError{message: "basic"}
 	stack := string(debug.Stack())
 	de := be.WithCauseAndStack(ae, stack)
 
@@ -135,7 +146,7 @@ func TestTimeout(t *testing.T) {
 		return os.IsTimeout(err)
 	}
 
-	ke = &basicError{"non-timeout"}
+	ke = &basicError{message: "non-timeout"}
 	TimeoutCheckFunc = osCheck
 	test.Assert(t, !IsTimeoutError(ke))
 	TimeoutCheckFunc = nil
@@ -173,7 +184,7 @@ func TestTimeout(t *testing.T) {
 }
 
 func TestWithCause1(t *testing.T) {
-	ae := &basicError{"basic"}
+	ae := &basicError{message: "basic"}
 	be := ErrRPCTimeout.WithCause(ae)
 	if e2, ok := be.(*DetailedError); ok {
 		e2.WithExtraMsg("retry circuite break")
@@ -218,7 +229,7 @@ func BenchmarkWithCause3(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ae := &basicError{"basic"}
+		ae := &basicError{message: "basic"}
 		be := ErrRPCTimeout.WithCause(ae)
 		if e2, ok := be.(*DetailedError); ok {
 			e2.WithExtraMsg("测试")

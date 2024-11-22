@@ -34,7 +34,9 @@ import (
 	"sync"
 	"sync/atomic"
 
+	istatus "github.com/cloudwego/kitex/internal/remote/trans/grpc/status"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
@@ -198,7 +200,7 @@ func (r *recvBufferReader) readClient(p []byte) (n int, err error) {
 		// TODO: delaying ctx error seems like a unnecessary side effect. What
 		// we really want is to mark the stream as done, and return ctx error
 		// faster.
-		r.closeStream(ContextErr(r.ctx.Err()))
+		r.closeStream(clientContextErr(r.ctx.Err()))
 		m := <-r.recv.get()
 		return r.readAdditional(m, p)
 	case m := <-r.recv.get():
@@ -236,7 +238,7 @@ type Stream struct {
 	st           ServerTransport  // nil for client side Stream
 	ct           *http2Client     // nil for server side Stream
 	ctx          context.Context  // the associated context of the stream
-	cancel       cancelWithReason // always nil for client side Stream
+	cancelFunc   cancelWithReason // always nil for client side Stream
 	done         chan struct{}    // closed at the end of stream to unblock writers. On the client side.
 	ctxDone      <-chan struct{}  // same as done chan but for server side. Cache of ctx.Done() (for performance)
 	method       string           // the associated RPC method of the stream
@@ -276,7 +278,7 @@ type Stream struct {
 
 	// On client-side it is the status error received from the server.
 	// On server-side it is unused.
-	status       *status.Status
+	status       *istatus.Status
 	bizStatusErr kerrors.BizStatusErrorIface
 
 	bytesReceived uint32 // indicates whether any bytes have been received on this stream
@@ -285,6 +287,11 @@ type Stream struct {
 	// contentSubtype is the content-subtype for requests.
 	// this must be lowercase or the behavior is undefined.
 	contentSubtype string
+
+	// closeStreamErr is used to store the error when stream is closed
+	closeStreamErr atomic.Value
+	// sourceService is the source service name of this stream
+	sourceService string
 }
 
 // isHeaderSent is only valid on the server-side.
@@ -479,6 +486,28 @@ func (s *Stream) Read(p []byte) (n int, err error) {
 	return io.ReadFull(s.trReader, p)
 }
 
+func (s *Stream) getCloseStreamErr() error {
+	rawErr := s.closeStreamErr.Load()
+	if rawErr != nil {
+		return rawErr.(error)
+	}
+	return errStatusStreamDone
+}
+
+// err should be of the same type
+func (s *Stream) cancel(err error) {
+	if err == nil {
+		s.cancelFunc(nil)
+		return
+	}
+	if _, ok := err.(*istatus.Error); !ok {
+		klog.CtxWarnf(s.ctx, "KITEX: stream canceled with non status.Error: %v", err)
+		err = newStatus(codes.Canceled, kerrors.ErrStreamingCanceled, err.Error()).Err()
+	}
+	// all errors propagated by cancelFunc must be of type *status.Error or nil
+	s.cancelFunc(err)
+}
+
 // StreamWrite only used for unit test
 func StreamWrite(s *Stream, buffer *bytes.Buffer) {
 	s.write(recvMsg{buffer: buffer})
@@ -496,10 +525,8 @@ func CreateStream(ctx context.Context, id uint32, requestRead func(i int), metho
 		},
 		windowHandler: func(i int) {},
 	}
-
 	stream := &Stream{
 		id:          id,
-		ctx:         ctx,
 		method:      method,
 		buf:         recvBuffer,
 		trReader:    trReader,
@@ -507,6 +534,9 @@ func CreateStream(ctx context.Context, id uint32, requestRead func(i int), metho
 		requestRead: requestRead,
 		hdrMu:       sync.Mutex{},
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	stream.ctx, stream.cancelFunc = newContextWithCancelReason(ctx, cancel)
 
 	return stream
 }
@@ -762,20 +792,19 @@ func (e ConnectionError) Origin() error {
 
 var (
 	// ErrConnClosing indicates that the transport is closing.
-	ErrConnClosing = connectionErrorf(true, nil, "transport is closing")
+	ErrConnClosing              = connectionErrorf(true, nil, "transport is closing")
+	errStatusConnClosing        = newStatus(codes.Unavailable, errConnectionIsClosing, "transport is closing").Err()
+	errStatusControlBufFinished = newStatus(codes.Unavailable, errControlBufFinished, "controlbuf finished").Err()
 
 	// errStreamDone is returned from write at the client side to indicate application
 	// layer of an error.
-	errStreamDone = errors.New("the stream is done")
+	errStreamDone       = errors.New("the stream is done")
+	errStatusStreamDone = newStatus(codes.Internal, errStreamIsDone, errStreamDone.Error()).Err()
 
-	// errStreamDrain indicates that the stream is rejected because the
+	// errStatusStreamDrain indicates that the stream is rejected because the
 	// connection is draining. This could be caused by goaway or balancer
 	// removing the address.
-	errStreamDrain = status.New(codes.Unavailable, "the connection is draining").Err()
-
-	// StatusGoAway indicates that the server sent a GOAWAY that included this
-	// stream's ID in unprocessed RPCs.
-	statusGoAway = status.New(codes.Unavailable, "the stream is rejected because server is draining the connection")
+	errStatusStreamDrain = newStatus(codes.Unavailable, errStreamDrain, "the connection is draining").Err()
 )
 
 // GoAwayReason contains the reason for the GoAway frame received.
@@ -796,15 +825,35 @@ const (
 func ContextErr(err error) error {
 	switch err {
 	case context.DeadlineExceeded:
-		return status.New(codes.DeadlineExceeded, err.Error()).Err()
+		return newStatus(codes.DeadlineExceeded, kerrors.ErrStreamTimeout, err.Error()).Err()
 	case context.Canceled:
-		return status.New(codes.Canceled, err.Error()).Err()
+		return newStatus(codes.Canceled, kerrors.ErrBizCanceled, err.Error()).Err()
 	}
-	statusErr, ok := err.(*status.Error)
+	statusErr, ok := err.(*istatus.Error)
 	if ok { // only returned by contextWithCancelReason
 		return statusErr
 	}
-	return status.Errorf(codes.Internal, "Unexpected error from context packet: %v", err)
+	return newStatusf(codes.Internal, kerrors.ErrStreamingCanceled, "Unexpected error from context packet: %v", err).Err()
+}
+
+// clientContextErr converts the error from context package into a status error
+// when the error is passed through streams by cancel.
+func clientContextErr(err error) error {
+	stErr := ContextErr(err).(*istatus.Error)
+	mappingErr := istatus.GetMappingErr(stErr)
+	// errors could pass through streams by cancel
+	// e.g. A -> B -> C
+	// stream between A and B closed by Graceful Shutdown, BC.Recv() could get kerrors.ErrGracefulShutdown
+	if _, ok := crossStreamErrMap[mappingErr]; ok {
+		return stErr
+	}
+	// Other errs are treated as kerrors.ErrStreamingCanceled
+	// when passed through streams by cancel.
+	// Then users could use errors.Is(err, kerrors.ErrStreamingCanceled)
+	// to check if an exception in the upstream stream caused cancel to be delivered
+	st := stErr.GRPCStatus()
+	istatus.InjectMappingErr(st, kerrors.ErrStreamingCanceled)
+	return st.Err()
 }
 
 // IsStreamDoneErr returns true if the error indicates that the stream is done.
@@ -839,4 +888,20 @@ func tlsAppendH2ToALPNProtocols(ps []string) []string {
 	ret := make([]string, 0, len(ps)+1)
 	ret = append(ret, ps...)
 	return append(ret, alpnProtoStrH2)
+}
+
+var (
+	sendRSTStreamFrameSuffix       = " [send RSTStream Frame]"
+	triggeredByRemoteServiceSuffix = " [triggered by remote service]"
+	triggeredByHandlerSideSuffix   = " [triggered by handler side]"
+)
+
+func newStatus(def codes.Code, mappingErr error, msg string) *istatus.Status {
+	code := getStatusCode(def, mappingErr)
+	return istatus.NewWithMappingErr(code, mappingErr, msg)
+}
+
+func newStatusf(def codes.Code, mappingErr error, format string, a ...interface{}) *istatus.Status {
+	code := getStatusCode(def, mappingErr)
+	return istatus.NewfWithMappingErr(code, mappingErr, format, a...)
 }

@@ -24,6 +24,8 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
 func TestConnPool(t *testing.T) {
@@ -77,7 +79,7 @@ func TestReleaseConn(t *testing.T) {
 	// close stream to ensure no active stream on this connection,
 	// which will be released when put back to the connection pool and closed by GracefulClose
 	s := conn.(*clientConn).s
-	conn.(*clientConn).tr.CloseStream(s, nil)
+	conn.(*clientConn).tr.CloseStream(s, status.Err(codes.Internal, "test"))
 	test.Assert(t, err == nil, err)
 	time.Sleep(100 * time.Millisecond)
 	shortCP.Put(conn)

@@ -18,8 +18,10 @@ package nphttp2
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
+	istatus "github.com/cloudwego/kitex/internal/remote/trans/grpc/status"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -100,5 +102,11 @@ func TestConvertStatus(t *testing.T) {
 
 	t.Run("user-defined-error", func(t *testing.T) {
 		test.Assert(t, convertStatus(&mockError{}).Code() == codes.Internal)
+	})
+
+	t.Run("GRPCStatusError with mapping Err", func(t *testing.T) {
+		oriSt := istatus.NewWithMappingErr(codes.Internal, errors.New("test"), "test")
+		st := convertStatus(oriSt.Err())
+		test.Assert(t, reflect.DeepEqual(st, oriSt), st)
 	})
 }

@@ -32,6 +32,7 @@ import (
 	"golang.org/x/net/http2/hpack"
 
 	"github.com/cloudwego/kitex/internal/utils/safemcache"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 )
 
@@ -453,7 +454,7 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 		select {
 		case <-c.ch:
 		case <-c.done:
-			return nil, c.finish(ErrConnClosing)
+			return nil, c.finish(errStatusControlBufFinished)
 		}
 	}
 }
@@ -569,7 +570,7 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 			err = nil
 		}
 		// make sure the Graceful Shutdown behaviour triggered
-		if errors.Is(err, errGracefulShutdown) {
+		if errors.Is(err, kerrors.ErrGracefulShutdown) {
 			l.framer.writer.Flush()
 		}
 	}()
@@ -704,7 +705,7 @@ func (l *loopyWriter) originateStream(str *outStream) error {
 		if err == ErrConnClosing {
 			return err
 		}
-		// Other errors(errStreamDrain) need not close transport.
+		// Other errors(errStatusStreamDrain) need not close transport.
 		return nil
 	}
 	if err := l.writeHeader(str.id, hdr.endStream, hdr.hf, hdr.onWrite); err != nil {
