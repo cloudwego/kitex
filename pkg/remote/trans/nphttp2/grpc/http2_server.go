@@ -80,6 +80,8 @@ var (
 				Err()
 	errStatusHandlerReturn = newStatus(codes.Canceled, kerrors.ErrServerStreamFinished, "transport: handler return"+triggeredByHandlerSideSuffix).
 				Err()
+	errStatusGracefulShutdown = newStatus(codes.Canceled, kerrors.ErrGracefulShutdown, gracefulShutdownMsg).
+					Err()
 )
 
 func init() {
@@ -1011,7 +1013,7 @@ func (t *http2Server) Close() error {
 	t.activeStreams = nil
 	t.mu.Unlock()
 
-	finishErr := errGracefulShutdown
+	finishErr := errStatusGracefulShutdown
 	finishCh := make(chan struct{}, 1)
 	activeNums := t.rstActiveStreams(streams, finishErr, gracefulShutdownCode, finishCh)
 	if activeNums == 0 {

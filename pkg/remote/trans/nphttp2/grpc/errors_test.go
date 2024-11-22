@@ -154,7 +154,7 @@ func Test_getMappingErrAndStatusCode(t *testing.T) {
 			}{
 				{
 					err:    kerrors.ErrGracefulShutdown,
-					stCode: codes.Canceled,
+					stCode: codes.Unavailable,
 				},
 				{
 					err:    kerrors.ErrBizCanceled,

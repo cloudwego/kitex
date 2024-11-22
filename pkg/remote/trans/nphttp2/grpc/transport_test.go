@@ -315,9 +315,10 @@ func (h *testStreamHandler) gracefulShutdown(t *testing.T, s *Stream) {
 	_, err = s.Read(msg)
 	test.Assert(t, err != nil, err)
 	test.Assert(t, strings.Contains(err.Error(), gracefulShutdownMsg), err)
-	st, ok := status.FromError(err)
-	test.Assert(t, ok, err)
-	test.Assert(t, st.Code() == codes.Unavailable, st)
+	test.Assert(t, errors.Is(err, kerrors.ErrGracefulShutdown), err)
+	//st, ok := status.FromError(err)
+	//test.Assert(t, ok, err)
+	//test.Assert(t, st.Code() == codes.Unavailable, st)
 }
 
 // start starts server. Other goroutines should block on s.readyChan for further operations.

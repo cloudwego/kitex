@@ -24,10 +24,15 @@ import (
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 )
 
 func TestGracefulShutdown(t *testing.T) {
+	SetCustomRstCodeEnabled(true)
+	defer func() {
+		SetCustomRstCodeEnabled(false)
+	}()
 	onGoAwayCh := make(chan struct{})
 	srv, cli := setUpWithOnGoAway(t, 10000, &ServerConfig{MaxStreams: math.MaxUint32}, gracefulShutdown, ConnectOptions{}, func(reason GoAwayReason) {
 		close(onGoAwayCh)
@@ -55,6 +60,7 @@ func TestGracefulShutdown(t *testing.T) {
 	_, err = stream.Read(msg)
 	test.Assert(t, err != nil, err)
 	st := stream.Status()
-	test.Assert(t, strings.Contains(st.Message(), gracefulShutdownMsg), st.Message())
+	test.Assert(t, errors.Is(st.Err(), kerrors.ErrGracefulShutdown), st)
+	test.Assert(t, strings.Contains(st.Err().Error(), gracefulShutdownMsg), st.Message())
 	test.Assert(t, st.Code() == codes.Unavailable, st.Code())
 }

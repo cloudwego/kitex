@@ -22,7 +22,6 @@ package grpc
 
 import (
 	"context"
-	"errors"
 	"io"
 	"math"
 	"net"
@@ -542,11 +541,7 @@ func (t *http2Client) CloseStream(s *Stream, err error) {
 	)
 	if err != nil {
 		rst = true
-		if errors.Is(err, errGracefulShutdown) {
-			rstCode = gracefulShutdownCode
-		} else {
-			rstCode = http2.ErrCodeCancel
-		}
+		rstCode = http2.ErrCodeCancel
 		klog.CtxInfof(s.ctx, "KITEX: stream closed by ctx canceled, err: %v"+sendRSTStreamFrameSuffix, err)
 	}
 	t.closeStream(s, err, rst, rstCode, istatus.Convert(err), nil, false)
@@ -835,7 +830,7 @@ func (t *http2Client) handleRSTStream(f *http2.RSTStreamFrame) {
 
 	mappingErr, stCode := getMappingErrAndStatusCode(s.ctx, f.ErrCode, clientSide)
 
-	st := newStatusf(stCode, mappingErr, "stream terminated by RST_STREAM with error code: %v", f.ErrCode)
+	st := newStatusf(stCode, mappingErr, "stream terminated by RST_STREAM with error code: %d", f.ErrCode)
 	t.closeStream(s, io.EOF, false, http2.ErrCodeNo, st, nil, false)
 }
 
@@ -978,7 +973,8 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 	// Pls refer to checkForStreamQuota in NewStream, it gets the controlbuf.mu and
 	// wants to get the t.mu.
 	for _, stream := range unprocessedStream {
-		t.closeStream(stream, errStreamDrain, false, http2.ErrCodeNo, statusGoAway, nil, false)
+		st := newStatus(codes.Unavailable, errStreamDrain, "the stream is rejected because server is draining the connection")
+		t.closeStream(stream, st.Err(), false, http2.ErrCodeNo, st, nil, false)
 	}
 }
 

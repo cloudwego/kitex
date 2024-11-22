@@ -32,6 +32,7 @@ import (
 	"golang.org/x/net/http2/hpack"
 
 	"github.com/cloudwego/kitex/internal/utils/safemcache"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 )
 
@@ -569,7 +570,7 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 			err = nil
 		}
 		// make sure the Graceful Shutdown behaviour triggered
-		if errors.Is(err, errGracefulShutdown) {
+		if errors.Is(err, kerrors.ErrGracefulShutdown) {
 			l.framer.writer.Flush()
 		}
 	}()
