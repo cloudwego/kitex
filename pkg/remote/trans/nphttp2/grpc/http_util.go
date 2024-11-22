@@ -77,6 +77,7 @@ var (
 		http2.ErrCodeEnhanceYourCalm:    codes.ResourceExhausted,
 		http2.ErrCodeInadequateSecurity: codes.PermissionDenied,
 		http2.ErrCodeHTTP11Required:     codes.Internal,
+		gracefulShutdownCode:            codes.Unavailable,
 	}
 	statusCodeConvTab = map[codes.Code]http2.ErrCode{
 		codes.Internal:          http2.ErrCodeInternal,

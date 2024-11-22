@@ -341,3 +341,26 @@ func TestSvrTransHandlerProtocolMatch(t *testing.T) {
 	err = th.ProtocolMatch(context.Background(), rawConn)
 	test.Assert(t, err != nil, err)
 }
+
+func Test_parseGraceAndPollTime(t *testing.T) {
+	// without timeout in ctx
+	ctx := context.Background()
+	graceTime, pollTime := parseGraceAndPollTime(ctx)
+	test.Assert(t, graceTime == defaultGraceTime, graceTime)
+	test.Assert(t, pollTime == defaultMaxPollTime, pollTime)
+
+	// with timeout longer than default timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	graceTime, pollTime = parseGraceAndPollTime(ctx)
+	test.Assert(t, graceTime > defaultGraceTime, graceTime)
+	// defaultMaxPollTime is the max poll time
+	test.Assert(t, pollTime == defaultMaxPollTime, pollTime)
+
+	// with timeout shorter than default timeout
+	ctx, cancel = context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+	graceTime, pollTime = parseGraceAndPollTime(ctx)
+	test.Assert(t, graceTime < defaultGraceTime, graceTime)
+	test.Assert(t, pollTime < defaultMaxPollTime, pollTime)
+}

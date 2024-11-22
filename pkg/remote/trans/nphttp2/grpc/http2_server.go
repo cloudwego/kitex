@@ -50,6 +50,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
+const (
+	gracefulShutdownCode = http2.ErrCode(1000)
+	gracefulShutdownMsg  = "graceful shutdown"
+)
+
 var (
 	// ErrIllegalHeaderWrite indicates that setting header is illegal because of
 	// the stream's state.
@@ -57,7 +62,8 @@ var (
 
 	// ErrHeaderListSizeLimitViolation indicates that the header list size is larger
 	// than the limit set by peer.
-	ErrHeaderListSizeLimitViolation = errors.New("transport: trying to send header list size larger than the limit set by peer")
+	ErrHeaderListSizeLimitViolation       = errors.New("transport: trying to send header list size larger than the limit set by peer")
+	errStatusHeaderListSizeLimitViolation = status.Err(codes.Internal, ErrHeaderListSizeLimitViolation.Error())
 
 	// errors used for cancelling stream.
 	// the code should be codes.Canceled coz it's NOT returned from remote
@@ -67,6 +73,8 @@ var (
 	errNotReachable       = status.New(codes.Canceled, "transport: server not reachable").Err()
 	errMaxAgeClosing      = status.New(codes.Canceled, "transport: closing server transport due to maximum connection age").Err()
 	errIdleClosing        = status.New(codes.Canceled, "transport: closing server transport due to idleness").Err()
+
+	errGracefulShutdown = status.Err(codes.Unavailable, gracefulShutdownMsg)
 )
 
 func init() {
@@ -81,7 +89,7 @@ type http2Server struct {
 	conn        net.Conn
 	loopy       *loopyWriter
 	readerDone  chan struct{} // sync point to enable testing.
-	writerDone  chan struct{} // sync point to enable testing.
+	writerDone  chan struct{} // denote that the loopyWriter has stopped.
 	remoteAddr  net.Addr
 	localAddr   net.Addr
 	maxStreamID uint32 // max stream ID ever seen
@@ -115,9 +123,11 @@ type http2Server struct {
 	// During this time we don't want to write another first GoAway(with ID 2^31 -1) frame.
 	// Thus call to drain(...) will be a no-op if drainChan is already initialized since draining is
 	// already underway.
-	drainChan     chan struct{}
-	state         transportState
-	activeStreams map[uint32]*Stream
+	drainChan chan struct{}
+	// denote that drainChan has been closed to prevent remote side sending more ping Ack with goAway
+	drainChanClosed bool
+	state           transportState
+	activeStreams   map[uint32]*Stream
 	// idle is the time instant when the connection went idle.
 	// This is either the beginning of the connection or when the number of
 	// RPCs go down to 0.
@@ -279,8 +289,9 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 	gofunc.RecoverGoFuncWithInfo(ctx, func() {
 		t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst)
 		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
-		if err := t.loopy.run(conn.RemoteAddr().String()); err != nil {
-			klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v", err)
+		runErr := t.loopy.run(conn.RemoteAddr().String())
+		if runErr != nil {
+			klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v", runErr)
 		}
 		t.conn.Close()
 		close(t.writerDone)
@@ -408,7 +419,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 					// it will be codes.Internal error for GRPC
 					// TODO: map http2.StreamError to status.Error?
 					s.cancel(err)
-					t.closeStream(s, true, se.Code, false)
+					t.closeStream(s, status.Errorf(codes.Canceled, "transport: ReadFrame encountered http2.StreamError: %v", err), true, se.Code, false)
 				} else {
 					t.controlBuf.put(&cleanupStream{
 						streamID: se.StreamID,
@@ -551,7 +562,7 @@ func (t *http2Server) handleData(f *grpcframe.DataFrame) {
 	}
 	if size > 0 {
 		if err := s.fc.onData(size); err != nil {
-			t.closeStream(s, true, http2.ErrCodeFlowControl, false)
+			t.closeStream(s, status.Errorf(codes.Canceled, "transport: inflow control err: %v", err), true, http2.ErrCodeFlowControl, false)
 			return
 		}
 		if f.Header().Flags.Has(http2.FlagDataPadded) {
@@ -579,7 +590,11 @@ func (t *http2Server) handleData(f *grpcframe.DataFrame) {
 func (t *http2Server) handleRSTStream(f *http2.RSTStreamFrame) {
 	// If the stream is not deleted from the transport's active streams map, then do a regular close stream.
 	if s, ok := t.getStream(f); ok {
-		t.closeStream(s, false, 0, false)
+		if f.ErrCode == gracefulShutdownCode {
+			t.closeStream(s, errGracefulShutdown, false, 0, false)
+		} else {
+			t.closeStream(s, status.Errorf(codes.Canceled, "transport: RSTStream Frame received with error code: %v", f.ErrCode), false, 0, false)
+		}
 		return
 	}
 	// If the stream is already deleted from the active streams map, then put a cleanupStream item into controlbuf to delete the stream from loopy writer's established streams map.
@@ -626,9 +641,13 @@ const (
 
 func (t *http2Server) handlePing(f *http2.PingFrame) {
 	if f.IsAck() {
-		if f.Data == goAwayPing.data && t.drainChan != nil {
-			close(t.drainChan)
-			return
+		if f.Data == goAwayPing.data {
+			t.mu.Lock()
+			if !t.drainChanClosed {
+				close(t.drainChan)
+				t.drainChanClosed = true
+			}
+			t.mu.Unlock()
 		}
 		// Maybe it's a BDP ping.
 		if t.bdpEst != nil {
@@ -756,7 +775,7 @@ func (t *http2Server) writeHeaderLocked(s *Stream) error {
 		if err != nil {
 			return err
 		}
-		t.closeStream(s, true, http2.ErrCodeInternal, false)
+		t.closeStream(s, errStatusHeaderListSizeLimitViolation, true, http2.ErrCodeInternal, false)
 		return ErrHeaderListSizeLimitViolation
 	}
 	return nil
@@ -819,7 +838,7 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 		if err != nil {
 			return err
 		}
-		t.closeStream(s, true, http2.ErrCodeInternal, false)
+		t.closeStream(s, errStatusHeaderListSizeLimitViolation, true, http2.ErrCodeInternal, false)
 		return ErrHeaderListSizeLimitViolation
 	}
 	// Send a RST_STREAM after the trailers if the client has not already half-closed.
@@ -910,12 +929,12 @@ func (t *http2Server) keepalive() {
 			if val <= 0 {
 				// The connection has been idle for a duration of keepalive.MaxConnectionIdle or more.
 				// Gracefully close the connection.
-				t.drain(http2.ErrCodeNo, []byte{})
+				t.drain(http2.ErrCodeNo, []byte("idleTimeout"))
 				return
 			}
 			idleTimer.Reset(val)
 		case <-ageTimer.C:
-			t.drain(http2.ErrCodeNo, []byte{})
+			t.drain(http2.ErrCodeNo, []byte("ageTimeout"))
 			ageTimer.Reset(t.kp.MaxConnectionAgeGrace)
 			select {
 			case <-ageTimer.C:
@@ -963,7 +982,71 @@ func (t *http2Server) keepalive() {
 // TODO(zhaoq): Now the destruction is not blocked on any pending streams. This
 // could cause some resource issue. Revisit this later.
 func (t *http2Server) Close() error {
-	return t.closeWithErr(nil)
+	t.mu.Lock()
+	if t.state == closing {
+		t.mu.Unlock()
+		return nil
+	}
+	t.state = closing
+	streams := t.activeStreams
+	t.activeStreams = nil
+	t.mu.Unlock()
+
+	finishErr := errGracefulShutdown
+	finishCh := make(chan struct{}, 1)
+	activeNums := t.rstActiveStreams(streams, finishErr, gracefulShutdownCode, finishCh)
+	if activeNums == 0 {
+		t.closeLoopyWriter(finishErr)
+		return nil
+	}
+	for {
+		select {
+		// wait for all the RstStream Frames to be written
+		case <-finishCh:
+			activeNums--
+			if activeNums == 0 {
+				t.closeLoopyWriter(finishErr)
+				return nil
+			}
+		// loopyWriter has quited, there is no chance to write the RstStream Frame
+		case <-t.writerDone:
+			t.closeLoopyWriter(finishErr)
+			return nil
+		}
+	}
+}
+
+func (t *http2Server) closeLoopyWriter(err error) {
+	t.controlBuf.finish(err)
+	close(t.done)
+	// make use of loopyWriter.run returning to close the connection
+	// there is no need to close the connection manually
+	<-t.writerDone
+}
+
+// rstActiveStreams sends RSTStream frames to all active streams.
+func (t *http2Server) rstActiveStreams(streams map[uint32]*Stream, cancelErr error, rstCode http2.ErrCode, finishCh chan struct{}) (activeStreams int) {
+	for _, s := range streams {
+		oldState := s.swapState(streamDone)
+		if oldState == streamDone {
+			// If the stream was already done, continue
+			continue
+		}
+		activeStreams++
+		// cancel the downstream
+		s.cancel(cancelErr)
+		// send RSTStream Frame to the upstream
+		t.controlBuf.put(&cleanupStream{
+			streamID: s.id,
+			rst:      true,
+			rstCode:  rstCode,
+			onWrite:  func() {},
+			onFinishWrite: func() {
+				finishCh <- struct{}{}
+			},
+		})
+	}
+	return activeStreams
 }
 
 func (t *http2Server) closeWithErr(reason error) error {
@@ -976,7 +1059,7 @@ func (t *http2Server) closeWithErr(reason error) error {
 	streams := t.activeStreams
 	t.activeStreams = nil
 	t.mu.Unlock()
-	t.controlBuf.finish()
+	t.controlBuf.finish(reason)
 	close(t.done)
 	err := t.conn.Close()
 
@@ -1025,7 +1108,11 @@ func (t *http2Server) finishStream(s *Stream, rst bool, rstCode http2.ErrCode, h
 }
 
 // closeStream clears the footprint of a stream when the stream is not needed any more.
-func (t *http2Server) closeStream(s *Stream, rst bool, rstCode http2.ErrCode, eosReceived bool) {
+func (t *http2Server) closeStream(s *Stream, err error, rst bool, rstCode http2.ErrCode, eosReceived bool) {
+	// In case stream sending and receiving are invoked in separate
+	// goroutines (e.g., bi-directional streaming), cancel needs to be
+	// called to interrupt the potential blocking on other goroutines.
+	s.cancel(err)
 	s.swapState(streamDone)
 	t.deleteStream(s, eosReceived)
 
@@ -1046,16 +1133,19 @@ func (t *http2Server) LocalAddr() net.Addr {
 }
 
 func (t *http2Server) Drain() {
-	t.drain(http2.ErrCodeNo, []byte{})
+	t.drain(http2.ErrCodeNo, []byte(gracefulShutdownMsg))
 }
 
 func (t *http2Server) drain(code http2.ErrCode, debugData []byte) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if t.drainChan != nil {
+		t.mu.Unlock()
 		return
 	}
 	t.drainChan = make(chan struct{})
+	t.mu.Unlock()
+	// drain successfully
+	// should release lock before access controlBuf
 	t.controlBuf.put(&goAway{code: code, debugData: debugData, headsUp: true})
 }
 
@@ -1096,7 +1186,7 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 	// originated before the GoAway reaches the client.
 	// After getting the ack or timer expiration send out another GoAway this
 	// time with an ID of the max stream server intends to process.
-	if err := t.framer.WriteGoAway(math.MaxUint32, http2.ErrCodeNo, []byte{}); err != nil {
+	if err := t.framer.WriteGoAway(math.MaxUint32, http2.ErrCodeNo, g.debugData); err != nil {
 		return false, err
 	}
 	if err := t.framer.WritePing(false, goAwayPing.data); err != nil {
@@ -1113,6 +1203,6 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 			return
 		}
 		t.controlBuf.put(&goAway{code: g.code, debugData: g.debugData})
-	}, gofunc.EmptyInfo)
+	}, gofunc.NewBasicInfo("", t.conn.RemoteAddr().String())) // we should create a new BasicInfo here
 	return false, nil
 }
