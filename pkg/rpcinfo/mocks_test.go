@@ -36,6 +36,7 @@ type MockRPCConfig struct {
 	IOBufferSizeFunc      func() (r int)
 	TransportProtocolFunc func() transport.Protocol
 	InteractionModeFunc   func() (r rpcinfo.InteractionMode)
+	StreamingModeFunc     func() (r serviceinfo.StreamingMode)
 }
 
 func (m *MockRPCConfig) PayloadCodec() serviceinfo.PayloadCodec {
@@ -86,6 +87,13 @@ func (m *MockRPCConfig) IOBufferSize() (r int) {
 func (m *MockRPCConfig) TransportProtocol() (r transport.Protocol) {
 	if m.TransportProtocolFunc != nil {
 		return m.TransportProtocolFunc()
+	}
+	return
+}
+
+func (m *MockRPCConfig) StreamingMode() (r serviceinfo.StreamingMode) {
+	if m.StreamingModeFunc != nil {
+		return m.StreamingModeFunc()
 	}
 	return
 }

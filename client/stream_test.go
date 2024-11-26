@@ -29,6 +29,7 @@ import (
 	mocksnet "github.com/cloudwego/kitex/internal/mocks/net"
 	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
@@ -636,4 +637,63 @@ func Test_isRPCError(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		test.Assert(t, isRPCError(errors.New("error")))
 	})
+}
+
+func Test_kClient_Stream_SetStreamingMode(t *testing.T) {
+	testcases := []struct {
+		method string
+		mode   serviceinfo.StreamingMode
+	}{
+		{
+			method: "None",
+			mode:   serviceinfo.StreamingNone,
+		},
+		{
+			method: "Unary",
+			mode:   serviceinfo.StreamingUnary,
+		},
+		{
+			method: "ClientStreaming",
+			mode:   serviceinfo.StreamingClient,
+		},
+		{
+			method: "ServerStreaming",
+			mode:   serviceinfo.StreamingServer,
+		},
+		{
+			method: "BidiStreaming",
+			mode:   serviceinfo.StreamingBidirectional,
+		},
+	}
+	info := &serviceinfo.ServiceInfo{Methods: make(map[string]serviceinfo.MethodInfo)}
+	for _, tc := range testcases {
+		info.Methods[tc.method] = serviceinfo.NewMethodInfo(
+			nil, nil, nil, false,
+			serviceinfo.WithStreamingMode(tc.mode),
+		)
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.method, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			opts := append(newOpts(ctrl), WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
+				return func(ctx context.Context, req, resp interface{}) (err error) {
+					ri := rpcinfo.GetRPCInfo(ctx)
+					test.Assert(t, ri.Config().StreamingMode() == tc.mode)
+					return nil
+				}
+			}))
+
+			kc := &kClient{
+				opt:     client.NewOptions(opts),
+				svcInfo: info,
+			}
+
+			_ = kc.init()
+
+			err := kc.Stream(context.Background(), tc.method, req, resp)
+			test.Assert(t, err == nil, err)
+		})
+	}
 }
