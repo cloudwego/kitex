@@ -188,14 +188,14 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 	}
 
 	if err := framer.WriteSettings(isettings...); err != nil {
-		return nil, status.Errorf(codes.Unavailable, "transport: %v", err)
+		return nil, connectionErrorf(false, err, "transport: %v", err)
 	}
 
 	// Adjust the connection flow control window if needed.
 	if icwz > defaultWindowSize {
 		if delta := icwz - defaultWindowSize; delta > 0 {
 			if err := framer.WriteWindowUpdate(0, delta); err != nil {
-				return nil, status.Errorf(codes.Unavailable, "transport: %v", err)
+				return nil, connectionErrorf(false, err, "transport: %v", err)
 			}
 		}
 	}
@@ -267,23 +267,23 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		if err == io.EOF {
 			return nil, io.EOF
 		}
-		return nil, status.Errorf(codes.Unavailable, "transport: http2Server.HandleStreams failed to receive the preface from client: %v", err)
+		return nil, connectionErrorf(false, err, "transport: http2Server.HandleStreams failed to receive the preface from client: %v", err)
 	}
 	if !bytes.Equal(preface, ClientPreface) {
-		return nil, status.Errorf(codes.Unavailable, "transport: http2Server.HandleStreams received bogus greeting from client: %q", preface)
+		return nil, connectionErrorf(false, nil, "transport: http2Server.HandleStreams received bogus greeting from client: %q", preface)
 	}
 
 	frame, err := t.framer.ReadFrame()
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
-		return nil, status.Errorf(codes.Unavailable, "transport: connection EOF: %v", err)
+		return nil, err
 	}
 	if err != nil {
-		return nil, status.Errorf(codes.Unavailable, "transport: http2Server.HandleStreams failed to read initial settings frame: %v", err)
+		return nil, connectionErrorf(false, err, "transport: http2Server.HandleStreams failed to read initial settings frame: %v", err)
 	}
 	atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())
 	sf, ok := frame.(*grpcframe.SettingsFrame)
 	if !ok {
-		return nil, status.Errorf(codes.Unavailable, "transport: http2Server.HandleStreams saw invalid preface type %T from client", frame)
+		return nil, connectionErrorf(false, nil, "transport: http2Server.HandleStreams saw invalid preface type %T from client", frame)
 	}
 	t.handleSettings(sf)
 

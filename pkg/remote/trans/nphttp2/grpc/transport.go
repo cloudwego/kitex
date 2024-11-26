@@ -775,10 +775,15 @@ func (e ConnectionError) Origin() error {
 	return e.err
 }
 
+// Code returns the error code of this connection error to solve the metrics problem(no error code).
+// It always returns codes.Unavailable to be aligned with official gRPC-go.
+func (e ConnectionError) Code() int32 {
+	return int32(codes.Unavailable)
+}
+
 var (
 	// ErrConnClosing indicates that the transport is closing.
-	ErrConnClosing       = connectionErrorf(true, nil, "transport is closing")
-	errStatusConnClosing = status.Err(codes.Unavailable, "transport is closing")
+	ErrConnClosing = connectionErrorf(true, nil, "transport is closing")
 
 	// errStreamDone is returned from write at the client side to indicate application
 	// layer of an error.
