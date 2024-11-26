@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2"
@@ -58,21 +59,21 @@ const (
 var (
 	// ErrIllegalHeaderWrite indicates that setting header is illegal because of
 	// the stream's state.
-	ErrIllegalHeaderWrite = errors.New("transport: the stream is done or WriteHeader was already called")
+	ErrIllegalHeaderWrite       = errors.New("transport: the stream is done or WriteHeader was already called")
+	errStatusIllegalHeaderWrite = status.Err(codes.Internal, ErrIllegalHeaderWrite.Error()+triggeredByHandlerSideSuffix)
 
 	// ErrHeaderListSizeLimitViolation indicates that the header list size is larger
 	// than the limit set by peer.
 	ErrHeaderListSizeLimitViolation       = errors.New("transport: trying to send header list size larger than the limit set by peer")
-	errStatusHeaderListSizeLimitViolation = status.Err(codes.Internal, ErrHeaderListSizeLimitViolation.Error())
+	errStatusHeaderListSizeLimitViolation = status.Err(codes.Internal, ErrHeaderListSizeLimitViolation.Error()+triggeredByHandlerSideSuffix)
 
 	// errors used for cancelling stream.
 	// the code should be codes.Canceled coz it's NOT returned from remote
-	errConnectionEOF      = status.New(codes.Canceled, "transport: connection EOF").Err()
-	errStreamClosing      = status.New(codes.Canceled, "transport: stream is closing").Err()
-	errMaxStreamsExceeded = status.New(codes.Canceled, "transport: max streams exceeded").Err()
-	errNotReachable       = status.New(codes.Canceled, "transport: server not reachable").Err()
-	errMaxAgeClosing      = status.New(codes.Canceled, "transport: closing server transport due to maximum connection age").Err()
-	errIdleClosing        = status.New(codes.Canceled, "transport: closing server transport due to idleness").Err()
+	errConnectionEOF      = status.Err(codes.Canceled, "transport: connection EOF"+triggeredByRemoteServiceSuffix)
+	errMaxStreamsExceeded = status.Err(codes.Canceled, "transport: max streams exceeded"+triggeredByRemoteServiceSuffix)
+	errNotReachable       = status.Err(codes.Canceled, "transport: server not reachable"+triggeredByRemoteServiceSuffix)
+	errMaxAgeClosing      = status.Err(codes.Canceled, "transport: closing server transport due to maximum connection age"+triggeredByRemoteServiceSuffix)
+	errIdleClosing        = status.Err(codes.Canceled, "transport: closing server transport due to idleness"+triggeredByRemoteServiceSuffix)
 
 	errGracefulShutdown = status.Err(codes.Unavailable, gracefulShutdownMsg)
 )
@@ -310,10 +311,12 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 	}
 	if err := state.decodeHeader(frame); err != nil {
 		if se, ok := status.FromError(err); ok {
+			rstCode := statusCodeConvTab[se.Code()]
+			klog.CtxInfof(t.ctx, "KITEX: http2Server.operateHeaders failed to decode header frame, err=%v, rstCode: %d"+sendRSTStreamFrameSuffix, err, rstCode)
 			t.controlBuf.put(&cleanupStream{
 				streamID: streamID,
 				rst:      true,
-				rstCode:  statusCodeConvTab[se.Code()],
+				rstCode:  rstCode,
 				onWrite:  func() {},
 			})
 		}
@@ -345,6 +348,11 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 	// Attach the received metadata to the context.
 	if len(state.data.mdata) > 0 {
 		s.ctx = metadata.NewIncomingContext(s.ctx, state.data.mdata)
+		// retrieve source service from metadata
+		vals := state.data.mdata[transmeta.HTTPSourceService]
+		if len(vals) > 0 {
+			s.sourceService = vals[0]
+		}
 	}
 
 	t.mu.Lock()
@@ -355,6 +363,7 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 	}
 	if uint32(len(t.activeStreams)) >= t.maxStreams {
 		t.mu.Unlock()
+		klog.CtxInfof(t.ctx, "KITEX: http2Server.operateHeaders failed to create stream, rstCode: %d"+sendRSTStreamFrameSuffix, http2.ErrCodeRefusedStream)
 		t.controlBuf.put(&cleanupStream{
 			streamID: streamID,
 			rst:      true,
@@ -416,11 +425,10 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				s := t.activeStreams[se.StreamID]
 				t.mu.Unlock()
 				if s != nil {
-					// it will be codes.Internal error for GRPC
-					// TODO: map http2.StreamError to status.Error?
-					s.cancel(err)
-					t.closeStream(s, status.Errorf(codes.Canceled, "transport: ReadFrame encountered http2.StreamError: %v", err), true, se.Code, false)
+					klog.CtxInfof(s.ctx, "KITEX: http2Server.HandleStreams encountered http2.StreamError, err=%v, rstCode: %d"+sendRSTStreamFrameSuffix, err, se.Code)
+					t.closeStream(s, status.Errorf(codes.Canceled, "transport: ReadFrame encountered http2.StreamError: %v [triggered by %s]", err, s.sourceService), true, se.Code, false)
 				} else {
+					klog.CtxInfof(t.ctx, "KITEX: http2Server.HandleStreams failed to ReadFrame, err=%v, rstCode: %d"+sendRSTStreamFrameSuffix, err, se.Code)
 					t.controlBuf.put(&cleanupStream{
 						streamID: se.StreamID,
 						rst:      true,
@@ -435,7 +443,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				return
 			}
 			klog.CtxWarnf(t.ctx, "transport: http2Server.HandleStreams failed to read frame: %v", err)
-			t.closeWithErr(err)
+			t.closeWithErr(status.Errorf(codes.Canceled, "transport: ReadFrame encountered err: %v"+triggeredByRemoteServiceSuffix, err))
 			return
 		}
 		switch frame := frame.(type) {
@@ -562,7 +570,8 @@ func (t *http2Server) handleData(f *grpcframe.DataFrame) {
 	}
 	if size > 0 {
 		if err := s.fc.onData(size); err != nil {
-			t.closeStream(s, status.Errorf(codes.Canceled, "transport: inflow control err: %v", err), true, http2.ErrCodeFlowControl, false)
+			klog.CtxInfof(s.ctx, "KITEX: http2Server.handleData inflow control err: %v, rstCode: %d"+sendRSTStreamFrameSuffix, err, http2.ErrCodeFlowControl)
+			t.closeStream(s, status.Errorf(codes.Canceled, "transport: inflow control err: %v [triggered by %s]", err, s.sourceService), true, http2.ErrCodeFlowControl, false)
 			return
 		}
 		if f.Header().Flags.Has(http2.FlagDataPadded) {
@@ -593,7 +602,7 @@ func (t *http2Server) handleRSTStream(f *http2.RSTStreamFrame) {
 		if f.ErrCode == gracefulShutdownCode {
 			t.closeStream(s, errGracefulShutdown, false, 0, false)
 		} else {
-			t.closeStream(s, status.Errorf(codes.Canceled, "transport: RSTStream Frame received with error code: %v", f.ErrCode), false, 0, false)
+			t.closeStream(s, status.Errorf(codes.Canceled, "transport: RSTStream Frame received with error code: %v [triggered by %s]", f.ErrCode, s.sourceService), false, 0, false)
 		}
 		return
 	}
@@ -730,8 +739,11 @@ func (t *http2Server) checkForHeaderListSize(it interface{}) bool {
 
 // WriteHeader sends the header metadata md back to the client.
 func (t *http2Server) WriteHeader(s *Stream, md metadata.MD) error {
-	if s.updateHeaderSent() || s.getState() == streamDone {
-		return ErrIllegalHeaderWrite
+	if s.updateHeaderSent() {
+		return errStatusIllegalHeaderWrite
+	}
+	if s.getState() == streamDone {
+		return ContextErr(s.ctx.Err())
 	}
 	s.hdrMu.Lock()
 	if md.Len() > 0 {
@@ -775,8 +787,9 @@ func (t *http2Server) writeHeaderLocked(s *Stream) error {
 		if err != nil {
 			return err
 		}
+		klog.CtxInfof(s.ctx, "KITEX: http2Server.writeHeaderLocked checkForHeaderListSize failed, rstCode: %d"+sendRSTStreamFrameSuffix, http2.ErrCodeInternal)
 		t.closeStream(s, errStatusHeaderListSizeLimitViolation, true, http2.ErrCodeInternal, false)
-		return ErrHeaderListSizeLimitViolation
+		return errStatusHeaderListSizeLimitViolation
 	}
 	return nil
 }
@@ -838,8 +851,9 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 		if err != nil {
 			return err
 		}
+		klog.CtxInfof(s.ctx, "KITEX: http2Server.WriteStatus checkForHeaderListSize failed, rstCode: %d"+sendRSTStreamFrameSuffix, http2.ErrCodeInternal)
 		t.closeStream(s, errStatusHeaderListSizeLimitViolation, true, http2.ErrCodeInternal, false)
-		return ErrHeaderListSizeLimitViolation
+		return errStatusHeaderListSizeLimitViolation
 	}
 	// Send a RST_STREAM after the trailers if the client has not already half-closed.
 	rst := s.getState() == streamActive
@@ -857,13 +871,6 @@ func (t *http2Server) Write(s *Stream, hdr, data []byte, opts *Options) error {
 	} else {
 		// Writing headers checks for this condition.
 		if s.getState() == streamDone {
-			// TODO(mmukhi, dfawley): Should the server write also return io.EOF?
-			s.cancel(errStreamClosing)
-			select {
-			case <-t.done:
-				return ErrConnClosing
-			default:
-			}
 			return ContextErr(s.ctx.Err())
 		}
 	}
@@ -875,11 +882,6 @@ func (t *http2Server) Write(s *Stream, hdr, data []byte, opts *Options) error {
 	df.originD = df.d
 	df.resetPingStrikes = &t.resetPingStrikes
 	if err := s.wq.get(int32(len(hdr) + len(data))); err != nil {
-		select {
-		case <-t.done:
-			return ErrConnClosing
-		default:
-		}
 		return ContextErr(s.ctx.Err())
 	}
 	return t.controlBuf.put(df)
@@ -1073,11 +1075,6 @@ func (t *http2Server) closeWithErr(reason error) error {
 
 // deleteStream deletes the stream s from transport's active streams.
 func (t *http2Server) deleteStream(s *Stream, eosReceived bool) {
-	// In case stream sending and receiving are invoked in separate
-	// goroutines (e.g., bi-directional streaming), cancel needs to be
-	// called to interrupt the potential blocking on other goroutines.
-	s.cancel(nil) // more details about the reason?
-
 	t.mu.Lock()
 	if _, ok := t.activeStreams[s.id]; ok {
 		delete(t.activeStreams, s.id)
@@ -1095,6 +1092,7 @@ func (t *http2Server) finishStream(s *Stream, rst bool, rstCode http2.ErrCode, h
 		// If the stream was already done, return.
 		return
 	}
+	s.cancel(nil)
 
 	hdr.cleanup = &cleanupStream{
 		streamID: s.id,
