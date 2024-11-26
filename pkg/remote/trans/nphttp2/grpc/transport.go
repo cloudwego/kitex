@@ -285,6 +285,11 @@ type Stream struct {
 	// contentSubtype is the content-subtype for requests.
 	// this must be lowercase or the behavior is undefined.
 	contentSubtype string
+
+	// closeStreamErr is used to store the error when stream is closed
+	closeStreamErr atomic.Value
+	// sourceService is the source service name of this stream
+	sourceService string
 }
 
 // isHeaderSent is only valid on the server-side.
@@ -479,6 +484,14 @@ func (s *Stream) Read(p []byte) (n int, err error) {
 	return io.ReadFull(s.trReader, p)
 }
 
+func (s *Stream) getCloseStreamErr() error {
+	rawErr := s.closeStreamErr.Load()
+	if rawErr != nil {
+		return rawErr.(error)
+	}
+	return errStatusStreamDone
+}
+
 // StreamWrite only used for unit test
 func StreamWrite(s *Stream, buffer *bytes.Buffer) {
 	s.write(recvMsg{buffer: buffer})
@@ -508,6 +521,8 @@ func CreateStream(ctx context.Context, id uint32, requestRead func(i int), metho
 		hdrMu:       sync.Mutex{},
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+	stream.ctx, stream.cancel = newContextWithCancelReason(ctx, cancel)
 	return stream
 }
 
@@ -762,16 +777,18 @@ func (e ConnectionError) Origin() error {
 
 var (
 	// ErrConnClosing indicates that the transport is closing.
-	ErrConnClosing = connectionErrorf(true, nil, "transport is closing")
+	ErrConnClosing       = connectionErrorf(true, nil, "transport is closing")
+	errStatusConnClosing = status.Err(codes.Unavailable, "transport is closing")
 
 	// errStreamDone is returned from write at the client side to indicate application
 	// layer of an error.
-	errStreamDone = errors.New("the stream is done")
+	errStreamDone       = errors.New("the stream is done")
+	errStatusStreamDone = status.Err(codes.Internal, errStreamDone.Error())
 
 	// errStreamDrain indicates that the stream is rejected because the
 	// connection is draining. This could be caused by goaway or balancer
 	// removing the address.
-	errStreamDrain = status.New(codes.Unavailable, "the connection is draining").Err()
+	errStreamDrain = status.Err(codes.Unavailable, "the connection is draining")
 
 	// StatusGoAway indicates that the server sent a GOAWAY that included this
 	// stream's ID in unprocessed RPCs.
@@ -840,3 +857,9 @@ func tlsAppendH2ToALPNProtocols(ps []string) []string {
 	ret = append(ret, ps...)
 	return append(ret, alpnProtoStrH2)
 }
+
+var (
+	sendRSTStreamFrameSuffix       = " [send RSTStream Frame]"
+	triggeredByRemoteServiceSuffix = " [triggered by remote service]"
+	triggeredByHandlerSideSuffix   = " [triggered by handler side]"
+)

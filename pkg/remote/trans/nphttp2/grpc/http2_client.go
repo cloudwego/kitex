@@ -140,7 +140,7 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	keepaliveEnabled := false
 	if kp.Time != Infinity {
 		if err = syscall.SetTCPUserTimeout(conn, kp.Timeout); err != nil {
-			return nil, connectionErrorf(false, err, "transport: failed to set TCP_USER_TIMEOUT: %v", err)
+			return nil, status.Errorf(codes.Unavailable, "transport: failed to set TCP_USER_TIMEOUT: %v", err)
 		}
 		keepaliveEnabled = true
 	}
@@ -221,12 +221,12 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	// Send connection preface to server.
 	n, err := t.conn.Write(ClientPreface)
 	if err != nil {
-		err = connectionErrorf(true, err, "transport: failed to write client preface: %v", err)
+		err = status.Errorf(codes.Unavailable, "transport: failed to write client preface: %v", err)
 		t.Close(err)
 		return nil, err
 	}
 	if n != ClientPrefaceLen {
-		err = connectionErrorf(true, err, "transport: preface mismatch, wrote %d bytes; want %d", n, ClientPrefaceLen)
+		err = status.Errorf(codes.Unavailable, "transport: preface mismatch, wrote %d bytes; want %d", n, ClientPrefaceLen)
 		t.Close(err)
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	}
 	err = t.framer.WriteSettings(ss...)
 	if err != nil {
-		err = connectionErrorf(true, err, "transport: failed to write initial settings frame: %v", err)
+		err = status.Errorf(codes.Unavailable, "transport: failed to write initial settings frame: %v", err)
 		t.Close(err)
 		return nil, err
 	}
@@ -247,7 +247,7 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	// Adjust the connection flow control window if needed.
 	if delta := uint32(icwz - defaultWindowSize); delta > 0 {
 		if err := t.framer.WriteWindowUpdate(0, delta); err != nil {
-			err = connectionErrorf(true, err, "transport: failed to write window update: %v", err)
+			err = status.Errorf(codes.Unavailable, "transport: failed to write window update: %v", err)
 			t.Close(err)
 			return nil, err
 		}
@@ -521,7 +521,7 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 		case <-t.goAway:
 			return nil, errStreamDrain
 		case <-t.ctx.Done():
-			return nil, ErrConnClosing
+			return nil, errStatusConnClosing
 		}
 	}
 	return s, nil
@@ -541,6 +541,7 @@ func (t *http2Client) CloseStream(s *Stream, err error) {
 		} else {
 			rstCode = http2.ErrCodeCancel
 		}
+		klog.CtxInfof(s.ctx, "KITEX: stream closed by ctx canceled, err: %v, rstCode: %d"+sendRSTStreamFrameSuffix, err, rstCode)
 	}
 	t.closeStream(s, err, rst, rstCode, status.Convert(err), nil, false)
 }
@@ -566,6 +567,16 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 		// This will unblock reads eventually.
 		s.write(recvMsg{err: err})
 	}
+
+	// store closeStreamErr
+	storeErr := err
+	if err == io.EOF || err == nil {
+		storeErr = st.Err()
+	}
+	if storeErr != nil {
+		s.closeStreamErr.Store(storeErr)
+	}
+
 	// If headerChan isn't closed, then close it.
 	if atomic.CompareAndSwapUint32(&s.headerChanClosed, 0, 1) {
 		s.noHeaders = true
@@ -653,7 +664,7 @@ func (t *http2Client) GracefulClose() {
 	active := len(t.activeStreams)
 	t.mu.Unlock()
 	if active == 0 {
-		t.Close(connectionErrorf(true, nil, "no active streams left to process while draining"))
+		t.Close(status.Err(codes.Unavailable, "no active streams left to process while draining"))
 		return
 	}
 	t.controlBuf.put(&incomingGoAway{})
@@ -665,10 +676,10 @@ func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
 	if opts.Last {
 		// If it's the last message, update stream state.
 		if !s.compareAndSwapState(streamActive, streamWriteDone) {
-			return errStreamDone
+			return s.getCloseStreamErr()
 		}
 	} else if s.getState() != streamActive {
-		return errStreamDone
+		return s.getCloseStreamErr()
 	}
 	df := newDataFrame()
 	df.streamID = s.id
@@ -679,7 +690,7 @@ func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
 	df.originD = df.d
 	if hdr != nil || data != nil { // If it's not an empty data frame, check quota.
 		if err := s.wq.get(int32(len(hdr) + len(data))); err != nil {
-			return err
+			return s.getCloseStreamErr()
 		}
 	}
 	return t.controlBuf.put(df)
@@ -775,6 +786,7 @@ func (t *http2Client) handleData(f *grpcframe.DataFrame) {
 	}
 	if size > 0 {
 		if err := s.fc.onData(size); err != nil {
+			klog.CtxInfof(s.ctx, "KITEX: http2Client.handleData inflow control err: %v, rstCode: %d"+sendRSTStreamFrameSuffix, err, http2.ErrCodeFlowControl)
 			t.closeStream(s, io.EOF, true, http2.ErrCodeFlowControl, status.New(codes.Internal, err.Error()), nil, false)
 			return
 		}
@@ -904,7 +916,7 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 	id := f.LastStreamID
 	if id > 0 && id%2 != 1 {
 		t.mu.Unlock()
-		t.Close(connectionErrorf(true, nil, "received goaway with non-zero even-numbered numbered stream id: %v", id))
+		t.Close(status.Errorf(codes.Unavailable, "received goaway with non-zero even-numbered numbered stream id: %v", id))
 		return
 	}
 	// A client can receive multiple GoAways from the server (see
@@ -922,7 +934,7 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 		// If there are multiple GoAways the first one should always have an ID greater than the following ones.
 		if id > t.prevGoAwayID {
 			t.mu.Unlock()
-			t.Close(connectionErrorf(true, nil, "received goaway with stream id: %v, which exceeds stream id of previous goaway: %v", id, t.prevGoAwayID))
+			t.Close(status.Errorf(codes.Unavailable, "received goaway with stream id: %v, which exceeds stream id of previous goaway: %v", id, t.prevGoAwayID))
 			return
 		}
 	default:
@@ -949,7 +961,7 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 	active := len(t.activeStreams)
 	if active <= 0 {
 		t.mu.Unlock()
-		t.Close(connectionErrorf(true, nil, "received goaway and there are no active streams"))
+		t.Close(status.Err(codes.Unavailable, "received goaway and there are no active streams"))
 		return
 	}
 
@@ -1011,6 +1023,7 @@ func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 	if !initialHeader && !endStream {
 		// As specified by gRPC over HTTP2, a HEADERS frame (and associated CONTINUATION frames) can only appear at the start or end of a stream. Therefore, second HEADERS frame must have EOS bit set.
 		st := status.New(codes.Internal, "a HEADERS frame cannot appear in the middle of a stream")
+		klog.CtxInfof(s.ctx, "KITEX: http2Client.operateHeaders received HEADERS frame in the middle of a stream, rstCode: %d"+sendRSTStreamFrameSuffix, http2.ErrCodeProtocol)
 		t.closeStream(s, st.Err(), true, http2.ErrCodeProtocol, st, nil, false)
 		return
 	}
@@ -1019,6 +1032,7 @@ func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 	// Initialize isGRPC value to be !initialHeader, since if a gRPC Response-Headers has already been received, then it means that the peer is speaking gRPC and we are in gRPC mode.
 	state.data.isGRPC = !initialHeader
 	if err := state.decodeHeader(frame); err != nil {
+		klog.CtxInfof(s.ctx, "KITEX: http2Client.operateHeaders decode HEADERS frame failed, err: %v, rstCode: %d"+sendRSTStreamFrameSuffix, err, http2.ErrCodeProtocol)
 		t.closeStream(s, err, true, http2.ErrCodeProtocol, status.Convert(err), nil, endStream)
 		return
 	}
@@ -1062,7 +1076,7 @@ func (t *http2Client) reader() {
 	// Check the validity of server preface.
 	frame, err := t.framer.ReadFrame()
 	if err != nil {
-		err = connectionErrorf(true, err, "error reading from server,  remoteAddress=%s, error=%v", t.conn.RemoteAddr(), err)
+		err = status.Errorf(codes.Unavailable, "error reading from server,  remoteAddress=%s, error=%v", t.conn.RemoteAddr(), err)
 		t.Close(err) // this kicks off resetTransport, so must be last before return
 		return
 	}
@@ -1072,7 +1086,7 @@ func (t *http2Client) reader() {
 	}
 	sf, ok := frame.(*grpcframe.SettingsFrame)
 	if !ok {
-		err = connectionErrorf(true, err, "first frame received is not a setting frame")
+		err = status.Errorf(codes.Unavailable, "first frame received is not a setting frame")
 		t.Close(err) // this kicks off resetTransport, so must be last before return
 		return
 	}
@@ -1101,12 +1115,13 @@ func (t *http2Client) reader() {
 					if err != nil {
 						msg = err.Error()
 					}
+					klog.CtxInfof(s.ctx, "KITEX: http2Client.reader encountered http2.StreamError: %v, rstCode: %d"+sendRSTStreamFrameSuffix, se, http2.ErrCodeProtocol)
 					t.closeStream(s, status.New(code, msg).Err(), true, http2.ErrCodeProtocol, status.New(code, msg), nil, false)
 				}
 				continue
 			} else {
 				// Transport error.
-				err = connectionErrorf(true, err, "error reading from server,  remoteAddress=%s, error=%v", t.conn.RemoteAddr(), err)
+				err = status.Errorf(codes.Unavailable, "error reading from server, remoteAddress=%s, error=%v", t.conn.RemoteAddr(), err)
 				t.Close(err)
 				return
 			}
@@ -1165,7 +1180,7 @@ func (t *http2Client) keepalive() {
 				continue
 			}
 			if outstandingPing && timeoutLeft <= 0 {
-				t.Close(connectionErrorf(true, nil, "keepalive ping failed to receive ACK within timeout"))
+				t.Close(status.Err(codes.Unavailable, "keepalive ping failed to receive ACK within timeout"))
 				return
 			}
 			t.mu.Lock()

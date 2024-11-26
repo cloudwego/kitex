@@ -942,9 +942,7 @@ func TestLargeMessageSuspension(t *testing.T) {
 	msg := make([]byte, initialWindowSize*8)
 	ct.Write(s, nil, msg, &Options{})
 	err = ct.Write(s, nil, msg, &Options{Last: true})
-	if err != errStreamDone {
-		t.Fatalf("write got %v, want io.EOF", err)
-	}
+	test.Assert(t, errors.Is(err, ContextErr(ctx.Err())), err)
 	expectedErr := status.Err(codes.DeadlineExceeded, context.DeadlineExceeded.Error())
 	if _, err := s.Read(make([]byte, 8)); err.Error() != expectedErr.Error() {
 		t.Fatalf("Read got %v of type %T, want %v", err, err, expectedErr)
