@@ -211,4 +211,6 @@ func TestConnectionError(t *testing.T) {
 	connectionError.err = context.Canceled
 	ori = connectionError.Origin()
 	test.Assert(t, ori == context.Canceled)
+
+	test.Assert(t, connectionError.Code() == 14)
 }
