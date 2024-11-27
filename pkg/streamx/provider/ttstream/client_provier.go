@@ -25,7 +25,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
 )
@@ -33,19 +32,17 @@ import (
 var _ streamx.ClientProvider = (*clientProvider)(nil)
 
 // NewClientProvider return a client provider
-func NewClientProvider(sinfo *serviceinfo.ServiceInfo, opts ...ClientProviderOption) (streamx.ClientProvider, error) {
+func NewClientProvider(opts ...ClientProviderOption) streamx.ClientProvider {
 	cp := new(clientProvider)
-	cp.sinfo = sinfo
 	cp.transPool = newMuxConnTransPool(DefaultMuxConnConfig)
 	for _, opt := range opts {
 		opt(cp)
 	}
-	return cp, nil
+	return cp
 }
 
 type clientProvider struct {
 	transPool     transPool
-	sinfo         *serviceinfo.ServiceInfo
 	metaHandler   MetaFrameHandler
 	headerHandler HeaderFrameWriteHandler
 
@@ -78,10 +75,10 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 	if strHeader == nil {
 		strHeader = map[string]string{}
 	}
-	strHeader[ttheader.HeaderIDLServiceName] = c.sinfo.ServiceName
+	strHeader[ttheader.HeaderIDLServiceName] = invocation.ServiceName()
 	metainfo.SaveMetaInfoToMap(ctx, strHeader)
 
-	trans, err := c.transPool.Get(c.sinfo, addr.Network(), addr.String())
+	trans, err := c.transPool.Get(addr.Network(), addr.String())
 	if err != nil {
 		return nil, err
 	}

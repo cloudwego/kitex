@@ -29,7 +29,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -43,17 +42,15 @@ type (
 var _ streamx.ServerProvider = (*serverProvider)(nil)
 
 // NewServerProvider return a server provider
-func NewServerProvider(sinfo *serviceinfo.ServiceInfo, opts ...ServerProviderOption) (streamx.ServerProvider, error) {
+func NewServerProvider(opts ...ServerProviderOption) streamx.ServerProvider {
 	sp := new(serverProvider)
-	sp.sinfo = sinfo
 	for _, opt := range opts {
 		opt(sp)
 	}
-	return sp, nil
+	return sp
 }
 
 type serverProvider struct {
-	sinfo         *serviceinfo.ServiceInfo
 	metaHandler   MetaFrameHandler
 	headerHandler HeaderFrameReadHandler
 }
@@ -74,7 +71,7 @@ func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
 // OnActive will be called when a connection accepted
 func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	nconn := conn.(netpoll.Connection)
-	trans := newTransport(serverTransport, s.sinfo, nconn, nil)
+	trans := newTransport(serverTransport, nconn, nil)
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
 		// server only close transport when peer connection closed
 		_ = trans.Close(nil)

@@ -55,12 +55,12 @@ type testCase struct {
 }
 
 func init() {
-	sp, _ := ttstream.NewServerProvider(testServiceInfo)
-	cp, _ := ttstream.NewClientProvider(testServiceInfo, ttstream.WithClientLongConnPool(ttstream.LongConnConfig{MaxIdleTimeout: time.Millisecond * 100}))
+	sp := ttstream.NewServerProvider()
+	cp := ttstream.NewClientProvider(ttstream.WithClientLongConnPool(ttstream.LongConnConfig{MaxIdleTimeout: time.Millisecond * 100}))
 	providerTestCases = append(providerTestCases, testCase{Name: "TTHeader_LongConn", ClientProvider: cp, ServerProvider: sp})
-	cp, _ = ttstream.NewClientProvider(testServiceInfo, ttstream.WithClientShortConnPool())
+	cp = ttstream.NewClientProvider(ttstream.WithClientShortConnPool())
 	providerTestCases = append(providerTestCases, testCase{Name: "TTHeader_ShortConn", ClientProvider: cp, ServerProvider: sp})
-	cp, _ = ttstream.NewClientProvider(testServiceInfo, ttstream.WithClientMuxConnPool(ttstream.MuxConnConfig{PoolSize: 8, MaxIdleTimeout: time.Millisecond * 100}))
+	cp = ttstream.NewClientProvider(ttstream.WithClientMuxConnPool(ttstream.MuxConnConfig{PoolSize: 8, MaxIdleTimeout: time.Millisecond * 100}))
 	providerTestCases = append(providerTestCases, testCase{Name: "TTHeader_Mux", ClientProvider: cp, ServerProvider: sp})
 }
 

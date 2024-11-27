@@ -19,7 +19,6 @@ package ttstream
 import (
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 )
 
@@ -46,7 +45,7 @@ type longConnTransPool struct {
 	config    LongConnConfig
 }
 
-func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (trans *transport, err error) {
+func (c *longConnTransPool) Get(network, addr string) (trans *transport, err error) {
 	for {
 		o := c.transPool.Pop(addr)
 		if o == nil {
@@ -63,7 +62,7 @@ func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr st
 	if err != nil {
 		return nil, err
 	}
-	trans = newTransport(clientTransport, sinfo, conn, c)
+	trans = newTransport(clientTransport, conn, c)
 	// create new transport
 	return trans, nil
 }

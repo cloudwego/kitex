@@ -30,7 +30,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 )
@@ -49,10 +48,9 @@ func isIgnoreError(err error) bool {
 
 // transport is used to read/write frames and disturbed frames to different streams
 type transport struct {
-	kind  int32
-	sinfo *serviceinfo.ServiceInfo
-	conn  netpoll.Connection
-	pool  transPool
+	kind int32
+	conn netpoll.Connection
+	pool transPool
 	// transport should operate directly on stream
 	streams       sync.Map                 // key=streamID val=stream
 	scache        []*stream                // size is streamCacheSize
@@ -62,12 +60,11 @@ type transport struct {
 	closedTrigger chan struct{}
 }
 
-func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection, pool transPool) *transport {
+func newTransport(kind int32, conn netpoll.Connection, pool transPool) *transport {
 	// TODO: let it configurable
 	_ = conn.SetReadTimeout(0)
 	t := &transport{
 		kind:          kind,
-		sinfo:         sinfo,
 		conn:          conn,
 		pool:          pool,
 		streams:       sync.Map{},
@@ -94,7 +91,7 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 			t.closedTrigger <- struct{}{}
 		}()
 		err = t.loopRead()
-	}, gofunc.NewBasicInfo(sinfo.ServiceName, addr))
+	}, gofunc.NewBasicInfo("", addr))
 	gofunc.RecoverGoFuncWithInfo(context.Background(), func() {
 		var err error
 		defer func() {
@@ -107,7 +104,7 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 			t.closedTrigger <- struct{}{}
 		}()
 		err = t.loopWrite()
-	}, gofunc.NewBasicInfo(sinfo.ServiceName, addr))
+	}, gofunc.NewBasicInfo("", addr))
 	return t
 }
 
@@ -184,8 +181,7 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 	var s *stream
 	if fr.typ == headerFrameType && t.kind == serverTransport {
 		// server recv a header frame, we should create a new stream
-		smode := t.sinfo.MethodInfo(fr.method).StreamingMode()
-		s = newStream(context.Background(), t, smode, fr.streamFrame)
+		s = newStream(context.Background(), t, fr.streamFrame)
 		t.storeStream(s)
 		err = t.spipe.Write(context.Background(), s)
 	} else {
@@ -298,9 +294,8 @@ func (t *transport) WriteStream(
 	}
 
 	sid := genStreamID()
-	smode := t.sinfo.MethodInfo(method).StreamingMode()
 	// new stream first
-	s := newStream(ctx, t, smode, streamFrame{sid: sid, method: method})
+	s := newStream(ctx, t, streamFrame{sid: sid, method: method})
 	t.storeStream(s)
 	// send create stream request for server
 	fr := newFrame(streamFrame{sid: sid, method: method, header: strHeader, meta: intHeader}, headerFrameType, nil)
