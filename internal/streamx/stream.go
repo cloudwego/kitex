@@ -16,12 +16,7 @@
 
 package streamx
 
-import (
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-)
-
 type StreamInfo interface {
 	Service() string
 	Method() string
-	Mode() serviceinfo.StreamingMode
 }

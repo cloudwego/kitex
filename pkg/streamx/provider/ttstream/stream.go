@@ -42,13 +42,12 @@ var (
 	_ StreamMeta           = (*stream)(nil)
 )
 
-func newStream(ctx context.Context, writer streamWriter, mode streamx.StreamingMode, smeta streamFrame) *stream {
+func newStream(ctx context.Context, writer streamWriter, smeta streamFrame) *stream {
 	s := new(stream)
 	s.streamFrame = smeta
 	s.StreamMeta = newStreamMeta()
 	s.reader = newStreamReader()
 	s.writer = writer
-	s.mode = mode
 	s.wheader = make(streamx.Header)
 	s.wtrailer = make(streamx.Trailer)
 	s.headerSig = make(chan int32, 1)
@@ -84,7 +83,6 @@ type stream struct {
 	StreamMeta
 	reader   *streamReader
 	writer   streamWriter
-	mode     streamx.StreamingMode
 	wheader  streamx.Header  // wheader == nil means it already be sent
 	wtrailer streamx.Trailer // wtrailer == nil means it already be sent
 
@@ -98,10 +96,6 @@ type stream struct {
 	recvTimeout      time.Duration
 	metaFrameHandler MetaFrameHandler
 	closeCallback    []streamxcallopt.StreamCloseCallback
-}
-
-func (s *stream) Mode() streamx.StreamingMode {
-	return s.mode
 }
 
 func (s *stream) Service() string {

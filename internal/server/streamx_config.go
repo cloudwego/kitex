@@ -22,5 +22,4 @@ type StreamXOptions struct {
 	StreamMiddlewares     []streamx.StreamMiddleware
 	StreamRecvMiddlewares []streamx.StreamRecvMiddleware
 	StreamSendMiddlewares []streamx.StreamSendMiddleware
-	Provider              streamx.ServerProvider
 }

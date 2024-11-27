@@ -20,7 +20,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 )
 
@@ -30,14 +29,14 @@ func newShortConnTransPool() transPool {
 
 type shortConnTransPool struct{}
 
-func (p *shortConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (*transport, error) {
+func (p *shortConnTransPool) Get(network, addr string) (*transport, error) {
 	// create new connection
 	conn, err := dialer.DialConnection(network, addr, time.Second)
 	if err != nil {
 		return nil, err
 	}
 	// create new transport
-	trans := newTransport(clientTransport, sinfo, conn, p)
+	trans := newTransport(clientTransport, conn, p)
 	return trans, nil
 }
 
