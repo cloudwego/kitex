@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package streamx_test
+package streamx
 
 import (
 	"context"
@@ -28,6 +28,10 @@ import (
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/streamxserver"
 )
+
+func ServiceInfo() *serviceinfo.ServiceInfo {
+	return testServiceInfo
+}
 
 // === gen code ===
 

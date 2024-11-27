@@ -16,7 +16,6 @@
 
 package test
 
-/*
 import (
 	"context"
 	"errors"
@@ -421,4 +420,3 @@ func newTestServiceEchoPingPongArgs() interface{} {
 func newTestServiceEchoPingPongResult() interface{} {
 	return kt.NewTestServiceEchoPingPongResult()
 }
-*/

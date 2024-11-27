@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package streamx_test
+package streamx
 
 import (
 	"bytes"

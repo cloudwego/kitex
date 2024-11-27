@@ -37,6 +37,10 @@ func NewClientProvider(sinfo *serviceinfo.ServiceInfo, opts ...ClientProviderOpt
 	cp := new(clientProvider)
 	cp.sinfo = sinfo
 	cp.transPool = newMuxConnTransPool(DefaultMuxConnConfig)
+	// TODO: lock sinfo. actually I don't really want to change sinfo like this here...
+	if _, ok := sinfo.Extra["generic"]; ok {
+		sinfo.Extra["ttheader_streaming"] = true
+	}
 	for _, opt := range opts {
 		opt(cp)
 	}

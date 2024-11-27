@@ -34,6 +34,7 @@ import (
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/streamxclient"
+	istreamx "github.com/cloudwego/kitex/internal/mocks/streamx"
 	istreamxclient "github.com/cloudwego/kitex/internal/streamx/streamxclient"
 	istreamxserver "github.com/cloudwego/kitex/internal/streamx/streamxserver"
 	"github.com/cloudwego/kitex/internal/test"
@@ -55,6 +56,7 @@ type testCase struct {
 }
 
 func init() {
+	testServiceInfo := istreamx.ServiceInfo()
 	sp, _ := ttstream.NewServerProvider(testServiceInfo)
 	cp, _ := ttstream.NewClientProvider(testServiceInfo, ttstream.WithClientLongConnPool(ttstream.LongConnConfig{MaxIdleTimeout: time.Millisecond * 100}))
 	providerTestCases = append(providerTestCases, testCase{Name: "TTHeader_LongConn", ClientProvider: cp, ServerProvider: sp})
@@ -71,7 +73,7 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func NewTestServer(serviceImpl TestService, opts ...server.Option) (string, server.Server, error) {
+func NewTestServer(serviceImpl istreamx.TestService, opts ...server.Option) (string, server.Server, error) {
 	addr := test.GetLocalAddress()
 	ln, err := netpoll.CreateListener("tcp", addr)
 	if err != nil {
@@ -82,7 +84,7 @@ func NewTestServer(serviceImpl TestService, opts ...server.Option) (string, serv
 		server.WithExitWaitTime(time.Millisecond * 10),
 	}
 	options = append(options, opts...)
-	svr := NewServer(serviceImpl, options...)
+	svr := istreamx.NewServer(serviceImpl, options...)
 	go func() {
 		_ = svr.Run()
 	}()
@@ -173,8 +175,8 @@ func TestStreamingBasic(t *testing.T) {
 								test.Assert(t, resArgs.Res() == nil)
 								err = next(ctx, streamArgs, reqArgs, resArgs)
 								if err == nil {
-									req := reqArgs.Req().(*Request)
-									res := resArgs.Res().(*Response)
+									req := reqArgs.Req().(*istreamx.Request)
+									res := resArgs.Res().(*istreamx.Response)
 									test.DeepEqual(t, req.Message, res.Message)
 								}
 							case streamx.StreamingClient:
@@ -182,7 +184,7 @@ func TestStreamingBasic(t *testing.T) {
 								test.Assert(t, resArgs.Res() == nil)
 								err = next(ctx, streamArgs, reqArgs, resArgs)
 								if err == nil {
-									res := resArgs.Res().(*Response)
+									res := resArgs.Res().(*istreamx.Response)
 									test.Assert(t, res.Message != "")
 								}
 							case streamx.StreamingServer:
@@ -192,7 +194,7 @@ func TestStreamingBasic(t *testing.T) {
 								test.Assert(t, reqArgs.Req() != nil)
 								test.Assert(t, resArgs.Res() == nil)
 								if err == nil {
-									req := reqArgs.Req().(*Request)
+									req := reqArgs.Req().(*istreamx.Request)
 									test.Assert(t, req.Message != "")
 								}
 							case streamx.StreamingBidirectional:
@@ -227,7 +229,7 @@ func TestStreamingBasic(t *testing.T) {
 				atomic.StoreInt32(&clientRecvCount, 0)
 				atomic.StoreInt32(&clientSendCount, 0)
 			}
-			cli, err := NewClient(
+			cli, err := istreamx.NewClient(
 				"kitex.echo.service",
 				client.WithHostPorts(addr),
 				client.WithTransportProtocol(transport.TTHeaderFramed),
@@ -270,8 +272,8 @@ func TestStreamingBasic(t *testing.T) {
 							case streamx.StreamingUnary:
 								test.Assert(t, reqArgs.Req() != nil)
 								test.Assert(t, resArgs.Res() != nil)
-								req := reqArgs.Req().(*Request)
-								res := resArgs.Res().(*Response)
+								req := reqArgs.Req().(*istreamx.Request)
+								res := resArgs.Res().(*istreamx.Response)
 								test.DeepEqual(t, req.Message, res.Message)
 							case streamx.StreamingClient:
 								test.Assert(t, reqArgs.Req() == nil, reqArgs.Req())
@@ -302,7 +304,7 @@ func TestStreamingBasic(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					req := new(Request)
+					req := new(istreamx.Request)
 					req.Message = "PingPong"
 					res, err := cli.PingPong(octx, req)
 					test.Assert(t, err == nil, err)
@@ -326,7 +328,7 @@ func TestStreamingBasic(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					req := new(Request)
+					req := new(istreamx.Request)
 					req.Type = 10000
 					req.Message = "Unary"
 					res, err := cli.Unary(octx, req)
@@ -357,7 +359,7 @@ func TestStreamingBasic(t *testing.T) {
 					ctx, cs, err := cli.ClientStream(octx)
 					test.Assert(t, err == nil, err)
 					for i := 0; i < round; i++ {
-						req := new(Request)
+						req := new(istreamx.Request)
 						req.Type = int32(i)
 						req.Message = "ClientStream"
 						err = cs.Send(ctx, req)
@@ -388,7 +390,7 @@ func TestStreamingBasic(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					req := new(Request)
+					req := new(istreamx.Request)
 					req.Message = "ServerStream"
 					ctx, ss, err := cli.ServerStream(octx, req)
 					test.Assert(t, err == nil, err)
@@ -430,7 +432,7 @@ func TestStreamingBasic(t *testing.T) {
 					go func() {
 						defer wg.Done()
 						for i := 0; i < round; i++ {
-							req := new(Request)
+							req := new(istreamx.Request)
 							req.Message = msg
 							err := bs.Send(ctx, req)
 							test.Assert(t, err == nil, err)
@@ -469,7 +471,7 @@ func TestStreamingBasic(t *testing.T) {
 			resetClientCount()
 
 			t.Logf("=== UnaryWithErr normalErr ===")
-			req := new(Request)
+			req := new(istreamx.Request)
 			req.Type = normalErr
 			res, err := cli.UnaryWithErr(octx, req)
 			test.Assert(t, res == nil, res)
@@ -477,7 +479,7 @@ func TestStreamingBasic(t *testing.T) {
 			assertNormalErr(t, err)
 
 			t.Logf("=== UnaryWithErr bizErr ===")
-			req = new(Request)
+			req = new(istreamx.Request)
 			req.Type = bizErr
 			res, err = cli.UnaryWithErr(octx, req)
 			test.Assert(t, res == nil, res)
@@ -488,7 +490,7 @@ func TestStreamingBasic(t *testing.T) {
 			ctx, cliStream, err := cli.ClientStreamWithErr(octx)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, cliStream != nil, cliStream)
-			req = new(Request)
+			req = new(istreamx.Request)
 			req.Type = normalErr
 			err = cliStream.Send(ctx, req)
 			test.Assert(t, err == nil, err)
@@ -501,7 +503,7 @@ func TestStreamingBasic(t *testing.T) {
 			ctx, cliStream, err = cli.ClientStreamWithErr(octx)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, cliStream != nil, cliStream)
-			req = new(Request)
+			req = new(istreamx.Request)
 			req.Type = bizErr
 			err = cliStream.Send(ctx, req)
 			test.Assert(t, err == nil, err)
@@ -511,7 +513,7 @@ func TestStreamingBasic(t *testing.T) {
 			assertBizErr(t, err)
 
 			t.Logf("=== ServerStreamWithErr normalErr ===")
-			req = new(Request)
+			req = new(istreamx.Request)
 			req.Type = normalErr
 			ctx, svrStream, err := cli.ServerStreamWithErr(octx, req)
 			test.Assert(t, err == nil, err)
@@ -522,7 +524,7 @@ func TestStreamingBasic(t *testing.T) {
 			assertNormalErr(t, err)
 
 			t.Logf("=== ServerStreamWithErr bizErr ===")
-			req = new(Request)
+			req = new(istreamx.Request)
 			req.Type = bizErr
 			ctx, svrStream, err = cli.ServerStreamWithErr(octx, req)
 			test.Assert(t, err == nil, err)
@@ -536,7 +538,7 @@ func TestStreamingBasic(t *testing.T) {
 			ctx, bidiStream, err := cli.BidiStreamWithErr(octx)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, bidiStream != nil, bidiStream)
-			req = new(Request)
+			req = new(istreamx.Request)
 			req.Type = normalErr
 			err = bidiStream.Send(ctx, req)
 			test.Assert(t, err == nil, err)
@@ -549,7 +551,7 @@ func TestStreamingBasic(t *testing.T) {
 			ctx, bidiStream, err = cli.BidiStreamWithErr(octx)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, bidiStream != nil, bidiStream)
-			req = new(Request)
+			req = new(istreamx.Request)
 			req.Type = bizErr
 			err = bidiStream.Send(ctx, req)
 			test.Assert(t, err == nil, err)
@@ -571,7 +573,7 @@ func TestStreamingBasic(t *testing.T) {
 
 			// timeout by client WithRecvTimeout
 			t.Logf("=== Timeout by WithRecvTimeout ===")
-			cli, _ = NewClient(
+			cli, _ = istreamx.NewClient(
 				"kitex.service.test",
 				client.WithHostPorts(addr),
 				streamxclient.WithProvider(tc.ClientProvider),
@@ -603,7 +605,7 @@ func TestStreamingException(t *testing.T) {
 
 			var circuitBreaker int32
 			circuitBreakerErr := fmt.Errorf("circuitBreaker on")
-			cli, _ := NewClient(
+			cli, _ := istreamx.NewClient(
 				"kitex.echo.service",
 				client.WithHostPorts(addr),
 
@@ -669,7 +671,7 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 			test.Assert(t, err == nil, err)
 			defer svr.Stop()
 
-			cli, _ := NewClient(
+			cli, _ := istreamx.NewClient(
 				"kitex.test.service",
 				client.WithHostPorts(addr),
 				streamxclient.WithProvider(tc.ClientProvider),
@@ -683,7 +685,7 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 				wg.Add(1)
 				ctx, bs, err := cli.BidiStream(octx)
 				test.Assert(t, err == nil, err)
-				req := new(Request)
+				req := new(istreamx.Request)
 				req.Message = string(make([]byte, 1024))
 				err = bs.Send(ctx, req)
 				test.Assert(t, err == nil, err)
@@ -733,7 +735,7 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 
 					ctx, bs, err := cli.BidiStream(octx)
 					test.Assert(t, err == nil, err)
-					req := new(Request)
+					req := new(istreamx.Request)
 					req.Message = msg
 					err = bs.Send(ctx, req)
 					test.Assert(t, err == nil, err)
@@ -760,7 +762,7 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 				go func() {
 					defer wg.Done()
 
-					req := new(Request)
+					req := new(istreamx.Request)
 					req.Message = msg
 					ctx, ss, err := cli.ServerStream(octx, req)
 					test.Assert(t, err == nil, err)
