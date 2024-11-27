@@ -19,6 +19,8 @@ package genericclient
 import (
 	"context"
 	"errors"
+	"runtime"
+
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/client/streamxclient"
@@ -26,11 +28,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
-	"runtime"
 )
 
 type genericServiceStreamingClient[T any] struct {
-	//*genericServiceClient
 	svcInfo *serviceinfo.ServiceInfo
 	kClient client.Client
 	g       generic.Generic
