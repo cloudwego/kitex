@@ -19,12 +19,13 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/tidwall/gjson"
 	"io"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/client/genericclient"
 	"github.com/cloudwego/kitex/internal/test"
