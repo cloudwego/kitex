@@ -27,7 +27,6 @@ import (
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/gofunc"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 )
 
@@ -77,7 +76,7 @@ func (tl *muxConnTransList) Close() {
 	tl.L.Unlock()
 }
 
-func (tl *muxConnTransList) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (*transport, error) {
+func (tl *muxConnTransList) Get(network, addr string) (*transport, error) {
 	// fast path
 	idx := atomic.AddUint32(&tl.cursor, 1) % uint32(tl.size)
 	tl.L.RLock()
@@ -103,7 +102,7 @@ func (tl *muxConnTransList) Get(sinfo *serviceinfo.ServiceInfo, network, addr st
 	if err != nil {
 		return nil, err
 	}
-	trans = newTransport(clientTransport, sinfo, conn, tl.pool)
+	trans = newTransport(clientTransport, conn, tl.pool)
 	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
 		// peer close
 		_ = trans.Close(terrors.ErrTransport.WithCause(errors.New("connection closed by peer")))
@@ -132,13 +131,13 @@ type muxConnTransPool struct {
 	cleanerOnce int32
 }
 
-func (p *muxConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (trans *transport, err error) {
+func (p *muxConnTransPool) Get(network, addr string) (trans *transport, err error) {
 	v, ok := p.pool.Load(addr)
 	if !ok {
 		// multi concurrent Get should get the same TransList object
 		v, _ = p.pool.LoadOrStore(addr, newMuxConnTransList(p.config.PoolSize, p))
 	}
-	return v.(*muxConnTransList).Get(sinfo, network, addr)
+	return v.(*muxConnTransList).Get(network, addr)
 }
 
 func (p *muxConnTransPool) Put(trans *transport) {

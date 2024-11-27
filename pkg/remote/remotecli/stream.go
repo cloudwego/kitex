@@ -23,7 +23,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 // NewStream create a client side stream
@@ -39,8 +38,7 @@ func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTra
 	// streamx provider
 	if opt.Provider != nil {
 		// wrap internal client provider
-		clientProvider := streamx.NewClientProvider(opt.Provider)
-		cs, err := clientProvider.NewStream(ctx, ri)
+		cs, err := opt.Provider.NewStream(ctx, ri)
 		if err != nil {
 			return nil, nil, err
 		}

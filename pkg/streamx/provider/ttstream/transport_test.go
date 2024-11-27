@@ -71,10 +71,10 @@ func TestTransportBasic(t *testing.T) {
 	intHeader[0] = "test"
 	strHeader := make(streamx.Header)
 	strHeader["key"] = "val"
-	ctrans := newTransport(clientTransport, testServiceInfo, cconn, nil)
+	ctrans := newTransport(clientTransport, cconn, nil)
 	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", intHeader, strHeader)
 	test.Assert(t, err == nil, err)
-	strans := newTransport(serverTransport, testServiceInfo, sconn, nil)
+	strans := newTransport(serverTransport, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 
@@ -139,10 +139,10 @@ func TestTransportServerStreaming(t *testing.T) {
 
 	intHeader := make(IntHeader)
 	strHeader := make(streamx.Header)
-	ctrans := newTransport(clientTransport, testServiceInfo, cconn, nil)
+	ctrans := newTransport(clientTransport, cconn, nil)
 	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", intHeader, strHeader)
 	test.Assert(t, err == nil, err)
-	strans := newTransport(serverTransport, testServiceInfo, sconn, nil)
+	strans := newTransport(serverTransport, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 
@@ -203,10 +203,10 @@ func TestTransportException(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// server send data
-	ctrans := newTransport(clientTransport, testServiceInfo, cconn, nil)
+	ctrans := newTransport(clientTransport, cconn, nil)
 	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", make(IntHeader), make(streamx.Header))
 	test.Assert(t, err == nil, err)
-	strans := newTransport(serverTransport, testServiceInfo, sconn, nil)
+	strans := newTransport(serverTransport, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 	cStream := newClientStream(rawClientStream)

@@ -19,6 +19,7 @@ package streamx
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"runtime/debug"
@@ -52,8 +53,7 @@ type svrTransHandlerFactory struct {
 
 // NewSvrTransHandlerFactory ...
 func NewSvrTransHandlerFactory(provider streamx.ServerProvider) remote.ServerTransHandlerFactory {
-	sp := streamx.NewServerProvider(provider) // wrapped server provider
-	return &svrTransHandlerFactory{provider: sp}
+	return &svrTransHandlerFactory{provider: provider}
 }
 
 func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
@@ -155,9 +155,17 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 
 	ink := ri.Invocation().(rpcinfo.InvocationSetter)
 	if si, ok := ss.(istreamx.StreamInfo); ok {
-		ink.SetServiceName(si.Service())
+		sinfo := t.opt.SvcSearcher.SearchService(si.Service(), si.Method(), false)
+		if sinfo == nil {
+			return remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", si.Service()))
+		}
+		minfo := sinfo.MethodInfo(si.Method())
+		if minfo == nil {
+			return remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", si.Method()))
+		}
+		ink.SetServiceName(sinfo.ServiceName)
 		ink.SetMethodName(si.Method())
-		ink.SetStreamingMode(si.Mode())
+		ink.SetStreamingMode(minfo.StreamingMode())
 		if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
 			_ = mutableTo.SetMethod(si.Method())
 		}
