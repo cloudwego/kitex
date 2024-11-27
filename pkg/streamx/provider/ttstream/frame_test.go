@@ -94,6 +94,7 @@ func TestGenericPayloadCodec(t *testing.T) {
 	p, err := generic.NewThriftContentProvider(idlContent, nil)
 	test.Assert(t, err == nil, err)
 	g, err := generic.JSONThriftGeneric(p)
+	test.Assert(t, err == nil)
 
 	req := `{"A":1, "B":"hello world"}`
 	args := &generic.Args{

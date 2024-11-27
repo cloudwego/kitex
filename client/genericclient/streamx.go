@@ -44,7 +44,7 @@ type StreamClient[T any] interface {
 	GenericCall(ctx context.Context, method string, request any, callOptions ...T) (response any, err error)
 }
 
-// WIP: NOTE: want to unify the user inteface for both uanry and ping pong calls
+// WIP: NOTE: want to unify the user interface for both uanry and ping pong calls
 func (sc *genericServiceStreamingClient[T]) GenericCall(ctx context.Context, method string, request any, callOptions ...T) (response any, err error) {
 	mtInfo := sc.svcInfo.MethodInfo(method)
 	_args := mtInfo.NewArgs().(*generic.Args)

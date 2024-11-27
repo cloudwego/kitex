@@ -19,8 +19,6 @@ package test
 import (
 	"context"
 	"errors"
-	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/streamx"
 	"io"
 	"time"
 
@@ -32,7 +30,9 @@ import (
 	istreamx "github.com/cloudwego/kitex/internal/mocks/streamx"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
 	"github.com/cloudwego/kitex/server"
