@@ -49,7 +49,7 @@ func TestTimeoutPool(t *testing.T) {
 					atomic.AddInt32(&sum, 1)
 					return nil
 				})
-			test.Assert(t, err == nil && ctx.Err() == nil)
+			test.Assert(t, err == nil && ctx.Err() == context.Canceled, err, ctx.Err())
 		}()
 	}
 	wg.Wait()
@@ -89,7 +89,7 @@ func TestTask(t *testing.T) {
 		go p.Run()
 		ctx, err := p.Wait()
 		test.Assert(t, returnErr == err, err)
-		test.Assert(t, ctx.Err() == nil, ctx.Err())
+		test.Assert(t, ctx.Err() == context.Canceled, ctx.Err())
 	})
 
 	t.Run("Timeout", func(t *testing.T) {
@@ -144,6 +144,6 @@ func TestTask(t *testing.T) {
 		go p.Run()
 		ctx, err := p.Wait()
 		test.Assert(t, err != nil && strings.Contains(err.Error(), "testpanic"), err)
-		test.Assert(t, ctx.Err() == nil)
+		test.Assert(t, ctx.Err() == context.Canceled, ctx.Err())
 	})
 }

@@ -18,7 +18,6 @@ package client
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"runtime/debug"
 	"sync"
@@ -124,6 +123,16 @@ func (p *timeoutPool) createWorker(t *timeoutTask) bool {
 }
 
 // RunTask creates/reuses a worker to run task.
+//
+// It returns:
+// - the underlying ctx used for calling endpoint.Endpoint
+// - err returned by endpoint.Endpoint or ctx.Err()
+//
+// NOTE:
+// Err() method of the ctx will always be set context.Canceled after the func returns,
+// because ctx.Done() will be closed, and context package requires Err() must not nil.
+// Caller should always check the err first,
+// if it's nil, which means everything is ok, no need to do the further ctx.Err() check.
 func (p *timeoutPool) RunTask(ctx context.Context, timeout time.Duration,
 	req, resp any, ep endpoint.Endpoint,
 ) (context.Context, error) {
@@ -202,7 +211,7 @@ func (t *timeoutTask) Run() {
 					panicInfo, debug.Stack()))
 			}
 		}
-		t.Cancel(errTaskDone)
+		t.Cancel(context.Canceled)
 		t.recycle()
 	}()
 	var err error
@@ -213,8 +222,8 @@ func (t *timeoutTask) Run() {
 	} else {
 		err = t.ep(t.ctx, t.req, t.resp)
 	}
-	if err != nil {
-		t.err.Store(err) // fix store nil value ...
+	if err != nil { // panic if store nil
+		t.err.Store(err)
 	}
 }
 
@@ -246,30 +255,34 @@ func (t *timeoutTask) Wait() (context.Context, error) {
 	defer poolTimer.Put(tm)
 	tm.Reset(d)
 	select {
-	case <-t.ctx.Done():
-		// Run returned before timeout
-	case <-t.ctx.Context.Done():
+	case <-t.ctx.Done(): // finished before timeout
+		v := t.err.Load()
+		if v != nil {
+			return t.ctx, v.(error)
+		}
+		return t.ctx, nil
+
+	case <-t.ctx.Context.Done(): // parent done
 		t.Cancel(t.ctx.Context.Err())
-	case <-tm.C:
+	case <-tm.C: // timeout
 		t.Cancel(context.DeadlineExceeded)
-	}
-	if v := t.err.Load(); v != nil {
-		return t.ctx, v.(error)
 	}
 	return t.ctx, t.ctx.Err()
 }
 
 func (t *timeoutTask) waitNoTimeout() (context.Context, error) {
 	select {
-	case <-t.ctx.Done():
-		// Run returned before timeout
-	case <-t.ctx.Context.Done():
+	case <-t.ctx.Done(): // finished before parent done
+		v := t.err.Load()
+		if v != nil {
+			return t.ctx, v.(error)
+		}
+		return t.ctx, nil
+
+	case <-t.ctx.Context.Done(): // parent done
 		t.Cancel(t.ctx.Context.Err())
+		return t.ctx, t.ctx.Err()
 	}
-	if v := t.err.Load(); v != nil {
-		return t.ctx, v.(error)
-	}
-	return t.ctx, t.ctx.Err()
 }
 
 type timeoutContext struct {
@@ -306,18 +319,14 @@ func (p *timeoutContext) Done() <-chan struct{} {
 	return p.ch
 }
 
-// only used internally
-// will not return to end user
-var errTaskDone = errors.New("task done")
-
 func (p *timeoutContext) Err() error {
 	p.mu.Lock()
 	err := p.err
 	p.mu.Unlock()
-	if err == nil || err == errTaskDone {
-		return p.Context.Err()
+	if err != nil {
+		return err
 	}
-	return err
+	return p.Context.Err()
 }
 
 func (p *timeoutContext) Cancel(err error) {
