@@ -73,9 +73,14 @@ type TimeoutProvider interface {
 	Timeouts(ri RPCInfo) Timeouts
 }
 
+type StreamConfig interface {
+	StreamRecvTimeout() time.Duration
+}
+
 // RPCConfig contains configuration for RPC.
 type RPCConfig interface {
 	Timeouts
+	StreamConfig
 	IOBufferSize() int
 	TransportProtocol() transport.Protocol
 	InteractionMode() InteractionMode
@@ -87,6 +92,7 @@ type Invocation interface {
 	PackageName() string
 	ServiceName() string
 	MethodName() string
+	StreamingMode() serviceinfo.StreamingMode
 	SeqID() int32
 	BizStatusErr() kerrors.BizStatusErrorIface
 	Extra(key string) interface{}
