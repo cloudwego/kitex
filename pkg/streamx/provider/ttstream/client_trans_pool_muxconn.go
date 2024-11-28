@@ -27,7 +27,6 @@ import (
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/gofunc"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 )
 
 var DefaultMuxConnConfig = MuxConnConfig{
@@ -105,7 +104,7 @@ func (tl *muxConnTransList) Get(network, addr string) (*transport, error) {
 	trans = newTransport(clientTransport, conn, tl.pool)
 	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
 		// peer close
-		_ = trans.Close(terrors.ErrTransport.WithCause(errors.New("connection closed by peer")))
+		_ = trans.Close(errTransport.WithCause(errors.New("connection closed by peer")))
 		return nil
 	})
 	runtime.SetFinalizer(trans, func(trans *transport) {
