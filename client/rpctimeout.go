@@ -125,7 +125,12 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 			}
 			start := time.Now()
 			ctx, err := workerPool.RunTask(ctx, tm, request, response, backgroundEP)
-			if ctx.Err() != nil { // context.Canceled or context.DeadlineExceeded?
+			if err == nil {
+				return nil
+			}
+			if err == ctx.Err() {
+				// err is from ctx.Err()
+				// either parent is cancelled by user, or timeout
 				return makeTimeoutErr(ctx, start, tm)
 			}
 			return err

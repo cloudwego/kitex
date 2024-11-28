@@ -98,7 +98,7 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
 	mw2 = rpcTimeoutMW(mwCtx)
 	err = mw1(mw2(panicEp))(ctx, nil, nil)
-	test.Assert(t, strings.Contains(err.Error(), panicMsg))
+	test.Assert(t, strings.Contains(err.Error(), panicMsg), err)
 
 	// 6. panic without timeout, panic won't be recovered in timeout mw, but it will be recoverd in client.Call
 	m.SetRPCTimeout(0)
