@@ -32,7 +32,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 
 	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 )
 
 const (
@@ -107,7 +106,7 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr *Frame) (err erro
 
 	totalLenField, err := ttheader.Encode(ctx, param, writer)
 	if err != nil {
-		return terrors.ErrIllegalFrame.WithCause(err)
+		return errIllegalFrame.WithCause(err)
 	}
 	if len(fr.payload) > 0 {
 		if nw, ok := writer.(gopkgthrift.NocopyWriter); ok {
@@ -116,7 +115,7 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr *Frame) (err erro
 			_, err = writer.WriteBinary(fr.payload)
 		}
 		if err != nil {
-			return terrors.ErrTransport.WithCause(err)
+			return errTransport.WithCause(err)
 		}
 	}
 	written = writer.WrittenLen() - written
@@ -131,10 +130,10 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 		if errors.Is(err, io.EOF) {
 			return nil, err
 		}
-		return nil, terrors.ErrIllegalFrame.WithCause(err)
+		return nil, errIllegalFrame.WithCause(err)
 	}
 	if dp.Flags&ttheader.HeaderFlagsStreaming == 0 {
-		return nil, terrors.ErrIllegalFrame.WithCause(fmt.Errorf("unexpected header flags: %d", dp.Flags))
+		return nil, errIllegalFrame.WithCause(fmt.Errorf("unexpected header flags: %d", dp.Flags))
 	}
 
 	var ftype int32
@@ -153,7 +152,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 		ftype = trailerFrameType
 		ftrailer = dp.StrInfo
 	default:
-		return nil, terrors.ErrIllegalFrame.WithCause(fmt.Errorf("unexpected frame type: %v", dp.IntInfo[ttheader.FrameType]))
+		return nil, errIllegalFrame.WithCause(fmt.Errorf("unexpected frame type: %v", dp.IntInfo[ttheader.FrameType]))
 	}
 	fmethod := dp.IntInfo[ttheader.ToMethod]
 	fsid := dp.SeqID
@@ -165,7 +164,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 		_, err = reader.ReadBinary(fpayload) // copy read
 		_ = reader.Release(err)
 		if err != nil {
-			return nil, terrors.ErrTransport.WithCause(err)
+			return nil, errTransport.WithCause(err)
 		}
 	} else {
 		_ = reader.Release(nil)

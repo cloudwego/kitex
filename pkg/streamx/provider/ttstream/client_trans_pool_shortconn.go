@@ -19,8 +19,6 @@ package ttstream
 import (
 	"errors"
 	"time"
-
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 )
 
 func newShortConnTransPool() transPool {
@@ -41,5 +39,5 @@ func (p *shortConnTransPool) Get(network, addr string) (*transport, error) {
 }
 
 func (p *shortConnTransPool) Put(trans *transport) {
-	_ = trans.Close(terrors.ErrTransport.WithCause(errors.New("short connection closed")))
+	_ = trans.Close(errTransport.WithCause(errors.New("short connection closed")))
 }

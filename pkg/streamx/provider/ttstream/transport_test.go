@@ -36,7 +36,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 	"github.com/cloudwego/kitex/server/streamxserver"
 )
 
@@ -246,7 +245,7 @@ func TestTransportException(t *testing.T) {
 	cStream = newClientStream(rawClientStream)
 	err = cStream.RecvMsg(context.Background(), res)
 	test.Assert(t, err != nil, err)
-	test.Assert(t, errors.Is(err, terrors.ErrIllegalFrame), err)
+	test.Assert(t, errors.Is(err, errIllegalFrame), err)
 }
 
 func TestStreamID(t *testing.T) {

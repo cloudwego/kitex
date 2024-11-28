@@ -32,7 +32,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 )
 
@@ -111,7 +110,7 @@ func (s *stream) Method() string {
 
 func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
 	if atomic.LoadInt32(&s.selfEOF) != 0 {
-		return terrors.ErrIllegalOperation.WithCause(errors.New("stream is closed send"))
+		return errIllegalOperation.WithCause(errors.New("stream is closed send"))
 	}
 	// encode payload
 	payload, err := EncodePayload(ctx, msg)
@@ -303,13 +302,13 @@ func (s *stream) onReadMetaFrame(fr *Frame) (err error) {
 
 func (s *stream) onReadHeaderFrame(fr *Frame) (err error) {
 	if s.header != nil {
-		return terrors.ErrUnexpectedHeader.WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
+		return errUnexpectedHeader.WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
 	}
 	s.header = fr.header
 	select {
 	case s.headerSig <- streamSigActive:
 	default:
-		return terrors.ErrUnexpectedHeader.WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
+		return errUnexpectedHeader.WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
 	}
 	klog.Debugf("stream[%s] read header: %v", s.method, fr.header)
 	return nil
@@ -328,12 +327,12 @@ func (s *stream) onReadTrailerFrame(fr *Frame) (err error) {
 	if len(fr.payload) > 0 {
 		// exception is type of (*thrift.ApplicationException)
 		_, _, err = thrift.UnmarshalFastMsg(fr.payload, nil)
-		exception = terrors.ErrApplicationException.WithCause(err)
+		exception = errApplicationException.WithCause(err)
 	} else if len(fr.trailer) > 0 {
 		// when server-side returns biz error, payload is empty and biz error information is stored in trailer frame header
 		bizErr, err := transmeta.ParseBizStatusErr(fr.trailer)
 		if err != nil {
-			exception = terrors.ErrIllegalBizErr.WithCause(err)
+			exception = errIllegalBizErr.WithCause(err)
 		} else if bizErr != nil {
 			// bizErr is independent of rpc exception handling
 			exception = bizErr

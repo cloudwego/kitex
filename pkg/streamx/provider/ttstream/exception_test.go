@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package terrors
+package ttstream
 
 import (
 	"errors"
@@ -28,23 +28,29 @@ import (
 
 func TestErrors(t *testing.T) {
 	causeErr := fmt.Errorf("test1")
-	newErr := ErrIllegalFrame.WithCause(causeErr)
-	test.Assert(t, errors.Is(newErr, ErrIllegalFrame), newErr)
+	newErr := errIllegalFrame.WithCause(causeErr)
+	test.Assert(t, errors.Is(newErr, errIllegalFrame), newErr)
 	test.Assert(t, errors.Is(newErr, kerrors.ErrStreamingProtocol), newErr)
-	test.Assert(t, strings.Contains(newErr.Error(), ErrIllegalFrame.Error()))
+	test.Assert(t, strings.Contains(newErr.Error(), errIllegalFrame.Error()))
 	test.Assert(t, strings.Contains(newErr.Error(), causeErr.Error()))
+
+	appErr := errApplicationException.WithCause(causeErr)
+	test.Assert(t, errors.Is(appErr, errApplicationException), appErr)
+	test.Assert(t, !errors.Is(appErr, kerrors.ErrStreamingProtocol), appErr)
+	test.Assert(t, strings.Contains(appErr.Error(), errApplicationException.Error()))
+	test.Assert(t, strings.Contains(appErr.Error(), causeErr.Error()))
 }
 
 func TestCommonParentKerror(t *testing.T) {
 	errs := []error{
-		ErrUnexpectedHeader,
-		ErrApplicationException,
-		ErrIllegalBizErr,
-		ErrIllegalFrame,
-		ErrIllegalOperation,
-		ErrTransport,
+		errUnexpectedHeader,
+		errIllegalBizErr,
+		errIllegalFrame,
+		errIllegalOperation,
+		errTransport,
 	}
 	for _, err := range errs {
 		test.Assert(t, errors.Is(err, kerrors.ErrStreamingProtocol), err)
 	}
+	test.Assert(t, !errors.Is(errApplicationException, kerrors.ErrStreamingProtocol))
 }
