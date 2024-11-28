@@ -24,11 +24,10 @@ import (
 	"net"
 	"runtime/debug"
 	"sync"
-	"time"
 
 	istreamx "github.com/cloudwego/kitex/internal/streamx"
-	"github.com/cloudwego/kitex/internal/wpool"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -44,8 +43,6 @@ import (
 
 Other interface is used by trans pipeline
 */
-
-var streamWorkerPool = wpool.New(128, time.Second)
 
 type svrTransHandlerFactory struct {
 	provider streamx.ServerProvider
@@ -120,7 +117,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		}
 		wg.Add(1)
 		// stream level goroutine
-		streamWorkerPool.GoCtx(nctx, func() {
+		gofunc.GoFunc(nctx, func() {
 			defer wg.Done()
 			err := t.OnStream(nctx, conn, ss)
 			if err != nil && !errors.Is(err, io.EOF) {
