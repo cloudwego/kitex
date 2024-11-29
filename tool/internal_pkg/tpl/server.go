@@ -30,8 +30,28 @@ import (
 	{{- end}}
 )
 
+{{- $serverInterfaceName := (call .ServiceTypeName) }}
+{{- if and .StreamX .HasStreaming}}
+{{- $serverInterfaceName = .ServiceName }}
+type {{.ServiceName}} interface {
+{{- range .AllMethods}}
+{{- $streamingUnary := (eq .Streaming.Mode "unary")}}
+{{- $clientSide := (eq .Streaming.Mode "client")}}
+{{- $serverSide := (eq .Streaming.Mode "server")}}
+{{- $bidiSide := (eq .Streaming.Mode "bidirectional")}}
+{{- $arg := index .Args 0}}
+    {{.Name}}{{- if $streamingUnary}}(ctx context.Context, req {{$arg.Type}}) ({{.Resp.Type}}, error)
+             {{- else if $clientSide}}(ctx context.Context, stream streamx.ClientStreamingServer[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}]) ({{.Resp.Type}}, error)
+             {{- else if $serverSide}}(ctx context.Context, req {{$arg.Type}}, stream streamx.ServerStreamingServer[{{NotPtr .Resp.Type}}]) error
+             {{- else if $bidiSide}}(ctx context.Context, stream streamx.BidiStreamingServer[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}]) error
+             {{- else }}(ctx context.Context {{range .Args}}, {{.RawName}} {{.Type}}{{end}}) ({{if not .Void}}r {{.Resp.Type}}, {{end}}err error)
+             {{- end}}
+{{- end}}
+}
+{{- end}} {{- /* if and .StreamX .HasStreaming end */}}
+
 // NewServer creates a server.Server with the given handler and options.
-func NewServer(handler {{call .ServiceTypeName}}, opts ...server.Option) server.Server {
+func NewServer(handler {{$serverInterfaceName}}, opts ...server.Option) server.Server {
     var options []server.Option
     {{template "@server.go-NewServer-option" .}}
     options = append(options, opts...)
@@ -50,7 +70,7 @@ func NewServer(handler {{call .ServiceTypeName}}, opts ...server.Option) server.
 }
 {{template "@server.go-EOF" .}}
 
-func RegisterService(svr server.Server, handler {{call .ServiceTypeName}}, opts ...server.RegisterOption) error {
+func RegisterService(svr server.Server, handler {{$serverInterfaceName}}, opts ...server.RegisterOption) error {
 	return svr.RegisterService(serviceInfo(), handler, opts...)
 }
 `

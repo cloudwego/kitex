@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/wpool"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -31,15 +30,8 @@ import (
 )
 
 // workerPool is used to reduce the timeout goroutine overhead.
-var workerPool *wpool.Pool
-
-func init() {
-	// if timeout middleware is not enabled, it will not cause any extra overhead
-	workerPool = wpool.New(
-		128,
-		time.Minute,
-	)
-}
+// if timeout middleware is not enabled, it will not cause any extra overhead
+var workerPool = newTimeoutPool(128, time.Minute)
 
 func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration) error {
 	ri := rpcinfo.GetRPCInfo(ctx)
@@ -96,68 +88,52 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 	}
 
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		backgroundEP := func(ctx context.Context, request, response interface{}) error {
+			err := next(ctx, request, response)
+			if err != nil && ctx.Err() != nil &&
+				!kerrors.IsTimeoutError(err) && !errors.Is(err, kerrors.ErrRPCFinish) {
+				ri := rpcinfo.GetRPCInfo(ctx)
+				// error occurs after the wait goroutine returns(RPCTimeout happens),
+				// we should log this error for troubleshooting, or it will be discarded.
+				// but ErrRPCTimeout and ErrRPCFinish can be ignored:
+				//    ErrRPCTimeout: it is same with outer timeout, here only care about non-timeout err.
+				//    ErrRPCFinish: it happens in retry scene, previous call returns first.
+				var errMsg string
+				if ri.To().Address() != nil {
+					errMsg = fmt.Sprintf("KITEX: to_service=%s method=%s addr=%s error=%s",
+						ri.To().ServiceName(), ri.To().Method(), ri.To().Address(), err.Error())
+				} else {
+					errMsg = fmt.Sprintf("KITEX: to_service=%s method=%s error=%s",
+						ri.To().ServiceName(), ri.To().Method(), err.Error())
+				}
+				klog.CtxErrorf(ctx, "%s", errMsg)
+			}
+			return err
+		}
 		return func(ctx context.Context, request, response interface{}) error {
 			ri := rpcinfo.GetRPCInfo(ctx)
 			if ri.Config().InteractionMode() == rpcinfo.Streaming {
 				return next(ctx, request, response)
 			}
-
 			tm := ri.Config().RPCTimeout()
 			if tm > 0 {
 				tm += moreTimeout
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, tm)
-				defer cancel()
 			}
-			// Fast path for ctx without timeout
-			if ctx.Done() == nil {
+			// fast path if no timeout
+			if ctx.Done() == nil && tm <= 0 {
 				return next(ctx, request, response)
 			}
-
-			var err error
 			start := time.Now()
-			done := make(chan error, 1)
-			workerPool.GoCtx(ctx, func() {
-				defer func() {
-					if panicInfo := recover(); panicInfo != nil {
-						e := rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, true)
-						done <- e
-					}
-					if err == nil || !errors.Is(err, kerrors.ErrRPCFinish) {
-						// Don't regards ErrRPCFinish as normal error, it happens in retry scene,
-						// ErrRPCFinish means previous call returns first but is decoding.
-						close(done)
-					}
-				}()
-				err = next(ctx, request, response)
-				if err != nil && ctx.Err() != nil &&
-					!kerrors.IsTimeoutError(err) && !errors.Is(err, kerrors.ErrRPCFinish) {
-					// error occurs after the wait goroutine returns(RPCTimeout happens),
-					// we should log this error for troubleshooting, or it will be discarded.
-					// but ErrRPCTimeout and ErrRPCFinish can be ignored:
-					//    ErrRPCTimeout: it is same with outer timeout, here only care about non-timeout err.
-					//    ErrRPCFinish: it happens in retry scene, previous call returns first.
-					var errMsg string
-					if ri.To().Address() != nil {
-						errMsg = fmt.Sprintf("KITEX: to_service=%s method=%s addr=%s error=%s",
-							ri.To().ServiceName(), ri.To().Method(), ri.To().Address(), err.Error())
-					} else {
-						errMsg = fmt.Sprintf("KITEX: to_service=%s method=%s error=%s",
-							ri.To().ServiceName(), ri.To().Method(), err.Error())
-					}
-					klog.CtxErrorf(ctx, "%s", errMsg)
-				}
-			})
-
-			select {
-			case panicErr := <-done:
-				if panicErr != nil {
-					return panicErr
-				}
-				return err
-			case <-ctx.Done():
+			ctx, err := workerPool.RunTask(ctx, tm, request, response, backgroundEP)
+			if err == nil {
+				return nil
+			}
+			if err == ctx.Err() {
+				// err is from ctx.Err()
+				// either parent is cancelled by user, or timeout
 				return makeTimeoutErr(ctx, start, tm)
 			}
+			return err
 		}
 	}
 }

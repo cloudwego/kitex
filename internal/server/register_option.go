@@ -16,7 +16,9 @@
 
 package server
 
-import "github.com/cloudwego/kitex/pkg/endpoint"
+import (
+	"github.com/cloudwego/kitex/pkg/endpoint"
+)
 
 // RegisterOption is the only way to config service registration.
 type RegisterOption struct {

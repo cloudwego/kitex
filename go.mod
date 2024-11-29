@@ -9,9 +9,9 @@ require (
 	github.com/cloudwego/dynamicgo v0.4.6-0.20241115162834-0e99bc39b128
 	github.com/cloudwego/fastpb v0.0.5
 	github.com/cloudwego/frugal v0.2.0
-	github.com/cloudwego/gopkg v0.1.2
+	github.com/cloudwego/gopkg v0.1.3-0.20241118053554-db5d7d475e7e
 	github.com/cloudwego/localsession v0.1.1
-	github.com/cloudwego/netpoll v0.6.4
+	github.com/cloudwego/netpoll v0.6.5-0.20240911104114-8a1f5597a920
 	github.com/cloudwego/runtimex v0.1.0
 	github.com/cloudwego/thriftgo v0.3.18
 	github.com/golang/mock v1.6.0

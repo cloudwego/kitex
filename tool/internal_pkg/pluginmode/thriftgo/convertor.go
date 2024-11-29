@@ -394,10 +394,14 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				ServiceFilePath: ast.Filename,
 				HasStreaming:    hasStreaming,
 				GenerateHandler: true,
+				StreamX:         c.Config.StreamX,
 			}
 
 			if c.IsHessian2() {
 				si.Protocol = transport.HESSIAN2.String()
+			}
+			if c.IsTTHeader() {
+				si.Protocol = transport.TTHeader.String()
 			}
 
 			si.HandlerReturnKeepResp = c.Config.HandlerReturnKeepResp
@@ -429,6 +433,7 @@ func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*ge
 		PkgInfo:        pkg,
 		ServiceName:    svc.GoName().String(),
 		RawServiceName: svc.Name,
+		StreamX:        c.Config.StreamX,
 	}
 	si.ServiceTypeName = func() string { return si.PkgRefName + "." + si.ServiceName }
 
@@ -445,6 +450,9 @@ func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*ge
 
 	if c.IsHessian2() {
 		si.Protocol = transport.HESSIAN2.String()
+	}
+	if c.IsTTHeader() {
+		si.Protocol = transport.TTHeader.String()
 	}
 	si.HandlerReturnKeepResp = c.Config.HandlerReturnKeepResp
 	si.UseThriftReflection = c.Utils.Features().WithReflection
@@ -469,6 +477,7 @@ func (c *converter) makeMethod(si *generator.ServiceInfo, f *golang.Function) (*
 		ClientStreaming:    st.ClientStreaming,
 		ServerStreaming:    st.ServerStreaming,
 		ArgsLength:         len(f.Arguments()),
+		StreamX:            si.StreamX,
 	}
 	if st.IsStreaming {
 		si.HasStreaming = true
@@ -542,6 +551,10 @@ func (c *converter) getCombineServiceName(name string, svcs []*generator.Service
 
 func (c *converter) IsHessian2() bool {
 	return strings.EqualFold(c.Config.Protocol, transport.HESSIAN2.String())
+}
+
+func (c *converter) IsTTHeader() bool {
+	return strings.EqualFold(c.Config.Protocol, transport.TTHeader.String())
 }
 
 func (c *converter) copyAnnotations(annotations parser.Annotations) parser.Annotations {
