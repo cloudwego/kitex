@@ -148,6 +148,7 @@ type Config struct {
 
 	GenFrugal    bool
 	FrugalStruct util.StringSlice
+	NoRecurse    bool
 
 	BuiltinTpl util.StringSlice // specify the built-in template to use
 }

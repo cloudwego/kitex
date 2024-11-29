@@ -294,7 +294,18 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 	var all ast2svc = make(map[string][]*generator.ServiceInfo)
 
 	c.svc2ast = make(map[*generator.ServiceInfo]*parser.Thrift)
-	for ast := range req.AST.DepthFirstSearch() {
+
+	var trees chan *parser.Thrift
+	if req.Recursive {
+		trees = req.AST.DepthFirstSearch()
+	} else {
+		trees = make(chan *parser.Thrift, 1)
+		trees <- req.AST
+		close(trees)
+	}
+	mainAST := req.AST
+
+	for ast := range trees {
 		ref, pkg, pth := c.Utils.ParseNamespace(ast)
 		// make the current ast as an include to produce correct type references.
 		fake := c.copyTreeWithRef(ast, ref)
@@ -324,7 +335,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				return fmt.Errorf("%s: makeService '%s': %w", ast.Filename, svc.Name, err)
 			}
 			si.ServiceFilePath = ast.Filename
-			if ast == req.AST {
+			if ast == mainAST {
 				si.GenerateHandler = true
 			}
 			all[ast.Filename] = append(all[ast.Filename], si)
@@ -354,7 +365,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 		c.fixStreamingForExtendedServices(ast, all)
 
 		// combine service
-		if ast == req.AST && c.Config.CombineService && len(ast.Services) > 0 {
+		if ast == mainAST && c.Config.CombineService && len(ast.Services) > 0 {
 			var (
 				svcs    []*generator.ServiceInfo
 				methods []*generator.MethodInfo
