@@ -466,6 +466,9 @@ func (s *server) stop() {
 	s.mu.Lock()
 	for c := range s.conns {
 		c.Close()
+		rawSrv := c.(*http2Server)
+		// wait for reader goroutine exited
+		<-rawSrv.readerDone
 	}
 	s.conns = nil
 	s.mu.Unlock()
