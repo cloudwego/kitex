@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/bytedance/gopkg v0.1.1
-	github.com/bytedance/sonic v1.12.2
+	github.com/bytedance/sonic v1.12.5
 	github.com/cloudwego/configmanager v0.2.2
 	github.com/cloudwego/dynamicgo v0.4.6
 	github.com/cloudwego/fastpb v0.0.5
