@@ -100,8 +100,6 @@ type Options struct {
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool
-
-	SectionConfigs map[string]interface{}
 }
 
 type Limit struct {
