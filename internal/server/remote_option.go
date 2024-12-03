@@ -31,8 +31,11 @@ import (
 
 func newServerRemoteOption() *remote.ServerOption {
 	return &remote.ServerOption{
-		TransServerFactory:    netpoll.NewTransServerFactory(),
-		SvrHandlerFactory:     detection.NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()),
+		TransServerFactory: netpoll.NewTransServerFactory(),
+		SvrHandlerFactory: detection.NewSvrTransHandlerFactory(
+			netpoll.NewSvrTransHandlerFactory(),
+			nphttp2.NewSvrTransHandlerFactory(),
+		),
 		Codec:                 codec.NewDefaultCodec(),
 		Address:               defaultAddress,
 		ExitWaitTime:          defaultExitWaitTime,

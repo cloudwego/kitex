@@ -47,6 +47,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
@@ -120,6 +121,7 @@ type Options struct {
 	CtxBackupHandler backup.BackupHandler
 
 	Streaming stream.StreamingConfig
+	StreamX   StreamXOptions
 }
 
 // Apply applies all options.
@@ -209,4 +211,12 @@ func (o *Options) InitRetryContainer() {
 		o.RetryContainer = retry.NewRetryContainerWithPercentageLimit()
 		o.CloseCallbacks = append(o.CloseCallbacks, o.RetryContainer.Close)
 	}
+}
+
+// StreamXOptions define the client options
+type StreamXOptions struct {
+	RecvTimeout   time.Duration
+	StreamMWs     []streamx.StreamMiddleware
+	StreamRecvMWs []streamx.StreamRecvMiddleware
+	StreamSendMWs []streamx.StreamSendMiddleware
 }

@@ -210,6 +210,7 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	}
 
 	registerOpts := internal_server.NewRegisterOptions(opts)
+	// register service
 	if err := s.svcs.addService(svcInfo, handler, registerOpts); err != nil {
 		panic(err.Error())
 	}
@@ -250,7 +251,7 @@ func (s *server) Run() (err error) {
 		return err
 	}
 	s.Lock()
-	s.svr, err = remotesvr.NewServer(s.opt.RemoteOpt, s.eps, transHdlr)
+	s.svr, err = remotesvr.NewServer(s.opt.RemoteOpt, transHdlr)
 	s.Unlock()
 	if err != nil {
 		return err
@@ -322,7 +323,7 @@ func (s *server) Stop() (err error) {
 func (s *server) buildServiceMiddleware() endpoint.Middleware {
 	hasServiceMW := false
 	for _, svc := range s.svcs.svcMap {
-		if svc.mw != nil {
+		if svc.MW != nil {
 			hasServiceMW = true
 			break
 		}
@@ -335,8 +336,8 @@ func (s *server) buildServiceMiddleware() endpoint.Middleware {
 			ri := rpcinfo.GetRPCInfo(ctx)
 			serviceName := ri.Invocation().ServiceName()
 			svc := s.svcs.svcMap[serviceName]
-			if svc != nil && svc.mw != nil {
-				next = svc.mw(next)
+			if svc != nil && svc.MW != nil {
+				next = svc.MW(next)
 			}
 			return next(ctx, req, resp)
 		}
@@ -395,10 +396,12 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 			// clear session
 			backup.ClearCtx()
 		}()
-		implHandlerFunc := svcInfo.MethodInfo(methodName).Handler()
+		minfo := svcInfo.MethodInfo(methodName)
+		implHandlerFunc := minfo.Handler()
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		// set session
 		backup.BackupCtx(ctx)
+
 		err = implHandlerFunc(ctx, svc.handler, args, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {

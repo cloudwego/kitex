@@ -336,3 +336,10 @@ func PrintlImports(imports []Import) string {
 	}
 	return builder.String()
 }
+
+func ToString(val interface{}) string {
+	if stringer, ok := val.(fmt.Stringer); ok {
+		return stringer.String()
+	}
+	return ""
+}

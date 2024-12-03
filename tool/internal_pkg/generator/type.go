@@ -159,6 +159,8 @@ type ServiceInfo struct {
 	RefName string
 	// identify whether this service would generate a corresponding handler.
 	GenerateHandler bool
+	// whether to generate StreamX interface code
+	StreamX bool
 }
 
 // AllMethods returns all methods that the service have.
@@ -212,6 +214,7 @@ type MethodInfo struct {
 	ClientStreaming        bool
 	ServerStreaming        bool
 	Streaming              *streaming.Streaming
+	StreamX                bool
 }
 
 // Parameter .
@@ -232,6 +235,7 @@ var funcs = map[string]interface{}{
 	"HasFeature":    HasFeature,
 	"FilterImports": FilterImports,
 	"backquoted":    BackQuoted,
+	"getStreamxRef": ToStreamxRef,
 }
 
 func AddTemplateFunc(key string, f interface{}) {
@@ -394,4 +398,13 @@ func FilterImports(Imports map[string]map[string]bool, ms []*MethodInfo) map[str
 
 func BackQuoted(s string) string {
 	return "`" + s + "`"
+}
+
+func ToStreamxRef(protocol transport.Protocol) string {
+	switch protocol {
+	case transport.TTHeader:
+		return streamxTTHeaderRef
+	default:
+		return ""
+	}
 }

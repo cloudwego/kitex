@@ -115,20 +115,29 @@ func (ch *clientTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Messag
 	transInfo := msg.TransInfo()
 	strInfo := transInfo.TransStrInfo()
 
-	if code, err := strconv.Atoi(strInfo[bizStatus]); err == nil && code != 0 {
-		if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
-			if bizExtra := strInfo[bizExtra]; bizExtra != "" {
-				extra, err := utils.JSONStr2Map(bizExtra)
-				if err != nil {
-					return ctx, fmt.Errorf("malformed header info, extra: %s", bizExtra)
-				}
-				setter.SetBizStatusErr(kerrors.NewBizStatusErrorWithExtra(int32(code), strInfo[bizMessage], extra))
-			} else {
-				setter.SetBizStatusErr(kerrors.NewBizStatusError(int32(code), strInfo[bizMessage]))
-			}
-		}
+	bizErr, err := ParseBizStatusErr(strInfo)
+	if err != nil {
+		return ctx, err
+	}
+	if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok && bizErr != nil {
+		setter.SetBizStatusErr(bizErr)
 	}
 	return ctx, nil
+}
+
+func ParseBizStatusErr(strInfo map[string]string) (kerrors.BizStatusErrorIface, error) {
+	if code, err := strconv.ParseInt(strInfo[bizStatus], 10, 32); err == nil && code != 0 {
+		if bizExtra := strInfo[bizExtra]; bizExtra != "" {
+			extra, err := utils.JSONStr2Map(bizExtra)
+			if err != nil {
+				return nil, fmt.Errorf("malformed header info, extra: %s", bizExtra)
+			}
+			return kerrors.NewBizStatusErrorWithExtra(int32(code), strInfo[bizMessage], extra), nil
+		} else {
+			return kerrors.NewBizStatusError(int32(code), strInfo[bizMessage]), nil
+		}
+	}
+	return nil, nil
 }
 
 // serverTTHeaderHandler implement remote.MetaHandler
