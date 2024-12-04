@@ -47,8 +47,9 @@ func (kc *kClient) NewStream(ctx context.Context, method string, streamArgs stre
 	// tracing
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	ctx, copts := streamxcallopt.NewCtxWithCallOptions(ctx)
-	callOptions = append(callOptions, streamxcallopt.WithStreamCloseCallback(func() {
-		kc.opt.TracerCtl.DoFinish(ctx, ri, err)
+	callOptions = append(callOptions, streamxcallopt.WithStreamCloseCallback(func(nCtx context.Context, nErr error) {
+		// use ctx instead of nCtx to retrieve rpc metadata
+		kc.opt.TracerCtl.DoFinish(ctx, ri, nErr)
 	}))
 	copts.Apply(callOptions)
 

@@ -21,7 +21,7 @@ import (
 )
 
 // StreamCloseCallback define close callback of the stream
-type StreamCloseCallback func()
+type StreamCloseCallback func(ctx context.Context, err error)
 
 // CallOptions define stream call level options
 type CallOptions struct {

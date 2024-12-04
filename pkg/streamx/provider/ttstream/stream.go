@@ -165,7 +165,7 @@ func (s *stream) closeSend(exception error) error {
 		return nil
 	}
 	err := s.sendTrailer(exception)
-	s.tryRunCloseCallback()
+	s.tryRunCloseCallback(exception)
 	return err
 }
 
@@ -189,7 +189,7 @@ func (s *stream) closeRecv(exception error) error {
 	default:
 	}
 	s.reader.close(exception)
-	s.tryRunCloseCallback()
+	s.tryRunCloseCallback(exception)
 	return nil
 }
 
@@ -220,13 +220,14 @@ func (s *stream) setMetaFrameHandler(metaHandler MetaFrameHandler) {
 	s.metaFrameHandler = metaHandler
 }
 
-func (s *stream) tryRunCloseCallback() {
+func (s *stream) tryRunCloseCallback(exception error) {
 	if atomic.AddInt32(&s.eofFlag, 1) != 2 {
 		return
 	}
+	ctx := context.Background()
 	if len(s.closeCallback) > 0 {
 		for _, cb := range s.closeCallback {
-			cb()
+			cb(ctx, exception)
 		}
 	}
 	_ = s.writer.CloseStream(s.sid)
