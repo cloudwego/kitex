@@ -50,7 +50,7 @@ func newExceptionType(message string, parent error, typeId int32) *exceptionType
 }
 
 func (e *exceptionType) WithCause(err error) error {
-	return &exceptionType{basic: e, cause: err}
+	return &exceptionType{basic: e, cause: err, typeId: e.typeId}
 }
 
 func (e *exceptionType) Error() string {
@@ -66,10 +66,13 @@ func (e *exceptionType) Is(target error) bool {
 
 // TypeId is used for aligning with ApplicationException interface
 func (e *exceptionType) TypeId() int32 {
+	if errWithTypeId, ok := e.cause.(interface{ TypeId() int32 }); ok {
+		return errWithTypeId.TypeId()
+	}
 	return e.typeId
 }
 
 // Code is used for uniform code retrieving by Kitex in the future
 func (e *exceptionType) Code() int32 {
-	return e.typeId
+	return e.TypeId()
 }
