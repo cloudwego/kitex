@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
+	istreamxclient "github.com/cloudwego/kitex/internal/streamx/streamxclient"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
@@ -46,9 +47,8 @@ func (kc *kClient) NewStream(ctx context.Context, method string, streamArgs stre
 
 	// tracing
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
-	ctx, copts := streamxcallopt.NewCtxWithCallOptions(ctx)
-	callOptions = append(callOptions, streamxcallopt.WithStreamCloseCallback(func(nCtx context.Context, nErr error) {
-		// use ctx instead of nCtx to retrieve rpc metadata
+	ctx, copts := istreamxclient.NewCtxWithCallOptions(ctx)
+	callOptions = append(callOptions, istreamxclient.WithStreamCloseCallback(func(nErr error) {
 		kc.opt.TracerCtl.DoFinish(ctx, ri, nErr)
 	}))
 	copts.Apply(callOptions)

@@ -19,7 +19,6 @@ package streamxclient
 import (
 	"context"
 
-	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	internal_client "github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -27,7 +26,7 @@ import (
 
 // StreamXClient implement a streamx interface client
 type StreamXClient interface {
-	NewStream(ctx context.Context, method string, streamArgs streamx.StreamArgs, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error)
+	NewStream(ctx context.Context, method string, streamArgs streamx.StreamArgs, callOptions ...CallOption) (context.Context, streamx.ClientStream, error)
 }
 
 // WithStreamMiddleware currently is not open for users to use for now

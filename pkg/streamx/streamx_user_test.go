@@ -34,6 +34,7 @@ import (
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/streamxclient"
+	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	istreamxclient "github.com/cloudwego/kitex/internal/streamx/streamxclient"
 	istreamxserver "github.com/cloudwego/kitex/internal/streamx/streamxserver"
 	"github.com/cloudwego/kitex/internal/test"
@@ -857,7 +858,7 @@ func TestStreamingTracing(t *testing.T) {
 		req := new(Request)
 		req.Message = "BidiStream"
 		req.Type = normalErr
-		ctx, stream, err := cli.BidiStreamWithErr(context.Background())
+		ctx, stream, err := cli.BidiStreamWithErr(context.Background(), streamxcallopt.CallOption{})
 		test.Assert(t, err == nil, err)
 		err = stream.Send(ctx, req)
 		test.Assert(t, err == nil, err)

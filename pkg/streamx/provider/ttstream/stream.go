@@ -27,7 +27,7 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
-	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
+	istreamxclient "github.com/cloudwego/kitex/internal/streamx/streamxclient"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -53,7 +53,7 @@ func newStream(ctx context.Context, writer streamWriter, smeta streamFrame) *str
 	s.trailerSig = make(chan int32, 1)
 
 	// register close callback
-	copts := streamxcallopt.GetCallOptionsFromCtx(ctx)
+	copts := istreamxclient.GetCallOptionsFromCtx(ctx)
 	if copts != nil && len(copts.StreamCloseCallback) > 0 {
 		s.closeCallback = append(s.closeCallback, copts.StreamCloseCallback...)
 	}
@@ -94,7 +94,7 @@ type stream struct {
 
 	recvTimeout      time.Duration
 	metaFrameHandler MetaFrameHandler
-	closeCallback    []streamxcallopt.StreamCloseCallback
+	closeCallback    []istreamxclient.StreamCloseCallback
 }
 
 func (s *stream) Service() string {
@@ -224,10 +224,9 @@ func (s *stream) tryRunCloseCallback(exception error) {
 	if atomic.AddInt32(&s.eofFlag, 1) != 2 {
 		return
 	}
-	ctx := context.Background()
 	if len(s.closeCallback) > 0 {
 		for _, cb := range s.closeCallback {
-			cb(ctx, exception)
+			cb(exception)
 		}
 	}
 	_ = s.writer.CloseStream(s.sid)
