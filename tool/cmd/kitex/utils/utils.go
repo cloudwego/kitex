@@ -24,16 +24,16 @@ import (
 )
 
 func OnKitexToolNormalExit(args kargs.Arguments) {
+	log.Warn("Code Generation is Done!")
+
 	if args.IDLType == "thrift" {
 		cmd := "go mod edit -replace github.com/apache/thrift=github.com/apache/thrift@v0.13.0"
 		argv := strings.Split(cmd, " ")
 		err := exec.Command(argv[0], argv[1:]...).Run()
 		if err != nil {
-			log.Warn("Adding apache/thrift@v0.13.0 to go.mod failed:%s\n please execute the following command manually:\n%s", err.Error(), cmd)
+			log.Warnf("Tips: please execute the following command to fix apache thrift lib version.\n%s", cmd)
 		}
 	}
-
-	log.Warn("Code Generation is Done!")
 
 	// If hessian option is java_extension, replace *java.Object to java.Object
 	if thriftgo.EnableJavaExtension(args.Config) {
