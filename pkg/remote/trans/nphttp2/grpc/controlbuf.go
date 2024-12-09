@@ -123,7 +123,7 @@ type cbItem interface {
 // registerStream is used to register an incoming stream with loopy writer.
 type registerStream struct {
 	streamID uint32
-	wq       *writeQuota
+	wq       *ctxWriteQuota
 }
 
 func (*registerStream) isTransportResponseFrame() bool { return false }
@@ -135,7 +135,7 @@ type headerFrame struct {
 	endStream  bool               // Valid on server side.
 	initStream func(uint32) error // Used only on the client side.
 	onWrite    func()
-	wq         *writeQuota    // write quota for the stream created.
+	wq         *ctxWriteQuota // write quota for the stream created.
 	cleanup    *cleanupStream // Valid on the server side.
 	onOrphaned func(error)    // Valid on client-side
 }
@@ -264,7 +264,7 @@ type outStream struct {
 	state            outStreamState
 	itl              *itemList
 	bytesOutStanding int
-	wq               *writeQuota
+	wq               *ctxWriteQuota
 
 	next *outStream
 	prev *outStream
@@ -877,6 +877,7 @@ func (l *loopyWriter) applySettings(ss []http2.Setting) error {
 // to be sent and stream has some stream-level flow control.
 func (l *loopyWriter) processData() (bool, error) {
 	if l.sendQuota == 0 {
+		klog.Infof("connection quota is 0, connection quota: %d, stream window: %d", l.sendQuota, l.oiws)
 		return true, nil
 	}
 	str := l.activeStreams.dequeue() // Remove the first stream.

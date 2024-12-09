@@ -245,7 +245,7 @@ type Stream struct {
 	buf          *recvBuffer
 	trReader     io.Reader
 	fc           *inFlow
-	wq           *writeQuota
+	wq           *ctxWriteQuota
 
 	// Callback to state application's intentions to read data. This
 	// is used to adjust flow control, if needed.
@@ -503,7 +503,7 @@ func CreateStream(ctx context.Context, id uint32, requestRead func(i int), metho
 		method:      method,
 		buf:         recvBuffer,
 		trReader:    trReader,
-		wq:          newWriteQuota(defaultWriteQuota, nil),
+		wq:          newCtxWriteQuota(context.Background(), defaultWriteQuota, nil),
 		requestRead: requestRead,
 		hdrMu:       sync.Mutex{},
 	}

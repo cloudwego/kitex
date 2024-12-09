@@ -291,7 +291,7 @@ func fillStreamFields(s *Stream) {
 		fields = allocateStreamFields()
 	}
 	s.buf = fields.recvBuffer
-	s.wq = fields.writeQuota
+	s.wq = newCtxWriteQuota(s.ctx, defaultWriteQuota, nil)
 	s.wq.done = s.done
 }
 
@@ -309,7 +309,7 @@ func preallocateForStream() {
 func allocateStreamFields() preAllocatedStreamFields {
 	return preAllocatedStreamFields{
 		recvBuffer: newRecvBuffer(),
-		writeQuota: newWriteQuota(defaultWriteQuota, nil),
+		//writeQuota: newWriteQuota(defaultWriteQuota, nil),
 	}
 }
 
