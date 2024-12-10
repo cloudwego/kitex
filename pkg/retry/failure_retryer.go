@@ -142,30 +142,27 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 
 // UpdatePolicy implements the Retryer interface.
 func (r *failureRetryer) UpdatePolicy(rp Policy) (err error) {
+	r.Lock()
+	defer r.Unlock()
 	if !rp.Enable {
-		r.Lock()
 		r.enable = rp.Enable
-		r.Unlock()
 		return nil
 	}
 	if rp.FailurePolicy == nil || rp.Type != FailureType {
-		err = errors.New("FailurePolicy is nil or retry type not match, cannot do update in failureRetryer")
-	}
-	if err == nil {
-		err = checkStopPolicy(&rp.FailurePolicy.StopPolicy, maxFailureRetryTimes, r)
-	}
-	r.Lock()
-	defer r.Unlock()
-	r.enable = rp.Enable
-	if err != nil {
+		err = fmt.Errorf("FailurePolicy is nil or retry type not match(type=%v), cannot do update in failureRetryer", rp.Type)
 		r.errMsg = err.Error()
 		return err
 	}
+	if err = checkStopPolicy(&rp.FailurePolicy.StopPolicy, maxFailureRetryTimes, r); err != nil {
+		r.errMsg = err.Error()
+		return err
+	}
+	r.enable = rp.Enable
 	r.policy = rp.FailurePolicy
 	r.setSpecifiedResultRetryIfNeeded(r.specifiedResultRetry, r.policy)
 	if bo, e := initBackOff(rp.FailurePolicy.BackOffPolicy); e != nil {
 		r.errMsg = fmt.Sprintf("failureRetryer update BackOffPolicy failed, err=%s", e.Error())
-		klog.Warnf(r.errMsg)
+		klog.Warnf("KITEX: %s", r.errMsg)
 	} else {
 		r.backOff = bo
 	}

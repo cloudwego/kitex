@@ -106,6 +106,12 @@ func Tag(ctx context.Context) {
 	}
 }
 
+// IsEnabled returns true if profiler is enabled
+// This func is short enough can be inlined, and likely it returns false
+func IsEnabled(ctx context.Context) bool {
+	return ctx.Value(profilerContextKey{}) != nil
+}
+
 // Untag current goroutine with tagged ctx
 // it's used for reuse goroutine scenario
 func Untag(ctx context.Context) {

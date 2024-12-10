@@ -21,7 +21,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -38,18 +37,15 @@ type server struct {
 	opt      *remote.ServerOption
 	listener net.Listener
 	transSvr remote.TransServer
-
-	inkHdlFunc endpoint.Endpoint
 	sync.Mutex
 }
 
 // NewServer creates a remote server.
-func NewServer(opt *remote.ServerOption, inkHdlFunc endpoint.Endpoint, transHdlr remote.ServerTransHandler) (Server, error) {
+func NewServer(opt *remote.ServerOption, transHdlr remote.ServerTransHandler) (Server, error) {
 	transSvr := opt.TransServerFactory.NewTransServer(opt, transHdlr)
 	s := &server{
-		opt:        opt,
-		inkHdlFunc: inkHdlFunc,
-		transSvr:   transSvr,
+		opt:      opt,
+		transSvr: transSvr,
 	}
 	return s, nil
 }
@@ -97,6 +93,8 @@ func (s *server) Stop() (err error) {
 }
 
 func (s *server) Address() net.Addr {
+	s.Lock()
+	defer s.Unlock()
 	if s.listener != nil {
 		return s.listener.Addr()
 	}

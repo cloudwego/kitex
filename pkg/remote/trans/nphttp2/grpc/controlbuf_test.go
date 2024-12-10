@@ -71,5 +71,5 @@ func TestControlBuf(t *testing.T) {
 	cb.throttle()
 
 	// test finish()
-	cb.finish()
+	cb.finish(ErrConnClosing)
 }

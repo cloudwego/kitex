@@ -104,7 +104,7 @@ func TestStreaming(t *testing.T) {
 	cliInfo.ConnPool = connpool
 	s, cr, _ := remotecli.NewStream(ctx, mockRPCInfo, new(mocks.MockCliTransHandler), cliInfo)
 	stream := newStream(
-		s, cr, kc, mockRPCInfo, serviceinfo.StreamingBidirectional,
+		s.(streaming.Stream), cr, kc, mockRPCInfo, serviceinfo.StreamingBidirectional,
 		func(stream streaming.Stream, message interface{}) (err error) {
 			return stream.SendMsg(message)
 		},

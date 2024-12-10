@@ -21,7 +21,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-func streamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
+func StreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
 	return newClientStreamingServiceInfo(g)
 }
 
@@ -100,5 +100,10 @@ func newClientStreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
 		Extra:        make(map[string]interface{}),
 	}
 	svcInfo.Extra["generic"] = true
+	if extra, ok := g.(generic.ExtraProvider); ok {
+		if extra.GetExtra(generic.CombineServiceKey) == "true" {
+			svcInfo.Extra["combine_service"] = true
+		}
+	}
 	return svcInfo
 }

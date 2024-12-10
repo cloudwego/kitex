@@ -124,10 +124,13 @@ func (m *WriteJSON) originalWrite(ctx context.Context, out bufiox.Writer, msg in
 			Index: 0,
 		}
 	}
-	if err = wrapJSONWriter(ctx, &body, bw, typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary}); err != nil {
-		return err
+
+	opt := &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary}
+	if fnDsc.IsWithoutWrapping {
+		return jsonWriter(ctx, &body, typeDsc, opt, bw)
 	}
-	return err
+
+	return wrapJSONWriter(ctx, &body, bw, typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary})
 }
 
 // NewReadJSON build ReadJSON according to ServiceDescriptor
@@ -180,15 +183,15 @@ func (m *ReadJSON) Read(ctx context.Context, method string, isClient bool, dataL
 	}
 
 	var resp interface{}
+	var err error
 	if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.VOID {
-		if err := in.Skip(voidWholeLen); err != nil {
+		if err = in.Skip(voidWholeLen); err != nil {
 			return nil, err
 		}
 		resp = descriptor.Void{}
 	} else {
 		transBuff := dirtmake.Bytes(dataLen, dataLen)
-		_, err := in.ReadBinary(transBuff)
-		if err != nil {
+		if _, err = in.ReadBinary(transBuff); err != nil {
 			return nil, err
 		}
 
@@ -196,17 +199,19 @@ func (m *ReadJSON) Read(ctx context.Context, method string, isClient bool, dataL
 		buf := dirtmake.Bytes(0, len(transBuff)*2)
 		// thrift []byte to json []byte
 		var t2jBinaryConv t2j.BinaryConv
-		if isClient {
+		if isClient && !fnDsc.IsWithoutWrapping() {
 			t2jBinaryConv = t2j.NewBinaryConv(m.convOptsWithException)
 		} else {
 			t2jBinaryConv = t2j.NewBinaryConv(m.convOpts)
 		}
-		if err := t2jBinaryConv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {
+		if err = t2jBinaryConv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {
 			return nil, err
 		}
-		buf = removePrefixAndSuffix(buf)
+		if !fnDsc.IsWithoutWrapping() {
+			buf = removePrefixAndSuffix(buf)
+		}
 		resp = utils.SliceByteToString(buf)
-		if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.STRING {
+		if !fnDsc.IsWithoutWrapping() && tyDsc.Struct().Fields()[0].Type().Type() == dthrift.STRING {
 			strresp := resp.(string)
 			resp, err = strconv.Unquote(strresp)
 			if err != nil {
@@ -223,13 +228,18 @@ func (m *ReadJSON) originalRead(ctx context.Context, method string, isClient boo
 	if err != nil {
 		return nil, err
 	}
-	fDsc := fnDsc.Response
+	tyDsc := fnDsc.Response
 	if !isClient {
-		fDsc = fnDsc.Request
+		tyDsc = fnDsc.Request
 	}
 	br := thrift.NewBufferReader(in)
 	defer br.Recycle()
-	resp, err := skipStructReader(ctx, br, fDsc, &readerOption{forJSON: true, throwException: true, binaryWithBase64: m.binaryWithBase64})
+
+	if fnDsc.IsWithoutWrapping {
+		return structReader(ctx, tyDsc, &readerOption{forJSON: true, binaryWithBase64: m.binaryWithBase64}, br)
+	}
+
+	resp, err := skipStructReader(ctx, br, tyDsc, &readerOption{forJSON: true, throwException: true, binaryWithBase64: m.binaryWithBase64})
 	if err != nil {
 		return nil, err
 	}
@@ -245,6 +255,7 @@ func (m *ReadJSON) originalRead(ctx context.Context, method string, isClient boo
 	}
 
 	// resp is map
+	// note: use json-iterator since sonic doesn't support map[interface{}]interface{}
 	respNode, err := jsoniter.Marshal(resp)
 	if err != nil {
 		return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("response marshal failed. err:%#v", err))
@@ -259,4 +270,28 @@ func removePrefixAndSuffix(buf []byte) []byte {
 		return buf[structWrapLen : len(buf)-1]
 	}
 	return buf
+}
+
+func jsonWriter(ctx context.Context, body *gjson.Result, typeDsc *descriptor.TypeDescriptor, opt *writerOption, bw *thrift.BufferWriter) error {
+	val, writer, err := nextJSONWriter(body, typeDsc, opt)
+	if err != nil {
+		return fmt.Errorf("nextWriter of field[%s] error %w", typeDsc.Name, err)
+	}
+	if err = writer(ctx, val, bw, typeDsc, opt); err != nil {
+		return fmt.Errorf("writer of field[%s] error %w", typeDsc.Name, err)
+	}
+	return nil
+}
+
+func structReader(ctx context.Context, typeDesc *descriptor.TypeDescriptor, opt *readerOption, br *thrift.BufferReader) (v interface{}, err error) {
+	resp, err := readStruct(ctx, br, typeDesc, opt)
+	if err != nil {
+		return nil, err
+	}
+	// note: use json-iterator since sonic doesn't support map[interface{}]interface{}
+	respNode, err := jsoniter.Marshal(resp)
+	if err != nil {
+		return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("streaming response marshal failed. err:%#v", err))
+	}
+	return string(respNode), nil
 }

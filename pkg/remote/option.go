@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 // Option is used to pack the inbound and outbound handlers.
@@ -122,6 +123,11 @@ type ServerOption struct {
 	// for thrift streaming, this is enabled by default
 	// for grpc(protobuf) streaming, it's disabled by default, enable with server.WithCompatibleMiddlewareForUnary
 	CompatibleMiddlewareForUnary bool
+
+	// for streamx middlewares
+	StreamMiddleware     streamx.StreamMiddleware
+	StreamRecvMiddleware streamx.StreamRecvMiddleware
+	StreamSendMiddleware streamx.StreamSendMiddleware
 }
 
 // ClientOption is used to init the remote client.
@@ -141,4 +147,6 @@ type ClientOption struct {
 	Option
 
 	EnableConnPoolReporter bool
+
+	Provider streamx.ClientProvider
 }

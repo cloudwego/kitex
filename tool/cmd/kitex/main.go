@@ -101,9 +101,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	if args.IDLType == "thrift" && args.Rapid {
+	if args.IDLType == "thrift" && !args.LocalThriftgo {
 		err = sdk.InvokeThriftgoBySDK(curpath, cmd)
 	} else {
+		log.Warn("You are using local thriftgo. Please make sure the version is matched with kitex tool.")
 		err = kargs.ValidateCMD(cmd.Path, args.IDLType)
 		if err != nil {
 			log.Warn(err)

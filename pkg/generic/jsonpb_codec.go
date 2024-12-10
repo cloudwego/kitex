@@ -41,13 +41,21 @@ type jsonPbCodec struct {
 	convOpts         conv.Options // used for dynamicgo conversion
 	dynamicgoEnabled bool         // currently set to true by default
 	svcName          string
+	extra            map[string]string
 }
 
 func newJsonPbCodec(p PbDescriptorProviderDynamicGo, opts *Options) *jsonPbCodec {
 	svc := <-p.Provide()
-	c := &jsonPbCodec{provider: p, opts: opts, dynamicgoEnabled: true, svcName: svc.Name()}
+	c := &jsonPbCodec{
+		provider:         p,
+		opts:             opts,
+		dynamicgoEnabled: true,
+		svcName:          svc.Name(),
+		extra:            make(map[string]string),
+	}
 	convOpts := opts.dynamicgoConvOpts
 	c.convOpts = convOpts
+	c.setCombinedServices(svc.IsCombinedServices())
 
 	c.svcDsc.Store(svc)
 	go c.update()
@@ -61,7 +69,16 @@ func (c *jsonPbCodec) update() {
 			return
 		}
 		c.svcName = svc.Name()
+		c.setCombinedServices(svc.IsCombinedServices())
 		c.svcDsc.Store(svc)
+	}
+}
+
+func (c *jsonPbCodec) setCombinedServices(isCombinedServices bool) {
+	if isCombinedServices {
+		c.extra[CombineServiceKey] = "true"
+	} else {
+		c.extra[CombineServiceKey] = "false"
 	}
 }
 

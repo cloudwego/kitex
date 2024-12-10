@@ -50,6 +50,8 @@ const (
 
 	// built in tpls
 	MultipleServicesTpl = "multiple_services"
+
+	streamxTTHeaderRef = "ttstream"
 )
 
 var (
@@ -144,7 +146,14 @@ type Config struct {
 
 	NoDependencyCheck bool
 	Rapid             bool
-	BuiltinTpl        util.StringSlice // specify the built-in template to use
+	LocalThriftgo     bool
+
+	GenFrugal    bool
+	FrugalStruct util.StringSlice
+	NoRecurse    bool
+
+	BuiltinTpl util.StringSlice // specify the built-in template to use
+	StreamX    bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -450,25 +459,24 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 		ext = new(TemplateExtension)
 	}
 
-	tasks := []*Task{
-		{
-			Name: ClientFileName,
-			Path: util.JoinPath(output, ClientFileName),
-			Text: tpl.ClientTpl,
-			Ext:  ext.ExtendClient,
-		},
-		{
-			Name: ServerFileName,
-			Path: util.JoinPath(output, ServerFileName),
-			Text: tpl.ServerTpl,
-			Ext:  ext.ExtendServer,
-		},
-		{
-			Name: ServiceFileName,
-			Path: util.JoinPath(output, svcPkg+".go"),
-			Text: tpl.ServiceTpl,
-		},
+	cliTask := &Task{
+		Name: ClientFileName,
+		Path: util.JoinPath(output, ClientFileName),
+		Text: tpl.ClientTpl,
+		Ext:  ext.ExtendClient,
 	}
+	svrTask := &Task{
+		Name: ServerFileName,
+		Path: util.JoinPath(output, ServerFileName),
+		Text: tpl.ServerTpl,
+		Ext:  ext.ExtendServer,
+	}
+	svcTask := &Task{
+		Name: ServiceFileName,
+		Path: util.JoinPath(output, svcPkg+".go"),
+		Text: tpl.ServiceTpl,
+	}
+	tasks := []*Task{cliTask, svrTask, svcTask}
 
 	// do not generate invoker.go in service package by default
 	if g.Config.GenerateInvoker {
@@ -519,6 +527,9 @@ func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 	if strings.EqualFold(g.Protocol, transport.HESSIAN2.String()) {
 		pkg.Protocol = transport.HESSIAN2
 	}
+	if strings.EqualFold(g.Protocol, transport.TTHeader.String()) {
+		pkg.Protocol = transport.TTHeader
+	}
 	if pkg.Dependencies == nil {
 		pkg.Dependencies = make(map[string]string)
 	}
@@ -535,7 +546,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 	switch name {
 	case ClientFileName:
 		pkg.AddImports("client")
-		if pkg.HasStreaming {
+		if !g.StreamX && pkg.HasStreaming {
 			pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
 			pkg.AddImport("transport", "github.com/cloudwego/kitex/transport")
 		}
@@ -548,8 +559,13 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		fallthrough
 	case HandlerFileName:
 		for _, m := range pkg.ServiceInfo.AllMethods() {
-			if !m.ServerStreaming && !m.ClientStreaming {
+			// for StreamX interface, every method in handler has ctx argument
+			// for old interface, streaming method in handler does not have ctx argument
+			if g.StreamX || (!m.ServerStreaming && !m.ClientStreaming) {
 				pkg.AddImports("context")
+			}
+			if g.StreamX && m.Streaming.IsStreaming {
+				pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
 			}
 			for _, a := range m.Args {
 				for _, dep := range a.Deps {
@@ -563,6 +579,15 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 			}
 		}
 	case ServerFileName, InvokerFileName:
+		// for StreamX, if there is streaming method, generate Server Interface in server.go
+		if g.StreamX {
+			for _, method := range pkg.AllMethods() {
+				if method.Streaming.IsStreaming {
+					pkg.AddImports("context")
+					pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
+				}
+			}
+		}
 		if len(pkg.CombineServices) == 0 {
 			pkg.AddImport(pkg.ServiceInfo.PkgRefName, pkg.ServiceInfo.ImportPath)
 		}
@@ -576,9 +601,6 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 			pkg.AddImports("context")
 		}
 		for _, m := range pkg.ServiceInfo.AllMethods() {
-			if m.ClientStreaming || m.ServerStreaming {
-				pkg.AddImports("fmt")
-			}
 			if m.GenArgResultStruct {
 				pkg.AddImports("proto")
 			} else {
@@ -590,9 +612,22 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 					pkg.AddImport(dep.PkgRefName, dep.ImportPath)
 				}
 			}
-			if m.Streaming.IsStreaming || pkg.Codec == "protobuf" {
-				// protobuf handler support both PingPong and Unary (streaming) requests
-				pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
+			// streaming imports
+			if !g.StreamX {
+				if m.Streaming.IsStreaming || pkg.Codec == "protobuf" {
+					// protobuf handler support both PingPong and Unary (streaming) requests
+					pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
+				}
+				if m.ClientStreaming || m.ServerStreaming {
+					pkg.AddImports("fmt")
+				}
+			} else {
+				if m.Streaming.IsStreaming {
+					pkg.AddImports("github.com/cloudwego/kitex/client/streamxclient")
+					pkg.AddImports("github.com/cloudwego/kitex/client/streamxclient/streamxcallopt")
+					pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
+					pkg.AddImports("github.com/cloudwego/kitex/server/streamxserver")
+				}
 			}
 			if !m.Void && m.Resp != nil {
 				for _, dep := range m.Resp.Deps {

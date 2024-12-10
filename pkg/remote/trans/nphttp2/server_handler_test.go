@@ -23,11 +23,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/kitex/internal/mocks"
+
+	"github.com/golang/mock/gomock"
+
+	"github.com/cloudwego/kitex/internal/mocks/netpoll"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
+	grpcTransport "github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
@@ -302,4 +308,59 @@ func Test_invokeStreamUnaryHandler(t *testing.T) {
 		test.Assert(t, handlerCalled)
 		test.Assert(t, sendCalled)
 	})
+}
+
+func TestSvrTransHandlerProtocolMatch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	th := &svrTransHandler{}
+	// netpoll reader
+	// 1. success
+	reader := netpoll.NewMockReader(ctrl)
+	reader.EXPECT().Peek(prefaceReadAtMost).Times(1).Return(grpcTransport.ClientPreface, nil)
+	conn := netpoll.NewMockConnection(ctrl)
+	conn.EXPECT().Reader().AnyTimes().Return(reader)
+	err := th.ProtocolMatch(context.Background(), conn)
+	test.Assert(t, err == nil, err)
+	// 2. failed, no reader
+	conn = netpoll.NewMockConnection(ctrl)
+	conn.EXPECT().Reader().AnyTimes().Return(nil)
+	err = th.ProtocolMatch(context.Background(), conn)
+	test.Assert(t, err != nil, err)
+	// 3. failed, wrong preface
+	failedReader := netpoll.NewMockReader(ctrl)
+	failedReader.EXPECT().Peek(prefaceReadAtMost).Times(1).Return([]byte{}, nil)
+	conn = netpoll.NewMockConnection(ctrl)
+	conn.EXPECT().Reader().AnyTimes().Return(failedReader)
+	err = th.ProtocolMatch(context.Background(), conn)
+	test.Assert(t, err != nil, err)
+
+	// non-netpoll reader, all failed
+	rawConn := &mocks.Conn{}
+	err = th.ProtocolMatch(context.Background(), rawConn)
+	test.Assert(t, err != nil, err)
+}
+
+func Test_parseGraceAndPollTime(t *testing.T) {
+	// without timeout in ctx
+	ctx := context.Background()
+	graceTime, pollTime := parseGraceAndPollTime(ctx)
+	test.Assert(t, graceTime == defaultGraceTime, graceTime)
+	test.Assert(t, pollTime == defaultMaxPollTime, pollTime)
+
+	// with timeout longer than default timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	graceTime, pollTime = parseGraceAndPollTime(ctx)
+	test.Assert(t, graceTime > defaultGraceTime, graceTime)
+	// defaultMaxPollTime is the max poll time
+	test.Assert(t, pollTime == defaultMaxPollTime, pollTime)
+
+	// with timeout shorter than default timeout
+	ctx, cancel = context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+	graceTime, pollTime = parseGraceAndPollTime(ctx)
+	test.Assert(t, graceTime < defaultGraceTime, graceTime)
+	test.Assert(t, pollTime < defaultMaxPollTime, pollTime)
 }

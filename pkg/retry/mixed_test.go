@@ -263,6 +263,25 @@ func TestMixedRetry(t *testing.T) {
 		test.Assert(t, err == mockErr, err)
 		test.Assert(t, !ok)
 	})
+
+	// case5: all error retry and trigger circuit breaker
+	t.Run("case5", func(t *testing.T) {
+		rc := NewRetryContainerWithPercentageLimit()
+		p := BuildMixedPolicy(NewMixedPolicyWithResultRetry(100, AllErrorRetry()))
+		ri = genRPCInfo()
+
+		for i := 0; i < 10; i++ {
+			// failure rate is 50%
+			_, _, err := rc.WithRetryIfNeeded(ctx, &p, retryWithTransError(0, transErrCode), ri, nil)
+			if i < 5 {
+				// i < 5, total request < 10
+				test.Assert(t, err == nil, err, i)
+			} else {
+				// the minSimple is 10, total request > 10 then trigger cb
+				test.Assert(t, err != nil)
+			}
+		}
+	})
 }
 
 // Assuming the first request returns at 300ms, the second request costs 150ms
@@ -621,5 +640,91 @@ func BenchmarkMixedRetry(b *testing.B) {
 			test.Assert(b, err == nil, err)
 			test.Assert(b, !ok)
 		}
+	})
+}
+
+func TestNewRetryer4MixedRetry(t *testing.T) {
+	t.Run("normal mixed retry - success", func(t *testing.T) {
+		jsonRet := `{"enable":true,"type":2,
+"mixed_policy":{"retry_delay_ms":10,"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1,"min_sample":200}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false,"extra":"{\"not_retry_for_timeout\":false,\"rpc_retry_code\":{\"all_error_code\":false,\"error_codes\":[103,1204]},\"biz_retry_code\":{\"all_error_code\":false,\"error_codes\":[]}}","extra_struct":{"not_retry_for_timeout":false,"rpc_retry_code":{"all_error_code":false,"error_codes":[103,1204]},"biz_retry_code":{"all_error_code":false,"error_codes":[]}}}}`
+		var p Policy
+		err := sonici.UnmarshalFromString(jsonRet, &p)
+		test.Assert(t, err == nil, err)
+
+		r, err := NewRetryer(p, nil, nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, r.(*mixedRetryer).enable)
+	})
+
+	t.Run("mixed retry disable - success but disable", func(t *testing.T) {
+		jsonRet := `{"enable":false,"type":2,
+"mixed_policy":{"retry_delay_ms":10,"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1,"min_sample":200}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false,"extra":"{\"not_retry_for_timeout\":false,\"rpc_retry_code\":{\"all_error_code\":false,\"error_codes\":[103,1204]},\"biz_retry_code\":{\"all_error_code\":false,\"error_codes\":[]}}","extra_struct":{"not_retry_for_timeout":false,"rpc_retry_code":{"all_error_code":false,"error_codes":[103,1204]},"biz_retry_code":{"all_error_code":false,"error_codes":[]}}}}`
+		var p Policy
+		err := sonici.UnmarshalFromString(jsonRet, &p)
+		test.Assert(t, err == nil, err)
+
+		r, err := NewRetryer(p, nil, nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, !r.(*mixedRetryer).enable)
+	})
+
+	t.Run("type is mixedRetry but policy is empty - failed", func(t *testing.T) {
+		jsonRet := `{"enable":true,"type":2, "mixed_policy":{}}`
+		var p Policy
+		err := sonici.UnmarshalFromString(jsonRet, &p)
+		test.Assert(t, err == nil, err)
+
+		r, err := NewRetryer(p, nil, nil)
+		test.Assert(t, err != nil, err)
+		test.Assert(t, r == nil)
+	})
+
+	t.Run("type is mixedRetry but no policy - failed", func(t *testing.T) {
+		jsonRet := `{"enable":true,"type":2}`
+		var p Policy
+		err := sonici.UnmarshalFromString(jsonRet, &p)
+		test.Assert(t, err == nil, err)
+
+		r, err := NewRetryer(p, nil, nil)
+		test.Assert(t, err != nil, err)
+		test.Assert(t, r == nil)
+	})
+
+	t.Run("type is backupRequest but policy is mixedRetry - failed", func(t *testing.T) {
+		jsonRet := `{"enable":true,"type":1,
+"mixed_policy":{"retry_delay_ms":10,"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1,"min_sample":200}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false,"extra":"{\"not_retry_for_timeout\":false,\"rpc_retry_code\":{\"all_error_code\":false,\"error_codes\":[103,1204]},\"biz_retry_code\":{\"all_error_code\":false,\"error_codes\":[]}}","extra_struct":{"not_retry_for_timeout":false,"rpc_retry_code":{"all_error_code":false,"error_codes":[103,1204]},"biz_retry_code":{"all_error_code":false,"error_codes":[]}}}}`
+		var p Policy
+		err := sonici.UnmarshalFromString(jsonRet, &p)
+		test.Assert(t, err == nil, err)
+
+		r, err := NewRetryer(p, nil, nil)
+		test.Assert(t, err != nil, err)
+		test.Assert(t, r == nil)
+	})
+
+	t.Run("type is mixedRetry but policy is failure retry - failed", func(t *testing.T) {
+		jsonRet := `{"enable":true,"type":2,
+"failure_policy":{"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1,"min_sample":200}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false,"extra":"{\"not_retry_for_timeout\":false,\"rpc_retry_code\":{\"all_error_code\":false,\"error_codes\":[103,1204]},\"biz_retry_code\":{\"all_error_code\":false,\"error_codes\":[]}}","extra_struct":{"not_retry_for_timeout":false,"rpc_retry_code":{"all_error_code":false,"error_codes":[103,1204]},"biz_retry_code":{"all_error_code":false,"error_codes":[]}}}}`
+		var p Policy
+		err := sonici.UnmarshalFromString(jsonRet, &p)
+		test.Assert(t, err == nil, err)
+
+		r, err := NewRetryer(p, nil, nil)
+		test.Assert(t, err != nil, err)
+		test.Assert(t, r == nil)
+	})
+
+	t.Run("type is mixedRetry but has multi-policies - success", func(t *testing.T) {
+		jsonRet := `{"enable":true,"type":2,
+"mixed_policy":{"retry_delay_ms":10,"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1,"min_sample":200}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false,"extra":"{\"not_retry_for_timeout\":false,\"rpc_retry_code\":{\"all_error_code\":false,\"error_codes\":[103,1204]},\"biz_retry_code\":{\"all_error_code\":false,\"error_codes\":[]}}","extra_struct":{"not_retry_for_timeout":false,"rpc_retry_code":{"all_error_code":false,"error_codes":[103,1204]},"biz_retry_code":{"all_error_code":false,"error_codes":[]}}},
+"failure_policy":{"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1,"min_sample":200}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false,"extra":"{\"not_retry_for_timeout\":false,\"rpc_retry_code\":{\"all_error_code\":false,\"error_codes\":[103,1204]},\"biz_retry_code\":{\"all_error_code\":false,\"error_codes\":[]}}","extra_struct":{"not_retry_for_timeout":false,"rpc_retry_code":{"all_error_code":false,"error_codes":[103,1204]},"biz_retry_code":{"all_error_code":false,"error_codes":[]}}}
+}`
+		var p Policy
+		err := sonici.UnmarshalFromString(jsonRet, &p)
+		test.Assert(t, err == nil, err)
+
+		r, err := NewRetryer(p, nil, nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, r.(*mixedRetryer).enable)
 	})
 }

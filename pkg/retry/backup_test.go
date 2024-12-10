@@ -99,3 +99,78 @@ func TestBackupRetryWithRPCInfo(t *testing.T) {
 	test.Assert(t, ri.To().Address().String() == "10.20.30.40:8888")
 	test.Assert(t, atomic.LoadInt32(&callTimes) == 2)
 }
+
+func TestNewRetryer4BackupRequest(t *testing.T) {
+	t.Run("normal backup request - success", func(t *testing.T) {
+		jsonRet := `{"enable":true,"type":1,
+"backup_policy":{"retry_delay_ms":10,"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1,"min_sample":200}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false,"extra":"{\"not_retry_for_timeout\":false,\"rpc_retry_code\":{\"all_error_code\":false,\"error_codes\":[103,1204]},\"biz_retry_code\":{\"all_error_code\":false,\"error_codes\":[]}}","extra_struct":{"not_retry_for_timeout":false,"rpc_retry_code":{"all_error_code":false,"error_codes":[103,1204]},"biz_retry_code":{"all_error_code":false,"error_codes":[]}}}}`
+		var p Policy
+		err := sonici.UnmarshalFromString(jsonRet, &p)
+		test.Assert(t, err == nil, err)
+
+		r, err := NewRetryer(p, nil, nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, r.(*backupRetryer).enable)
+	})
+
+	t.Run("type is mixedRetry but policy is empty - failed", func(t *testing.T) {
+		jsonRet := `{"enable":true,"type":2, "backup_policy":{}}`
+		var p Policy
+		err := sonici.UnmarshalFromString(jsonRet, &p)
+		test.Assert(t, err == nil, err)
+
+		r, err := NewRetryer(p, nil, nil)
+		test.Assert(t, err != nil, err)
+		test.Assert(t, r == nil)
+	})
+
+	t.Run("type is backup but no policy - failed", func(t *testing.T) {
+		jsonRet := `{"enable":true,"type":1}`
+		var p Policy
+		err := sonici.UnmarshalFromString(jsonRet, &p)
+		test.Assert(t, err == nil, err)
+
+		r, err := NewRetryer(p, nil, nil)
+		test.Assert(t, err != nil, err)
+		test.Assert(t, r == nil)
+	})
+
+	t.Run("type is failure retry but policy is backupRequest - failed", func(t *testing.T) {
+		jsonRet := `{"enable":true,"type":0,
+"backup_policy":{"retry_delay_ms":10,"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1,"min_sample":200}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false,"extra":"{\"not_retry_for_timeout\":false,\"rpc_retry_code\":{\"all_error_code\":false,\"error_codes\":[103,1204]},\"biz_retry_code\":{\"all_error_code\":false,\"error_codes\":[]}}","extra_struct":{"not_retry_for_timeout":false,"rpc_retry_code":{"all_error_code":false,"error_codes":[103,1204]},"biz_retry_code":{"all_error_code":false,"error_codes":[]}}}}`
+		var p Policy
+		err := sonici.UnmarshalFromString(jsonRet, &p)
+		test.Assert(t, err == nil, err)
+
+		r, err := NewRetryer(p, nil, nil)
+		test.Assert(t, err != nil, err)
+		test.Assert(t, r == nil)
+	})
+
+	t.Run("type is backup but has multi-policies - success", func(t *testing.T) {
+		jsonRet := `{"enable":true,"type":1,
+"backup_policy":{"retry_delay_ms":10,"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1,"min_sample":200}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false,"extra":"{\"not_retry_for_timeout\":false,\"rpc_retry_code\":{\"all_error_code\":false,\"error_codes\":[103,1204]},\"biz_retry_code\":{\"all_error_code\":false,\"error_codes\":[]}}","extra_struct":{"not_retry_for_timeout":false,"rpc_retry_code":{"all_error_code":false,"error_codes":[103,1204]},"biz_retry_code":{"all_error_code":false,"error_codes":[]}}},
+"failure_policy":{"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1,"min_sample":200}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false,"extra":"{\"not_retry_for_timeout\":false,\"rpc_retry_code\":{\"all_error_code\":false,\"error_codes\":[103,1204]},\"biz_retry_code\":{\"all_error_code\":false,\"error_codes\":[]}}","extra_struct":{"not_retry_for_timeout":false,"rpc_retry_code":{"all_error_code":false,"error_codes":[103,1204]},"biz_retry_code":{"all_error_code":false,"error_codes":[]}}}
+}`
+		var p Policy
+		err := sonici.UnmarshalFromString(jsonRet, &p)
+		test.Assert(t, err == nil, err)
+
+		r, err := NewRetryer(p, nil, nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, r.(*backupRetryer).enable)
+	})
+
+	t.Run("type is backup but policy json has extra configuration - success", func(t *testing.T) {
+		jsonRet := `{"enable":true,"type":1,
+"backup_policy":{"retry_delay_ms":10,"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1,"min_sample":200}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false,"extra":"{\"not_retry_for_timeout\":false,\"rpc_retry_code\":{\"all_error_code\":false,\"error_codes\":[103,1204]},\"biz_retry_code\":{\"all_error_code\":false,\"error_codes\":[]}}","extra_struct":{"not_retry_for_timeout":false,"rpc_retry_code":{"all_error_code":false,"error_codes":[103,1204]},"biz_retry_code":{"all_error_code":false,"error_codes":[]}}}
+}`
+		var p Policy
+		err := sonici.UnmarshalFromString(jsonRet, &p)
+		test.Assert(t, err == nil, err)
+
+		r, err := NewRetryer(p, nil, nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, r.(*backupRetryer).enable)
+	})
+}
