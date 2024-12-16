@@ -144,6 +144,10 @@ func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreami
 	return svcInfo
 }
 
+{{- $serverInterfaceName := printf "%s.%s" .PkgRefName .ServiceName }}
+{{- if and .StreamX .HasStreaming}}
+{{- $serverInterfaceName = .ServiceName }} {{/* when streamx is enabled and there are streaming methods, refer to Server Interface defined in service/server.go */}}
+{{- end}}
 {{range .AllMethods}}
 {{- $isStreaming := or .ClientStreaming .ServerStreaming}}
 {{- $streamingUnary := (eq .Streaming.Mode "unary")}}
@@ -228,8 +232,8 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 	{{- end}}
 	{{if gt .ArgsLength 0}}realArg := {{else}}_ = {{end}}arg.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ArgStructName}})
 	{{if or (not .Void) .Exceptions}}realResult := result.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ResStructName}}){{end}}
-	{{if .Void}}err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, realArg.{{.Name}}{{end}})
-	{{else}}success, err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, realArg.{{.Name}}{{end}})
+	{{if .Void}}err := handler.({{$serverInterfaceName}}).{{.Name}}(ctx{{range .Args}}, realArg.{{.Name}}{{end}})
+	{{else}}success, err := handler.({{$serverInterfaceName}}).{{.Name}}(ctx{{range .Args}}, realArg.{{.Name}}{{end}})
 	{{end -}}
 	if err != nil {
 	{{- if $HandlerReturnKeepResp }}
