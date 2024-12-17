@@ -144,10 +144,7 @@ func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreami
 	return svcInfo
 }
 
-{{- $serverInterfaceName := printf "%s.%s" .PkgRefName .ServiceName }}
-{{- if and .StreamX .HasStreaming}}
-{{- $serverInterfaceName = .ServiceName }} {{/* when streamx is enabled and there are streaming methods, refer to Server Interface defined in service/server.go */}}
-{{- end}}
+{{- $referToKitexServerInterface := and .StreamX .HasStreaming}}
 {{range .AllMethods}}
 {{- $isStreaming := or .ClientStreaming .ServerStreaming}}
 {{- $streamingUnary := (eq .Streaming.Mode "unary")}}
@@ -157,6 +154,10 @@ func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreami
 {{- $bidiSide := and .ClientStreaming .ServerStreaming}}
 {{- $arg := ""}}
 {{- $handlerFunc := ""}}
+{{- $serverInterfaceName := printf "%s.%s" .PkgRefName .ServiceName }}
+	{{- if $referToKitexServerInterface}}}}
+	{{- $serverInterfaceName = .ServiceName}}{{/* when streamx is enabled and there are streaming methods, refer to Server Interface defined in service/server.go */}}
+	{{- end}}
 {{- $mode := ""}}
     {{- if $streamingUnary -}} {{- $mode = "serviceinfo.StreamingUnary" }} {{- $handlerFunc = "InvokeUnaryHandler" }}
     {{- else if $serverSide -}} {{- $mode = "serviceinfo.StreamingServer" }} {{- $handlerFunc = "InvokeServerStreamHandler" }}
