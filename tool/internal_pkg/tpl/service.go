@@ -155,7 +155,7 @@ func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreami
 {{- $arg := ""}}
 {{- $handlerFunc := ""}}
 {{- $serverInterfaceName := printf "%s.%s" .PkgRefName .ServiceName }}
-	{{- if $referToKitexServerInterface}}}}
+	{{- if $referToKitexServerInterface}}
 	{{- $serverInterfaceName = .ServiceName}}{{/* when streamx is enabled and there are streaming methods, refer to Server Interface defined in service/server.go */}}
 	{{- end}}
 {{- $mode := ""}}
