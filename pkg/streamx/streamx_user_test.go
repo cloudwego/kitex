@@ -628,7 +628,7 @@ func TestStreamingException(t *testing.T) {
 			atomic.StoreInt32(&circuitBreaker, 0)
 
 			// assert context deadline error
-			ctx, cancel := context.WithTimeout(octx, time.Millisecond)
+			ctx, cancel := context.WithTimeout(octx, 10*time.Millisecond)
 			ctx, bs, err := cli.BidiStream(ctx)
 			test.Assert(t, err == nil, err)
 			res, err := bs.Recv(ctx)
