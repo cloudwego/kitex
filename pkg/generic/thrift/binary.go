@@ -31,5 +31,6 @@ func NewWriteBinary() *WriteBinary {
 }
 
 func (w *WriteBinary) Write(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
-	return nil
+	_, err := out.WriteBinary([]byte{0})
+	return err
 }

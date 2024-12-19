@@ -178,7 +178,7 @@ func initRawThriftBinaryClient() genericclient.Client {
 }
 
 func initNormalClient() client.Client {
-	cli, err := client.NewClient(serviceInfo(), client.WithDestService("Mock"), client.WithHostPorts(addr), client.WithTransportProtocol(transport.Framed))
+	cli, err := client.NewClient(serviceInfo(), client.WithDestService("Mock"), client.WithHostPorts(addr), client.WithTransportProtocol(transport.TTHeader))
 	if err != nil {
 		panic(err)
 	}
