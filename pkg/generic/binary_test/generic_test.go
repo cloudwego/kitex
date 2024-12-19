@@ -18,6 +18,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -25,26 +26,21 @@ import (
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 
+	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/client/genericclient"
+	"github.com/cloudwego/kitex/internal/mocks"
 	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/server"
+	"github.com/cloudwego/kitex/transport"
 )
 
 var addr = test.GetLocalAddress()
 
-func TestRun(t *testing.T) {
-	t.Run("RawThriftBinary", rawThriftBinary)
-	t.Run("RawThriftBinaryError", rawThriftBinaryError)
-	t.Run("RawThriftBinaryBizError", rawThriftBinaryBizError)
-	t.Run("RawThriftBinaryMockReq", rawThriftBinaryMockReq)
-	t.Run("RawThriftBinary2NormalServer", rawThriftBinary2NormalServer)
-}
-
-func rawThriftBinary(t *testing.T) {
+func TestThriftBinary(t *testing.T) {
 	svr := initRawThriftBinaryServer(new(GenericServiceImpl))
 	defer svr.Stop()
 
@@ -60,7 +56,7 @@ func rawThriftBinary(t *testing.T) {
 	test.Assert(t, string(respBuf[12+len(method):]) == respMsg)
 }
 
-func rawThriftBinaryError(t *testing.T) {
+func TestThriftBinaryError(t *testing.T) {
 	svr := initRawThriftBinaryServer(new(GenericServiceErrorImpl))
 	defer svr.Stop()
 
@@ -72,9 +68,15 @@ func rawThriftBinaryError(t *testing.T) {
 	_, err := cli.GenericCall(context.Background(), method, buf, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil)
 	test.Assert(t, strings.Contains(err.Error(), errResp), err.Error())
+
+	cli2 := initNormalClient()
+	err2 := cli2.Call(context.Background(), "Test", mocks.NewMockArgs(), mocks.NewMockResult())
+	test.Assert(t, err2 != nil)
+	fmt.Printf("err2: %v\n", err2)
+	test.Assert(t, strings.Contains(err.Error(), errResp), err.Error())
 }
 
-func rawThriftBinaryBizError(t *testing.T) {
+func TestThriftBinaryBizError(t *testing.T) {
 	svr := initRawThriftBinaryServer(new(GenericServiceBizErrorImpl))
 	defer svr.Stop()
 
@@ -89,9 +91,18 @@ func rawThriftBinaryBizError(t *testing.T) {
 	test.Assert(t, ok)
 	test.Assert(t, bizStatusErr.BizStatusCode() == 404)
 	test.Assert(t, bizStatusErr.BizMessage() == "not found")
+
+	cli2 := initNormalClient()
+	err2 := cli2.Call(context.Background(), "Test", mocks.NewMockArgs(), mocks.NewMockResult())
+	test.Assert(t, err2 != nil)
+	fmt.Printf("err2: %v\n", err2)
+	bizStatusErr2, ok2 := kerrors.FromBizStatusError(err2)
+	test.Assert(t, ok2)
+	test.Assert(t, bizStatusErr2.BizStatusCode() == 404)
+	test.Assert(t, bizStatusErr2.BizMessage() == "not found")
 }
 
-func rawThriftBinaryMockReq(t *testing.T) {
+func TestThriftBinaryMockReq(t *testing.T) {
 	svr := initRawThriftBinaryServer(new(GenericServiceMockImpl))
 	defer svr.Stop()
 
@@ -127,7 +138,7 @@ func rawThriftBinaryMockReq(t *testing.T) {
 	test.Assert(t, seqID2 == seqID, seqID2)
 }
 
-func rawThriftBinary2NormalServer(t *testing.T) {
+func TestThriftBinary2NormalServer(t *testing.T) {
 	svr := initMockServer(new(MockImpl))
 	defer svr.Stop()
 
@@ -163,6 +174,14 @@ func rawThriftBinary2NormalServer(t *testing.T) {
 func initRawThriftBinaryClient() genericclient.Client {
 	g := generic.BinaryThriftGeneric()
 	cli := newGenericClient("destServiceName", g, addr)
+	return cli
+}
+
+func initNormalClient() client.Client {
+	cli, err := client.NewClient(serviceInfo(), client.WithDestService("Mock"), client.WithHostPorts(addr), client.WithTransportProtocol(transport.Framed))
+	if err != nil {
+		panic(err)
+	}
 	return cli
 }
 

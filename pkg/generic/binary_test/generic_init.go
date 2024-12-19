@@ -32,6 +32,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/server"
@@ -90,7 +91,11 @@ type GenericServiceBizErrorImpl struct{}
 
 // GenericCall ...
 func (g *GenericServiceBizErrorImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
-	return response, kerrors.NewBizStatusError(404, "not found")
+	seqid, _ := generic.GetSeqID(request.([]byte))
+	ri := rpcinfo.GetRPCInfo(ctx)
+	inv := ri.Invocation().(rpcinfo.InvocationSetter)
+	inv.SetSeqID(seqid)
+	return nil, kerrors.NewBizStatusError(404, "not found")
 }
 
 // GenericServiceMockImpl ...
