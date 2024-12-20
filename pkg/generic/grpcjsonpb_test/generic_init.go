@@ -23,7 +23,6 @@ import (
 	"net"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/genericclient"
@@ -32,6 +31,15 @@ import (
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/transport"
 )
+
+var startChan chan struct{}
+
+func init() {
+	startChan = make(chan struct{})
+	server.RegisterStartHook(func() {
+		startChan <- struct{}{}
+	})
+}
 
 func newGenericClient(g generic.Generic, targetIPPort string, cliOpts ...client.Option) genericclient.Client {
 	cliOpts = append(cliOpts, client.WithTransportProtocol(transport.GRPC), client.WithHostPorts(targetIPPort))
@@ -51,6 +59,8 @@ func newMockTestServer(handler mock.Mock, addr net.Addr, opts ...server.Option) 
 			panic(err)
 		}
 	}()
+	// wait for server starting to avoid data race
+	<-startChan
 	return svr
 }
 
@@ -78,7 +88,6 @@ func (s *StreamingTestImpl) ClientStreamingTest(stream mock.Mock_ClientStreaming
 		}
 		fmt.Printf("Recv: %s\n", req.Message)
 		msgs = append(msgs, req.Message)
-		time.Sleep(time.Second)
 	}
 	return stream.SendAndClose(&mock.MockResp{Message: "all message: " + strings.Join(msgs, ", ")})
 }
@@ -92,7 +101,6 @@ func (s *StreamingTestImpl) ServerStreamingTest(req *mock.MockReq, stream mock.M
 		if err != nil {
 			return err
 		}
-		time.Sleep(time.Second)
 	}
 	return
 }
@@ -119,7 +127,6 @@ func (s *StreamingTestImpl) BidirectionalStreamingTest(stream mock.Mock_Bidirect
 				return
 			}
 			fmt.Printf("BidirectionaStreamingTest: received message = %s\n", msg.Message)
-			time.Sleep(time.Second)
 		}
 	}()
 
@@ -138,7 +145,6 @@ func (s *StreamingTestImpl) BidirectionalStreamingTest(stream mock.Mock_Bidirect
 				return
 			}
 			fmt.Printf("BidirectionaStreamingTest: sent message = %s\n", resp)
-			time.Sleep(time.Second)
 		}
 	}()
 	wg.Wait()

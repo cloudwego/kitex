@@ -25,7 +25,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	dproto "github.com/cloudwego/dynamicgo/proto"
 	"github.com/tidwall/gjson"
@@ -54,7 +53,6 @@ func TestClientStreaming(t *testing.T) {
 		req := fmt.Sprintf(`{"message": "grpc client streaming generic %dth request"}`, i)
 		err = streamCli.Send(req)
 		test.Assert(t, err == nil)
-		time.Sleep(100 * time.Millisecond)
 	}
 	resp, err := streamCli.CloseAndRecv()
 	test.Assert(t, err == nil)
@@ -87,7 +85,6 @@ func TestServerStreaming(t *testing.T) {
 			fmt.Printf("serverStreaming message received: %s\n", strResp)
 			test.Assert(t, strings.Contains(strResp, "grpc server streaming generic request ->"))
 		}
-		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -130,7 +127,6 @@ func TestBidirectionalStreaming(t *testing.T) {
 				fmt.Printf("bidirectionalStreaming message received: %s\n", strResp)
 				test.Assert(t, strings.Contains(strResp, "th response"))
 			}
-			time.Sleep(100 * time.Millisecond)
 		}
 	}()
 	wg.Wait()
