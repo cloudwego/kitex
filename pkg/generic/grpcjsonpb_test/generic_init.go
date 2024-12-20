@@ -33,11 +33,9 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
-func newGenericClient(g generic.Generic, targetIPPort string) genericclient.Client {
-	cli, err := genericclient.NewStreamingClient("destService", g,
-		client.WithTransportProtocol(transport.GRPC),
-		client.WithHostPorts(targetIPPort),
-	)
+func newGenericClient(g generic.Generic, targetIPPort string, cliOpts ...client.Option) genericclient.Client {
+	cliOpts = append(cliOpts, client.WithTransportProtocol(transport.GRPC), client.WithHostPorts(targetIPPort))
+	cli, err := genericclient.NewStreamingClient("destService", g, cliOpts...)
 	if err != nil {
 		panic(err)
 	}
