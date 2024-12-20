@@ -56,6 +56,7 @@ func newJsonPbCodec(p PbDescriptorProviderDynamicGo, opts *Options) *jsonPbCodec
 	convOpts := opts.dynamicgoConvOpts
 	c.convOpts = convOpts
 	c.setCombinedServices(svc.IsCombinedServices())
+	c.setPackageName(svc.PackageName())
 
 	c.svcDsc.Store(svc)
 	go c.update()
@@ -80,6 +81,10 @@ func (c *jsonPbCodec) setCombinedServices(isCombinedServices bool) {
 	} else {
 		c.extra[CombineServiceKey] = "false"
 	}
+}
+
+func (c *jsonPbCodec) setPackageName(pkg string) {
+	c.extra["PackageName"] = pkg
 }
 
 func (c *jsonPbCodec) getMessageReaderWriter() interface{} {
