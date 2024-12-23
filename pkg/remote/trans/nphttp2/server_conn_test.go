@@ -147,7 +147,7 @@ func TestGetServerConn(t *testing.T) {
 				SvcSearcher: mock_remote.NewDefaultSvcSearcher(),
 				GRPCCfg:     grpc.DefaultServerConfig(),
 				InitOrResetRPCInfoFunc: func(info rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-					return newMockRPCInfo()
+					return newMockRPCInfo(false)
 				},
 				TracerCtl: &rpcinfo.TraceController{},
 			})

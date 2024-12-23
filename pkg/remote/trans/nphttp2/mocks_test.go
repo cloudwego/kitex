@@ -308,7 +308,7 @@ func newMockServerOption() *remote.ServerOption {
 		MaxConnectionIdleTime: 0,
 		ReadWriteTimeout:      0,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-			return newMockRPCInfo()
+			return newMockRPCInfo(false)
 		},
 		TracerCtl: &rpcinfo.TraceController{},
 		GRPCCfg: &grpc.ServerConfig{
@@ -361,10 +361,10 @@ func newMockDialerWithDialFunc(dialFunc func(network, address string, timeout ti
 }
 
 func newMockCtxWithRPCInfo() context.Context {
-	return rpcinfo.NewCtxWithRPCInfo(context.Background(), newMockRPCInfo())
+	return rpcinfo.NewCtxWithRPCInfo(context.Background(), newMockRPCInfo(false))
 }
 
-func newMockRPCInfo() rpcinfo.RPCInfo {
+func newMockRPCInfo(isStreaming bool) rpcinfo.RPCInfo {
 	method := "method"
 	c := rpcinfo.NewEndpointInfo("", method, nil, nil)
 	endpointTags := map[string]string{}
@@ -372,6 +372,9 @@ func newMockRPCInfo() rpcinfo.RPCInfo {
 	s := rpcinfo.NewEndpointInfo("", method, nil, endpointTags)
 	ink := rpcinfo.NewInvocation("", method)
 	cfg := rpcinfo.NewRPCConfig()
+	if isStreaming {
+		cfg.(rpcinfo.MutableRPCConfig).SetInteractionMode(rpcinfo.Streaming)
+	}
 	ri := rpcinfo.NewRPCInfo(c, s, ink, cfg, rpcinfo.NewRPCStats())
 	return ri
 }
