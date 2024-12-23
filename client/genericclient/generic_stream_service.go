@@ -104,6 +104,9 @@ func newClientStreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
 		if extra.GetExtra(generic.CombineServiceKey) == "true" {
 			svcInfo.Extra["combine_service"] = true
 		}
+		if pkg := extra.GetExtra("PackageName"); pkg != "" {
+			svcInfo.Extra["PackageName"] = pkg
+		}
 	}
 	return svcInfo
 }

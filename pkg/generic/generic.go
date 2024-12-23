@@ -59,7 +59,10 @@ type ExtraProvider interface {
 	GetExtra(key string) string
 }
 
-const CombineServiceKey = "combine_service"
+const (
+	CombineServiceKey = "combine_service"
+	packageNameKey    = "PackageName"
+)
 
 // BinaryThriftGeneric raw thrift binary Generic
 func BinaryThriftGeneric() Generic {
