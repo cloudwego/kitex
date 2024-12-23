@@ -53,6 +53,7 @@ func TestJsonPbCodec(t *testing.T) {
 	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, jpc.svcName == "Echo")
 	test.Assert(t, jpc.extra[CombineServiceKey] == "false")
+	test.Assert(t, jpc.extra[packageNameKey] == "test")
 
 	rw := jpc.getMessageReaderWriter()
 	_, ok := rw.(gproto.MessageWriter)
