@@ -466,6 +466,9 @@ func (s *server) stop() {
 	s.mu.Lock()
 	for c := range s.conns {
 		c.Close()
+		rawSrv := c.(*http2Server)
+		// wait for reader goroutine exited
+		<-rawSrv.readerDone
 	}
 	s.conns = nil
 	s.mu.Unlock()
@@ -555,9 +558,11 @@ func setUpWithNoPingServer(t *testing.T, copts ConnectOptions, connCh chan net.C
 	}
 	go func() {
 		go func() {
-			err = eventLoop.Serve(lis)
-			if err != nil {
-				t.Errorf("netpoll server exit failed, err=%v", err)
+			// need to define a new err otherwise
+			// there is data race between "conn, err := netpoll.NewDialer().DialTimeout("tcp", lis.Addr().String(), time.Second)"
+			serveErr := eventLoop.Serve(lis)
+			if serveErr != nil {
+				t.Errorf("netpoll server exit failed, err=%v", serveErr)
 				return
 			}
 		}()
