@@ -35,6 +35,10 @@ var invocationType = reflect.TypeOf(rpcinfo.NewServerInvocation()).Elem()
 
 func constructServerCtxWithMetadata(cliCtx context.Context) (serverCtx context.Context) {
 	serverCtx = context.Background()
+	customVal := cliCtx.Value(consts.SERVICE_INLINE_CUSTOM_CTX_KEY)
+	if customVal != nil {
+		serverCtx = context.WithValue(serverCtx, consts.SERVICE_INLINE_CUSTOM_CTX_KEY, customVal)
+	}
 	// metainfo
 	// forward transmission
 	kvs := make(map[string]string, 16)
