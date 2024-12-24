@@ -33,22 +33,17 @@ type Queue interface {
 
 // queue implements a fixed size Queue.
 type queue struct {
-	ring        []*Event
-	tail        uint32
-	tailVersion map[uint32]*uint32
-	mu          sync.RWMutex
+	ring []*Event
+	tail uint32
+	mu   sync.RWMutex
 }
 
 // NewQueue creates a queue with the given capacity.
 func NewQueue(cap int) Queue {
 	q := &queue{
-		ring:        make([]*Event, cap),
-		tailVersion: make(map[uint32]*uint32, cap),
+		ring: make([]*Event, cap),
 	}
-	for i := 0; i <= cap; i++ {
-		t := uint32(0)
-		q.tailVersion[uint32(i)] = &t
-	}
+
 	return q
 }
 
@@ -58,9 +53,6 @@ func (q *queue) Push(e *Event) {
 	defer q.mu.Unlock()
 
 	q.ring[q.tail] = e
-
-	newVersion := (*(q.tailVersion[q.tail])) + 1
-	q.tailVersion[q.tail] = &newVersion
 
 	q.tail = (q.tail + 1) % uint32(len(q.ring))
 }
