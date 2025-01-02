@@ -144,10 +144,11 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 			} else {
 				klog.CtxErrorf(ctx, "KITEX: panic happened, error=%v\nstack=%s", panicErr, stack)
 			}
-			if err != nil {
-				wrapErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in OnRead] %s, last error=%s", panicErr, err.Error()), stack)
-			} else {
+			if err == nil {
+				// if err is nil, set err as panic wrapErr
 				wrapErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in OnRead] %s", panicErr), stack)
+				err = remote.NewTransError(remote.InternalError, wrapErr)
+				t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
 			}
 		}
 		t.finishTracer(ctx, ri, err, panicErr)
@@ -158,10 +159,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		if rpcinfo.PoolEnabled() {
 			t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
 		}
-		if wrapErr != nil {
-			err = wrapErr
-		}
 		if err != nil && !closeConnOutsideIfErr {
+			// when error is not nil, outside will close conn,
+			// set err not nil just indicate that this kind of error don't need close conn
 			err = nil
 		}
 	}()
@@ -186,7 +186,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		// reply processing
 		var methodInfo serviceinfo.MethodInfo
 		if methodInfo, err = GetMethodInfo(ri, svcInfo); err != nil {
-			// it won't be err, because the method has been checked in decode, err check here just do defensive inspection
+			// it won't be error, because the method has been checked in decode, err check here just do defensive inspection
 			t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
 			// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded,
 			// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
@@ -278,6 +278,12 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 		// conn is closed, no need reply
 		return
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			rService, rAddr := getRemoteInfo(ri, conn)
+			klog.CtxErrorf(ctx, "KITEX: write error reply panic, remoteAddress=%s, remoteService=%s, error=%v\nstack=%s", rAddr, rService, r, string(debug.Stack()))
+		}
+	}()
 	svcInfo := recvMsg.ServiceInfo()
 	if svcInfo != nil {
 		if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
