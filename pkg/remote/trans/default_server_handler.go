@@ -89,6 +89,13 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remote.Message) (nctx context.Context, err error) {
 	var bufReader remote.ByteBuffer
 	defer func() {
+		if r := recover(); r != nil {
+			stack := string(debug.Stack())
+			panicErr := kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in Read] %s", r), stack)
+			rpcinfo.AsMutableRPCStats(recvMsg.RPCInfo().Stats()).SetPanicked(panicErr)
+			err = remote.NewTransError(remote.ProtocolError, panicErr)
+			nctx = ctx
+		}
 		t.ext.ReleaseBuffer(bufReader, err)
 		rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadFinish, err)
 	}()
@@ -133,9 +140,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	var sendMsg remote.Message
 	closeConnOutsideIfErr := true
 	defer func() {
-		panicErr := recover()
-		var wrapErr error
-		if panicErr != nil {
+		var panicErr error
+		if r := recover(); r != nil {
 			stack := string(debug.Stack())
 			if conn != nil {
 				ri := rpcinfo.GetRPCInfo(ctx)
@@ -144,10 +150,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 			} else {
 				klog.CtxErrorf(ctx, "KITEX: panic happened, error=%v\nstack=%s", panicErr, stack)
 			}
-			if err != nil {
-				wrapErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in OnRead] %s, last error=%s", panicErr, err.Error()), stack)
-			} else {
-				wrapErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in OnRead] %s", panicErr), stack)
+			panicErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in OnRead] %s", panicErr), stack)
+			if err == nil {
+				err = panicErr
 			}
 		}
 		t.finishTracer(ctx, ri, err, panicErr)
@@ -158,10 +163,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		if rpcinfo.PoolEnabled() {
 			t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
 		}
-		if wrapErr != nil {
-			err = wrapErr
-		}
 		if err != nil && !closeConnOutsideIfErr {
+			// when error is not nil, outside will close conn,
+			// set err to nil to indicate that this kind of error does not require closing the connection
 			err = nil
 		}
 	}()
@@ -186,7 +190,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		// reply processing
 		var methodInfo serviceinfo.MethodInfo
 		if methodInfo, err = GetMethodInfo(ri, svcInfo); err != nil {
-			// it won't be err, because the method has been checked in decode, err check here just do defensive inspection
+			// it won't be error, because the method has been checked in decode, err check here just do defensive inspection
 			t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
 			// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded,
 			// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
