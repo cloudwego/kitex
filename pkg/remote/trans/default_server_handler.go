@@ -88,18 +88,19 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 // Read implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remote.Message) (nctx context.Context, err error) {
 	var bufReader remote.ByteBuffer
+	ri := recvMsg.RPCInfo()
 	defer func() {
 		if r := recover(); r != nil {
 			stack := string(debug.Stack())
 			panicErr := kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in Read] %s", r), stack)
-			rpcinfo.AsMutableRPCStats(recvMsg.RPCInfo().Stats()).SetPanicked(panicErr)
+			rpcinfo.AsMutableRPCStats(ri.Stats()).SetPanicked(panicErr)
 			err = remote.NewTransError(remote.ProtocolError, panicErr)
 			nctx = ctx
 		}
 		t.ext.ReleaseBuffer(bufReader, err)
-		rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadFinish, err)
+		rpcinfo.Record(ctx, ri, stats.ReadFinish, err)
 	}()
-	rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadStart, nil)
+	rpcinfo.Record(ctx, ri, stats.ReadStart, nil)
 
 	bufReader = t.ext.NewReadByteBuffer(ctx, conn, recvMsg)
 	if codec, ok := t.codec.(remote.MetaDecoder); ok {
