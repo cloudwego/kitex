@@ -46,7 +46,7 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
-var reqMsg = `{"Msg":"hello","i16":1,"InnerBase":{"Base":{"LogID":"log_id_inner"}},"Base":{"LogID":"log_id"}}`
+var reqMsg = `{"Msg":"hello","I16":1,"InnerBase":{"Base":{"LogID":"log_id_inner"}},"Base":{"LogID":"log_id"}}`
 
 var reqRegression = `{"Msg":"hello","InnerBase":{"Base":{"LogID":"log_id_inner"}},"Base":{"LogID":"log_id"},"I8":"8","I16":"16","I32":"32","I64":"64","Double":"12.3"}`
 

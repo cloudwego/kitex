@@ -43,8 +43,8 @@ import (
 )
 
 func TestRun(t *testing.T) {
-	t.Run("TestThrift", testThrift)
-	// t.Run("TestThriftWithDynamicGo", testThriftWithDynamicGo)
+	// t.Run("TestThrift", testThrift)
+	t.Run("TestThriftWithDynamicGo", testThriftWithDynamicGo)
 	// t.Run("TestThriftPingMethod", testThriftPingMethod)
 	// t.Run("TestThriftPingMethodWithDynamicGo", testThriftPingMethodWithDynamicGo)
 	// t.Run("TestThriftError", testThriftError)

@@ -14,7 +14,7 @@ struct InnerBase {
 struct ExampleReq {
     1: required string Msg,
     2: FOO Foo,
-    3: InnerBase InnerBase,
+    3: InnerBase InnerBase (api.body="inner_base"),
     4: optional i8 I8,
     5: optional i16 I16 (api.body="i16"),
     6: optional i32 I32,
