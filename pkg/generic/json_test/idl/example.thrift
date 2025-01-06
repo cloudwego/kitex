@@ -16,7 +16,7 @@ struct ExampleReq {
     2: FOO Foo,
     3: InnerBase InnerBase,
     4: optional i8 I8,
-    5: optional i16 I16,
+    5: optional i16 I16 (api.body="i16"),
     6: optional i32 I32,
     7: optional i64 I64,
     8: optional double Double,
