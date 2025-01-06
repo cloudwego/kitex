@@ -252,12 +252,13 @@ func (s *server) Run() (err error) {
 	if err != nil {
 		return err
 	}
-	s.Lock()
-	s.svr, err = remotesvr.NewServer(s.opt.RemoteOpt, transHdlr)
-	s.Unlock()
+	svr, err := remotesvr.NewServer(s.opt.RemoteOpt, transHdlr)
 	if err != nil {
 		return err
 	}
+	s.Lock()
+	s.svr = svr
+	s.Unlock()
 
 	// start profiler
 	if s.opt.RemoteOpt.Profiler != nil {
@@ -270,7 +271,7 @@ func (s *server) Run() (err error) {
 		})
 	}
 
-	errCh := s.svr.Start()
+	errCh := svr.Start()
 	select {
 	case err = <-errCh:
 		klog.Errorf("KITEX: server start error: error=%s", err.Error())
@@ -283,7 +284,7 @@ func (s *server) Run() (err error) {
 	}
 	muStartHooks.Unlock()
 	s.Lock()
-	s.buildRegistryInfo(s.svr.Address())
+	s.buildRegistryInfo(svr.Address())
 	s.Unlock()
 
 	if err = s.waitExit(errCh); err != nil {
