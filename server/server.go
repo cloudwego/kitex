@@ -155,7 +155,7 @@ func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 	// register server middlewares
 	for i := range s.opt.MWBs {
 		if mw := s.opt.MWBs[i](ctx); mw != nil {
-			mws = append(mws, s.opt.MWBs[i](ctx))
+			mws = append(mws, mw)
 		}
 	}
 	// register services middlewares
