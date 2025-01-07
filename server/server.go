@@ -27,8 +27,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/localsession/backup"
+
+	"github.com/cloudwego/kitex/pkg/streamx"
 
 	"github.com/cloudwego/kitex/pkg/streaming"
 
@@ -421,11 +422,6 @@ func (s *server) invokeHandleEndpoint() sep.UnaryEndpoint {
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		// set session
 		backup.BackupCtx(ctx)
-<<<<<<< HEAD
-
-=======
-		// todo: directly pass in streaming.ServerStream, but need to be supported by generate code
->>>>>>> 18bce99e (feat: refactor: stream api)
 		err = implHandlerFunc(ctx, svc.handler, args, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
@@ -469,7 +465,7 @@ func (s *server) streamHandleEndpoint() sep.StreamEndpoint {
 		// set session
 		backup.BackupCtx(ctx)
 		args := &streaming.Args{ServerStream: st}
-		if grpcStreamGetter, ok := st.(streamx.GRPCStreamGetter); ok {
+		if grpcStreamGetter, ok := st.(streaming.GRPCStreamGetter); ok {
 			// for compatible with gRPC
 			args.Stream = grpcStreamGetter.GetGRPCStream()
 		}
