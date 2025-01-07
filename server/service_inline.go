@@ -128,8 +128,9 @@ func (s *server) BuildServiceInlineInvokeChain() endpoint.Endpoint {
 			return
 		}
 	}
+	ctx := fillContext(s.opt)
 	mws := []endpoint.Middleware{mw}
-	smws := s.buildMiddlewares(context.Background())
+	smws := s.buildMiddlewares(ctx)
 	mws = append(mws, smws...)
 	return endpoint.Chain(mws...)(innerHandlerEp)
 }
