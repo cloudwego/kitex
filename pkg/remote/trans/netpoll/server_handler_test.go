@@ -172,8 +172,8 @@ func TestInvokeErr(t *testing.T) {
 	test.Assert(t, isInvoked)
 }
 
-// TestPanicAfterRead test server_handler not panic after read
-func TestPanicAfterRead(t *testing.T) {
+// TestPipelineNilPanic test server_handler that TransPipeline is nil
+func TestPipelineNilPanic(t *testing.T) {
 	// 1. prepare mock data
 	var isWriteBufFlushed bool
 	var isReaderBufReleased bool
