@@ -68,9 +68,13 @@ type StreamOption struct {
 }
 
 type StreamOptions struct {
+	EventHandler          streamx.EventHandler
 	StreamMiddlewares     []sep.StreamMiddleware
 	StreamRecvMiddlewares []sep.StreamRecvMiddleware
 	StreamSendMiddlewares []sep.StreamSendMiddleware
+}
+
+func (o *StreamOptions) InitMiddlewares(ctx context.Context) {
 }
 
 func (o *StreamOptions) BuildRecvChain() sep.StreamRecvEndpoint {
