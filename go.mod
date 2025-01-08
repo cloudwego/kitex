@@ -9,7 +9,7 @@ require (
 	github.com/cloudwego/dynamicgo v0.4.7-0.20241220085612-55704ea4ca8f
 	github.com/cloudwego/fastpb v0.0.5
 	github.com/cloudwego/frugal v0.2.3
-	github.com/cloudwego/gopkg v0.1.4-0.20250103023101-f7dd603f3886
+	github.com/cloudwego/gopkg v0.1.4-0.20250108101532-52ba6073f5a1
 	github.com/cloudwego/localsession v0.1.1
 	github.com/cloudwego/netpoll v0.6.5
 	github.com/cloudwego/runtimex v0.1.0
@@ -49,3 +49,5 @@ require (
 	golang.org/x/arch v0.2.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 )
+
+replace github.com/cloudwego/netpoll => github.com/AsterDY/netpoll v0.6.6-0.20250108101917-ce45ac8dcfc5
