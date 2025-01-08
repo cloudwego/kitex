@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/cloudwego/kitex/internal/wpool"
@@ -62,7 +63,9 @@ func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration)
 		}
 	}
 	if ddl, ok := ctx.Deadline(); !ok {
-		errMsg = fmt.Sprintf("%s, %s", errMsg, "unknown error: context deadline not set?")
+		// 获取ctx对象的具体类型信息
+		ctxType := reflect.TypeOf(ctx).String()
+		errMsg = fmt.Sprintf("%s, %s, origin reason: %s, ctxType %s", errMsg, "unknown error: context deadline not set?", ctx.Err(), ctxType)
 	} else {
 		// Go's timer implementation is not so accurate,
 		// so if we need to check ctx deadline earlier than our timeout, we should consider the accuracy
