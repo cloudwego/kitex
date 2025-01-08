@@ -22,7 +22,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/bytedance/gopkg/util/gopool"
+	"github.com/cloudwego/gopkg/concurrency/gopool"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 )
