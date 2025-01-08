@@ -35,7 +35,7 @@ var GoFunc GoTask
 
 func init() {
 	GoFunc = func(ctx context.Context, f func()) {
-		gopool.GoCtx(ctx, func() {
+		gopool.CtxGo(ctx, func() {
 			profiler.Tag(ctx)
 			f()
 			profiler.Untag(ctx)
