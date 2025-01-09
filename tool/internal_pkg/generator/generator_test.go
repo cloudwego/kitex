@@ -231,3 +231,32 @@ func Test_needCallOpt(t *testing.T) {
 		test.Assert(t, needCallOpt(pkg))
 	})
 }
+
+func Test_scanDir(t *testing.T) {
+	testcases := []struct {
+		filePath   string
+		update     *Update
+		expectPath string
+		expectErr  error
+	}{
+		{
+			filePath:   "./test_dir/test1.txt",
+			update:     &Update{ScanDirRecursively: true, Type: "skip"},
+			expectPath: "test_dir/test_dir1/test1.txt",
+		},
+		{
+			filePath: "./test_dir/test2.txt",
+			update:   &Update{ScanDirRecursively: true, Type: "skip"},
+		},
+		{
+			filePath: "./non_exist_dir/test3.txt",
+			update:   &Update{ScanDirRecursively: true, Type: "skip"},
+		},
+	}
+
+	for _, tc := range testcases {
+		res, err := scanDir(tc.filePath, tc.update)
+		test.Assert(t, err == tc.expectErr, err)
+		test.Assert(t, res == tc.expectPath, res)
+	}
+}

@@ -16,6 +16,7 @@ package generator
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -47,6 +48,8 @@ type Update struct {
 	AppendTpl string `yaml:"append_tpl,omitempty"`
 	// Append import template. Use it to render import content to append.
 	ImportTpl []string `yaml:"import_tpl,omitempty"`
+	// Using this field to scan the current directory and all the subdirecotries recursively.
+	ScanDirRecursively bool `yaml:"scan_dir_recursively,omitempty"`
 }
 
 type Template struct {
@@ -97,6 +100,18 @@ func (c *customGenerator) loopGenerate(tpl *Template) error {
 		if util.Exists(filePath) && updateType(tpl.UpdateBehavior.Type) == skip {
 			continue
 		}
+		// using scanDir to substitute the default directory
+		scanPath, scanErr := scanDir(filePath, tpl.UpdateBehavior)
+		if scanErr != nil {
+			return scanErr
+		}
+		if scanPath != "" {
+			if updateType(tpl.UpdateBehavior.Type) == skip {
+				continue
+			}
+			filePath = scanPath
+		}
+
 		task := &Task{
 			Name: path.Base(renderPath),
 			Path: filePath,
@@ -109,6 +124,36 @@ func (c *customGenerator) loopGenerate(tpl *Template) error {
 		c.fs = append(c.fs, f)
 	}
 	return nil
+}
+
+// scanDir scans the directory of the filePath recursively and returns the path of the file with the same name.
+func scanDir(filePath string, behavior *Update) (res string, err error) {
+	if behavior == nil || !behavior.ScanDirRecursively {
+		return "", nil
+	}
+	fileName := filepath.Base(filePath)
+	dirPath := filepath.Dir(filePath)
+	var found bool
+	if err := filepath.Walk(dirPath, func(path string, info fs.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !info.IsDir() && info.Name() == fileName {
+			found = true
+			res = path
+			return nil
+		}
+		return nil
+	}); err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	if found {
+		return res, nil
+	}
+	return "", nil
 }
 
 func (c *customGenerator) commonGenerate(tpl *Template) error {
@@ -131,6 +176,17 @@ func (c *customGenerator) commonGenerate(tpl *Template) error {
 	if update && updateType(tpl.UpdateBehavior.Type) == skip {
 		log.Infof("skip generate file %s", tpl.Path)
 		return nil
+	}
+	// using scanDir to substitute the default directory
+	scanPath, scanErr := scanDir(filePath, tpl.UpdateBehavior)
+	if scanErr != nil {
+		return scanErr
+	}
+	if scanPath != "" {
+		if updateType(tpl.UpdateBehavior.Type) == skip {
+			return nil
+		}
+		filePath = scanPath
 	}
 	var f *File
 	if update && updateType(tpl.UpdateBehavior.Type) == incrementalUpdate {
