@@ -20,15 +20,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/utils/goroutine_lock"
+	goroutinelock "github.com/cloudwego/kitex/internal/utils/goroutine_lock"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 func TestGoroutineLockAndUnlock(t *testing.T) {
 	t.Parallel()
 	startTime := time.Now()
+	utils.GoroutineLock()
 	go func() {
-		utils.GoroutineLock()
 		time.Sleep(time.Second)
 		utils.GoroutineUnlock()
 	}()
