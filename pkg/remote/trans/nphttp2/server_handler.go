@@ -31,6 +31,7 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	goroutinelock "github.com/cloudwego/kitex/internal/utils/goroutine_lock"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -416,6 +417,9 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 				svrTrans := elem.Value.(*SvrTrans)
 				svrTrans.tr.Close()
 			}
+			// Goroutine Locks must wait after all connections are closed, otherwise new connections might be created
+			// while waiting for goroutine locks.
+			goroutinelock.GoroutineWg.Wait()
 			t.mu.Unlock()
 			return nil
 		}

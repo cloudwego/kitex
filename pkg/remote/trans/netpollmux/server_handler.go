@@ -27,6 +27,7 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	goroutinelock "github.com/cloudwego/kitex/internal/utils/goroutine_lock"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -365,7 +366,9 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 			}
 			return true
 		})
-		// 4. waiting all crrst packets received by client
+		// 4. waiting for goroutine locks to be released
+		goroutinelock.GoroutineWg.Wait()
+		// 5. waiting all crrst packets received by client
 		deadline := time.Now().Add(defaultExitWaitGracefulShutdownTime)
 		ticker := time.NewTicker(defaultExitWaitGracefulShutdownTime / 10)
 		defer ticker.Stop()
