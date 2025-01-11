@@ -39,7 +39,7 @@ func (wg *WaitGroup) Add(delta int) {
 	atomic.AddInt64(&wg.count, int64(delta))
 	wg.WaitGroup.Add(delta)
 	if atomic.LoadUint32(&wg.shutdownStarted) > 0 {
-		klog.Warn("shutdown started but a new goroutine lock is added")
+		klog.Warn("KITEX: shutdown started but a new goroutine lock is added")
 	}
 }
 
@@ -48,7 +48,12 @@ func (wg *WaitGroup) Done() {
 	atomic.AddInt64(&wg.count, -1)
 	wg.WaitGroup.Done()
 	if atomic.LoadUint32(&wg.shutdownStarted) > 0 {
-		klog.Infof("waiting for goroutine locks to be released, remaining %d...", wg.GetCount())
+		count := wg.GetCount()
+		if count > 0 {
+			klog.Infof("KITEX: waiting for goroutine locks to be released, remaining %d...", count)
+		} else {
+			klog.Info("KITEX: all goroutine locks have been released")
+		}
 	}
 }
 

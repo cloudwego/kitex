@@ -324,7 +324,7 @@ func (s *server) Stop() (err error) {
 		// waiting for goroutine locks.
 		goroutinelock.Wg.StartShutdown()
 		if count := goroutinelock.Wg.GetCount(); count > 0 {
-			klog.Infof("waiting for goroutine locks to be released, remaining %d...", count)
+			klog.Infof("KITEX: waiting for goroutine locks to be released, remaining %d...", count)
 			goroutinelock.Wg.Wait()
 		}
 	})
