@@ -30,6 +30,7 @@ import (
 	"github.com/cloudwego/localsession/backup"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
+	goroutinelock "github.com/cloudwego/kitex/internal/utils/goroutine_lock"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -319,6 +320,9 @@ func (s *server) Stop() (err error) {
 			}
 			s.svr = nil
 		}
+		// Goroutine Locks must wait after all connections are closed, otherwise new connections might be created while
+		// waiting for goroutine locks.
+		goroutinelock.GoroutineWg.Wait()
 	})
 	return
 }
