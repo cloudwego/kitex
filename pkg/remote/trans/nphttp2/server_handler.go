@@ -408,6 +408,7 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 			}
 			t.mu.Unlock()
 			if activeNums == 0 {
+				goroutinelock.GoroutineWg.Wait()
 				return nil
 			}
 		case <-graceTimer.C:
