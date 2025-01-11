@@ -322,7 +322,11 @@ func (s *server) Stop() (err error) {
 		}
 		// Goroutine Locks must wait after all connections are closed, otherwise new connections might be created while
 		// waiting for goroutine locks.
-		goroutinelock.GoroutineWg.Wait()
+		goroutinelock.Wg.StartShutdown()
+		if count := goroutinelock.Wg.GetCount(); count > 0 {
+			klog.Infof("waiting for goroutine locks to be released, remaining %d...", count)
+			goroutinelock.Wg.Wait()
+		}
 	})
 	return
 }

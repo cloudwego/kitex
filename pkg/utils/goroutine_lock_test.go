@@ -32,7 +32,7 @@ func TestGoroutineLockAndUnlock(t *testing.T) {
 		time.Sleep(time.Second)
 		utils.GoroutineUnlock()
 	}()
-	goroutinelock.GoroutineWg.Wait()
+	goroutinelock.Wg.Wait()
 	diff := time.Since(startTime)
 	if diff < time.Second {
 		t.Errorf("Expect diff >= 1s, get %v", diff)

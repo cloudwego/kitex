@@ -20,12 +20,12 @@ import goroutinelock "github.com/cloudwego/kitex/internal/utils/goroutine_lock"
 
 // GoroutineLock locks the goroutine so that graceful shutdown will wait until the lock is released
 func GoroutineLock() {
-	goroutinelock.GoroutineWg.Add(1)
+	goroutinelock.Wg.Add(1)
 }
 
 // GoroutineUnlock unlocks the goroutine to allow graceful shutdown to continue.
 // NOTE: This function should be executed using defer to avoid panic in the middle and causing the lock to not be
 // released.
 func GoroutineUnlock() {
-	goroutinelock.GoroutineWg.Done()
+	goroutinelock.Wg.Done()
 }
