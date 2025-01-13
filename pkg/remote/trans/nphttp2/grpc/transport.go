@@ -748,12 +748,24 @@ func connectionErrorf(temp bool, e error, format string, a ...interface{}) Conne
 	}
 }
 
+// connectionErrorfWithExpectedFlag creates an ConnectionError with the specified error description and
+// determines whether the error is expected.
+func connectionErrorfWithExpectedFlag(temp bool, isExpected bool, e error, format string, a ...interface{}) ConnectionError {
+	return ConnectionError{
+		Desc:       fmt.Sprintf(format, a...),
+		temp:       temp,
+		err:        e,
+		isExpected: isExpected,
+	}
+}
+
 // ConnectionError is an error that results in the termination of the
 // entire connection and the retry of all the active streams.
 type ConnectionError struct {
-	Desc string
-	temp bool
-	err  error
+	Desc       string
+	temp       bool
+	err        error
+	isExpected bool
 }
 
 func (e ConnectionError) Error() string {

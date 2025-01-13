@@ -664,7 +664,7 @@ func (t *http2Client) GracefulClose() {
 	active := len(t.activeStreams)
 	t.mu.Unlock()
 	if active == 0 {
-		t.Close(connectionErrorf(true, nil, "no active streams left to process while draining"))
+		t.Close(connectionErrorfWithExpectedFlag(true, true, nil, "no active streams left to process while draining"))
 		return
 	}
 	t.controlBuf.put(&incomingGoAway{})

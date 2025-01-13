@@ -560,13 +560,15 @@ const minBatchSize = 1000
 // if the batch size is too low to give stream goroutines a chance to fill it up.
 func (l *loopyWriter) run(remoteAddr string) (err error) {
 	defer func() {
-		if err == ErrConnClosing {
-			// Don't log ErrConnClosing as error since it happens
-			// 1. When the connection is closed by some other known issue.
-			// 2. User closed the connection.
-			// 3. A graceful close of connection.
-			klog.Debugf("KITEX: grpc transport loopyWriter.run returning, error=%v, remoteAddr=%s", err, remoteAddr)
-			err = nil
+		if connErr, ok := err.(ConnectionError); ok {
+			if err == ErrConnClosing || connErr.isExpected {
+				// Don't log ErrConnClosing as error since it happens
+				// 1. When the connection is closed by some other known issue.
+				// 2. User closed the connection.
+				// 3. A graceful close of connection.
+				klog.Debugf("KITEX: grpc transport loopyWriter.run returning, error=%v, remoteAddr=%s", err, remoteAddr)
+				err = nil
+			}
 		}
 		// make sure the Graceful Shutdown behaviour triggered
 		if errors.Is(err, errGracefulShutdown) {
