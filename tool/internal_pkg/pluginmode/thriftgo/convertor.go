@@ -295,17 +295,9 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 
 	c.svc2ast = make(map[*generator.ServiceInfo]*parser.Thrift)
 
-	var trees chan *parser.Thrift
-	if req.Recursive {
-		trees = req.AST.DepthFirstSearch()
-	} else {
-		trees = make(chan *parser.Thrift, 1)
-		trees <- req.AST
-		close(trees)
-	}
 	mainAST := req.AST
 
-	for ast := range trees {
+	for ast := range req.AST.DepthFirstSearch() {
 		ref, pkg, pth := c.Utils.ParseNamespace(ast)
 		// make the current ast as an include to produce correct type references.
 		fake := c.copyTreeWithRef(ast, ref)
@@ -411,7 +403,9 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 			c.svc2ast[si] = ast
 		}
 
-		c.Services = append(c.Services, all[ast.Filename]...)
+		if req.Recursive || ast == mainAST {
+			c.Services = append(c.Services, all[ast.Filename]...)
+		}
 	}
 	return nil
 }
