@@ -18,10 +18,13 @@ package gofunc
 
 import (
 	"context"
+	"os"
 	"runtime/debug"
+	"strconv"
 	"sync"
 
-	"github.com/bytedance/gopkg/util/gopool"
+	bytedancePool "github.com/bytedance/gopkg/util/gopool"
+	cloudwegoPool "github.com/cloudwego/gopkg/concurrency/gopool"
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/profiler"
@@ -30,12 +33,24 @@ import (
 // GoTask is used to spawn a new task.
 type GoTask func(context.Context, func())
 
-// GoFunc is the default func used globally.
-var GoFunc GoTask
+var (
+	ctxGo GoTask
+
+	// GoFunc is the default func used globally.
+	GoFunc GoTask
+)
 
 func init() {
+	ctxGo = bytedancePool.CtxGo
+	if yes, _ := strconv.ParseBool(os.Getenv("KITEX_USE_CLOUDWEGO_GOPOOL")); yes {
+		ctxGo = cloudwegoPool.CtxGo
+	}
 	GoFunc = func(ctx context.Context, f func()) {
-		gopool.CtxGo(ctx, func() {
+		if !profiler.IsEnabled(ctx) {
+			ctxGo(ctx, f)
+			return
+		}
+		ctxGo(ctx, func() {
 			profiler.Tag(ctx)
 			f()
 			profiler.Untag(ctx)
