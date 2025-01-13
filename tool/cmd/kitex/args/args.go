@@ -136,12 +136,11 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Generate streaming code with streamx interface",
 	)
 
-	f.BoolVar(&a.GenFrugal, "gen_frugal", false, `Gen frugal codec for those structs with (go.codec="frugal")`)
-	f.Var(&a.FrugalStruct, "frugal_struct", "Gen frugal codec for given struct")
+	f.BoolVar(&a.GenFrugal, "gen-frugal", false, `Gen frugal codec for those structs with (go.codec="frugal")`)
+	f.Var(&a.FrugalStruct, "frugal-struct", "Gen frugal codec for given struct")
 
 	f.BoolVar(&a.NoRecurse, "no-recurse", false, `Don't generate thrift files recursively, just generate the given file.'`)
 
-	a.RecordCmd = os.Args
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
 		"naming_style=golint",
@@ -178,6 +177,18 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 	if err = f.Parse(kitexArgs); err != nil {
 		return err
 	}
+
+	if a.Record {
+		a.RecordCmd = os.Args
+	}
+
+	// format -thrift xxx,xxx to -thrift xx -thrift xx
+	thriftOptions := make([]string, len(a.ThriftOptions))
+	for i := range a.ThriftOptions {
+		op := a.ThriftOptions[i]
+		thriftOptions = append(thriftOptions, strings.Split(op, ",")...)
+	}
+	a.ThriftOptions = thriftOptions
 
 	log.Verbose = a.Verbose
 
