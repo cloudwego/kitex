@@ -546,9 +546,14 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 	switch name {
 	case ClientFileName:
 		pkg.AddImports("client")
-		if !g.StreamX && pkg.HasStreaming {
-			pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
-			pkg.AddImport("transport", "github.com/cloudwego/kitex/transport")
+		if pkg.HasStreaming {
+			if !g.StreamX {
+				pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
+				pkg.AddImport("transport", "github.com/cloudwego/kitex/transport")
+			} else {
+				pkg.AddImports("github.com/cloudwego/kitex/client/streamxclient/streamxcallopt")
+				pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
+			}
 		}
 		if len(pkg.AllMethods()) > 0 {
 			if needCallOpt(pkg) {
