@@ -28,14 +28,9 @@ import (
 			{{- end}}
 		{{- end}}
 	{{- end}}
-	{{- if .HasStreaming}}
-	{{- if not .StreamX}}
+	{{- if and .HasStreaming (not .StreamX) }}
 	"github.com/cloudwego/kitex/client/streamclient"
 	"github.com/cloudwego/kitex/client/callopt/streamcall"
-	{{- else}}
-	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
-	"github.com/cloudwego/kitex/pkg/streamx"
-	{{- end}}{{- /* if not .StreamX end */}}
 	{{- end}}
 )
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
