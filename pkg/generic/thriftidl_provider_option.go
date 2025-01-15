@@ -38,6 +38,8 @@ func (o *thriftIDLProviderOptions) apply(opts []ThriftIDLProviderOption) {
 	}
 }
 
+// WithParseMode sets the parse mode.
+// NOTE: when using WithIDLServiceName at the same time, parse mode will be ignored.
 func WithParseMode(parseMode thrift.ParseMode) ThriftIDLProviderOption {
 	return ThriftIDLProviderOption{F: func(opt *thriftIDLProviderOptions) {
 		opt.parseMode = &parseMode
@@ -52,6 +54,8 @@ func WithGoTagDisabled(disable bool) ThriftIDLProviderOption {
 	}}
 }
 
+// WithIDLServiceName specifies the target IDL service to be parsed.
+// NOTE: when using this option, the specified service is prioritized, and parse mode will be ignored.
 func WithIDLServiceName(serviceName string) ThriftIDLProviderOption {
 	return ThriftIDLProviderOption{F: func(opt *thriftIDLProviderOptions) {
 		opt.serviceName = serviceName
