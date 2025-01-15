@@ -77,22 +77,33 @@ func Parse(tree *parser.Thrift, mode ParseMode, opts ...ParseOption) (*descripto
 		Router:    descriptor.NewRouter(),
 	}
 
-	// support one service
-	svcs := tree.Services
-	switch mode {
-	case LastServiceOnly:
-		svcs = svcs[len(svcs)-1:]
-		sDsc.Name = svcs[len(svcs)-1].Name
-	case FirstServiceOnly:
-		svcs = svcs[:1]
-		sDsc.Name = svcs[0].Name
-	case CombineServices:
-		sDsc.Name = "CombinedServices"
-		sDsc.IsCombinedServices = true
-	}
-
 	pOpts := &parseOptions{}
 	pOpts.apply(opts)
+
+	// support one service
+	svcs := tree.Services
+
+	// if an idl service name is specified, it takes precedence over parse mode
+	if pOpts.serviceName != "" {
+		var err error
+		svcs, err = getTargetService(svcs, pOpts.serviceName)
+		if err != nil {
+			return nil, err
+		}
+		sDsc.Name = pOpts.serviceName
+	} else {
+		switch mode {
+		case LastServiceOnly:
+			svcs = svcs[len(svcs)-1:]
+			sDsc.Name = svcs[len(svcs)-1].Name
+		case FirstServiceOnly:
+			svcs = svcs[:1]
+			sDsc.Name = svcs[0].Name
+		case CombineServices:
+			sDsc.Name = "CombinedServices"
+			sDsc.IsCombinedServices = true
+		}
+	}
 
 	visitedSvcs := make(map[*parser.Service]bool, len(tree.Services))
 	for _, svc := range svcs {
@@ -107,6 +118,15 @@ func Parse(tree *parser.Thrift, mode ParseMode, opts ...ParseOption) (*descripto
 		}
 	}
 	return sDsc, nil
+}
+
+func getTargetService(svcs []*parser.Service, serviceName string) ([]*parser.Service, error) {
+	for _, svc := range svcs {
+		if svc.Name == serviceName {
+			return []*parser.Service{svc}, nil
+		}
+	}
+	return nil, fmt.Errorf("the idl service name %s is not in the idl. Please check your idl", serviceName)
 }
 
 type pair struct {

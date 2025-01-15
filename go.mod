@@ -6,7 +6,7 @@ require (
 	github.com/bytedance/gopkg v0.1.1
 	github.com/bytedance/sonic v1.12.7
 	github.com/cloudwego/configmanager v0.2.2
-	github.com/cloudwego/dynamicgo v0.5.0
+	github.com/cloudwego/dynamicgo v0.5.1-0.20250115031329-d58b94fc7d71
 	github.com/cloudwego/fastpb v0.0.5
 	github.com/cloudwego/frugal v0.2.3
 	github.com/cloudwego/gopkg v0.1.4-0.20241217093255-8980b14172b7
