@@ -619,18 +619,20 @@ func TestStreamingException(t *testing.T) {
 					}
 				}),
 			)
-			octx := context.Background()
 
 			// assert circuitBreaker error
+			octx := context.Background()
 			atomic.StoreInt32(&circuitBreaker, 1)
 			_, _, err = cli.BidiStream(octx)
 			test.Assert(t, errors.Is(err, circuitBreakerErr), err)
 			atomic.StoreInt32(&circuitBreaker, 0)
 
 			// assert context deadline error
-			ctx, cancel := context.WithTimeout(octx, time.Millisecond)
-			ctx, bs, err := cli.BidiStream(ctx)
+			octx = context.Background()
+			ctx, bs, err := cli.BidiStream(octx)
 			test.Assert(t, err == nil, err)
+			// ctx timeout should be injected before invoking Recv and after creating stream
+			ctx, cancel := context.WithTimeout(ctx, time.Millisecond)
 			res, err := bs.Recv(ctx)
 			cancel()
 			test.Assert(t, res == nil && err != nil, res, err)
