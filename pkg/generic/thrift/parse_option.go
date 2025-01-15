@@ -41,6 +41,8 @@ func WithGoTagDisabled(disable bool) ParseOption {
 	}}
 }
 
+// WithIDLServiceName specifies the target IDL service to be parsed.
+// NOTE: with this option, the specified service is prioritized and parse mode will be ignored.
 func WithIDLServiceName(serviceName string) ParseOption {
 	return ParseOption{F: func(opt *parseOptions) {
 		opt.serviceName = serviceName
