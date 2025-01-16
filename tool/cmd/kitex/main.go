@@ -32,6 +32,8 @@ import (
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
+	"github.com/cloudwego/kitex/tool/internal_pkg/prutal"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util/env"
 )
 
 var args kargs.Arguments
@@ -72,6 +74,7 @@ func main() {
 		case protoc.PluginName:
 			os.Exit(protoc.Run())
 		}
+		panic(mode)
 	}
 
 	curpath, err := filepath.Abs(".")
@@ -94,6 +97,14 @@ func main() {
 			os.Exit(versions.CompatibilityCheckExitCode)
 		}
 	}
+	if args.IsProtobuf() && !env.UseProtoc() {
+		g := prutal.NewPrutalGen(args.Config)
+		if err := g.Process(); err != nil {
+			log.Errorf("%s", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	out := new(bytes.Buffer)
 	cmd, err := args.BuildCmd(out)
@@ -102,7 +113,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if args.IDLType == "thrift" && !args.LocalThriftgo {
+	if args.IsThrift() && !args.LocalThriftgo {
 		if err = sdk.InvokeThriftgoBySDK(curpath, cmd); err != nil {
 			// todo: optimize -use and remove error returned from thriftgo
 			out.WriteString(err.Error())

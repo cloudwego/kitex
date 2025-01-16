@@ -30,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util/env"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -53,6 +54,13 @@ type Arguments struct {
 	extends []*ExtraFlag
 }
 
+const (
+	Thrift   = "thrift"
+	Protobuf = "protobuf"
+
+	Unknown = "unknown"
+)
+
 const cmdExample = `  # Generate client codes or update kitex_gen codes when a project is in $GOPATH:
   kitex {{path/to/IDL_file.thrift}}
 
@@ -66,16 +74,6 @@ const cmdExample = `  # Generate client codes or update kitex_gen codes when a p
 // AddExtraFlag .
 func (a *Arguments) AddExtraFlag(e *ExtraFlag) {
 	a.extends = append(a.extends, e)
-}
-
-func (a *Arguments) guessIDLType() (string, bool) {
-	switch {
-	case strings.HasSuffix(a.IDL, ".thrift"):
-		return "thrift", true
-	case strings.HasSuffix(a.IDL, ".proto"):
-		return "protobuf", true
-	}
-	return "unknown", false
 }
 
 func (a *Arguments) buildFlags(version string) *flag.FlagSet {
@@ -100,8 +98,6 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.DurationVar(&a.ThriftPluginTimeLimit, "thrift-plugin-time-limit", generator.DefaultThriftPluginTimeLimit, "Specify thrift plugin execution time limit.")
 	f.StringVar(&a.CompilerPath, "compiler-path", "", "Specify the path of thriftgo/protoc.")
 	f.Var(&a.ThriftPlugins, "thrift-plugin", "Specify thrift plugin arguments for the thrift compiler.")
-	f.Var(&a.ProtobufOptions, "protobuf", "Specify arguments for the protobuf compiler.")
-	f.Var(&a.ProtobufPlugins, "protobuf-plugin", "Specify protobuf plugin arguments for the protobuf compiler.(plugin_name:options:out_dir)")
 	f.BoolVar(&a.CombineService, "combine-service", false,
 		"Combine services in root thrift file.")
 	f.BoolVar(&a.CopyIDL, "copy-idl", false,
@@ -134,6 +130,14 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.Var(&a.FrugalStruct, "frugal-struct", "Replace fastCodec code to frugal. Use `-frugal-struct @all` for all, `-frugal-struct @auto` for annotated structs (go.codec=\"frugal\"), or specify multiple structs (e.g., `-frugal-struct A -frugal-struct B`).")
 
 	f.BoolVar(&a.NoRecurse, "no-recurse", false, `Don't generate thrift files recursively, just generate the given file.'`)
+
+	if env.UseProtoc() {
+		f.Var(&a.ProtobufOptions, "protobuf", "Specify arguments for the protobuf compiler.")
+		f.Var(&a.ProtobufPlugins, "protobuf-plugin", "Specify protobuf plugin arguments for the protobuf compiler.(plugin_name:options:out_dir)")
+	} else {
+		f.Var(deprecatedFlag{}, "protobuf", "Deprecated")
+		f.Var(deprecatedFlag{}, "protobuf-plugin", "Deprecated")
+	}
 
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
@@ -171,10 +175,10 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 	if err = f.Parse(kitexArgs); err != nil {
 		return err
 	}
-
 	if a.Record {
 		a.RecordCmd = os.Args
 	}
+	log.Verbose = a.Verbose
 
 	// format -thrift xxx,xxx to -thrift xx -thrift xx
 	thriftOptions := make([]string, len(a.ThriftOptions))
@@ -183,8 +187,6 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 		thriftOptions = append(thriftOptions, strings.Split(op, ",")...)
 	}
 	a.ThriftOptions = thriftOptions
-
-	log.Verbose = a.Verbose
 
 	for _, e := range a.extends {
 		err = e.Check(a)
@@ -205,11 +207,25 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 	if err != nil {
 		return err
 	}
-	// todo finish protobuf
-	if a.IDLType != "thrift" {
-		a.GenPath = generator.KitexGenPath
-	}
 	return a.checkPath(curpath)
+}
+
+func (a *Arguments) IsThrift() bool {
+	return a.IDLType == Thrift
+}
+
+func (a *Arguments) IsProtobuf() bool {
+	return a.IDLType == Protobuf
+}
+
+func guessIDLType(idl string) (string, bool) {
+	switch {
+	case strings.HasSuffix(idl, ".thrift"):
+		return Thrift, true
+	case strings.HasSuffix(idl, ".proto"):
+		return Protobuf, true
+	}
+	return Unknown, false
 }
 
 func (a *Arguments) checkIDL(files []string) error {
@@ -224,9 +240,9 @@ func (a *Arguments) checkIDL(files []string) error {
 	a.IDL = files[0]
 
 	switch a.IDLType {
-	case "thrift", "protobuf":
-	case "unknown":
-		if typ, ok := a.guessIDLType(); ok {
+	case Thrift, Protobuf:
+	case Unknown:
+		if typ, ok := guessIDLType(a.IDL); ok {
 			a.IDLType = typ
 		} else {
 			return fmt.Errorf("can not guess an IDL type from %q (unknown suffix), please specify with the '-type' flag", a.IDL)
@@ -256,7 +272,7 @@ func (a *Arguments) checkStreamX() error {
 	if !a.StreamX {
 		return nil
 	}
-	if a.IDLType == "thrift" {
+	if a.IsThrift() {
 		// set TTHeader Streaming by default
 		a.Protocol = transport.TTHeader.String()
 	}
@@ -371,7 +387,7 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 		Stderr: io.MultiWriter(out, os.Stderr),
 	}
 
-	if a.IDLType == "thrift" {
+	if a.IsThrift() {
 		os.Setenv(EnvPluginMode, thriftgo.PluginName)
 		cmd.Args = append(cmd.Args, "thriftgo")
 		for _, inc := range a.Includes {
@@ -410,7 +426,8 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 			cmd.Args = append(cmd.Args, "-p", p)
 		}
 		cmd.Args = append(cmd.Args, a.IDL)
-	} else {
+
+	} else if a.IsProtobuf() {
 		os.Setenv(EnvPluginMode, protoc.PluginName)
 		a.ThriftOptions = a.ThriftOptions[:0]
 		// "protobuf"
@@ -443,9 +460,9 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 				fmt.Sprintf("--%s_opt=%s", pluginParams[0], pluginParams[1]),
 			)
 		}
-
 		cmd.Args = append(cmd.Args, a.IDL)
 	}
+
 	log.Debugf("cmd.Args %v", cmd.Args)
 	log.Debugf("config pairs %v", configkv)
 	return cmd, nil
