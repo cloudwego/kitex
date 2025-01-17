@@ -17,6 +17,8 @@
 package args
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -51,4 +53,13 @@ func Test_versionSatisfied(t *testing.T) {
 		test.Assert(t, !versionSatisfied("1.2.3", "v1.2.4"))
 		test.Assert(t, !versionSatisfied("1.2.3", "1.2.4"))
 	})
+}
+
+func Test_refGoSrcPath(t *testing.T) {
+	gopath, _ := os.Getwd()
+	t.Setenv("GOPATH", gopath)
+	pkgpath := filepath.Join(gopath, "src", "github.com", "cloudwego", "kitex")
+	ret, ok := refGoSrcPath(pkgpath)
+	test.Assert(t, ok)
+	test.Assert(t, filepath.ToSlash(ret) == "github.com/cloudwego/kitex")
 }
