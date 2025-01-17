@@ -2125,3 +2125,15 @@ func TestTlsAppendH2ToALPNProtocols(t *testing.T) {
 	appended = tlsAppendH2ToALPNProtocols(appended)
 	test.Assert(t, len(appended) == 1)
 }
+
+func Test_isIgnorable(t *testing.T) {
+	test.Assert(t, !isIgnorable(nil))
+
+	err := connectionErrorfWithIgnorable(true, nil, "ignorable")
+	test.Assert(t, isIgnorable(err))
+
+	err = connectionErrorf(true, nil, "not ignorable")
+	test.Assert(t, !isIgnorable(err))
+
+	test.Assert(t, isIgnorable(ErrConnClosing))
+}
