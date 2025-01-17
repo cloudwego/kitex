@@ -377,7 +377,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 	}
 	for _, t := range tasks {
 		if util.Exists(t.Path) {
-			log.Info(t.Path, "exists. Skipped.")
+			log.Debug(t.Path, "exists. Skipped.")
 			continue
 		}
 		g.setImports(t.Name, pkg)

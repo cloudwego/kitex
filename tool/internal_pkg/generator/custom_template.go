@@ -129,7 +129,7 @@ func (c *customGenerator) commonGenerate(tpl *Template) error {
 	filePath := filepath.Join(c.basePath, renderPath)
 	update := util.Exists(filePath)
 	if update && updateType(tpl.UpdateBehavior.Type) == skip {
-		log.Infof("skip generate file %s", tpl.Path)
+		log.Debugf("skip generate file %s", tpl.Path)
 		return nil
 	}
 	var f *File

@@ -17,7 +17,6 @@ package thriftgo
 import (
 	"fmt"
 	"go/format"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -31,7 +30,7 @@ import (
 	"github.com/cloudwego/thriftgo/semantic"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
-	internal_log "github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -80,20 +79,9 @@ func (c *converter) initLogs() backend.LogFunc {
 		lf.Info = lf.Warn
 	}
 
-	internal_log.SetDefaultLogger(internal_log.Logger{
-		Println: func(w io.Writer, a ...interface{}) (n int, err error) {
-			if w != os.Stdout || c.Config.Verbose {
-				c.Warnings = append(c.Warnings, fmt.Sprint(a...))
-			}
-			return 0, nil
-		},
-		Printf: func(w io.Writer, format string, a ...interface{}) (n int, err error) {
-			if w != os.Stdout || c.Config.Verbose {
-				c.Warnings = append(c.Warnings, fmt.Sprintf(format, a...))
-			}
-			return 0, nil
-		},
-	})
+	log.SetDefaultLogger(log.LoggerFunc(func(format string, a ...interface{}) {
+		c.Warnings = append(c.Warnings, fmt.Sprintf(format, a...))
+	}))
 	return lf
 }
 
@@ -516,13 +504,13 @@ func (c *converter) persist(res *plugin.Response) error {
 		content := []byte(c.Content)
 		if filepath.Ext(full) == ".go" {
 			if formatted, err := format.Source([]byte(c.Content)); err != nil {
-				internal_log.Warn(fmt.Sprintf("Failed to format %s: %s", full, err.Error()))
+				log.Warnf("Failed to format %s: %s", full, err)
 			} else {
 				content = formatted
 			}
 		}
 
-		internal_log.Info("Write", full)
+		log.Debug("Write", full)
 		path := filepath.Dir(full)
 		if err := os.MkdirAll(path, 0o755); err != nil && !os.IsExist(err) {
 			return fmt.Errorf("failed to create path '%s': %w", path, err)

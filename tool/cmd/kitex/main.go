@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"os"
 	"path/filepath"
@@ -56,7 +57,7 @@ func init() {
 			Version: "v0.11.0",
 		},
 	); err != nil {
-		log.Warn(err)
+		log.Error(err)
 		os.Exit(versions.CompatibilityCheckExitCode)
 	}
 }
@@ -75,17 +76,17 @@ func main() {
 
 	curpath, err := filepath.Abs(".")
 	if err != nil {
-		log.Warn("Get current path failed:", err.Error())
+		log.Errorf("Get current path failed: %s", err)
 		os.Exit(1)
 	}
 	// run as kitex
 	err = args.ParseArgs(kitex.Version, curpath, os.Args[1:])
 	if err != nil {
-		if err.Error() != "flag: help requested" {
-			log.Warn(err.Error())
-			os.Exit(2)
+		if errors.Is(err, flag.ErrHelp) {
+			os.Exit(0)
 		}
-		os.Exit(0)
+		log.Error(err)
+		os.Exit(2)
 	}
 	if !args.NoDependencyCheck {
 		// check dependency compatibility between kitex cmd tool and dependency in go.mod

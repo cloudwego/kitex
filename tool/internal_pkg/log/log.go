@@ -16,7 +16,7 @@ package log
 
 import (
 	"fmt"
-	"io"
+	"log"
 	"os"
 )
 
@@ -24,14 +24,23 @@ import (
 var Verbose bool
 
 // Logger .
-type Logger struct {
-	Println func(w io.Writer, a ...interface{}) (n int, err error)
-	Printf  func(w io.Writer, format string, a ...interface{}) (n int, err error)
+type Logger interface {
+	Printf(format string, a ...interface{})
 }
 
-var defaultLogger = Logger{
-	Println: fmt.Fprintln,
-	Printf:  fmt.Fprintf,
+// LoggerFunc implements Logger
+type LoggerFunc func(format string, a ...interface{})
+
+func (f LoggerFunc) Printf(format string, a ...interface{}) {
+	f(format, a...)
+}
+
+// must use os.Stderr, os.Stdout is used by plugin for output
+var defaultLogger Logger = log.New(os.Stderr, "", 0)
+
+// DefaultLogger ...
+func DefaultLogger() Logger {
+	return defaultLogger
 }
 
 // SetDefaultLogger sets the default logger.
@@ -39,26 +48,48 @@ func SetDefaultLogger(l Logger) {
 	defaultLogger = l
 }
 
-// Warn .
+// Error ...
+func Error(v ...interface{}) {
+	defaultLogger.Printf("[ERROR] %s", fmt.Sprintln(v...))
+}
+
+// Errorf ...
+func Errorf(format string, v ...interface{}) {
+	defaultLogger.Printf("[ERROR] "+format, v...)
+}
+
+// Warn ...
 func Warn(v ...interface{}) {
-	defaultLogger.Println(os.Stderr, v...)
+	defaultLogger.Printf("[WARN] %s", fmt.Sprintln(v...))
 }
 
-// Warnf .
+// Warnf ...
 func Warnf(format string, v ...interface{}) {
-	defaultLogger.Printf(os.Stderr, format, v...)
+	defaultLogger.Printf("[WARN] "+format, v...)
 }
 
-// Info .
+// Info ...
 func Info(v ...interface{}) {
-	if Verbose {
-		defaultLogger.Println(os.Stderr, v...)
-	}
+	defaultLogger.Printf("[INFO] %s", fmt.Sprintln(v...))
 }
 
-// Infof .
+// Infof ...
 func Infof(format string, v ...interface{}) {
-	if Verbose {
-		defaultLogger.Printf(os.Stderr, format, v...)
+	defaultLogger.Printf("[INFO] "+format, v...)
+}
+
+// Debug ...
+func Debug(v ...interface{}) {
+	if !Verbose {
+		return
 	}
+	defaultLogger.Printf("[DEBUG] %s", fmt.Sprintln(v...))
+}
+
+// Debugf ...
+func Debugf(format string, v ...interface{}) {
+	if !Verbose {
+		return
+	}
+	defaultLogger.Printf("[DEBUG] "+format, v...)
 }
