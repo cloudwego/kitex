@@ -78,7 +78,7 @@ func DefaultCheckDependencyAndProcess() error {
 	}
 	res, shouldExit := defaultParseCheckResult(cr)
 	if res != "" {
-		log.Warn(res)
+		log.Info(res)
 	}
 	if shouldExit {
 		return errors.New("kitex cmd tool dependency compatibility check failed")

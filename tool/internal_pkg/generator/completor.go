@@ -83,7 +83,7 @@ func (c *completer) compare(pkg *ast.Package) []*MethodInfo {
 			}
 		}
 		if !have {
-			log.Infof("[complete handler] add '%s' to handler.go\n", m.Name)
+			log.Debugf("[complete handler] add '%s' to handler.go\n", m.Name)
 			newMethods = append(newMethods, m)
 		}
 	}
@@ -159,8 +159,10 @@ func (c *completer) process(w io.Writer) error {
 	fset := token.NewFileSet()
 	pkgs, err := parser.ParseDir(fset, filepath.Dir(c.handlerPath), nil, parser.ParseComments)
 	if err != nil {
-		err = fmt.Errorf("go/parser failed to parse the main package: %w", err)
-		log.Warn("NOTICE: This is not a bug. We cannot add new methods to handler.go because your codes failed to compile. Fix the compile errors and try again.\n%s", err.Error())
+		log.Warnf("This is not a bug. \n"+
+			"We cannot add new methods to handler.go because your codes failed to compile. \n"+
+			"Fix the compile errors and try again.\n"+
+			"go/parser err: %s", err)
 		return err
 	}
 	main, ok := pkgs["main"]
