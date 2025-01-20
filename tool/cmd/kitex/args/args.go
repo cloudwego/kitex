@@ -212,9 +212,9 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 		return err
 	}
 	// todo finish protobuf
-	if a.IDLType != "thrift" {
-		a.GenPath = generator.KitexGenPath
-	}
+	//if a.IDLType != "thrift" {
+	//	a.GenPath = generator.KitexGenPath
+	//}
 	return a.checkPath(curpath)
 }
 
@@ -399,12 +399,8 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 		for _, inc := range a.Includes {
 			cmd.Args = append(cmd.Args, "-I", inc)
 		}
-		outPath := util.JoinPath(".", a.GenPath)
-		if a.Use == "" {
-			os.MkdirAll(outPath, 0o755)
-		} else {
-			outPath = "."
-		}
+		// using current path as the output path
+		outPath := "."
 		cmd.Args = append(cmd.Args,
 			"--plugin=protoc-gen-kitex="+exe,
 			"--kitex_out="+outPath,

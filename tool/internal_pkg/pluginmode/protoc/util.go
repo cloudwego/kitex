@@ -43,20 +43,34 @@ type pathElements struct {
 	prefix string // prefix of import path for generated codes
 }
 
-func (p *pathElements) getImportPath(pkg string) (path string, ok bool) {
-	parts := strings.Split(pkg, "/")
+// getImportPath returns the complete import path for the given go_package defined in pb idl
+func (p *pathElements) getImportPath(goPackage string) (path string, ok bool) {
+	parts := strings.Split(goPackage, "/")
 	if len(parts) == 0 {
 		// malformed import path
 		return "", false
 	}
 
-	if strings.HasPrefix(pkg, p.prefix) {
-		return pkg, true
+	if strings.HasPrefix(goPackage, p.prefix) {
+		return goPackage, true
 	}
-	if strings.Contains(parts[0], ".") || (p.module != "" && strings.HasPrefix(pkg, p.module)) {
+	if strings.Contains(parts[0], ".") || (p.module != "" && strings.HasPrefix(goPackage, p.module)) {
 		// already a complete import path, but outside the target path
 		return "", false
 	}
 	// incomplete import path
-	return util.JoinPath(p.prefix, pkg), true
+
+	return util.JoinPath(p.prefix, goPackage), true
+}
+
+func (p *pathElements) getImportPathAndNamespace(goPackage string) (path string, ns string, ok bool) {
+	parts := strings.Split(goPackage, "/")
+	if len(parts) == 0 {
+		return "", "", false
+	}
+	// todo: consider complete path
+	if strings.HasPrefix(goPackage, p.prefix) {
+		return goPackage, strings.TrimPrefix(goPackage, p.prefix), true
+	}
+	return util.CombineOutputPath(p.prefix, goPackage), goPackage, true
 }

@@ -100,9 +100,10 @@ func GenKitex(req *pluginpb.CodeGeneratorRequest, opts protogen.Options) (*plugi
 			}
 			gopkg = f.GetOptions().GetGoPackage()
 		}
-		if path, ok := pe.getImportPath(gopkg); ok {
-			f.Options.GoPackage = &path
-			log.Infof("[INFO] update import path for %q: %q -> %q\n", f.GetName(), gopkg, path)
+		if dirPath, ns, ok := pe.getImportPathAndNamespace(gopkg); ok {
+			f.Options.GoPackage = &dirPath
+			pp.namespaces[f.GetName()] = ns
+			log.Infof("[INFO] update import path for %q: %q -> %q\n", f.GetName(), gopkg, dirPath)
 		}
 	}
 

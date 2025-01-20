@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -40,6 +41,7 @@ type protocPlugin struct {
 	kg          generator.Generator
 	err         error
 	importPaths map[string]string // file -> import path
+	namespaces  map[string]string // file name -> go_package in idl
 }
 
 // Name implements the protobuf_generator.Plugin interface.
@@ -52,6 +54,7 @@ func (pp *protocPlugin) init() {
 	pp.Dependencies = map[string]string{
 		"proto": "google.golang.org/protobuf/proto",
 	}
+	pp.namespaces = make(map[string]string)
 }
 
 // parse the 'M*' option
@@ -121,17 +124,13 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 		return
 	}
 	gopkg := file.Proto.GetOptions().GetGoPackage()
-	if !strings.HasPrefix(gopkg, pp.PackagePrefix) {
-		log.Warnf("[WARN] %q is skipped because its import path %q is not located in ./kitex_gen. Change the go_package option or use '--protobuf M%s=A-Import-Path-In-kitex_gen' to override it if you want this file to be generated under kitex_gen.\n",
-			file.Proto.GetName(), gopkg, file.Proto.GetName())
-		return
-	}
 	log.Infof("[INFO] Generate %q at %q\n", file.Proto.GetName(), gopkg)
 
 	if parts := strings.Split(gopkg, ";"); len(parts) > 1 {
 		gopkg = parts[0] // remove package alias from file path
 	}
-	pp.Namespace = strings.TrimPrefix(gopkg, pp.PackagePrefix)
+	// extract original go_package from idl
+	pp.Namespace = pp.namespaces[file.Proto.GetName()]
 	pp.IDLName = util.IDLName(pp.Config.IDL)
 
 	ss := pp.convertTypes(file)
@@ -160,7 +159,7 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 	// generate service interface
 	if pp.err == nil {
 		fixed := *file
-		fixed.GeneratedFilenamePrefix = strings.TrimPrefix(fixed.GeneratedFilenamePrefix, pp.PackagePrefix)
+		fixed.GeneratedFilenamePrefix = strings.TrimPrefix(fixed.GeneratedFilenamePrefix, pp.ModuleName)
 		f := gengo.GenerateFile(gen, &fixed)
 		f.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "context"})
 		if hasStreaming {
@@ -183,7 +182,7 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 	// generate fast api
 	if !pp.Config.NoFastAPI && pp.err == nil {
 		fixed := *file
-		fixed.GeneratedFilenamePrefix = strings.TrimPrefix(fixed.GeneratedFilenamePrefix, pp.PackagePrefix)
+		fixed.GeneratedFilenamePrefix = strings.TrimPrefix(fixed.GeneratedFilenamePrefix, pp.ModuleName)
 		genfastpb.GenerateFile(gen, &fixed)
 	}
 }
@@ -270,6 +269,7 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 		PkgRefName: goSanitized(path.Base(pth)),
 		ImportPath: pth,
 	}
+	refPkgMap := make(map[string]map[string]int)
 	for _, service := range file.Services {
 		si := &generator.ServiceInfo{
 			PkgInfo:        pi,
@@ -278,8 +278,8 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 		}
 		si.ServiceTypeName = func() string { return si.PkgRefName + "." + si.ServiceName }
 		for _, m := range service.Methods {
-			req := pp.convertParameter(m.Input, "Req")
-			res := pp.convertParameter(m.Output, "Resp")
+			req := pp.convertParameter(m.Input, "Req", refPkgMap)
+			res := pp.convertParameter(m.Output, "Resp", refPkgMap)
 
 			methodName := m.GoName
 			mi := &generator.MethodInfo{
@@ -379,9 +379,25 @@ func (pp *protocPlugin) getCombineServiceName(name string, svcs []*generator.Ser
 	return name
 }
 
-func (pp *protocPlugin) convertParameter(msg *protogen.Message, paramName string) *generator.Parameter {
+func (pp *protocPlugin) convertParameter(msg *protogen.Message, paramName string, refPkgMap map[string]map[string]int) *generator.Parameter {
 	importPath := pp.fixImport(msg.GoIdent.GoImportPath.String())
 	pkgRefName := goSanitized(path.Base(importPath))
+	importPkg, ok := refPkgMap[pkgRefName]
+	if !ok {
+		refPkgMap[pkgRefName] = map[string]int{
+			importPath: 0,
+		}
+	} else {
+		if idx, ok := importPkg[importPath]; ok {
+			if idx != 0 {
+				pkgRefName = pkgRefName + strconv.Itoa(idx)
+			}
+		} else {
+			newIdx := len(importPkg)
+			pkgRefName = pkgRefName + strconv.Itoa(newIdx)
+			importPkg[importPath] = newIdx
+		}
+	}
 	res := &generator.Parameter{
 		Deps: []generator.PkgInfo{
 			{
@@ -430,8 +446,12 @@ func (pp *protocPlugin) makeInterfaces(gf *protogen.GeneratedFile, file *protoge
 
 func (pp *protocPlugin) adjustPath(path string) (ret string) {
 	cur, _ := filepath.Abs(".")
+	fileRelPath, _ := filepath.Rel(cur, path)
+	return fileRelPath
 	if pp.Config.Use == "" {
-		cur = util.JoinPath(cur, generator.KitexGenPath)
+		// change kitex_gen to custom path
+		genPath := util.CombineOutputPath(pp.GenPath, generator.KitexGenPath)
+		cur = util.JoinPath(cur, genPath)
 	}
 	if filepath.IsAbs(path) {
 		path, _ = filepath.Rel(cur, path)
