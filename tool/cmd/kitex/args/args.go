@@ -29,7 +29,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
@@ -306,7 +305,7 @@ func (a *Arguments) checkPath(curpath string) error {
 
 	goMod, goModPath, hasGoMod := util.SearchGoMod(curpath)
 	if usingGOPATH && a.ModuleName == "" && !hasGoMod {
-		log.Warn("[Warn] You're relying on $GOPATH for generating code.\n" +
+		log.Warn("You're relying on $GOPATH for generating code.\n" +
 			"Please add go.mod or specify -module for module path.\n" +
 			"We will deprecate $GOPATH support in the near future!")
 	}
@@ -370,7 +369,8 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 		}
 	}
 
-	kas := strings.Join(a.Config.Pack(), ",")
+	configkv := a.Config.Pack()
+	kas := strings.Join(configkv, ",")
 	cmd := &exec.Cmd{
 		Path:   LookupTool(a.IDLType, a.CompilerPath),
 		Stdin:  os.Stdin,
@@ -453,7 +453,8 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 
 		cmd.Args = append(cmd.Args, a.IDL)
 	}
-	log.Info(strings.ReplaceAll(strings.Join(cmd.Args, " "), kas, fmt.Sprintf("%q", kas)))
+	log.Debugf("cmd.Args %v", cmd.Args)
+	log.Debugf("config pairs %v", configkv)
 	return cmd, nil
 }
 
@@ -525,11 +526,11 @@ func versionSatisfied(current, required string) bool {
 		var currentSeg, minimalSeg int
 		var err error
 		if currentSeg, err = strconv.Atoi(currentSegments[i]); err != nil {
-			klog.Warnf("invalid current version: %s, seg=%v, err=%v", current, currentSegments[i], err)
+			log.Warnf("invalid current version: %s, seg=%v, err=%v", current, currentSegments[i], err)
 			return false
 		}
 		if minimalSeg, err = strconv.Atoi(requiredSegments[i]); err != nil {
-			klog.Warnf("invalid required version: %s, seg=%v, err=%v", required, requiredSegments[i], err)
+			log.Warnf("invalid required version: %s, seg=%v, err=%v", required, requiredSegments[i], err)
 			return false
 		}
 		if currentSeg > minimalSeg {
@@ -551,7 +552,7 @@ func LookupTool(idlType, compilerPath string) string {
 		tool = "protoc"
 	}
 	if compilerPath != "" {
-		log.Infof("Will use the specified %s: %s\n", tool, compilerPath)
+		log.Debugf("Will use the specified %s: %s\n", tool, compilerPath)
 		return compilerPath
 	}
 

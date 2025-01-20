@@ -24,7 +24,7 @@ import (
 )
 
 func OnKitexToolNormalExit(args kargs.Arguments) {
-	log.Warn("Code Generation is Done!")
+	log.Info("Code Generation is Done!")
 
 	if args.IDLType == "thrift" {
 		cmd := "go mod edit -replace github.com/apache/thrift=github.com/apache/thrift@v0.13.0"
