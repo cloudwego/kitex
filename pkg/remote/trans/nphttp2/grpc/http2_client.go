@@ -664,7 +664,7 @@ func (t *http2Client) GracefulClose() {
 	active := len(t.activeStreams)
 	t.mu.Unlock()
 	if active == 0 {
-		t.Close(connectionErrorf(true, nil, "no active streams left to process while draining"))
+		t.Close(connectionErrorfWithIgnorable(true, nil, "no active streams left to process while draining"))
 		return
 	}
 	t.controlBuf.put(&incomingGoAway{})
@@ -961,7 +961,7 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 	active := len(t.activeStreams)
 	if active <= 0 {
 		t.mu.Unlock()
-		t.Close(connectionErrorf(true, nil, "received goaway and there are no active streams"))
+		t.Close(connectionErrorfWithIgnorable(true, nil, "received goaway and there are no active streams"))
 		return
 	}
 
