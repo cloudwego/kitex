@@ -26,8 +26,7 @@ func StreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
 }
 
 func newClientStreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
-	readerWriter := g.MessageReaderWriter()
-	if readerWriter == nil {
+	if g.MessageReaderWriter() == nil {
 		// TODO: support grpc binary generic
 		panic("binary generic streaming is not supported")
 	}
@@ -37,12 +36,12 @@ func newClientStreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
 			nil,
 			func() interface{} {
 				args := &generic.Args{}
-				args.SetCodec(readerWriter)
+				args.SetCodec(g.MessageReaderWriter())
 				return args
 			},
 			func() interface{} {
 				result := &generic.Result{}
-				result.SetCodec(readerWriter)
+				result.SetCodec(g.MessageReaderWriter())
 				return result
 			},
 			false,
@@ -52,12 +51,12 @@ func newClientStreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
 			nil,
 			func() interface{} {
 				args := &generic.Args{}
-				args.SetCodec(readerWriter)
+				args.SetCodec(g.MessageReaderWriter())
 				return args
 			},
 			func() interface{} {
 				result := &generic.Result{}
-				result.SetCodec(readerWriter)
+				result.SetCodec(g.MessageReaderWriter())
 				return result
 			},
 			false,
@@ -67,12 +66,12 @@ func newClientStreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
 			nil,
 			func() interface{} {
 				args := &generic.Args{}
-				args.SetCodec(readerWriter)
+				args.SetCodec(g.MessageReaderWriter())
 				return args
 			},
 			func() interface{} {
 				result := &generic.Result{}
-				result.SetCodec(readerWriter)
+				result.SetCodec(g.MessageReaderWriter())
 				return result
 			},
 			false,
@@ -82,12 +81,12 @@ func newClientStreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
 			nil,
 			func() interface{} {
 				args := &generic.Args{}
-				args.SetCodec(readerWriter)
+				args.SetCodec(g.MessageReaderWriter())
 				return args
 			},
 			func() interface{} {
 				result := &generic.Result{}
-				result.SetCodec(readerWriter)
+				result.SetCodec(g.MessageReaderWriter())
 				return result
 			},
 			false,

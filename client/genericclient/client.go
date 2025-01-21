@@ -96,8 +96,6 @@ func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, 
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	mtInfo := gc.svcInfo.MethodInfo(method)
 	_args := mtInfo.NewArgs().(*generic.Args)
-	codec := gc.g.MessageReaderWriter()
-	_args.SetCodec(codec)
 	_args.Method = method
 	_args.Request = request
 
@@ -110,7 +108,6 @@ func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, 
 	}
 
 	_result := mtInfo.NewResult().(*generic.Result)
-	_result.SetCodec(codec)
 	if err = gc.kClient.Call(ctx, mt.Name, _args, _result); err != nil {
 		return
 	}
