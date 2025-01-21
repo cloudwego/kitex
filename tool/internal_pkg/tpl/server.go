@@ -35,10 +35,10 @@ import (
 {{- $serverInterfaceName = .ServiceName }}
 type {{.ServiceName}} interface {
 {{- range .AllMethods}}
-{{- $streamingUnary := (eq .Streaming.Mode "unary")}}
-{{- $clientSide := (eq .Streaming.Mode "client")}}
-{{- $serverSide := (eq .Streaming.Mode "server")}}
-{{- $bidiSide := (eq .Streaming.Mode "bidirectional")}}
+{{- $streamingUnary := (eq .StreamingMode "unary")}}
+{{- $clientSide := (eq .StreamingMode "client")}}
+{{- $serverSide := (eq .StreamingMode "server")}}
+{{- $bidiSide := (eq .StreamingMode "bidirectional")}}
 {{- $arg := index .Args 0}}
     {{.Name}}{{- if $streamingUnary}}(ctx context.Context, req {{$arg.Type}}) ({{.Resp.Type}}, error)
              {{- else if $clientSide}}(ctx context.Context, stream streamx.ClientStreamingServer[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}]) ({{.Resp.Type}}, error)
