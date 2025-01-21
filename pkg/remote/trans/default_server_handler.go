@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"runtime/debug"
+	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -49,13 +50,14 @@ func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.
 }
 
 type svrTransHandler struct {
-	opt           *remote.ServerOption
-	svcSearcher   remote.ServiceSearcher
-	targetSvcInfo *serviceinfo.ServiceInfo
-	inkHdlFunc    endpoint.Endpoint
-	codec         remote.Codec
-	transPipe     *remote.TransPipeline
-	ext           Extension
+	opt                *remote.ServerOption
+	svcSearcher        remote.ServiceSearcher
+	targetSvcInfo      *serviceinfo.ServiceInfo
+	inkHdlFunc         endpoint.Endpoint
+	codec              remote.Codec
+	transPipe          *remote.TransPipeline
+	ext                Extension
+	inGracefulShutdown uint32
 }
 
 // Write implements the remote.ServerTransHandler interface.
@@ -115,13 +117,22 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 }
 
 func (t *svrTransHandler) newCtxWithRPCInfo(ctx context.Context, conn net.Conn) (context.Context, rpcinfo.RPCInfo) {
+	var ri rpcinfo.RPCInfo
 	if rpcinfo.PoolEnabled() { // reuse per-connection rpcinfo
-		return ctx, rpcinfo.GetRPCInfo(ctx)
+		ri = rpcinfo.GetRPCInfo(ctx)
 		// delayed reinitialize for faster response
+	} else {
+		// new rpcinfo if reuse is disabled
+		ri = t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
+		ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	}
-	// new rpcinfo if reuse is disabled
-	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
-	return rpcinfo.NewCtxWithRPCInfo(ctx, ri), ri
+	if atomic.LoadUint32(&t.inGracefulShutdown) == 1 {
+		// If server is in graceful shutdown status, mark connection reset flag to all responses to let client close the connections.
+		if ei := rpcinfo.AsTaggable(ri.To()); ei != nil {
+			ei.SetTag(rpcinfo.ConnResetTag, "1")
+		}
+	}
+	return ctx, ri
 }
 
 // OnRead implements the remote.ServerTransHandler interface.
@@ -341,6 +352,11 @@ func (t *svrTransHandler) finishProfiler(ctx context.Context) {
 		return
 	}
 	t.opt.Profiler.Untag(ctx)
+}
+
+func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
+	atomic.StoreUint32(&t.inGracefulShutdown, 1)
+	return nil
 }
 
 func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
