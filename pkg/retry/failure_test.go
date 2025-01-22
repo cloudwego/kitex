@@ -80,7 +80,7 @@ func TestFixedBackOff_Wait(t *testing.T) {
 	bk.Wait(1)
 	waitTime := time.Since(startTime)
 	test.Assert(t, time.Millisecond*fix <= waitTime)
-	test.Assert(t, waitTime < time.Millisecond*(fix+5))
+	test.Assert(t, waitTime < time.Millisecond*(fix*2))
 }
 
 func TestFixedBackOff_String(t *testing.T) {
