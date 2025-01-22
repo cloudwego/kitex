@@ -126,6 +126,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Specify a protocol for codec")
 	f.BoolVar(&a.NoDependencyCheck, "no-dependency-check", false,
 		"Skip dependency checking.")
+	f.BoolVar(&a.NoRecurse, "no-recurse", false, `Don't generate thrift files recursively, just generate the given file.'`)
 	a.RecordCmd = os.Args
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
@@ -329,7 +330,7 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 		if a.Verbose {
 			cmd.Args = append(cmd.Args, "-v")
 		}
-		if a.Use == "" {
+		if a.Use == "" && !a.NoRecurse {
 			cmd.Args = append(cmd.Args, "-r")
 		}
 		cmd.Args = append(cmd.Args,

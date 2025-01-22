@@ -13,7 +13,7 @@ require (
 	github.com/cloudwego/localsession v0.0.2
 	github.com/cloudwego/netpoll v0.6.3
 	github.com/cloudwego/runtimex v0.1.0
-	github.com/cloudwego/thriftgo v0.3.15
+	github.com/cloudwego/thriftgo v0.3.19-0.20250116111101-c09887b1861d
 	github.com/golang/mock v1.6.0
 	github.com/google/pprof v0.0.0-20220608213341-c488b8fa1db3
 	github.com/jhump/protoreflect v1.8.2

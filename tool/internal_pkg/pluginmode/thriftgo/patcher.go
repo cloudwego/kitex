@@ -234,7 +234,15 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 
 	protection := make(map[string]*plugin.Generated)
 
-	for ast := range req.AST.DepthFirstSearch() {
+	var trees chan *parser.Thrift
+	if req.Recursive {
+		trees = req.AST.DepthFirstSearch()
+	} else {
+		trees = make(chan *parser.Thrift, 1)
+		trees <- req.AST
+		close(trees)
+	}
+	for ast := range trees {
 		// fd.WriteString(p.utils.GetFilename(ast) + "\n")
 		// scope, err := golang.BuildScope(p.utils, ast)
 		scope, _, err := golang.BuildRefScope(p.utils, ast)

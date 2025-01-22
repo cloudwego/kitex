@@ -393,7 +393,9 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 			c.svc2ast[si] = ast
 		}
 
-		c.Services = append(c.Services, all[ast.Filename]...)
+		if req.Recursive || ast == req.AST {
+			c.Services = append(c.Services, all[ast.Filename]...)
+		}
 	}
 	return nil
 }
