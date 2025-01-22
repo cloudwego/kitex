@@ -86,7 +86,7 @@ func GetKiteXSDKPlugin(pwd string, rawKiteXArgs []string) (*KiteXSDKPlugin, erro
 		if i == 0 {
 			continue
 		}
-		if arg == "-p" {
+		if arg == "-p" && i+1 < len(cmd.Args) && strings.HasPrefix(cmd.Args[i+1], "kitex") {
 			findKitex = true
 			continue
 		}
