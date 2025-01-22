@@ -455,7 +455,7 @@ func (c *converter) makeMethod(si *generator.ServiceInfo, f *golang.Function) (*
 		Void:               f.Void,
 		ArgStructName:      f.ArgType().GoName().String(),
 		GenArgResultStruct: false,
-		Streaming:          st,
+		IsStreaming:        st.IsStreaming,
 		ClientStreaming:    st.ClientStreaming,
 		ServerStreaming:    st.ServerStreaming,
 		ArgsLength:         len(f.Arguments()),

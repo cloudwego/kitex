@@ -39,23 +39,23 @@ type Client interface {
 {{- if and (eq $.Codec "protobuf") (or .ClientStreaming .ServerStreaming)}}{{/* protobuf: generate streaming calls in Client, to keep compatibility */}}
 	{{.Name}}(ctx context.Context {{if not .ClientStreaming}}{{range .Args}}, {{.RawName}} {{.Type}}{{end}}{{end}}, callOptions ...callopt.Option ) (stream {{.ServiceName}}_{{.RawName}}Client, err error)
 {{- else}}
-	{{- if or (eq $.Codec "protobuf") (eq .Streaming.Mode "")}}
+	{{- if or (eq $.Codec "protobuf") (eq .StreamingMode "")}}
 	{{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{.Type}}{{end}}, callOptions ...callopt.Option ) ({{if not .Void}}r {{.Resp.Type}}, {{end}}err error)
 	{{- end}}
 {{- end}}
 {{- /* Streamx interface for streaming method */}}
-{{- if and .StreamX (eq $.Codec "thrift") .Streaming.IsStreaming}}
-{{- $streamingUnary := (eq .Streaming.Mode "unary")}}
-{{- $clientSide := (eq .Streaming.Mode "client")}}
-{{- $serverSide := (eq .Streaming.Mode "server")}}
-{{- $bidiSide := (eq .Streaming.Mode "bidirectional")}}
+{{- if and .StreamX (eq $.Codec "thrift") .IsStreaming}}
+{{- $streamingUnary := (eq .StreamingMode "unary")}}
+{{- $clientSide := (eq .StreamingMode "client")}}
+{{- $serverSide := (eq .StreamingMode "server")}}
+{{- $bidiSide := (eq .StreamingMode "bidirectional")}}
 {{- $arg := index .Args 0}}
     {{.Name}}{{- if $streamingUnary}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (r {{.Resp.Type}}, err error)
              {{- else if $clientSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error)
              {{- else if $serverSide}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ServerStreamingClient[{{NotPtr .Resp.Type}}], error)
              {{- else if $bidiSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.BidiStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error)
              {{- end}}
-{{- end}}{{- /* if and .StreamX (eq $.Codec "thrift") .Streaming.IsStreaming end */}}
+{{- end}}{{- /* if and .StreamX (eq $.Codec "thrift") .IsStreaming end */}}
 {{- end}}
 }
 
@@ -66,7 +66,7 @@ type StreamClient interface {
 {{- range .AllMethods}}
 {{- if or .ClientStreaming .ServerStreaming}}
 	{{.Name}}(ctx context.Context {{if not .ClientStreaming}}{{range .Args}}, {{.RawName}} {{.Type}}{{end}}{{end}}, callOptions ...streamcall.Option ) (stream {{.ServiceName}}_{{.RawName}}Client, err error)
-{{- else if .Streaming.Unary}}
+{{- else if eq .StreamingMode "unary"}}
 	{{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{.Type}}{{end}}, callOptions ...streamcall.Option ) ({{if not .Void}}r {{.Resp.Type}}, {{end}}err error)
 {{- end}}
 {{- end}}
@@ -139,7 +139,7 @@ func (p *k{{$.ServiceName}}Client) {{.Name}}(ctx context.Context {{if not .Clien
 }
 {{- end}}
 {{- else}}
-{{- if or (eq $.Codec "protobuf") (eq .Streaming.Mode "")}}
+{{- if or (eq $.Codec "protobuf") (eq .StreamingMode "")}}
 func (p *k{{$.ServiceName}}Client) {{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{.Type}}{{end}}, callOptions ...callopt.Option ) ({{if not .Void}}r {{.Resp.Type}}, {{end}}err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.{{.Name}}(ctx{{range .Args}}, {{.RawName}}{{end}})
@@ -147,11 +147,11 @@ func (p *k{{$.ServiceName}}Client) {{.Name}}(ctx context.Context {{range .Args}}
 {{- end}}
 {{- end}}
 {{- /* Streamx interface for streaming method */}}
-{{- if and .StreamX (eq $.Codec "thrift") .Streaming.IsStreaming}}
-{{- $streamingUnary := (eq .Streaming.Mode "unary")}}
-{{- $clientSide := (eq .Streaming.Mode "client")}}
-{{- $serverSide := (eq .Streaming.Mode "server")}}
-{{- $bidiSide := (eq .Streaming.Mode "bidirectional")}}
+{{- if and .StreamX (eq $.Codec "thrift") .IsStreaming}}
+{{- $streamingUnary := (eq .StreamingMode "unary")}}
+{{- $clientSide := (eq .StreamingMode "client")}}
+{{- $serverSide := (eq .StreamingMode "server")}}
+{{- $bidiSide := (eq .StreamingMode "bidirectional")}}
 {{- $arg := index .Args 0}}
 func (p *k{{$.ServiceName}}Client) {{.Name}}{{- if $streamingUnary}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (r {{.Resp.Type}}, err error) {
     return p.kClient.{{.Name}}(ctx, req, callOptions...)
@@ -163,7 +163,7 @@ func (p *k{{$.ServiceName}}Client) {{.Name}}{{- if $streamingUnary}}(ctx context
 	return p.kClient.{{.Name}}(ctx, callOptions...)
              {{- end}}
 }
-{{- end}}{{- /* if and .StreamX (eq $.Codec "thrift") .Streaming.IsStreaming end */}}
+{{- end}}{{- /* if and .StreamX (eq $.Codec "thrift") .IsStreaming end */}}
 {{end}}
 
 {{- if not .StreamX}}
@@ -207,7 +207,7 @@ func (p *k{{$.ServiceName}}StreamClient) {{.Name}}(ctx context.Context {{if not 
 	ctx = client.NewCtxWithCallOptions(ctx, streamcall.GetCallOptions(callOptions))
 	return p.kClient.{{.Name}}(ctx{{if not .ClientStreaming}}{{range .Args}}, {{.RawName}}{{end}}{{end}})
 }
-{{else if .Streaming.Unary}}
+{{else if eq .StreamingMode "unary"}}
 func (p *k{{$.ServiceName}}StreamClient) {{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{.Type}}{{end}}, callOptions ...streamcall.Option ) ({{if not .Void}}r {{.Resp.Type}}, {{end}}err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, streamcall.GetCallOptions(callOptions))
 	return p.kClient.{{.Name}}(ctx{{range .Args}}, {{.RawName}}{{end}})

@@ -19,8 +19,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudwego/thriftgo/generator/golang/streaming"
-
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
@@ -202,9 +200,8 @@ func Test_needCallOpt(t *testing.T) {
 			Codec: "thrift",
 			ServiceInfo: &ServiceInfo{
 				Methods: []*MethodInfo{{
-					Streaming: &streaming.Streaming{
-						IsStreaming: true,
-					},
+					IsStreaming:     true,
+					ServerStreaming: true,
 				}},
 			},
 		}
@@ -215,16 +212,8 @@ func Test_needCallOpt(t *testing.T) {
 			Codec: "thrift",
 			ServiceInfo: &ServiceInfo{
 				Methods: []*MethodInfo{
-					{
-						Streaming: &streaming.Streaming{
-							IsStreaming: true,
-						},
-					},
-					{
-						Streaming: &streaming.Streaming{
-							IsStreaming: false,
-						},
-					},
+					{IsStreaming: true, ServerStreaming: true},
+					{},
 				},
 			},
 		}
