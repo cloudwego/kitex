@@ -4,7 +4,7 @@ on: [ push, pull_request ]
 
 jobs:
   unit-scenario-test:
-    runs-on: [ self-hosted, X64 ]
+    runs-on: [ Linux, X64 ]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
@@ -34,12 +34,26 @@ jobs:
         # setting benchtime=100ms is saving our time...
         run: go test -bench=. -benchmem -run=none ./... -benchtime=100ms
 
-  compatibility-test:
+  compatibility-test-x64:
     strategy:
       matrix:
         go: [ "1.18", "1.19", "1.20", "1.21", "1.22", "1.23" ]
-        os: [ X64, ARM64 ]
-    runs-on: ${{ matrix.os }}
+    runs-on: [ Linux, X64 ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: false # don't use cache for self-hosted runners
+      - name: Unit Test
+        run: go test -race ./...
+
+  compatibility-test-arm:
+    strategy:
+      matrix:
+        go: [ "1.18", "1.19", "1.20", "1.21", "1.22", "1.23" ]
+    runs-on: [ ARM64 ] # It's OK under Linux or macOS
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
@@ -80,15 +94,13 @@ jobs:
           bash ./codegen_run.sh        
 
   windows-test:
-    runs-on: windows-latest
-    env: # Fixes https://github.com/actions/setup-go/issues/240
-      GOMODCACHE: 'D:\go\pkg\mod'
-      GOCACHE: 'D:\go\go-build'
+    runs-on: [ Windows ]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: stable
+          cache: false # don't use cache for self-hosted runners
       - name: Windows compatibility test
         run: go test -run=^$ ./...

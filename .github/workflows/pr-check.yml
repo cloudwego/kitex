@@ -17,7 +17,7 @@ jobs:
         uses: crate-ci/typos@v1.13.14
 
   golangci-lint:
-    runs-on: [ self-hosted, X64 ]
+    runs-on: [ Linux, X64 ]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
