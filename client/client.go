@@ -25,6 +25,8 @@ import (
 	"strconv"
 	"sync/atomic"
 
+	"github.com/cloudwego/kitex/pkg/streamx"
+
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession/backup"
 
@@ -70,8 +72,14 @@ type kClient struct {
 	mws     []endpoint.Middleware
 	eps     endpoint.Endpoint
 	sEps    endpoint.Endpoint
-	opt     *client.Options
-	lbf     *lbcache.BalancerFactory
+
+	// streamx
+	sxStreamMW     streamx.StreamMiddleware
+	sxStreamRecvMW streamx.StreamRecvMiddleware
+	sxStreamSendMW streamx.StreamSendMiddleware
+
+	opt *client.Options
+	lbf *lbcache.BalancerFactory
 
 	inited bool
 	closed bool
@@ -302,7 +310,9 @@ func (kc *kClient) initStreamMiddlewares(ctx context.Context) {
 
 func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) (mws []endpoint.Middleware) {
 	for i := range mwBs {
-		mws = append(mws, mwBs[i](ctx))
+		if mw := mwBs[i](ctx); mw != nil {
+			mws = append(mws, mw)
+		}
 	}
 	return
 }
@@ -424,21 +434,30 @@ func (kc *kClient) richRemoteOption() {
 		// (newClientStreamer: call WriteMeta before remotecli.NewClient)
 		transInfoHdlr := bound.NewTransMetaHandler(kc.opt.MetaHandlers)
 		kc.opt.RemoteOpt.PrependBoundHandler(transInfoHdlr)
+
+		// add meta handlers into streaming meta handlers
+		for _, h := range kc.opt.MetaHandlers {
+			if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
+				kc.opt.RemoteOpt.StreamingMetaHandlers = append(kc.opt.RemoteOpt.StreamingMetaHandlers, shdlr)
+			}
+		}
 	}
 }
 
 func (kc *kClient) buildInvokeChain() error {
+	mwchain := endpoint.Chain(kc.mws...)
+
 	innerHandlerEp, err := kc.invokeHandleEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.eps = endpoint.Chain(kc.mws...)(innerHandlerEp)
+	kc.eps = mwchain(innerHandlerEp)
 
 	innerStreamingEp, err := kc.invokeStreamingEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.sEps = endpoint.Chain(kc.mws...)(innerStreamingEp)
+	kc.sEps = mwchain(innerStreamingEp)
 	return nil
 }
 
@@ -720,6 +739,9 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 		rpcStats.ImmutableView(),
 	)
 
+	if mi != nil {
+		ri.Invocation().(rpcinfo.InvocationSetter).SetStreamingMode(mi.StreamingMode())
+	}
 	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
 		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))
 	}
@@ -730,6 +752,12 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 			_ = cfg.SetConnectTimeout(c.ConnectTimeout())
 			_ = cfg.SetReadWriteTimeout(c.ReadWriteTimeout())
 		}
+	}
+
+	// streamx config
+	sopt := opt.StreamX
+	if sopt.RecvTimeout > 0 {
+		cfg.SetStreamRecvTimeout(sopt.RecvTimeout)
 	}
 
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)

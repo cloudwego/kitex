@@ -16,6 +16,7 @@ package sdk
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"os/exec"
@@ -33,7 +34,7 @@ import (
 
 var args kargs.Arguments
 
-var errExitZero = fmt.Errorf("os.Exit(0)")
+var errExitZero = errors.New("os.Exit(0)")
 
 func init() {
 	var queryVersion bool
@@ -55,7 +56,7 @@ func init() {
 func RunKitexTool(wd string, plugins []plugin.SDKPlugin, kitexArgs ...string) error {
 	kitexPlugin, err := GetKiteXSDKPlugin(wd, kitexArgs)
 	if err != nil {
-		if err.Error() == "flag: help requested" || err == errExitZero {
+		if errors.Is(err, flag.ErrHelp) || errors.Is(err, errExitZero) {
 			return nil
 		}
 		return err
@@ -101,16 +102,11 @@ func InvokeThriftgoBySDK(pwd string, cmd *exec.Cmd) (err error) {
 
 	kitexPlugin.Pwd = pwd
 
-	s := []plugin.SDKPlugin{kitexPlugin}
-
-	err = sdk.RunThriftgoAsSDK(pwd, s, kitexPlugin.GetThriftgoParameters()...)
-	// when execute thriftgo as function, log will be unexpectedly replaced (for old code by design), so we have to change it back.
-	log.SetDefaultLogger(log.Logger{
-		Println: fmt.Fprintln,
-		Printf:  fmt.Fprintf,
-	})
-
-	return err
+	l := log.DefaultLogger()      // pluginmode/thriftgo/convertor.go will change the logger
+	defer log.SetDefaultLogger(l) // revert it back
+	return sdk.RunThriftgoAsSDK(pwd,
+		[]plugin.SDKPlugin{kitexPlugin},
+		kitexPlugin.GetThriftgoParameters()...)
 }
 
 type KiteXSDKPlugin struct {

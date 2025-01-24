@@ -19,8 +19,9 @@ package generic
 import "github.com/cloudwego/kitex/pkg/generic/thrift"
 
 type thriftIDLProviderOptions struct {
-	parseMode *thrift.ParseMode
-	goTag     *goTagOption
+	parseMode   *thrift.ParseMode
+	goTag       *goTagOption
+	serviceName string
 }
 
 type goTagOption struct {
@@ -37,6 +38,8 @@ func (o *thriftIDLProviderOptions) apply(opts []ThriftIDLProviderOption) {
 	}
 }
 
+// WithParseMode sets the parse mode.
+// NOTE: when using WithIDLServiceName at the same time, parse mode will be ignored.
 func WithParseMode(parseMode thrift.ParseMode) ThriftIDLProviderOption {
 	return ThriftIDLProviderOption{F: func(opt *thriftIDLProviderOptions) {
 		opt.parseMode = &parseMode
@@ -48,5 +51,13 @@ func WithGoTagDisabled(disable bool) ThriftIDLProviderOption {
 		opt.goTag = &goTagOption{
 			isGoTagAliasDisabled: disable,
 		}
+	}}
+}
+
+// WithIDLServiceName specifies the target IDL service to be parsed.
+// NOTE: when using this option, the specified service is prioritized, and parse mode will be ignored.
+func WithIDLServiceName(serviceName string) ThriftIDLProviderOption {
+	return ThriftIDLProviderOption{F: func(opt *thriftIDLProviderOptions) {
+		opt.serviceName = serviceName
 	}}
 }

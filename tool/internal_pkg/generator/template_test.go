@@ -23,10 +23,7 @@ import (
 
 func TestNilSafe(t *testing.T) {
 	var q *TemplateExtension
-
-	tempDir := t.TempDir()
-
-	fn := filepath.Join(tempDir, "kitex-template-nil.json")
+	fn := filepath.Join(t.TempDir(), "kitex-template-nil.json")
 
 	err := q.ToJSONFile(fn)
 	test.Assert(t, err == nil, err)
@@ -60,10 +57,7 @@ func TestMarshal(t *testing.T) {
 		},
 	}
 
-	tempDir := t.TempDir()
-
-	fn := filepath.Join(tempDir, "kitex-template.json")
-
+	fn := filepath.Join(t.TempDir(), "kitex-template.json")
 	err := p.ToJSONFile(fn)
 	test.Assert(t, err == nil, err)
 

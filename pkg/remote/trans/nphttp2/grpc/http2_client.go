@@ -22,6 +22,8 @@ package grpc
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -468,9 +470,10 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 		s.id = h.streamID
 		s.fc = &inFlow{limit: uint32(t.initialWindowSize)}
 		t.mu.Lock()
-		if t.activeStreams == nil { // Can be niled from Close().
+		// Don't create a stream if the transport is in a state of graceful shutdown or already closed
+		if t.state == draining || t.activeStreams == nil { // Can be niled from Close().
 			t.mu.Unlock()
-			return false // Don't create a stream if the transport is already closed.
+			return false
 		}
 		t.activeStreams[s.id] = s
 		t.mu.Unlock()
@@ -533,11 +536,18 @@ func (t *http2Client) CloseStream(s *Stream, err error) {
 	)
 	if err != nil {
 		rst = true
-		rstCode = http2.ErrCodeCancel
+		if errors.Is(err, errGracefulShutdown) {
+			rstCode = gracefulShutdownCode
+		} else {
+			rstCode = http2.ErrCodeCancel
+		}
+		klog.CtxInfof(s.ctx, "KITEX: stream closed by ctx canceled, err: %v, rstCode: %d"+sendRSTStreamFrameSuffix, err, rstCode)
 	}
 	t.closeStream(s, err, rst, rstCode, status.Convert(err), nil, false)
 }
 
+// before invoking closeStream, pls do not hold the t.mu
+// because accessing the controlbuf while holding t.mu will cause a deadlock.
 func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.ErrCode, st *status.Status, mdata map[string][]string, eosReceived bool) {
 	// Set stream status to done.
 	if s.swapState(streamDone) == streamDone {
@@ -557,6 +567,16 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 		// This will unblock reads eventually.
 		s.write(recvMsg{err: err})
 	}
+
+	// store closeStreamErr
+	storeErr := err
+	if err == io.EOF || err == nil {
+		storeErr = st.Err()
+	}
+	if storeErr != nil {
+		s.closeStreamErr.Store(storeErr)
+	}
+
 	// If headerChan isn't closed, then close it.
 	if atomic.CompareAndSwapUint32(&s.headerChanClosed, 0, 1) {
 		s.noHeaders = true
@@ -617,7 +637,7 @@ func (t *http2Client) Close(err error) error {
 		t.kpDormancyCond.Signal()
 	}
 	t.mu.Unlock()
-	t.controlBuf.finish()
+	t.controlBuf.finish(err)
 	t.cancel()
 	cErr := t.conn.Close()
 
@@ -644,7 +664,7 @@ func (t *http2Client) GracefulClose() {
 	active := len(t.activeStreams)
 	t.mu.Unlock()
 	if active == 0 {
-		t.Close(connectionErrorf(true, nil, "no active streams left to process while draining"))
+		t.Close(connectionErrorfWithIgnorable(true, nil, "no active streams left to process while draining"))
 		return
 	}
 	t.controlBuf.put(&incomingGoAway{})
@@ -656,10 +676,10 @@ func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
 	if opts.Last {
 		// If it's the last message, update stream state.
 		if !s.compareAndSwapState(streamActive, streamWriteDone) {
-			return errStreamDone
+			return s.getCloseStreamErr()
 		}
 	} else if s.getState() != streamActive {
-		return errStreamDone
+		return s.getCloseStreamErr()
 	}
 	df := newDataFrame()
 	df.streamID = s.id
@@ -670,7 +690,7 @@ func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
 	df.originD = df.d
 	if hdr != nil || data != nil { // If it's not an empty data frame, check quota.
 		if err := s.wq.get(int32(len(hdr) + len(data))); err != nil {
-			return err
+			return s.getCloseStreamErr()
 		}
 	}
 	return t.controlBuf.put(df)
@@ -766,6 +786,7 @@ func (t *http2Client) handleData(f *grpcframe.DataFrame) {
 	}
 	if size > 0 {
 		if err := s.fc.onData(size); err != nil {
+			klog.CtxInfof(s.ctx, "KITEX: http2Client.handleData inflow control err: %v, rstCode: %d"+sendRSTStreamFrameSuffix, err, http2.ErrCodeFlowControl)
 			t.closeStream(s, io.EOF, true, http2.ErrCodeFlowControl, status.New(codes.Internal, err.Error()), nil, false)
 			return
 		}
@@ -812,7 +833,13 @@ func (t *http2Client) handleRSTStream(f *http2.RSTStreamFrame) {
 			statusCode = codes.DeadlineExceeded
 		}
 	}
-	t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.Newf(statusCode, "stream terminated by RST_STREAM with error code: %v", f.ErrCode), nil, false)
+	var msg string
+	if f.ErrCode == gracefulShutdownCode {
+		msg = gracefulShutdownMsg
+	} else {
+		msg = fmt.Sprintf("stream terminated by RST_STREAM with error code: %v", f.ErrCode)
+	}
+	t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.New(statusCode, msg), nil, false)
 }
 
 func (t *http2Client) handleSettings(f *grpcframe.SettingsFrame, isFirst bool) {
@@ -917,10 +944,12 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 		// Notify the clientconn about the GOAWAY before we set the state to
 		// draining, to allow the client to stop attempting to create streams
 		// before disallowing new streams on this connection.
-		if t.onGoAway != nil {
-			t.onGoAway(t.goAwayReason)
+		if t.state != draining {
+			if t.onGoAway != nil {
+				t.onGoAway(t.goAwayReason)
+			}
+			t.state = draining
 		}
-		t.state = draining
 	}
 	// All streams with IDs greater than the GoAwayId
 	// and smaller than the previous GoAway ID should be killed.
@@ -928,18 +957,29 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 	if upperLimit == 0 { // This is the first GoAway Frame.
 		upperLimit = math.MaxUint32 // Kill all streams after the GoAway ID.
 	}
+	t.prevGoAwayID = id
+	active := len(t.activeStreams)
+	if active <= 0 {
+		t.mu.Unlock()
+		t.Close(connectionErrorfWithIgnorable(true, nil, "received goaway and there are no active streams"))
+		return
+	}
+
+	var unprocessedStream []*Stream
 	for streamID, stream := range t.activeStreams {
 		if streamID > id && streamID <= upperLimit {
 			// The stream was unprocessed by the server.
 			atomic.StoreUint32(&stream.unprocessed, 1)
-			t.closeStream(stream, errStreamDrain, false, http2.ErrCodeNo, statusGoAway, nil, false)
+			unprocessedStream = append(unprocessedStream, stream)
 		}
 	}
-	t.prevGoAwayID = id
-	active := len(t.activeStreams)
 	t.mu.Unlock()
-	if active == 0 {
-		t.Close(connectionErrorf(true, nil, "received goaway and there are no active streams"))
+
+	// we should not access controlBuf with t.mu held since it will cause deadlock.
+	// Pls refer to checkForStreamQuota in NewStream, it gets the controlbuf.mu and
+	// wants to get the t.mu.
+	for _, stream := range unprocessedStream {
+		t.closeStream(stream, errStreamDrain, false, http2.ErrCodeNo, statusGoAway, nil, false)
 	}
 }
 
@@ -983,6 +1023,7 @@ func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 	if !initialHeader && !endStream {
 		// As specified by gRPC over HTTP2, a HEADERS frame (and associated CONTINUATION frames) can only appear at the start or end of a stream. Therefore, second HEADERS frame must have EOS bit set.
 		st := status.New(codes.Internal, "a HEADERS frame cannot appear in the middle of a stream")
+		klog.CtxInfof(s.ctx, "KITEX: http2Client.operateHeaders received HEADERS frame in the middle of a stream, rstCode: %d"+sendRSTStreamFrameSuffix, http2.ErrCodeProtocol)
 		t.closeStream(s, st.Err(), true, http2.ErrCodeProtocol, st, nil, false)
 		return
 	}
@@ -991,6 +1032,7 @@ func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 	// Initialize isGRPC value to be !initialHeader, since if a gRPC Response-Headers has already been received, then it means that the peer is speaking gRPC and we are in gRPC mode.
 	state.data.isGRPC = !initialHeader
 	if err := state.decodeHeader(frame); err != nil {
+		klog.CtxInfof(s.ctx, "KITEX: http2Client.operateHeaders decode HEADERS frame failed, err: %v, rstCode: %d"+sendRSTStreamFrameSuffix, err, http2.ErrCodeProtocol)
 		t.closeStream(s, err, true, http2.ErrCodeProtocol, status.Convert(err), nil, endStream)
 		return
 	}
@@ -1034,7 +1076,7 @@ func (t *http2Client) reader() {
 	// Check the validity of server preface.
 	frame, err := t.framer.ReadFrame()
 	if err != nil {
-		err = connectionErrorf(true, err, "error reading from server,  remoteAddress=%s, error=%v", t.conn.RemoteAddr(), err)
+		err = connectionErrorf(true, err, "error reading from server, remoteAddress=%s, error=%v", t.conn.RemoteAddr(), err)
 		t.Close(err) // this kicks off resetTransport, so must be last before return
 		return
 	}
@@ -1073,12 +1115,13 @@ func (t *http2Client) reader() {
 					if err != nil {
 						msg = err.Error()
 					}
+					klog.CtxInfof(s.ctx, "KITEX: http2Client.reader encountered http2.StreamError: %v, rstCode: %d"+sendRSTStreamFrameSuffix, se, http2.ErrCodeProtocol)
 					t.closeStream(s, status.New(code, msg).Err(), true, http2.ErrCodeProtocol, status.New(code, msg), nil, false)
 				}
 				continue
 			} else {
 				// Transport error.
-				err = connectionErrorf(true, err, "error reading from server,  remoteAddress=%s, error=%v", t.conn.RemoteAddr(), err)
+				err = connectionErrorf(true, err, "error reading from server, remoteAddress=%s, error=%v", t.conn.RemoteAddr(), err)
 				t.Close(err)
 				return
 			}

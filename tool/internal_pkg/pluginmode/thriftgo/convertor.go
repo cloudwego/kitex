@@ -17,7 +17,6 @@ package thriftgo
 import (
 	"fmt"
 	"go/format"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -31,7 +30,7 @@ import (
 	"github.com/cloudwego/thriftgo/semantic"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
-	internal_log "github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -80,20 +79,9 @@ func (c *converter) initLogs() backend.LogFunc {
 		lf.Info = lf.Warn
 	}
 
-	internal_log.SetDefaultLogger(internal_log.Logger{
-		Println: func(w io.Writer, a ...interface{}) (n int, err error) {
-			if w != os.Stdout || c.Config.Verbose {
-				c.Warnings = append(c.Warnings, fmt.Sprint(a...))
-			}
-			return 0, nil
-		},
-		Printf: func(w io.Writer, format string, a ...interface{}) (n int, err error) {
-			if w != os.Stdout || c.Config.Verbose {
-				c.Warnings = append(c.Warnings, fmt.Sprintf(format, a...))
-			}
-			return 0, nil
-		},
-	})
+	log.SetDefaultLogger(log.LoggerFunc(func(format string, a ...interface{}) {
+		c.Warnings = append(c.Warnings, fmt.Sprintf(format, a...))
+	}))
 	return lf
 }
 
@@ -294,6 +282,9 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 	var all ast2svc = make(map[string][]*generator.ServiceInfo)
 
 	c.svc2ast = make(map[*generator.ServiceInfo]*parser.Thrift)
+
+	mainAST := req.AST
+
 	for ast := range req.AST.DepthFirstSearch() {
 		ref, pkg, pth := c.Utils.ParseNamespace(ast)
 		// make the current ast as an include to produce correct type references.
@@ -324,7 +315,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				return fmt.Errorf("%s: makeService '%s': %w", ast.Filename, svc.Name, err)
 			}
 			si.ServiceFilePath = ast.Filename
-			if ast == req.AST {
+			if ast == mainAST {
 				si.GenerateHandler = true
 			}
 			all[ast.Filename] = append(all[ast.Filename], si)
@@ -354,7 +345,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 		c.fixStreamingForExtendedServices(ast, all)
 
 		// combine service
-		if ast == req.AST && c.Config.CombineService && len(ast.Services) > 0 {
+		if ast == mainAST && c.Config.CombineService && len(ast.Services) > 0 {
 			var (
 				svcs    []*generator.ServiceInfo
 				methods []*generator.MethodInfo
@@ -383,10 +374,14 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				ServiceFilePath: ast.Filename,
 				HasStreaming:    hasStreaming,
 				GenerateHandler: true,
+				StreamX:         c.Config.StreamX,
 			}
 
 			if c.IsHessian2() {
 				si.Protocol = transport.HESSIAN2.String()
+			}
+			if c.IsTTHeader() {
+				si.Protocol = transport.TTHeader.String()
 			}
 
 			si.HandlerReturnKeepResp = c.Config.HandlerReturnKeepResp
@@ -396,7 +391,9 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 			c.svc2ast[si] = ast
 		}
 
-		c.Services = append(c.Services, all[ast.Filename]...)
+		if req.Recursive || ast == mainAST {
+			c.Services = append(c.Services, all[ast.Filename]...)
+		}
 	}
 	return nil
 }
@@ -418,6 +415,7 @@ func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*ge
 		PkgInfo:        pkg,
 		ServiceName:    svc.GoName().String(),
 		RawServiceName: svc.Name,
+		StreamX:        c.Config.StreamX,
 	}
 	si.ServiceTypeName = func() string { return si.PkgRefName + "." + si.ServiceName }
 
@@ -434,6 +432,9 @@ func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*ge
 
 	if c.IsHessian2() {
 		si.Protocol = transport.HESSIAN2.String()
+	}
+	if c.IsTTHeader() {
+		si.Protocol = transport.TTHeader.String()
 	}
 	si.HandlerReturnKeepResp = c.Config.HandlerReturnKeepResp
 	si.UseThriftReflection = c.Utils.Features().WithReflection
@@ -454,10 +455,11 @@ func (c *converter) makeMethod(si *generator.ServiceInfo, f *golang.Function) (*
 		Void:               f.Void,
 		ArgStructName:      f.ArgType().GoName().String(),
 		GenArgResultStruct: false,
-		Streaming:          st,
+		IsStreaming:        st.IsStreaming,
 		ClientStreaming:    st.ClientStreaming,
 		ServerStreaming:    st.ServerStreaming,
 		ArgsLength:         len(f.Arguments()),
+		StreamX:            si.StreamX,
 	}
 	if st.IsStreaming {
 		si.HasStreaming = true
@@ -502,13 +504,13 @@ func (c *converter) persist(res *plugin.Response) error {
 		content := []byte(c.Content)
 		if filepath.Ext(full) == ".go" {
 			if formatted, err := format.Source([]byte(c.Content)); err != nil {
-				internal_log.Warn(fmt.Sprintf("Failed to format %s: %s", full, err.Error()))
+				log.Warnf("Failed to format %s: %s", full, err)
 			} else {
 				content = formatted
 			}
 		}
 
-		internal_log.Info("Write", full)
+		log.Debug("Write", full)
 		path := filepath.Dir(full)
 		if err := os.MkdirAll(path, 0o755); err != nil && !os.IsExist(err) {
 			return fmt.Errorf("failed to create path '%s': %w", path, err)
@@ -531,6 +533,10 @@ func (c *converter) getCombineServiceName(name string, svcs []*generator.Service
 
 func (c *converter) IsHessian2() bool {
 	return strings.EqualFold(c.Config.Protocol, transport.HESSIAN2.String())
+}
+
+func (c *converter) IsTTHeader() bool {
+	return strings.EqualFold(c.Config.Protocol, transport.TTHeader.String())
 }
 
 func (c *converter) copyAnnotations(annotations parser.Annotations) parser.Annotations {

@@ -27,9 +27,7 @@ import (
 )
 
 func getTestYamlFile(t *testing.T) string {
-	tempDir := t.TempDir()
-
-	return filepath.Join(tempDir, "test.yaml")
+	return filepath.Join(t.TempDir(), "test.yaml")
 }
 
 var cfg *YamlConfig

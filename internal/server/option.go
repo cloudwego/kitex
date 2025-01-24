@@ -96,7 +96,9 @@ type Options struct {
 
 	BackupOpt backup.Options
 
-	Streaming stream.StreamingConfig
+	// Streaming
+	Streaming stream.StreamingConfig // old version streaming API config
+	StreamX   StreamXOptions         // new version streaming API config
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool
@@ -177,9 +179,7 @@ func DefaultSupportedTransportsFunc(option remote.ServerOption) []string {
 	if factory, ok := option.SvrHandlerFactory.(trans.MuxEnabledFlag); ok {
 		if factory.MuxEnabled() {
 			return []string{"ttheader_mux"}
-		} else {
-			return []string{"ttheader", "framed", "ttheader_framed", "grpc"}
 		}
 	}
-	return nil
+	return []string{"ttheader", "framed", "ttheader_framed", "grpc"}
 }

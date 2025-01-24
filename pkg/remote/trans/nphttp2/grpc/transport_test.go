@@ -57,6 +57,10 @@ type server struct {
 	conns      map[ServerTransport]bool
 	h          *testStreamHandler
 	ready      chan struct{}
+	hdlWG      sync.WaitGroup
+	transWG    sync.WaitGroup
+
+	srvReady chan struct{}
 }
 
 var (
@@ -77,6 +81,7 @@ func init() {
 
 type testStreamHandler struct {
 	t           *http2Server
+	srv         *server
 	notify      chan struct{}
 	getNotified chan struct{}
 }
@@ -92,6 +97,8 @@ const (
 	invalidHeaderField
 	delayRead
 	pingpong
+
+	gracefulShutdown
 )
 
 func (h *testStreamHandler) handleStreamAndNotify(s *Stream) {
@@ -292,6 +299,24 @@ func (h *testStreamHandler) handleStreamDelayRead(t *testing.T, s *Stream) {
 	}
 }
 
+func (h *testStreamHandler) gracefulShutdown(t *testing.T, s *Stream) {
+	t.Log("run graceful shutdown")
+	close(h.srv.srvReady)
+	msg := make([]byte, 5)
+	num, err := s.Read(msg)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, num == 5, num)
+	test.Assert(t, string(msg) == "hello", string(msg))
+	err = h.t.Write(s, nil, msg, &Options{})
+	test.Assert(t, err == nil, err)
+	_, err = s.Read(msg)
+	test.Assert(t, err != nil, err)
+	test.Assert(t, strings.Contains(err.Error(), gracefulShutdownMsg), err)
+	st, ok := status.FromError(err)
+	test.Assert(t, ok, err)
+	test.Assert(t, st.Code() == codes.Unavailable, st)
+}
+
 // start starts server. Other goroutines should block on s.readyChan for further operations.
 func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hType) {
 	// 创建 listener
@@ -328,6 +353,7 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 		s.conns[transport] = true
 		h := &testStreamHandler{t: transport.(*http2Server)}
 		s.h = h
+		h.srv = s
 		s.mu.Unlock()
 		switch ht {
 		case notifyCall:
@@ -378,12 +404,26 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 			}, func(ctx context.Context, method string) context.Context {
 				return ctx
 			})
+		case gracefulShutdown:
+			s.transWG.Add(1)
+			go func() {
+				defer s.transWG.Done()
+				transport.HandleStreams(func(stream *Stream) {
+					s.hdlWG.Add(1)
+					go func() {
+						defer s.hdlWG.Done()
+						h.gracefulShutdown(t, stream)
+					}()
+				}, func(ctx context.Context, method string) context.Context { return ctx })
+			}()
 		default:
-			go transport.HandleStreams(func(s *Stream) {
-				go h.handleStream(t, s)
-			}, func(ctx context.Context, method string) context.Context {
-				return ctx
-			})
+			go func() {
+				transport.HandleStreams(func(s *Stream) {
+					go h.handleStream(t, s)
+				}, func(ctx context.Context, method string) context.Context {
+					return ctx
+				})
+			}()
 		}
 		return ctx
 	}
@@ -422,9 +462,6 @@ func (s *server) wait(t *testing.T, timeout time.Duration) {
 func (s *server) stop() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := s.eventLoop.Shutdown(ctx); err != nil {
-		fmt.Printf("netpoll server exit failed, err=%v", err)
-	}
 	s.lis.Close()
 	s.mu.Lock()
 	for c := range s.conns {
@@ -432,6 +469,40 @@ func (s *server) stop() {
 	}
 	s.conns = nil
 	s.mu.Unlock()
+	if err := s.eventLoop.Shutdown(ctx); err != nil {
+		fmt.Printf("netpoll server exit failed, err=%v", err)
+	}
+}
+
+func (s *server) gracefulShutdown(finishCh chan struct{}) {
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	s.lis.Close()
+	s.mu.Lock()
+	for trans := range s.conns {
+		trans.Drain()
+	}
+	s.mu.Unlock()
+	timeout, _ := ctx.Deadline()
+	graceTimer := time.NewTimer(time.Until(timeout))
+	exitCh := make(chan struct{})
+	go func() {
+		select {
+		case <-graceTimer.C:
+			s.mu.Lock()
+			for trans := range s.conns {
+				trans.Close()
+			}
+			s.mu.Unlock()
+			return
+		case <-exitCh:
+			return
+		}
+	}()
+	s.hdlWG.Wait()
+	s.transWG.Wait()
+	close(exitCh)
+	close(finishCh)
 }
 
 func (s *server) addr() string {
@@ -442,7 +513,7 @@ func (s *server) addr() string {
 }
 
 func setUpServerOnly(t *testing.T, port int, serverConfig *ServerConfig, ht hType) *server {
-	server := &server{startedErr: make(chan error, 1), ready: make(chan struct{})}
+	server := &server{startedErr: make(chan error, 1), ready: make(chan struct{}), srvReady: make(chan struct{})}
 	go server.start(t, port, serverConfig, ht)
 	server.wait(t, time.Second)
 	return server
@@ -508,6 +579,19 @@ func setUpWithNoPingServer(t *testing.T, copts ConnectOptions, connCh chan net.C
 		t.Fatalf("Failed to dial: %v", err)
 	}
 	return tr.(*http2Client)
+}
+
+func setUpWithOnGoAway(t *testing.T, port int, serverConfig *ServerConfig, ht hType, copts ConnectOptions, onGoAway func(reason GoAwayReason)) (*server, *http2Client) {
+	server := setUpServerOnly(t, port, serverConfig, ht)
+	conn, err := netpoll.NewDialer().DialTimeout("tcp", "localhost:"+server.port, time.Second)
+	if err != nil {
+		t.Fatalf("failed to dial connection: %v", err)
+	}
+	ct, connErr := NewClientTransport(context.Background(), conn.(netpoll.Connection), copts, "", onGoAway, func() {})
+	if connErr != nil {
+		t.Fatalf("failed to create transport: %v", connErr)
+	}
+	return server, ct.(*http2Client)
 }
 
 // TestInflightStreamClosing ensures that closing in-flight stream
@@ -858,9 +942,7 @@ func TestLargeMessageSuspension(t *testing.T) {
 	msg := make([]byte, initialWindowSize*8)
 	ct.Write(s, nil, msg, &Options{})
 	err = ct.Write(s, nil, msg, &Options{Last: true})
-	if err != errStreamDone {
-		t.Fatalf("write got %v, want io.EOF", err)
-	}
+	test.Assert(t, errors.Is(err, ContextErr(ctx.Err())), err)
 	expectedErr := status.Err(codes.DeadlineExceeded, context.DeadlineExceeded.Error())
 	if _, err := s.Read(make([]byte, 8)); err.Error() != expectedErr.Error() {
 		t.Fatalf("Read got %v of type %T, want %v", err, err, expectedErr)
@@ -2042,4 +2124,16 @@ func TestTlsAppendH2ToALPNProtocols(t *testing.T) {
 	test.Assert(t, appended[0] == alpnProtoStrH2)
 	appended = tlsAppendH2ToALPNProtocols(appended)
 	test.Assert(t, len(appended) == 1)
+}
+
+func Test_isIgnorable(t *testing.T) {
+	test.Assert(t, !isIgnorable(nil))
+
+	err := connectionErrorfWithIgnorable(true, nil, "ignorable")
+	test.Assert(t, isIgnorable(err))
+
+	err = connectionErrorf(true, nil, "not ignorable")
+	test.Assert(t, !isIgnorable(err))
+
+	test.Assert(t, isIgnorable(ErrConnClosing))
 }

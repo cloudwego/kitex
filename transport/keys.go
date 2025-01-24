@@ -29,8 +29,10 @@ const (
 	HTTP
 	GRPC
 	HESSIAN2
+	STREAMING
 
-	TTHeaderFramed = TTHeader | Framed
+	TTHeaderFramed    = TTHeader | Framed
+	TTHeaderStreaming = TTHeader | STREAMING
 )
 
 // Unknown indicates the protocol is unknown.
@@ -53,6 +55,8 @@ func (tp Protocol) String() string {
 		return "GRPC"
 	case HESSIAN2:
 		return "Hessian2"
+	case TTHeaderStreaming:
+		return "TTHeaderStreaming"
 	}
 	return Unknown
 }

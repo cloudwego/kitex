@@ -16,23 +16,25 @@ package args
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
+	"github.com/cloudwego/kitex/transport"
 )
 
 // EnvPluginMode is an environment that kitex uses to distinguish run modes.
@@ -131,11 +133,15 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.BoolVar(&a.LocalThriftgo, "local_thriftgo", false,
 		"Use local thriftgo exec instead of kitex embedded thriftgo.")
 	f.Var(&a.BuiltinTpl, "tpl", "Specify kitex built-in template.")
+	f.BoolVar(&a.StreamX, "streamx", false,
+		"Generate streaming code with streamx interface",
+	)
 
-	f.BoolVar(&a.GenFrugal, "gen_frugal", false, `Gen frugal codec for those structs with (go.codec="frugal")`)
-	f.Var(&a.FrugalStruct, "frugal_struct", "Gen frugal codec for given struct")
+	f.BoolVar(&a.GenFrugal, "gen-frugal", false, `Gen frugal codec for those structs with (go.codec="frugal")`)
+	f.Var(&a.FrugalStruct, "frugal-struct", "Gen frugal codec for given struct")
 
-	a.RecordCmd = os.Args
+	f.BoolVar(&a.NoRecurse, "no-recurse", false, `Don't generate thrift files recursively, just generate the given file.'`)
+
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
 		"naming_style=golint",
@@ -173,6 +179,18 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 		return err
 	}
 
+	if a.Record {
+		a.RecordCmd = os.Args
+	}
+
+	// format -thrift xxx,xxx to -thrift xx -thrift xx
+	thriftOptions := make([]string, len(a.ThriftOptions))
+	for i := range a.ThriftOptions {
+		op := a.ThriftOptions[i]
+		thriftOptions = append(thriftOptions, strings.Split(op, ",")...)
+	}
+	a.ThriftOptions = thriftOptions
+
 	log.Verbose = a.Verbose
 
 	for _, e := range a.extends {
@@ -187,6 +205,10 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 		return err
 	}
 	err = a.checkServiceName()
+	if err != nil {
+		return err
+	}
+	err = a.checkStreamX()
 	if err != nil {
 		return err
 	}
@@ -237,50 +259,86 @@ func (a *Arguments) checkServiceName() error {
 	return nil
 }
 
-func (a *Arguments) checkPath(curpath string) error {
-	pathToGo, err := exec.LookPath("go")
-	if err != nil {
-		return err
+func (a *Arguments) checkStreamX() error {
+	if !a.StreamX {
+		return nil
 	}
+	if a.IDLType == "thrift" {
+		// set TTHeader Streaming by default
+		a.Protocol = transport.TTHeader.String()
+	}
+	// todo(DMwangnima): process pb and gRPC
+	return nil
+}
 
+// refGoSrcPath returns ref path to curpath, base path is $GOPATH/src
+func refGoSrcPath(curpath string) (string, bool) {
 	gopath, err := util.GetGOPATH()
 	if err != nil {
-		return err
+		return "", false
 	}
-	gosrc := util.JoinPath(gopath, "src")
-	gosrc, err = filepath.Abs(gosrc)
+	gosrc, err := filepath.Abs(filepath.Join(gopath, "src"))
 	if err != nil {
-		return fmt.Errorf("get GOPATH/src path failed: %s", err.Error())
+		return "", false
+	}
+	// if curpath is NOT under gosrc
+	if !strings.HasPrefix(curpath, gosrc) {
+		return "", false
+	}
+	ret, err := filepath.Rel(gosrc, curpath)
+	if err != nil {
+		return "", false
+	}
+	return ret, true
+}
+
+func (a *Arguments) checkPath(curpath string) error {
+	genPath := filepath.ToSlash(a.GenPath) // for PackagePrefix
+	usingGOPATH := false
+
+	// Try to get ref path to $GOPARH/src for PackagePrefix
+	// Deprecated: to be removed in the future
+	if ref, ok := refGoSrcPath(curpath); ok {
+		usingGOPATH = true
+		a.PackagePrefix = path.Join(filepath.ToSlash(ref), genPath)
 	}
 
-	if strings.HasPrefix(curpath, gosrc) {
-		if a.PackagePrefix, err = filepath.Rel(gosrc, curpath); err != nil {
-			return fmt.Errorf("get GOPATH/src relpath failed: %s", err.Error())
-		}
-		a.PackagePrefix = util.JoinPath(a.PackagePrefix, a.GenPath)
-	} else {
-		if a.ModuleName == "" {
-			return fmt.Errorf("outside of $GOPATH. Please specify a module name with the '-module' flag")
+	goMod, goModPath, hasGoMod := util.SearchGoMod(curpath)
+	if usingGOPATH && a.ModuleName == "" && !hasGoMod {
+		log.Warn("You're relying on $GOPATH for generating code.\n" +
+			"Please add go.mod or specify -module for module path.\n" +
+			"We will deprecate $GOPATH support in the near future!")
+	}
+
+	if !usingGOPATH && a.ModuleName == "" {
+		// try to update a.ModuleName with module name from go.mod
+		if hasGoMod {
+			a.ModuleName = goMod
+		} else {
+			// case:
+			// * -module not set
+			// * not under $GOPATH/src
+			// * go.mod not found
+			return errors.New("go.mod not found. Please specify a module name with the '-module' flag")
 		}
 	}
 
 	if a.ModuleName != "" {
-		module, path, ok := util.SearchGoMod(curpath)
-		if ok {
-			// go.mod exists
-			if module != a.ModuleName {
+		if hasGoMod {
+			if goMod != a.ModuleName {
 				return fmt.Errorf("the module name given by the '-module' option ('%s') is not consist with the name defined in go.mod ('%s' from %s)",
-					a.ModuleName, module, path)
+					a.ModuleName, goMod, goModPath)
 			}
-			if a.PackagePrefix, err = filepath.Rel(path, curpath); err != nil {
-				return fmt.Errorf("get package prefix failed: %s", err.Error())
+			refPath, err := filepath.Rel(goModPath, curpath)
+			if err != nil {
+				return fmt.Errorf("get package prefix failed: %w", err)
 			}
-			a.PackagePrefix = util.JoinPath(a.ModuleName, a.PackagePrefix, a.GenPath)
+			a.PackagePrefix = path.Join(a.ModuleName, filepath.ToSlash(refPath), genPath)
 		} else {
-			if err = initGoMod(pathToGo, a.ModuleName); err != nil {
-				return fmt.Errorf("init go mod failed: %s", err.Error())
+			if err := initGoMod(a.ModuleName); err != nil {
+				return fmt.Errorf("init go mod failed: %w", err)
 			}
-			a.PackagePrefix = util.JoinPath(a.ModuleName, a.GenPath)
+			a.PackagePrefix = path.Join(a.ModuleName, genPath)
 		}
 	}
 
@@ -311,16 +369,13 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 		}
 	}
 
-	kas := strings.Join(a.Config.Pack(), ",")
+	configkv := a.Config.Pack()
+	kas := strings.Join(configkv, ",")
 	cmd := &exec.Cmd{
 		Path:   LookupTool(a.IDLType, a.CompilerPath),
 		Stdin:  os.Stdin,
 		Stdout: io.MultiWriter(out, os.Stdout),
 		Stderr: io.MultiWriter(out, os.Stderr),
-	}
-
-	if err != nil {
-		return nil, err
 	}
 
 	if a.IDLType == "thrift" {
@@ -345,7 +400,7 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 		if a.Verbose {
 			cmd.Args = append(cmd.Args, "-v")
 		}
-		if a.Use == "" {
+		if a.Use == "" && !a.NoRecurse {
 			cmd.Args = append(cmd.Args, "-r")
 		}
 		cmd.Args = append(cmd.Args,
@@ -398,7 +453,8 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 
 		cmd.Args = append(cmd.Args, a.IDL)
 	}
-	log.Info(strings.ReplaceAll(strings.Join(cmd.Args, " "), kas, fmt.Sprintf("%q", kas)))
+	log.Debugf("cmd.Args %v", cmd.Args)
+	log.Debugf("config pairs %v", configkv)
 	return cmd, nil
 }
 
@@ -470,11 +526,11 @@ func versionSatisfied(current, required string) bool {
 		var currentSeg, minimalSeg int
 		var err error
 		if currentSeg, err = strconv.Atoi(currentSegments[i]); err != nil {
-			klog.Warnf("invalid current version: %s, seg=%v, err=%v", current, currentSegments[i], err)
+			log.Warnf("invalid current version: %s, seg=%v, err=%v", current, currentSegments[i], err)
 			return false
 		}
 		if minimalSeg, err = strconv.Atoi(requiredSegments[i]); err != nil {
-			klog.Warnf("invalid required version: %s, seg=%v, err=%v", required, requiredSegments[i], err)
+			log.Warnf("invalid required version: %s, seg=%v, err=%v", required, requiredSegments[i], err)
 			return false
 		}
 		if currentSeg > minimalSeg {
@@ -496,7 +552,7 @@ func LookupTool(idlType, compilerPath string) string {
 		tool = "protoc"
 	}
 	if compilerPath != "" {
-		log.Infof("Will use the specified %s: %s\n", tool, compilerPath)
+		log.Debugf("Will use the specified %s: %s\n", tool, compilerPath)
 		return compilerPath
 	}
 
@@ -512,11 +568,14 @@ func LookupTool(idlType, compilerPath string) string {
 	return path
 }
 
-func initGoMod(pathToGo, module string) error {
+func initGoMod(module string) error {
 	if util.Exists("go.mod") {
 		return nil
 	}
-
+	pathToGo, err := exec.LookPath("go")
+	if err != nil {
+		return err
+	}
 	cmd := &exec.Cmd{
 		Path:   pathToGo,
 		Args:   []string{"go", "mod", "init", module},

@@ -20,8 +20,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/cloudwego/thriftgo/generator/golang/streaming"
-
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -159,6 +157,8 @@ type ServiceInfo struct {
 	RefName string
 	// identify whether this service would generate a corresponding handler.
 	GenerateHandler bool
+	// whether to generate StreamX interface code
+	StreamX bool
 }
 
 // AllMethods returns all methods that the service have.
@@ -209,9 +209,26 @@ type MethodInfo struct {
 	ResStructName          string
 	IsResponseNeedRedirect bool // int -> int*
 	GenArgResultStruct     bool
+	IsStreaming            bool
 	ClientStreaming        bool
 	ServerStreaming        bool
-	Streaming              *streaming.Streaming
+	StreamX                bool
+}
+
+func (m *MethodInfo) StreamingMode() string {
+	if !m.IsStreaming {
+		return ""
+	}
+	if m.ClientStreaming {
+		if m.ServerStreaming {
+			return "bidirectional"
+		}
+		return "client"
+	}
+	if m.ServerStreaming {
+		return "server"
+	}
+	return "unary"
 }
 
 // Parameter .
@@ -232,6 +249,7 @@ var funcs = map[string]interface{}{
 	"HasFeature":    HasFeature,
 	"FilterImports": FilterImports,
 	"backquoted":    BackQuoted,
+	"getStreamxRef": ToStreamxRef,
 }
 
 func AddTemplateFunc(key string, f interface{}) {
@@ -394,4 +412,13 @@ func FilterImports(Imports map[string]map[string]bool, ms []*MethodInfo) map[str
 
 func BackQuoted(s string) string {
 	return "`" + s + "`"
+}
+
+func ToStreamxRef(protocol transport.Protocol) string {
+	switch protocol {
+	case transport.TTHeader:
+		return streamxTTHeaderRef
+	default:
+		return ""
+	}
 }
