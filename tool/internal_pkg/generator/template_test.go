@@ -15,6 +15,7 @@
 package generator
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -22,7 +23,10 @@ import (
 
 func TestNilSafe(t *testing.T) {
 	var q *TemplateExtension
-	fn := "/tmp/kitex-template-nil.json"
+
+	tempDir := t.TempDir()
+
+	fn := filepath.Join(tempDir, "kitex-template-nil.json")
 
 	err := q.ToJSONFile(fn)
 	test.Assert(t, err == nil, err)
@@ -56,7 +60,10 @@ func TestMarshal(t *testing.T) {
 		},
 	}
 
-	fn := "/tmp/kitex-template.json"
+	tempDir := t.TempDir()
+
+	fn := filepath.Join(tempDir, "kitex-template.json")
+
 	err := p.ToJSONFile(fn)
 	test.Assert(t, err == nil, err)
 
