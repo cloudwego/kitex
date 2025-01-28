@@ -16,6 +16,8 @@
 
 package streamxcallopt
 
-import istreamxclient "github.com/cloudwego/kitex/internal/streamx/streamxclient"
+import (
+	"github.com/cloudwego/kitex/client/streamxclient"
+)
 
-type CallOption = istreamxclient.CallOption
+type CallOption = streamxclient.CallOption

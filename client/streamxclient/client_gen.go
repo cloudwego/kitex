@@ -21,8 +21,6 @@ import (
 	"errors"
 
 	"github.com/cloudwego/kitex/client"
-	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
-	"github.com/cloudwego/kitex/internal/streamx/streamxclient"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
@@ -30,73 +28,40 @@ import (
 // InvokeStream create a new client stream and wrapped related middlewares
 func InvokeStream[Req, Res any](
 	ctx context.Context, cli client.Client, smode serviceinfo.StreamingMode, method string,
-	req *Req, res *Res, callOptions ...streamxcallopt.CallOption,
+	req *Req, res *Res, callOptions ...CallOption,
 ) (context.Context, *streamx.GenericClientStream[Req, Res], error) {
-	reqArgs, resArgs := streamx.NewStreamReqArgs(nil), streamx.NewStreamResArgs(nil)
-	streamArgs := streamx.NewStreamArgs(nil)
-	// important notes: please don't set a typed nil value into interface arg like NewStreamReqArgs({typ: *Res, ptr: nil})
-	// otherwise, reqArgs.Req() may not ==nil forever
-	if req != nil {
-		reqArgs.SetReq(req)
-	}
-	if res != nil {
-		resArgs.SetRes(res)
-	}
 
-	scli, ok := cli.(streamxclient.StreamXClient)
+	scli, ok := cli.(client.Streaming)
 	if !ok {
 		return nil, nil, errors.New("current client is not support streamx interface")
 	}
-	// NewStream should register client middlewares into stream Args
-	ctx, cs, err := scli.NewStream(ctx, method, streamArgs, callOptions...)
+	ctx, cs, err := scli.StreamX(ctx, method)
 	if err != nil {
 		return nil, nil, err
 	}
 	stream := streamx.NewGenericClientStream[Req, Res](cs)
-	var streamMW streamx.StreamMiddleware
-	if streamMWs, ok := streamArgs.(streamx.StreamMiddlewaresArgs); ok {
-		var recvMW streamx.StreamRecvMiddleware
-		var sendMW streamx.StreamSendMiddleware
-		streamMW, recvMW, sendMW = streamMWs.Middlewares()
-		stream.SetStreamRecvMiddleware(recvMW)
-		stream.SetStreamSendMiddleware(sendMW)
-	}
 
-	streamInvoke := func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
-		// assemble streaming args depend on each stream mode
-		switch smode {
-		case serviceinfo.StreamingUnary:
-			// client should call CloseSend and server should call SendAndClose
-			if err = stream.SendMsg(ctx, req); err != nil {
-				return err
-			}
-			if err = stream.RecvMsg(ctx, res); err != nil {
-				return err
-			}
-			resArgs.SetRes(res)
-			if err = stream.CloseSend(ctx); err != nil {
-				return err
-			}
-		case serviceinfo.StreamingClient:
-		case serviceinfo.StreamingServer:
-			if err = stream.SendMsg(ctx, req); err != nil {
-				return err
-			}
-			if err = stream.CloseSend(ctx); err != nil {
-				return err
-			}
-		case serviceinfo.StreamingBidirectional:
-		default:
+	// assemble streaming args depend on each stream mode
+	switch smode {
+	case serviceinfo.StreamingUnary:
+		// client should call CloseSend and server should call SendAndClose
+		if err = stream.SendMsg(ctx, req); err != nil {
+			return nil, nil, err
 		}
-		return nil
-	}
-	if streamMW != nil {
-		err = streamMW(streamInvoke)(ctx, streamArgs, reqArgs, resArgs)
-	} else {
-		err = streamInvoke(ctx, streamArgs, reqArgs, resArgs)
-	}
-	if err != nil {
-		return nil, nil, err
+		if err = stream.RecvMsg(ctx, res); err != nil {
+			return nil, nil, err
+		}
+		if err = stream.CloseSend(ctx); err != nil {
+			return nil, nil, err
+		}
+	case serviceinfo.StreamingServer:
+		if err = stream.SendMsg(ctx, req); err != nil {
+			return nil, nil, err
+		}
+		if err = stream.CloseSend(ctx); err != nil {
+			return nil, nil, err
+		}
+	default:
 	}
 	return ctx, stream, nil
 }

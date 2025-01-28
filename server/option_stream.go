@@ -20,9 +20,40 @@ import (
 	"context"
 	"fmt"
 
+	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
+
+func WithStreamOptions(opts ...StreamOption) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		if o.StreamOptions == nil {
+			o.StreamOptions = &StreamOptions{}
+		}
+		for _, opt := range opts {
+			opt.F(o.StreamOptions, nil)
+		}
+	}}
+}
+
+func WithStreamMiddleware(mw sep.StreamMiddleware) StreamOption {
+	return StreamOption{F: func(o *StreamOptions, di *utils.Slice) {
+		o.StreamMiddlewares = append(o.StreamMiddlewares, mw)
+	}}
+}
+
+func WithStreamRecvMiddleware(mw sep.StreamRecvMiddleware) StreamOption {
+	return StreamOption{F: func(o *internal_server.StreamOptions, di *utils.Slice) {
+		o.StreamRecvMiddlewares = append(o.StreamRecvMiddlewares, mw)
+	}}
+}
+
+func WithStreamSendMiddleware(mw sep.StreamSendMiddleware) StreamOption {
+	return StreamOption{F: func(o *internal_server.StreamOptions, di *utils.Slice) {
+		o.StreamSendMiddlewares = append(o.StreamSendMiddlewares, mw)
+	}}
+}
 
 // WithRecvMiddleware adds middleware for server to handle response.
 // It's used for intercepting stream.RecvMsg (called by Recv or CloseAndRecv) calls

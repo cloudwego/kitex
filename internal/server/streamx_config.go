@@ -19,8 +19,5 @@ package server
 import "github.com/cloudwego/kitex/pkg/streamx"
 
 type StreamXOptions struct {
-	StreamMiddlewares     []streamx.StreamMiddleware
-	StreamRecvMiddlewares []streamx.StreamRecvMiddleware
-	StreamSendMiddlewares []streamx.StreamSendMiddleware
-	Provider              streamx.ServerProvider
+	Provider streamx.ServerProvider
 }
