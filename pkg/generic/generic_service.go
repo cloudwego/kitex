@@ -64,7 +64,7 @@ func newServiceInfo(g Generic, isCombinedServices bool) *serviceinfo.ServiceInfo
 }
 
 func getMethodInfo(g Generic, serviceName string) (methods map[string]serviceinfo.MethodInfo, svcName string) {
-	if g.MessageReaderWriter() == nil {
+	if g.PayloadCodec() != nil {
 		// note: binary generic cannot be used with multi-service feature
 		svcName = serviceinfo.GenericService
 		methods = map[string]serviceinfo.MethodInfo{

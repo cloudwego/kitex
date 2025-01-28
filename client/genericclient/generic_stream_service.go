@@ -26,7 +26,7 @@ func StreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
 }
 
 func newClientStreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
-	if g.MessageReaderWriter() == nil {
+	if g.PayloadCodec() == nil {
 		// TODO: support grpc binary generic
 		panic("binary generic streaming is not supported")
 	}
