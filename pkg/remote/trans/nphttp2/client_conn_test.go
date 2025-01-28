@@ -17,7 +17,10 @@
 package nphttp2
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -94,5 +97,48 @@ func Test_fullMethodName(t *testing.T) {
 	t.Run("with pkg", func(t *testing.T) {
 		got := fullMethodName("pkg", "svc", "method")
 		test.Assert(t, got == "/pkg.svc/method")
+	})
+}
+
+func Test_streamingCancel(t *testing.T) {
+	t.Run("unary method", func(t *testing.T) {
+		// unary method
+		pool := newMockConnPool()
+		ctx, cancel := context.WithCancel(context.Background())
+		ctx = rpcinfo.NewCtxWithRPCInfo(ctx, newMockRPCInfo(false))
+		conn, err := pool.Get(ctx, "tcp", mockAddr0, newMockConnOption())
+		test.Assert(t, err == nil, err)
+		cliConn, ok := conn.(*clientConn)
+		test.Assert(t, ok)
+		cancel()
+		st := cliConn.s
+		test.Assert(t, errors.Is(st.Context().Err(), context.Canceled))
+		// Wait a while in case the monitor goroutine is actually created.
+		time.Sleep(10 * time.Millisecond)
+		select {
+		case <-st.Done():
+			t.Fatal("stream.Done() should not be closed")
+		default:
+		}
+	})
+
+	t.Run("non-unary method", func(t *testing.T) {
+		// non-unary method
+		pool := newMockConnPool()
+		ctx, cancel := context.WithCancel(context.Background())
+		ctx = rpcinfo.NewCtxWithRPCInfo(ctx, newMockRPCInfo(true))
+		conn, err := pool.Get(ctx, "tcp", mockAddr1, newMockConnOption())
+		test.Assert(t, err == nil, err)
+		cliConn, ok := conn.(*clientConn)
+		test.Assert(t, ok)
+		cancel()
+		st := cliConn.s
+		test.Assert(t, errors.Is(st.Context().Err(), context.Canceled))
+		timer := time.NewTimer(10 * time.Second)
+		select {
+		case <-st.Done():
+		case <-timer.C:
+			t.Fatal("stream.Done() should be closed quickly")
+		}
 	})
 }

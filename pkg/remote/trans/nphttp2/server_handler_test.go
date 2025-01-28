@@ -84,7 +84,7 @@ func TestServerHandler(t *testing.T) {
 		return remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Protobuf)
 	}
 	msg.RPCInfoFunc = func() rpcinfo.RPCInfo {
-		return newMockRPCInfo()
+		return newMockRPCInfo(false)
 	}
 	npConn := newMockNpConn(mockAddr0)
 	npConn.mockSettingFrame()
