@@ -216,7 +216,7 @@ func testServerStreaming(t *testing.T, ctx context.Context, cli genericclient.Cl
 
 func testBidirectionalStreaming(t *testing.T, ctx context.Context, cli genericclient.Client) {
 	streamCli, err := genericclient.NewBidirectionalStreaming(ctx, cli, "Echo")
-	test.Assert(t, err == nil)
+	test.Assert(t, err == nil, err)
 
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
