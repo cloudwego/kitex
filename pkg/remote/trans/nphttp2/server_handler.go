@@ -29,6 +29,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/remote/trans"
+
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -128,6 +130,10 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 
 // 只 return write err
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
+	if v := ctx.Value(trans.CtxKeyOnRead{}); v != nil {
+		value := v.(*trans.CtxValueOnRead)
+		value.SetOnlyOnce(true)
+	}
 	svrTrans := ctx.Value(ctxKeySvrTransport).(*SvrTrans)
 	tr := svrTrans.tr
 	tr.HandleStreams(func(s *grpcTransport.Stream) {

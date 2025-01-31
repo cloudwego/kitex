@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -28,6 +29,29 @@ import (
 )
 
 var readMoreTimeout = 5 * time.Millisecond
+
+type (
+	CtxKeyOnRead   struct{}
+	CtxValueOnRead struct {
+		onlyOnce int32
+	}
+)
+
+func (v *CtxValueOnRead) SetOnlyOnce(b bool) {
+	if b {
+		atomic.StoreInt32(&v.onlyOnce, 1)
+	} else {
+		atomic.StoreInt32(&v.onlyOnce, 0)
+	}
+}
+
+func (v *CtxValueOnRead) GetOnlyOnce() bool {
+	if atomic.LoadInt32(&v.onlyOnce) == 1 {
+		return true
+	} else {
+		return false
+	}
+}
 
 // Extension is the interface that trans extensions need to implement, it will make the extension of trans more easily.
 // Normally if we want to extend transport layer we need to implement the trans interfaces which are defined in trans_handler.go.

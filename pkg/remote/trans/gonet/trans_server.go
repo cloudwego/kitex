@@ -96,9 +96,18 @@ func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
 				klog.CtxErrorf(ctx, "KITEX: OnActive error=%s", err)
 				return
 			}
+			ctxValueOnRead := &trans.CtxValueOnRead{}
+			ctx = context.WithValue(ctx, trans.CtxKeyOnRead{}, ctxValueOnRead)
+			onReadOnlyOnceCheck := false
 			for {
 				ts.refreshDeadline(rpcinfo.GetRPCInfo(ctx), bc)
 				err := ts.transHdlr.OnRead(ctx, bc)
+				if !onReadOnlyOnceCheck {
+					onReadOnlyOnceCheck = true
+					if ctxValueOnRead.GetOnlyOnce() {
+						break
+					}
+				}
 				if err != nil {
 					ts.onError(ctx, err, bc)
 					_ = bc.Close()
