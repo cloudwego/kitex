@@ -26,6 +26,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/gopkg/concurrency/gopool"
+
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans"
@@ -82,7 +84,7 @@ func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
 			klog.Errorf("KITEX: BootstrapServer accept failed, err=%s", err.Error())
 			os.Exit(1)
 		}
-		go func() {
+		gopool.CtxGo(nil, func() {
 			var (
 				ctx = context.Background()
 				err error
@@ -114,7 +116,7 @@ func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
 					return
 				}
 			}
-		}()
+		})
 	}
 }
 
