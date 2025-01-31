@@ -21,6 +21,8 @@ import (
 	"context"
 	"time"
 
+	internalRemote "github.com/cloudwego/kitex/internal/remote"
+
 	"github.com/cloudwego/localsession/backup"
 
 	"github.com/cloudwego/kitex/internal/configutil"
@@ -292,22 +294,27 @@ func (o *Options) initRemoteOpt() {
 		}
 		o.RemoteOpt.TTHeaderStreamingProvider = ttstream.NewClientProvider(o.TTHeaderStreamingOptions.TransportOptions...)
 	}
+
+	_, setConnPoolProactiveCheck := o.RemoteOpt.Dialer.(internalRemote.IsGonet)
 	if o.RemoteOpt.ConnPool == nil {
 		if o.PoolCfg != nil {
 			if *o.PoolCfg == zero {
 				o.RemoteOpt.ConnPool = connpool.NewShortPool(o.Svr.ServiceName)
 			} else {
-				o.RemoteOpt.ConnPool = connpool.NewLongPool(o.Svr.ServiceName, *o.PoolCfg)
+				cfg := newDefaultLongPoolCfg(o.Svr.ServiceName, *o.PoolCfg, setConnPoolProactiveCheck)
+				o.RemoteOpt.ConnPool = connpool.NewLongPoolWithConfig(cfg)
 			}
 		} else {
-			o.RemoteOpt.ConnPool = connpool.NewLongPool(
+			cfg := newDefaultLongPoolCfg(
 				o.Svr.ServiceName,
 				connpool2.IdleConfig{
 					MaxIdlePerAddress: 10,
 					MaxIdleGlobal:     100,
 					MaxIdleTimeout:    time.Minute,
 				},
+				setConnPoolProactiveCheck,
 			)
+			o.RemoteOpt.ConnPool = connpool.NewLongPoolWithConfig(cfg)
 		}
 	}
 }
@@ -317,5 +324,17 @@ func (o *Options) InitRetryContainer() {
 	if o.UnaryOptions.RetryContainer == nil {
 		o.UnaryOptions.RetryContainer = retry.NewRetryContainerWithPercentageLimit()
 		o.CloseCallbacks = append(o.CloseCallbacks, o.UnaryOptions.RetryContainer.Close)
+	}
+}
+
+func newDefaultLongPoolCfg(serviceName string, idleCfg connpool2.IdleConfig, enableProactiveCheck bool) connpool.LongPoolConfig {
+	return connpool.LongPoolConfig{
+		ServiceName: serviceName,
+		IdleConfig:  idleCfg,
+		ProactiveCheckConfig: connpool.ProactiveCheckConfig{
+			Enable:    enableProactiveCheck,
+			CheckFunc: internalRemote.ConnectionStateCheck,
+			Interval:  connpool.DefaultProactiveConnCheckInterval,
+		},
 	}
 }

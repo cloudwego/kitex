@@ -127,7 +127,7 @@ func (ts *transServer) Shutdown() (err error) {
 			   To reduce such cases, wait for some time to try to receive these requests as much as possible,
 			   so that the closing of connections can be controlled by the upper-layer protocol and the EOF problem can be reduced.
 			*/
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(200 * time.Millisecond)
 		}
 	}
 	if ts.evl != nil {

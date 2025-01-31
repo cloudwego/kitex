@@ -19,7 +19,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/cloudwego/netpoll"
+	"github.com/cloudwego/gopkg/bufiox"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
@@ -34,7 +34,7 @@ type Framer struct {
 	lastHeaderStream uint32
 	lastFrame        http2.Frame
 
-	reader      netpoll.Reader
+	reader      bufiox.Reader
 	maxReadSize uint32
 
 	writer io.Writer
@@ -104,7 +104,7 @@ func (fc *frameCache) getDataFrame() *DataFrame {
 }
 
 // NewFramer returns a Framer that writes frames to w and reads them from r.
-func NewFramer(w io.Writer, r netpoll.Reader) *Framer {
+func NewFramer(w io.Writer, r bufiox.Reader) *Framer {
 	fr := &Framer{
 		writer: w,
 		reader: r,

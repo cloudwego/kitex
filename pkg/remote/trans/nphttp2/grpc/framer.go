@@ -20,6 +20,8 @@ import (
 	"io"
 	"net"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/bytedance/gopkg/lang/dirtmake"
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2/hpack"
@@ -29,16 +31,24 @@ import (
 
 type framer struct {
 	*grpcframe.Framer
-	reader netpoll.Reader
+	reader bufiox.Reader
 	writer *bufWriter
 }
 
 func newFramer(conn net.Conn, writeBufferSize, readBufferSize, maxHeaderListSize uint32) *framer {
-	var r netpoll.Reader
-	if npConn, ok := conn.(interface{ Reader() netpoll.Reader }); ok {
-		r = npConn.Reader()
+	var r bufiox.Reader
+	// Initialize a bufiox.Reader based on the connection:
+	// 1. If the connection's reader is a `bufiox.Reader`, use it directly.
+	// 2. If the connection's reader is a `netpoll.Reader`, wrap it in a `netpollBufioxReader`.
+	// 3. Otherwise, create a `bufiox.DefaultReader` with the connection.
+	if bc, ok := conn.(interface{ Reader() bufiox.Reader }); ok {
+		r = bc.Reader()
 	} else {
-		r = netpoll.NewReader(conn)
+		if npConn, ok := conn.(interface{ Reader() netpoll.Reader }); ok {
+			r = &netpollBufioxReader{Reader: npConn.Reader()}
+		} else {
+			r = bufiox.NewDefaultReader(conn)
+		}
 	}
 	w := newBufWriter(conn, int(writeBufferSize))
 	fr := &framer{
@@ -100,4 +110,48 @@ func (w *bufWriter) Flush() error {
 	_, w.err = w.writer.Write(w.buf[:w.offset])
 	w.offset = 0
 	return w.err
+}
+
+var _ bufiox.Reader = &netpollBufioxReader{}
+
+// netpollBufioxReader implements bufiox.Reader with netpoll.Reader
+type netpollBufioxReader struct {
+	netpoll.Reader
+	readLen int
+}
+
+func (r *netpollBufioxReader) Next(n int) (p []byte, err error) {
+	p, err = r.Reader.Next(n)
+	if err != nil {
+		return nil, err
+	}
+	r.readLen += len(p)
+	return p, nil
+}
+
+func (r *netpollBufioxReader) ReadBinary(bs []byte) (n int, err error) {
+	p, err := r.Next(len(bs))
+	if err != nil {
+		return 0, err
+	}
+	n = copy(bs, p)
+	return n, nil
+}
+
+func (r *netpollBufioxReader) Skip(n int) (err error) {
+	err = r.Reader.Skip(n)
+	if err != nil {
+		return err
+	}
+	r.readLen += n
+	return nil
+}
+
+func (r *netpollBufioxReader) ReadLen() (n int) {
+	return r.readLen
+}
+
+func (r *netpollBufioxReader) Release(e error) (err error) {
+	r.readLen = 0
+	return r.Reader.Release()
 }

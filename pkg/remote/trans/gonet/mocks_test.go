@@ -21,6 +21,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -50,17 +52,28 @@ func (m *MockCodec) Decode(ctx context.Context, msg remote.Message, in remote.By
 	return
 }
 
-var _ net.Conn = &MockNetConn{}
+var (
+	_ net.Conn         = &MockNetConn{}
+	_ bufioxReadWriter = &MockNetConn{}
+)
 
 // MockNetConn implements net.Conn.
 type MockNetConn struct {
 	mocks.Conn
+	r                  bufiox.Reader
+	w                  bufiox.Writer
 	IsActiveFunc       func() (r bool)
-	ReaderFunc         func() (r netpoll.Reader)
-	WriterFunc         func() (r netpoll.Writer)
 	SetIdleTimeoutFunc func(timeout time.Duration) (e error)
 	SetOnRequestFunc   func(on netpoll.OnRequest) (e error)
 	SetReadTimeoutFunc func(timeout time.Duration) (e error)
+}
+
+func newMockNetConn(conn net.Conn) *MockNetConn {
+	return &MockNetConn{
+		Conn: conn.(mocks.Conn),
+		r:    bufiox.NewDefaultReader(conn),
+		w:    bufiox.NewDefaultWriter(conn),
+	}
 }
 
 // IsActive implements the netpoll.Connection interface.
@@ -72,19 +85,13 @@ func (m *MockNetConn) IsActive() (r bool) {
 }
 
 // Reader implements the netpoll.Connection interface.
-func (m *MockNetConn) Reader() (r netpoll.Reader) {
-	if m.ReaderFunc != nil {
-		return m.ReaderFunc()
-	}
-	return
+func (m *MockNetConn) Reader() (r bufiox.Reader) {
+	return m.r
 }
 
 // Writer implements the netpoll.Connection interface.
-func (m *MockNetConn) Writer() (r netpoll.Writer) {
-	if m.WriterFunc != nil {
-		return m.WriterFunc()
-	}
-	return
+func (m *MockNetConn) Writer() (r bufiox.Writer) {
+	return m.w
 }
 
 // SetIdleTimeout implements the netpoll.Connection interface.
@@ -108,132 +115,5 @@ func (m *MockNetConn) SetReadTimeout(timeout time.Duration) (e error) {
 	if m.SetReadTimeoutFunc != nil {
 		return m.SetReadTimeoutFunc(timeout)
 	}
-	return
-}
-
-// MockNetConnWriter implements netpoll.Writer
-type MockNetConnWriter struct {
-	FlushFunc       func() (err error)
-	WriteDirectFunc func(p []byte, remainCap int) error
-}
-
-var _ netpoll.Writer = &MockNetConnWriter{}
-
-// Flush implements the netpoll.Writer interface.
-func (m *MockNetConnWriter) Flush() (err error) {
-	if m.FlushFunc != nil {
-		return m.FlushFunc()
-	}
-	return
-}
-
-// Malloc implements the netpoll.Writer interface.
-func (m *MockNetConnWriter) Malloc(n int) (buf []byte, err error) {
-	return
-}
-
-// MallocLen implements the netpoll.Writer interface.
-func (m *MockNetConnWriter) MallocLen() (length int) {
-	return
-}
-
-// MallocAck implements the netpoll.Writer interface.
-func (m *MockNetConnWriter) MallocAck(n int) (err error) {
-	return
-}
-
-// Append implements the netpoll.Writer interface.
-func (m *MockNetConnWriter) Append(w netpoll.Writer) (err error) {
-	return
-}
-
-// Write implements the netpoll.Writer interface.
-func (m *MockNetConnWriter) Write(b []byte) (n int, err error) {
-	return
-}
-
-// WriteString implements the netpoll.Writer interface.
-func (m *MockNetConnWriter) WriteString(s string) (n int, err error) {
-	return
-}
-
-// WriteBinary implements the netpoll.Writer interface.
-func (m *MockNetConnWriter) WriteBinary(b []byte) (n int, err error) {
-	return
-}
-
-// WriteDirect implements the netpoll.Writer interface.
-func (m *MockNetConnWriter) WriteDirect(p []byte, remainCap int) (err error) {
-	if m.WriteDirectFunc != nil {
-		return m.WriteDirectFunc(p, remainCap)
-	}
-	return
-}
-
-// WriteByte implements the netpoll.Writer interface.
-func (m *MockNetConnWriter) WriteByte(b byte) (err error) {
-	return
-}
-
-// MockNetConnReader implements netpoll.Reader
-type MockNetConnReader struct {
-	ReleaseFunc func() (err error)
-}
-
-// Next implements the netpoll.Reader interface.
-func (m *MockNetConnReader) Next(n int) (p []byte, err error) {
-	return
-}
-
-// Peek implements the netpoll.Reader interface.
-func (m *MockNetConnReader) Peek(n int) (buf []byte, err error) {
-	return
-}
-
-// Until implements the netpoll.Reader interface.
-func (m *MockNetConnReader) Until(b byte) (p []byte, err error) {
-	return
-}
-
-// Skip implements the netpoll.Reader interface.
-func (m *MockNetConnReader) Skip(n int) (err error) {
-	return
-}
-
-// Release implements the netpoll.Reader interface.
-func (m *MockNetConnReader) Release() (err error) {
-	if m.ReleaseFunc != nil {
-		return m.ReleaseFunc()
-	}
-	return
-}
-
-// Slice implements the netpoll.Reader interface.
-func (m *MockNetConnReader) Slice(n int) (r netpoll.Reader, err error) {
-	return
-}
-
-// Len implements the netpoll.Reader interface.
-func (m *MockNetConnReader) Len() (length int) {
-	return
-}
-
-// Read implements the netpoll.Reader interface.
-func (m *MockNetConnReader) Read(b []byte) (n int, err error) {
-	return
-}
-
-// ReadString implements the netpoll.Reader interface.
-func (m *MockNetConnReader) ReadString(n int) (s string, err error) {
-	return
-}
-
-// ReadBinary implements the netpoll.Reader interface.
-func (m *MockNetConnReader) ReadBinary(n int) (p []byte, err error) {
-	return
-}
-
-// ReadByte implements the netpoll.Reader interface.
-func (m *MockNetConnReader) ReadByte() (b byte, err error) {
 	return
 }

@@ -29,13 +29,9 @@ import (
 
 // TestOnActive test server_handler OnActive success
 func TestOnActive(t *testing.T) {
-	conn := &MockNetConn{
-		Conn: mocks.Conn{
-			RemoteAddrFunc: func() (r net.Addr) {
-				return addr
-			},
-		},
-	}
+	conn := newMockNetConn(mocks.Conn{RemoteAddrFunc: func() (r net.Addr) {
+		return addr
+	}})
 	pl := remote.NewTransPipeline(svrTransHdlr)
 	svrTransHdlr.SetPipeline(pl)
 	if setter, ok := svrTransHdlr.(remote.InvokeHandleFuncSetter); ok {
@@ -55,13 +51,9 @@ func TestOnRead(t *testing.T) {
 	// var isWriteBufFlushed bool
 	// var isReaderBufReleased bool
 	var isInvoked bool
-	conn := &MockNetConn{
-		Conn: mocks.Conn{
-			RemoteAddrFunc: func() (r net.Addr) {
-				return addr
-			},
-		},
-	}
+	conn := newMockNetConn(mocks.Conn{RemoteAddrFunc: func() (r net.Addr) {
+		return addr
+	}})
 
 	if setter, ok := svrTransHdlr.(remote.InvokeHandleFuncSetter); ok {
 		setter.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
@@ -85,18 +77,11 @@ func TestOnRead(t *testing.T) {
 func TestInvokeErr(t *testing.T) {
 	// 1. prepare mock data
 	var isInvoked bool
-	conn := &MockNetConn{
-		Conn: mocks.Conn{
-			RemoteAddrFunc: func() (r net.Addr) {
-				return addr
-			},
-			CloseFunc: func() (e error) {
-				return nil
-			},
-		},
-		IsActiveFunc: func() (r bool) {
-			return true
-		},
+	conn := newMockNetConn(mocks.Conn{RemoteAddrFunc: func() (r net.Addr) {
+		return addr
+	}})
+	conn.IsActiveFunc = func() (r bool) {
+		return true
 	}
 	remote.NewTransPipeline(svrTransHdlr)
 
@@ -123,20 +108,19 @@ func TestPanicAfterRead(t *testing.T) {
 	// 1. prepare mock data
 	var isInvoked bool
 	var isClosed bool
-	conn := &MockNetConn{
-		Conn: mocks.Conn{
-			RemoteAddrFunc: func() (r net.Addr) {
-				return addr
-			},
-			CloseFunc: func() (e error) {
-				isClosed = true
-				return nil
-			},
+	conn := newMockNetConn(mocks.Conn{
+		RemoteAddrFunc: func() (r net.Addr) {
+			return addr
 		},
-		IsActiveFunc: func() (r bool) {
-			return true
+		CloseFunc: func() (e error) {
+			isClosed = true
+			return nil
 		},
+	})
+	conn.IsActiveFunc = func() (r bool) {
+		return true
 	}
+
 	// pipeline nil panic
 	svrTransHdlr.SetPipeline(nil)
 
@@ -155,20 +139,19 @@ func TestPanicAfterRead(t *testing.T) {
 func TestNoMethodInfo(t *testing.T) {
 	// 1. prepare mock data
 	var isClosed bool
-	conn := &MockNetConn{
-		Conn: mocks.Conn{
-			RemoteAddrFunc: func() (r net.Addr) {
-				return addr
-			},
-			CloseFunc: func() (e error) {
-				isClosed = true
-				return nil
-			},
+	conn := newMockNetConn(mocks.Conn{
+		RemoteAddrFunc: func() (r net.Addr) {
+			return addr
 		},
-		IsActiveFunc: func() (r bool) {
-			return true
+		CloseFunc: func() (e error) {
+			isClosed = true
+			return nil
 		},
+	})
+	conn.IsActiveFunc = func() (r bool) {
+		return true
 	}
+
 	remote.NewTransPipeline(svrTransHdlr)
 
 	svcInfo := svrOpt.TargetSvcInfo

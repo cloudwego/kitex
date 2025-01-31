@@ -45,10 +45,11 @@ var _ netpoll.Connection = &mockNetpollConn{}
 // mockNetpollConn implements netpoll.Connection.
 type mockNetpollConn struct {
 	mockConn
+	reader netpoll.Reader
 }
 
 func (m *mockNetpollConn) Reader() netpoll.Reader {
-	panic("implement me")
+	return m.reader
 }
 
 func (m *mockNetpollConn) Writer() netpoll.Writer {

@@ -29,6 +29,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	internalRemote "github.com/cloudwego/kitex/internal/remote"
+
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -92,17 +95,26 @@ var prefaceReadAtMost = func() int {
 
 func (t *svrTransHandler) ProtocolMatch(ctx context.Context, conn net.Conn) error {
 	// Check the validity of client preface.
-	// FIXME: should not rely on netpoll.Reader
+	var peekReader interface {
+		Peek(n int) (buf []byte, err error)
+	}
+	if withReader, ok := conn.(interface{ Reader() bufiox.Reader }); ok {
+		if br := withReader.Reader(); br != nil {
+			peekReader = br
+		}
+	}
 	if withReader, ok := conn.(interface{ Reader() netpoll.Reader }); ok {
-		if npReader := withReader.Reader(); npReader != nil {
-			// read at most avoid block
-			preface, err := npReader.Peek(prefaceReadAtMost)
-			if err != nil {
-				return err
-			}
-			if len(preface) >= prefaceReadAtMost && bytes.Equal(preface[:prefaceReadAtMost], grpcTransport.ClientPreface[:prefaceReadAtMost]) {
-				return nil
-			}
+		if br := withReader.Reader(); br != nil {
+			peekReader = br
+		}
+	}
+	if peekReader != nil {
+		preface, err := peekReader.Peek(prefaceReadAtMost)
+		if err != nil {
+			return err
+		}
+		if len(preface) >= prefaceReadAtMost && bytes.Equal(preface[:prefaceReadAtMost], grpcTransport.ClientPreface[:prefaceReadAtMost]) {
+			return nil
 		}
 	}
 	return errors.New("error protocol not match")
@@ -128,6 +140,9 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 
 // 只 return write err
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
+	if !t.shouldExecuteOnRead(conn) {
+		return nil
+	}
 	svrTrans := ctx.Value(ctxKeySvrTransport).(*SvrTrans)
 	tr := svrTrans.tr
 	tr.HandleStreams(func(s *grpcTransport.Stream) {
@@ -278,6 +293,16 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 		return
 	}
 	tr.WriteStatus(s, status.New(codes.OK, ""))
+}
+
+func (t *svrTransHandler) shouldExecuteOnRead(conn net.Conn) bool {
+	// make sure that each conn only executes OnRead once.
+	// `Do` return true if executed the first time. Otherwise, return.
+	// `Done` will be checked in transServer to decide whether to break the serve connection loop.
+	if e, ok := conn.(internalRemote.OnceExecutor); ok {
+		return e.Do()
+	}
+	return true
 }
 
 // invokeStreamUnaryHandler allows unary APIs over HTTP2 to use the same server middleware as non-streaming APIs.

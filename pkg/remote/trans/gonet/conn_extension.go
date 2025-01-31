@@ -24,8 +24,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/cloudwego/netpoll"
-
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -40,17 +38,17 @@ type gonetConnExtension struct{}
 
 // SetReadTimeout implements the trans.Extension interface.
 func (e *gonetConnExtension) SetReadTimeout(ctx context.Context, conn net.Conn, cfg rpcinfo.RPCConfig, role remote.RPCRole) {
-	// Do nothing.
+	// FIXME
 }
 
 // NewWriteByteBuffer implements the trans.Extension interface.
 func (e *gonetConnExtension) NewWriteByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-	return NewBufferWriter(conn)
+	return NewBufferWriter(conn.(bufioxReadWriter).Writer())
 }
 
 // NewReadByteBuffer implements the trans.Extension interface.
 func (e *gonetConnExtension) NewReadByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-	return NewBufferReader(conn)
+	return NewBufferReader(conn.(bufioxReadWriter).Reader())
 }
 
 // ReleaseBuffer implements the trans.Extension interface.
@@ -78,8 +76,7 @@ func (e *gonetConnExtension) IsRemoteClosedErr(err error) bool {
 	}
 	// strings.Contains(err.Error(), "closed network connection") change to errors.Is(err, net.ErrClosed)
 	// when support go version >= 1.16
-	return errors.Is(err, netpoll.ErrConnClosed) ||
-		errors.Is(err, io.EOF) ||
+	return errors.Is(err, io.EOF) ||
 		errors.Is(err, syscall.EPIPE) ||
 		strings.Contains(err.Error(), "closed network connection")
 }

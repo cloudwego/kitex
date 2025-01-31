@@ -103,7 +103,6 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 		rpcinfo.Record(ctx, ri, stats.ReadFinish, err)
 	}()
 	rpcinfo.Record(ctx, ri, stats.ReadStart, nil)
-
 	bufReader = t.ext.NewReadByteBuffer(ctx, conn, recvMsg)
 	if codec, ok := t.codec.(remote.MetaDecoder); ok {
 		if err = codec.DecodeMeta(ctx, recvMsg, bufReader); err == nil {
