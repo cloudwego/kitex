@@ -123,7 +123,6 @@ func (c *httpThriftCodec) getMessageReaderWriter() interface{} {
 	rw := thrift.NewHTTPReaderWriter(svcDsc)
 	c.configureHTTPRequestWriter(rw.WriteHTTPRequest)
 	c.configureHTTPResponseReader(rw.ReadHTTPResponse)
-
 	newCache := &cachedHTTPReaderWriterData{
 		svcDsc:       svcDsc,
 		readerWriter: rw,

@@ -122,6 +122,11 @@ func (c *jsonThriftCodec) getMessageReaderWriter() interface{} {
 	rw := thrift.NewJsonReaderWriter(svcDsc)
 	c.configureJSONWriter(rw.WriteJSON)
 	c.configureJSONReader(rw.ReadJSON)
+	newCache := &cachedJSONReaderWriterData{
+		svcDsc:       svcDsc,
+		readerWriter: rw,
+	}
+	c.cachedReaderWriterData.Store(newCache)
 	return rw
 }
 

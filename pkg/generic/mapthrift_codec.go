@@ -113,6 +113,11 @@ func (c *mapThriftCodec) getMessageReaderWriter() interface{} {
 	}
 	c.configureStructWriter(rw.WriteStruct)
 	c.configureStructReader(rw.ReadStruct)
+	newCache := &cachedStructReaderWriter{
+		svcDsc:       svcDsc,
+		readerWriter: rw,
+	}
+	c.cachedReaderWriterData.Store(newCache)
 	return rw
 }
 
