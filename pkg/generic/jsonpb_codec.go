@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -35,13 +36,20 @@ import (
 var _ Closer = &jsonPbCodec{}
 
 type jsonPbCodec struct {
-	svcDsc           atomic.Value // *idl
-	provider         PbDescriptorProviderDynamicGo
-	opts             *Options
-	convOpts         conv.Options // used for dynamicgo conversion
-	dynamicgoEnabled bool         // currently set to true by default
-	svcName          string
-	extra            map[string]string
+	svcDsc                 atomic.Value // *idl
+	provider               PbDescriptorProviderDynamicGo
+	opts                   *Options
+	convOpts               conv.Options // used for dynamicgo conversion
+	dynamicgoEnabled       bool         // currently set to true by default
+	svcName                string
+	extra                  map[string]string
+	cachedReaderWriterData atomic.Value // *cachedJSONPbReaderWriter
+	sync.Mutex
+}
+
+type cachedJSONPbReaderWriter struct {
+	svcDsc       *dproto.ServiceDescriptor
+	readerWriter *proto.JSONReaderWriter
 }
 
 func newJsonPbCodec(p PbDescriptorProviderDynamicGo, opts *Options) *jsonPbCodec {
@@ -93,7 +101,22 @@ func (c *jsonPbCodec) getMessageReaderWriter() interface{} {
 		return errors.New("get parser dynamicgo ServiceDescriptor failed")
 	}
 
-	return proto.NewJsonReaderWriter(pbSvc, &c.convOpts)
+	cachedData := c.cachedReaderWriterData.Load()
+	if cachedData != nil {
+		if cd, ok := cachedData.(*cachedJSONPbReaderWriter); ok && cd.svcDsc == pbSvc {
+			return cd.readerWriter
+		}
+	}
+
+	c.Lock()
+	defer c.Unlock()
+	rw := proto.NewJsonReaderWriter(pbSvc, &c.convOpts)
+	newCache := &cachedJSONPbReaderWriter{
+		svcDsc:       pbSvc,
+		readerWriter: rw,
+	}
+	c.cachedReaderWriterData.Store(newCache)
+	return rw
 }
 
 func (c *jsonPbCodec) getMethod(req interface{}, method string) (*Method, error) {

@@ -19,6 +19,7 @@ package generic
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -39,6 +40,13 @@ type mapThriftCodec struct {
 	setFieldsForEmptyStruct uint8
 	svcName                 string
 	extra                   map[string]string
+	cachedReaderWriterData  atomic.Value // *cachedStructReaderWriter
+	sync.Mutex
+}
+
+type cachedStructReaderWriter struct {
+	svcDsc       *descriptor.ServiceDescriptor
+	readerWriter *thrift.StructReaderWriter
 }
 
 func newMapThriftCodec(p DescriptorProvider) *mapThriftCodec {
@@ -87,6 +95,16 @@ func (c *mapThriftCodec) getMessageReaderWriter() interface{} {
 	if !ok {
 		return errors.New("get parser ServiceDescriptor failed")
 	}
+
+	cachedData := c.cachedReaderWriterData.Load()
+	if cachedData != nil {
+		if cd, ok := cachedData.(*cachedStructReaderWriter); ok && cd.svcDsc == svcDsc {
+			return cd.readerWriter
+		}
+	}
+
+	c.Lock()
+	defer c.Unlock()
 	var rw *thrift.StructReaderWriter
 	if c.forJSON {
 		rw = thrift.NewStructReaderWriterForJSON(svcDsc)

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -50,6 +51,13 @@ type httpThriftCodec struct {
 	useRawBodyForHTTPResp  bool
 	svcName                string
 	extra                  map[string]string
+	cachedReaderWriterData atomic.Value // *cachedHTTPReaderWriterData
+	sync.Mutex
+}
+
+type cachedHTTPReaderWriterData struct {
+	svcDsc       *descriptor.ServiceDescriptor
+	readerWriter *thrift.HTTPReaderWriter
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
@@ -102,9 +110,25 @@ func (c *httpThriftCodec) getMessageReaderWriter() interface{} {
 	if !ok {
 		return errors.New("get parser ServiceDescriptor failed")
 	}
+
+	cachedData := c.cachedReaderWriterData.Load()
+	if cachedData != nil {
+		if cd, ok := cachedData.(*cachedHTTPReaderWriterData); ok && cd.svcDsc == svcDsc {
+			return cd.readerWriter
+		}
+	}
+
+	c.Lock()
+	defer c.Unlock()
 	rw := thrift.NewHTTPReaderWriter(svcDsc)
 	c.configureHTTPRequestWriter(rw.WriteHTTPRequest)
 	c.configureHTTPResponseReader(rw.ReadHTTPResponse)
+
+	newCache := &cachedHTTPReaderWriterData{
+		svcDsc:       svcDsc,
+		readerWriter: rw,
+	}
+	c.cachedReaderWriterData.Store(newCache)
 	return rw
 }
 
