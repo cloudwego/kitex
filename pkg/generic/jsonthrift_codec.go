@@ -19,6 +19,7 @@ package generic
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -43,6 +44,13 @@ type jsonThriftCodec struct {
 	convOptsWithException  conv.Options // used for dynamicgo conversion with ConvertException turned on
 	svcName                string
 	extra                  map[string]string
+	cachedReaderWriterData atomic.Value // *cachedJSONReaderWriterData
+	sync.Mutex
+}
+
+type cachedJSONReaderWriterData struct {
+	svcDsc       *descriptor.ServiceDescriptor
+	readerWriter *thrift.JSONReaderWriter
 }
 
 func newJsonThriftCodec(p DescriptorProvider, opts *Options) *jsonThriftCodec {
@@ -102,6 +110,15 @@ func (c *jsonThriftCodec) getMessageReaderWriter() interface{} {
 		return errors.New("get parser ServiceDescriptor failed")
 	}
 
+	cachedData := c.cachedReaderWriterData.Load()
+	if cachedData != nil {
+		if cd, ok := cachedData.(*cachedJSONReaderWriterData); ok && cd.svcDsc == svcDsc {
+			return cd.readerWriter
+		}
+	}
+
+	c.Lock()
+	defer c.Unlock()
 	rw := thrift.NewJsonReaderWriter(svcDsc)
 	c.configureJSONWriter(rw.WriteJSON)
 	c.configureJSONReader(rw.ReadJSON)
