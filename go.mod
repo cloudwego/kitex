@@ -11,7 +11,7 @@ require (
 	github.com/cloudwego/frugal v0.2.3
 	github.com/cloudwego/gopkg v0.1.4-0.20250108101532-52ba6073f5a1
 	github.com/cloudwego/localsession v0.1.2
-	github.com/cloudwego/netpoll v0.6.5
+	github.com/cloudwego/netpoll v0.6.6-0.20250203063552-1a23ea584add
 	github.com/cloudwego/runtimex v0.1.1
 	github.com/cloudwego/thriftgo v0.3.18
 	github.com/golang/mock v1.6.0

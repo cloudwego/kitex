@@ -55,7 +55,7 @@ func NewBufferReader(ir io.Reader) remote.ByteBuffer {
 	if npReader, ok := ir.(interface{ Reader() netpoll.Reader }); ok {
 		rw.reader = npReader.Reader()
 	} else {
-		rw.reader = netpoll.NewReader(ir)
+		rw.reader = netpoll.NewReaderReuseBuffer(ir)
 	}
 	rw.ioReader = ir
 	rw.status = remote.BitReadable
