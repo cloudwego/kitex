@@ -66,7 +66,7 @@ func NewBufferReader(ir io.Reader) remote.ByteBuffer {
 // NewBufferWriter creates a new remote.ByteBuffer using the given netpoll.ZeroCopyWriter.
 func NewBufferWriter(iw io.Writer) remote.ByteBuffer {
 	rw := rwPool.Get().(*bufferReadWriter)
-	rw.writer = netpoll.NewWriter(iw)
+	rw.writer = netpoll.NewWriterReuseBuffer(iw)
 	rw.ioWriter = iw
 	rw.status = remote.BitWritable
 	return rw
