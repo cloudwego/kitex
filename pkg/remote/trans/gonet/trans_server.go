@@ -92,7 +92,7 @@ func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
 			defer func() {
 				transRecover(ctx, conn, "OnRead")
 			}()
-			bc := newBufioConn(conn)
+			bc := conn //newBufioConn(conn)
 			ctx, err = ts.transHdlr.OnActive(ctx, bc)
 			if err != nil {
 				klog.CtxErrorf(ctx, "KITEX: OnActive error=%s", err)
@@ -166,7 +166,7 @@ type bufioConn struct {
 func newBufioConn(c net.Conn) *bufioConn {
 	return &bufioConn{
 		conn: c,
-		r:    netpoll.NewReader(c),
+		r:    netpoll.NewReaderReuseBuffer(c),
 	}
 }
 
