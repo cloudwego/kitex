@@ -60,7 +60,7 @@ type UnaryOption struct {
 }
 
 type UnaryOptions struct {
-	UnaryMiddlewares []sep.UnaryMiddleware
+	UnaryMiddlewares []endpoint.UnaryMiddleware
 }
 
 type StreamOption struct {
@@ -136,9 +136,8 @@ type Options struct {
 
 	BackupOpt backup.Options
 
-	// Streaming
-	Streaming stream.StreamingConfig // old version streaming API config
-	StreamX   StreamXOptions         // new version streaming API config
+	Streaming stream.StreamingConfig // deprecated, use StreamOptions instead
+	StreamX   StreamXOptions         // deprecated
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool

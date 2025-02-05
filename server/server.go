@@ -381,7 +381,7 @@ func (s *server) buildCoreMiddleware() endpoint.Middleware {
 }
 
 func (s *server) lastCompatibleEndpoint(ctx context.Context) endpoint.Endpoint {
-	unaryEp := sep.UnaryChain(s.opt.UnaryOptions.UnaryMiddlewares...)(s.invokeHandleEndpoint())
+	unaryEp := endpoint.UnaryChain(s.opt.UnaryOptions.UnaryMiddlewares...)(s.invokeHandleEndpoint())
 	streamEp := sep.StreamChain(s.opt.StreamOptions.StreamMiddlewares...)(s.streamHandleEndpoint())
 
 	return func(ctx context.Context, req, resp interface{}) (err error) {

@@ -73,7 +73,7 @@ type Client interface {
 type kClient struct {
 	svcInfo *serviceinfo.ServiceInfo
 	mws     []endpoint.Middleware
-	eps     cep.UnaryEndpoint
+	eps     endpoint.UnaryEndpoint
 	sEps    cep.StreamEndpoint
 
 	opt *client.Options
@@ -452,7 +452,7 @@ func (kc *kClient) buildInvokeChain() error {
 	}
 	eps := mwchain(innerHandlerEp)
 
-	kc.eps = cep.UnaryChain(kc.opt.UnaryOptions.UnaryMiddlewares...)(func(ctx context.Context, req, resp interface{}) (err error) {
+	kc.eps = endpoint.UnaryChain(kc.opt.UnaryOptions.UnaryMiddlewares...)(func(ctx context.Context, req, resp interface{}) (err error) {
 		return eps(ctx, req, resp)
 	})
 
