@@ -25,8 +25,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-// WithRecvMiddleware adds middleware for client to handle response.
-// It's used for intercepting stream.RecvMsg (called by Recv or CloseAndRecv) calls
+// Deprecated: Use client.WithStreamRecvMiddleware instead, this requires enabling the streamx feature.
 func WithRecvMiddleware(mw endpoint.RecvMiddleware) Option {
 	mwb := func(ctx context.Context) endpoint.RecvMiddleware {
 		return mw
@@ -37,7 +36,7 @@ func WithRecvMiddleware(mw endpoint.RecvMiddleware) Option {
 	}}
 }
 
-// WithRecvMiddlewareBuilder adds middleware that depend on a per-client context for client to handle response
+// Deprecated: Use client.WithStreamRecvMiddlewareBuilder instead, this requires enabling the streamx feature.
 func WithRecvMiddlewareBuilder(mwb endpoint.RecvMiddlewareBuilder) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithRecvMiddlewareBuilder(%+v)", utils.GetFuncName(mwb)))
@@ -45,8 +44,7 @@ func WithRecvMiddlewareBuilder(mwb endpoint.RecvMiddlewareBuilder) Option {
 	}}
 }
 
-// WithSendMiddleware adds middleware for client to handle request.
-// It's used for intercepting stream.SendMsg (called by Send or SendAndClose) calls
+// Deprecated: Use client.WithStreamSendMiddleware instead, this requires enabling the streamx feature.
 func WithSendMiddleware(mw endpoint.SendMiddleware) Option {
 	mwb := func(ctx context.Context) endpoint.SendMiddleware {
 		return mw
@@ -57,7 +55,7 @@ func WithSendMiddleware(mw endpoint.SendMiddleware) Option {
 	}}
 }
 
-// WithSendMiddlewareBuilder adds middleware that depend on a per-client context for client to handle request
+// Deprecated: Use client.WithStreamSendMiddlewareBuilder instead, this requires enabling the streamx feature.
 func WithSendMiddlewareBuilder(mwb endpoint.SendMiddlewareBuilder) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithSendMiddlewareBuilder(%+v)", utils.GetFuncName(mwb)))

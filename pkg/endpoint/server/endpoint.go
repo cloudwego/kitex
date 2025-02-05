@@ -6,31 +6,34 @@ import (
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
-type UnaryEndpoint func(ctx context.Context, req, resp interface{}) (err error)
-
-type UnaryMiddleware func(next UnaryEndpoint) UnaryEndpoint
-
+// StreamEndpoint represent one Stream call, it provides a stream to server handler.
 type StreamEndpoint func(ctx context.Context, st streamx.ServerStream) (err error)
 
+// StreamMiddleware deal with input StreamEndpoint and output StreamEndpoint.
 type StreamMiddleware func(next StreamEndpoint) StreamEndpoint
 
+// StreamMiddlewareBuilder builds a stream middleware with information from a context.
+type StreamMiddlewareBuilder func(ctx context.Context) StreamMiddleware
+
+// StreamRecvEndpoint represent one Stream recv call.
 type StreamRecvEndpoint func(ctx context.Context, stream streamx.ServerStream, message interface{}) (err error)
 
+// StreamRecvMiddleware deal with input StreamRecvEndpoint and output StreamRecvEndpoint.
 type StreamRecvMiddleware func(next StreamRecvEndpoint) StreamRecvEndpoint
 
+// StreamRecvMiddlewareBuilder builds a stream recv middleware with information from a context.
+type StreamRecvMiddlewareBuilder func(ctx context.Context) StreamRecvMiddleware
+
+// StreamSendEndpoint represent one Stream send call.
 type StreamSendEndpoint func(ctx context.Context, stream streamx.ServerStream, message interface{}) (err error)
 
+// StreamSendMiddleware deal with input StreamSendEndpoint and output StreamSendEndpoint.
 type StreamSendMiddleware func(next StreamSendEndpoint) StreamSendEndpoint
 
-func UnaryChain(mws ...UnaryMiddleware) UnaryMiddleware {
-	return func(next UnaryEndpoint) UnaryEndpoint {
-		for i := len(mws) - 1; i >= 0; i-- {
-			next = mws[i](next)
-		}
-		return next
-	}
-}
+// StreamSendMiddlewareBuilder builds a stream send middleware with information from a context.
+type StreamSendMiddlewareBuilder func(ctx context.Context) StreamSendMiddleware
 
+// StreamChain connect stream middlewares into one stream middleware.
 func StreamChain(mws ...StreamMiddleware) StreamMiddleware {
 	return func(next StreamEndpoint) StreamEndpoint {
 		for i := len(mws) - 1; i >= 0; i-- {
@@ -40,6 +43,7 @@ func StreamChain(mws ...StreamMiddleware) StreamMiddleware {
 	}
 }
 
+// StreamRecvChain connect stream recv middlewares into one stream recv middleware.
 func StreamRecvChain(mws ...StreamRecvMiddleware) StreamRecvMiddleware {
 	return func(next StreamRecvEndpoint) StreamRecvEndpoint {
 		for i := len(mws) - 1; i >= 0; i-- {
@@ -49,6 +53,7 @@ func StreamRecvChain(mws ...StreamRecvMiddleware) StreamRecvMiddleware {
 	}
 }
 
+// StreamSendChain connect stream send middlewares into one stream send middleware.
 func StreamSendChain(mws ...StreamSendMiddleware) StreamSendMiddleware {
 	return func(next StreamSendEndpoint) StreamSendEndpoint {
 		for i := len(mws) - 1; i >= 0; i-- {

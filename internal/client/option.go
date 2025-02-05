@@ -66,7 +66,7 @@ type UnaryOption struct {
 }
 
 type UnaryOptions struct {
-	UnaryMiddlewares []cep.UnaryMiddleware
+	UnaryMiddlewares []endpoint.UnaryMiddleware
 }
 
 type StreamOption struct {
@@ -74,14 +74,38 @@ type StreamOption struct {
 }
 
 type StreamOptions struct {
-	EventHandler          stream.StreamEventHandler
-	RecvTimeout           time.Duration
-	StreamMiddlewares     []cep.StreamMiddleware
-	StreamRecvMiddlewares []cep.StreamRecvMiddleware
-	StreamSendMiddlewares []cep.StreamSendMiddleware
+	EventHandler                 stream.StreamEventHandler
+	RecvTimeout                  time.Duration
+	StreamMiddlewares            []cep.StreamMiddleware
+	StreamMiddlewareBuilders     []cep.StreamMiddlewareBuilder
+	StreamRecvMiddlewares        []cep.StreamRecvMiddleware
+	StreamRecvMiddlewareBuilders []cep.StreamRecvMiddlewareBuilder
+	StreamSendMiddlewares        []cep.StreamSendMiddleware
+	StreamSendMiddlewareBuilders []cep.StreamSendMiddlewareBuilder
 }
 
 func (o *StreamOptions) InitMiddlewares(ctx context.Context) {
+	if len(o.StreamMiddlewareBuilders) > 0 {
+		streamMiddlewares := make([]cep.StreamMiddleware, 0, len(o.StreamMiddlewareBuilders))
+		for _, mwb := range o.StreamMiddlewareBuilders {
+			streamMiddlewares = append(streamMiddlewares, mwb(ctx))
+		}
+		o.StreamMiddlewares = append(o.StreamMiddlewares, streamMiddlewares...)
+	}
+	if len(o.StreamRecvMiddlewareBuilders) > 0 {
+		streamRecvMiddlewares := make([]cep.StreamRecvMiddleware, 0, len(o.StreamRecvMiddlewareBuilders))
+		for _, mwb := range o.StreamRecvMiddlewareBuilders {
+			streamRecvMiddlewares = append(streamRecvMiddlewares, mwb(ctx))
+		}
+		o.StreamRecvMiddlewares = append(o.StreamRecvMiddlewares, streamRecvMiddlewares...)
+	}
+	if len(o.StreamSendMiddlewareBuilders) > 0 {
+		streamSendMiddlewares := make([]cep.StreamSendMiddleware, 0, len(o.StreamSendMiddlewareBuilders))
+		for _, mwb := range o.StreamSendMiddlewareBuilders {
+			streamSendMiddlewares = append(streamSendMiddlewares, mwb(ctx))
+		}
+		o.StreamSendMiddlewares = append(o.StreamSendMiddlewares, streamSendMiddlewares...)
+	}
 }
 
 func (o *StreamOptions) BuildRecvChain() cep.StreamRecvEndpoint {
@@ -160,8 +184,7 @@ type Options struct {
 	// Context backup
 	CtxBackupHandler backup.BackupHandler
 
-	// deprecated, use StreamOptions instead
-	Streaming stream.StreamingConfig
+	Streaming stream.StreamingConfig // deprecated, use StreamOptions instead
 }
 
 // Apply applies all options.

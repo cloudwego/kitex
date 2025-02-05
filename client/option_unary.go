@@ -2,7 +2,7 @@ package client
 
 import (
 	"github.com/cloudwego/kitex/internal/client"
-	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
+	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -17,7 +17,7 @@ func WithUnaryOptions(opts ...UnaryOption) Option {
 	}}
 }
 
-func WithUnaryMiddleware(mw cep.UnaryMiddleware) UnaryOption {
+func WithUnaryMiddleware(mw endpoint.UnaryMiddleware) UnaryOption {
 	return UnaryOption{F: func(o *UnaryOptions, di *utils.Slice) {
 		o.UnaryMiddlewares = append(o.UnaryMiddlewares, mw)
 	}}
