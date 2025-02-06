@@ -26,37 +26,59 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
+// WithStreamOptions add stream options for server.
+// It is used to isolate options that are only effective for streaming methods.
 func WithStreamOptions(opts ...StreamOption) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		if o.StreamOptions == nil {
-			o.StreamOptions = &StreamOptions{}
-		}
 		for _, opt := range opts {
-			opt.F(o.StreamOptions, nil)
+			opt.F(&o.StreamOptions, nil)
 		}
 	}}
 }
 
+// WithStreamMiddleware add middleware for stream.
 func WithStreamMiddleware(mw sep.StreamMiddleware) StreamOption {
 	return StreamOption{F: func(o *StreamOptions, di *utils.Slice) {
 		o.StreamMiddlewares = append(o.StreamMiddlewares, mw)
 	}}
 }
 
+// WithStreamMiddlewareBuilder add middleware builder for stream.
+func WithStreamMiddlewareBuilder(mwb sep.StreamMiddlewareBuilder) StreamOption {
+	return StreamOption{F: func(o *StreamOptions, di *utils.Slice) {
+		o.StreamMiddlewareBuilders = append(o.StreamMiddlewareBuilders, mwb)
+	}}
+}
+
+// WithStreamRecvMiddleware add recv middleware for stream.
 func WithStreamRecvMiddleware(mw sep.StreamRecvMiddleware) StreamOption {
 	return StreamOption{F: func(o *internal_server.StreamOptions, di *utils.Slice) {
 		o.StreamRecvMiddlewares = append(o.StreamRecvMiddlewares, mw)
 	}}
 }
 
+// WithStreamRecvMiddlewareBuilder add recv middleware builder for stream.
+func WithStreamRecvMiddlewareBuilder(mwb sep.StreamRecvMiddlewareBuilder) StreamOption {
+	return StreamOption{F: func(o *internal_server.StreamOptions, di *utils.Slice) {
+		o.StreamRecvMiddlewareBuilders = append(o.StreamRecvMiddlewareBuilders, mwb)
+	}}
+}
+
+// WithStreamSendMiddleware add send middleware for stream.
 func WithStreamSendMiddleware(mw sep.StreamSendMiddleware) StreamOption {
 	return StreamOption{F: func(o *internal_server.StreamOptions, di *utils.Slice) {
 		o.StreamSendMiddlewares = append(o.StreamSendMiddlewares, mw)
 	}}
 }
 
-// WithRecvMiddleware adds middleware for server to handle response.
-// It's used for intercepting stream.RecvMsg (called by Recv or CloseAndRecv) calls
+// WithStreamSendMiddlewareBuilder add send middleware builder for stream.
+func WithStreamSendMiddlewareBuilder(mwb sep.StreamSendMiddlewareBuilder) StreamOption {
+	return StreamOption{F: func(o *internal_server.StreamOptions, di *utils.Slice) {
+		o.StreamSendMiddlewareBuilders = append(o.StreamSendMiddlewareBuilders, mwb)
+	}}
+}
+
+// Deprecated: Use WithStreamRecvMiddleware instead, this requires enabling the streamx feature.
 func WithRecvMiddleware(mw endpoint.RecvMiddleware) Option {
 	mwb := func(ctx context.Context) endpoint.RecvMiddleware {
 		return mw
@@ -67,7 +89,7 @@ func WithRecvMiddleware(mw endpoint.RecvMiddleware) Option {
 	}}
 }
 
-// WithRecvMiddlewareBuilder adds middleware that depend on a per-server context for server to handle response
+// Deprecated: Use WithStreamRecvMiddlewareBuilder instead, this requires enabling the streamx feature.
 func WithRecvMiddlewareBuilder(mwb endpoint.RecvMiddlewareBuilder) Option {
 	return Option{F: func(o *Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithRecvMiddlewareBuilder(%+v)", utils.GetFuncName(mwb)))
@@ -75,8 +97,7 @@ func WithRecvMiddlewareBuilder(mwb endpoint.RecvMiddlewareBuilder) Option {
 	}}
 }
 
-// WithSendMiddleware adds middleware for server to handle request.
-// It's used for intercepting stream.SendMsg (called by Send or SendAndClose) calls
+// Deprecated: Use WithStreamSendMiddleware instead, this requires enabling the streamx feature.
 func WithSendMiddleware(mw endpoint.SendMiddleware) Option {
 	mwb := func(ctx context.Context) endpoint.SendMiddleware {
 		return mw
@@ -87,7 +108,7 @@ func WithSendMiddleware(mw endpoint.SendMiddleware) Option {
 	}}
 }
 
-// WithSendMiddlewareBuilder adds middleware that depend on a per-server context for server to handle request
+// Deprecated: Use WithStreamSendMiddlewareBuilder instead, this requires enabling the streamx feature.
 func WithSendMiddlewareBuilder(mwb endpoint.SendMiddlewareBuilder) Option {
 	return Option{F: func(o *Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithSendMiddlewareBuilder(%+v)", utils.GetFuncName(mwb)))

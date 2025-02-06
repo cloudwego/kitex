@@ -23,20 +23,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
-func (s *server) initStreamMiddlewares(ctx context.Context) {
-	// === for old version streaming ===
-	s.opt.Streaming.InitMiddlewares(ctx)
-	s.opt.StreamOptions.EventHandler = s.opt.TracerCtl.GetStreamEventHandler()
-	s.opt.StreamOptions.InitMiddlewares(ctx)
-}
-
-func (s *server) buildStreamInvokeChain() {
-	s.opt.RemoteOpt.StreamRecvEndpoint = s.opt.StreamOptions.BuildRecvChain()
-	s.opt.RemoteOpt.StreamSendEndpoint = s.opt.StreamOptions.BuildSendChain()
-	s.opt.RemoteOpt.RecvEndpoint = s.opt.Streaming.BuildRecvInvokeChain(s.invokeRecvEndpoint())
-	s.opt.RemoteOpt.SendEndpoint = s.opt.Streaming.BuildSendInvokeChain(s.invokeSendEndpoint())
-}
-
 func (s *server) invokeRecvEndpoint() endpoint.RecvEndpoint {
 	return func(stream streaming.Stream, resp interface{}) (err error) {
 		return stream.RecvMsg(resp)
