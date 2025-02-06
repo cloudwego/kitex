@@ -25,11 +25,14 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
+	"github.com/cloudwego/kitex/pkg/streamx"
+
 	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/limit"
@@ -52,6 +55,75 @@ func init() {
 	remote.PutPayloadCode(serviceinfo.Protobuf, protobuf.NewProtobufCodec())
 }
 
+type UnaryOption struct {
+	F func(o *UnaryOptions, di *utils.Slice)
+}
+
+type UnaryOptions struct {
+	UnaryMiddlewares        []endpoint.UnaryMiddleware
+	UnaryMiddlewareBuilders []endpoint.UnaryMiddlewareBuilder
+}
+
+func (o *UnaryOptions) InitMiddlewares(ctx context.Context) {
+	if len(o.UnaryMiddlewareBuilders) > 0 {
+		unaryMiddlewares := make([]endpoint.UnaryMiddleware, 0, len(o.UnaryMiddlewareBuilders))
+		for _, mwb := range o.UnaryMiddlewareBuilders {
+			unaryMiddlewares = append(unaryMiddlewares, mwb(ctx))
+		}
+		o.UnaryMiddlewares = append(o.UnaryMiddlewares, unaryMiddlewares...)
+	}
+}
+
+type StreamOption struct {
+	F func(o *StreamOptions, di *utils.Slice)
+}
+
+type StreamOptions struct {
+	EventHandler                 streamx.EventHandler
+	StreamMiddlewares            []sep.StreamMiddleware
+	StreamMiddlewareBuilders     []sep.StreamMiddlewareBuilder
+	StreamRecvMiddlewares        []sep.StreamRecvMiddleware
+	StreamRecvMiddlewareBuilders []sep.StreamRecvMiddlewareBuilder
+	StreamSendMiddlewares        []sep.StreamSendMiddleware
+	StreamSendMiddlewareBuilders []sep.StreamSendMiddlewareBuilder
+}
+
+func (o *StreamOptions) InitMiddlewares(ctx context.Context) {
+	if len(o.StreamMiddlewareBuilders) > 0 {
+		streamMiddlewares := make([]sep.StreamMiddleware, 0, len(o.StreamMiddlewareBuilders))
+		for _, mwb := range o.StreamMiddlewareBuilders {
+			streamMiddlewares = append(streamMiddlewares, mwb(ctx))
+		}
+		o.StreamMiddlewares = append(o.StreamMiddlewares, streamMiddlewares...)
+	}
+	if len(o.StreamRecvMiddlewareBuilders) > 0 {
+		streamRecvMiddlewares := make([]sep.StreamRecvMiddleware, 0, len(o.StreamRecvMiddlewareBuilders))
+		for _, mwb := range o.StreamRecvMiddlewareBuilders {
+			streamRecvMiddlewares = append(streamRecvMiddlewares, mwb(ctx))
+		}
+		o.StreamRecvMiddlewares = append(o.StreamRecvMiddlewares, streamRecvMiddlewares...)
+	}
+	if len(o.StreamSendMiddlewareBuilders) > 0 {
+		streamSendMiddlewares := make([]sep.StreamSendMiddleware, 0, len(o.StreamSendMiddlewareBuilders))
+		for _, mwb := range o.StreamSendMiddlewareBuilders {
+			streamSendMiddlewares = append(streamSendMiddlewares, mwb(ctx))
+		}
+		o.StreamSendMiddlewares = append(o.StreamSendMiddlewares, streamSendMiddlewares...)
+	}
+}
+
+func (o *StreamOptions) BuildRecvChain() sep.StreamRecvEndpoint {
+	return sep.StreamRecvChain(o.StreamRecvMiddlewares...)(func(ctx context.Context, stream streamx.ServerStream, message interface{}) (err error) {
+		return stream.RecvMsg(ctx, message)
+	})
+}
+
+func (o *StreamOptions) BuildSendChain() sep.StreamSendEndpoint {
+	return sep.StreamSendChain(o.StreamSendMiddlewares...)(func(ctx context.Context, stream streamx.ServerStream, message interface{}) (err error) {
+		return stream.SendMsg(ctx, message)
+	})
+}
+
 // Option is the only way to config a server.
 type Option struct {
 	F func(o *Options, di *utils.Slice)
@@ -63,6 +135,9 @@ type Options struct {
 	Configs  rpcinfo.RPCConfig
 	LockBits int
 	Once     *configutil.OptionOnce
+
+	UnaryOptions  UnaryOptions
+	StreamOptions StreamOptions
 
 	MetaHandlers []remote.MetaHandler
 
@@ -96,9 +171,8 @@ type Options struct {
 
 	BackupOpt backup.Options
 
-	// Streaming
-	Streaming stream.StreamingConfig // old version streaming API config
-	StreamX   StreamXOptions         // new version streaming API config
+	Streaming stream.StreamingConfig // deprecated, use StreamOptions instead
+	StreamX   StreamXOptions         // deprecated
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool

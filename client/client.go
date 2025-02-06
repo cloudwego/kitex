@@ -30,6 +30,8 @@ import (
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession/backup"
 
+	"github.com/cloudwego/kitex/pkg/streaming"
+
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -37,6 +39,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -68,15 +71,10 @@ type Client interface {
 }
 
 type kClient struct {
-	svcInfo *serviceinfo.ServiceInfo
-	mws     []endpoint.Middleware
-	eps     endpoint.Endpoint
-	sEps    endpoint.Endpoint
-
-	// streamx
-	sxStreamMW     streamx.StreamMiddleware
-	sxStreamRecvMW streamx.StreamRecvMiddleware
-	sxStreamSendMW streamx.StreamSendMiddleware
+	svcInfo   *serviceinfo.ServiceInfo
+	mws, smws []endpoint.Middleware
+	eps       endpoint.UnaryEndpoint
+	sEps      cep.StreamEndpoint
 
 	opt *client.Options
 	lbf *lbcache.BalancerFactory
@@ -138,7 +136,6 @@ func (kc *kClient) init() (err error) {
 	}
 	ctx := kc.initContext()
 	kc.initMiddlewares(ctx)
-	kc.initStreamMiddlewares(ctx)
 	kc.initDebugService()
 	kc.richRemoteOption()
 	if err = kc.buildInvokeChain(); err != nil {
@@ -166,13 +163,13 @@ func (kc *kClient) initCircuitBreaker() error {
 }
 
 func (kc *kClient) initRetryer() error {
-	if kc.opt.RetryContainer == nil {
-		if kc.opt.RetryMethodPolicies == nil {
+	if kc.opt.UnaryOptions.RetryContainer == nil {
+		if kc.opt.UnaryOptions.RetryMethodPolicies == nil {
 			return nil
 		}
 		kc.opt.InitRetryContainer()
 	}
-	return kc.opt.RetryContainer.Init(kc.opt.RetryMethodPolicies, kc.opt.RetryWithResult)
+	return kc.opt.UnaryOptions.RetryContainer.Init(kc.opt.UnaryOptions.RetryMethodPolicies, kc.opt.UnaryOptions.RetryWithResult)
 }
 
 func (kc *kClient) initContext() context.Context {
@@ -281,13 +278,19 @@ func (kc *kClient) initLBCache() error {
 	return nil
 }
 
+// For unary:
+// service cb mw -> xds router -> rpctimeout mw -> customized unary mws -> context mw -> customized mws -> other mws
+
+// For streaming:
+// service cb mw -> customized stream mws -> xds router -> context mw -> customized mws -> other mws
+
+// The reason why the xds router must be placed before the timeout middleware is that the timeout configuration is
+// obtained from the rds config, and the timeout middleware only takes effect in the unary scenario.
+// Therefore, in the streaming scenario, the xds router can be placed after the stream middleware.
 func (kc *kClient) initMiddlewares(ctx context.Context) {
+	// 1. universal middlewares
 	builderMWs := richMWsWithBuilder(ctx, kc.opt.MWBs)
-	// integrate xds if enabled
-	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {
-		kc.mws = append(kc.mws, kc.opt.XDSRouterMiddleware)
-	}
-	kc.mws = append(kc.mws, kc.opt.CBSuite.ServiceCBMW(), rpcTimeoutMW(ctx), contextMW)
+	kc.mws = append(kc.mws, contextMW)
 	kc.mws = append(kc.mws, builderMWs...)
 	kc.mws = append(kc.mws, acl.NewACLMiddleware(kc.opt.ACLRules))
 	if kc.opt.Proxy == nil {
@@ -301,11 +304,30 @@ func (kc *kClient) initMiddlewares(ctx context.Context) {
 		kc.mws = append(kc.mws, newProxyMW(kc.opt.Proxy))
 	}
 	kc.mws = append(kc.mws, newIOErrorHandleMW(kc.opt.ErrHandle))
-}
 
-func (kc *kClient) initStreamMiddlewares(ctx context.Context) {
-	kc.opt.Streaming.EventHandler = kc.opt.TracerCtl.GetStreamEventHandler()
+	// 2. unary middlewares
+	var uMW []endpoint.UnaryMiddleware
+	uMW = append(uMW, kc.opt.CBSuite.ServiceCBMW().ToUnaryMiddleware())
+	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {
+		// integrate xds if enabled
+		uMW = append(uMW, kc.opt.XDSRouterMiddleware.ToUnaryMiddleware())
+	}
+	uMW = append(uMW, rpcTimeoutMW(ctx))
+	kc.opt.UnaryOptions.InitMiddlewares(ctx)
+	kc.opt.UnaryOptions.UnaryMiddlewares = append(uMW, kc.opt.UnaryOptions.UnaryMiddlewares...)
+
+	// 3. stream middlewares
 	kc.opt.Streaming.InitMiddlewares(ctx)
+	kc.opt.StreamOptions.EventHandler = kc.opt.TracerCtl.GetStreamEventHandler()
+	kc.smws = kc.mws
+	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {
+		// integrate xds if enabled
+		kc.smws = append([]endpoint.Middleware{kc.opt.XDSRouterMiddleware}, kc.mws...)
+	}
+	kc.opt.StreamOptions.InitMiddlewares(ctx)
+	if cbMW := kc.opt.CBSuite.StreamingServiceCBMW(); cbMW != nil {
+		kc.opt.StreamOptions.StreamMiddlewares = append([]cep.StreamMiddleware{cbMW}, kc.opt.StreamOptions.StreamMiddlewares...)
+	}
 }
 
 func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) (mws []endpoint.Middleware) {
@@ -365,7 +387,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	}()
 
 	callOptRetry := getCalloptRetryPolicy(callOpts)
-	if kc.opt.RetryContainer == nil && callOptRetry != nil && callOptRetry.Enable {
+	if kc.opt.UnaryOptions.RetryContainer == nil && callOptRetry != nil && callOptRetry.Enable {
 		// setup retry in callopt
 		kc.opt.InitRetryContainer()
 	}
@@ -373,7 +395,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	// Add necessary keys to context for isolation between kitex client method calls
 	ctx = retry.PrepareRetryContext(ctx)
 
-	if kc.opt.RetryContainer == nil {
+	if kc.opt.UnaryOptions.RetryContainer == nil {
 		// call without retry policy
 		err = kc.eps(ctx, request, response)
 		if err == nil {
@@ -381,7 +403,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 		}
 	} else {
 		var lastRI rpcinfo.RPCInfo
-		lastRI, recycleRI, err = kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
+		lastRI, recycleRI, err = kc.opt.UnaryOptions.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
 		if ri != lastRI {
 			// reset ri of ctx to lastRI
 			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, lastRI)
@@ -390,7 +412,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	}
 
 	// do fallback if with setup
-	err, reportErr = doFallbackIfNeeded(ctx, ri, request, response, err, kc.opt.Fallback, callOpts)
+	err, reportErr = doFallbackIfNeeded(ctx, ri, request, response, err, kc.opt.UnaryOptions.Fallback, callOpts)
 	return err
 }
 
@@ -445,19 +467,29 @@ func (kc *kClient) richRemoteOption() {
 }
 
 func (kc *kClient) buildInvokeChain() error {
-	mwchain := endpoint.Chain(kc.mws...)
-
 	innerHandlerEp, err := kc.invokeHandleEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.eps = mwchain(innerHandlerEp)
+	eps := endpoint.Chain(kc.mws...)(innerHandlerEp)
+
+	kc.eps = endpoint.UnaryChain(kc.opt.UnaryOptions.UnaryMiddlewares...)(func(ctx context.Context, req, resp interface{}) (err error) {
+		return eps(ctx, req, resp)
+	})
 
 	innerStreamingEp, err := kc.invokeStreamingEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.sEps = mwchain(innerStreamingEp)
+	sEps := endpoint.Chain(kc.smws...)(innerStreamingEp)
+	kc.sEps = cep.StreamChain(kc.opt.StreamOptions.StreamMiddlewares...)(func(ctx context.Context) (st streamx.ClientStream, err error) {
+		resp := &streaming.Result{}
+		err = sEps(ctx, nil, resp)
+		if err != nil {
+			return nil, err
+		}
+		return resp.ClientStream, nil
+	})
 	return nil
 }
 
@@ -739,9 +771,6 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 		rpcStats.ImmutableView(),
 	)
 
-	if mi != nil {
-		ri.Invocation().(rpcinfo.InvocationSetter).SetStreamingMode(mi.StreamingMode())
-	}
 	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
 		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))
 	}
@@ -753,9 +782,7 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 			_ = cfg.SetReadWriteTimeout(c.ReadWriteTimeout())
 		}
 	}
-
-	// streamx config
-	sopt := opt.StreamX
+	sopt := opt.StreamOptions
 	if sopt.RecvTimeout > 0 {
 		cfg.SetStreamRecvTimeout(sopt.RecvTimeout)
 	}

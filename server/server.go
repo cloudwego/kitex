@@ -29,6 +29,12 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
+	"github.com/cloudwego/kitex/pkg/streamx"
+
+	"github.com/cloudwego/kitex/pkg/streaming"
+
+	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
+
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -95,8 +101,6 @@ func (s *server) init() {
 	// init invoker chain here since we need to get some svc information to add MW
 	// register stream recv/send middlewares
 	s.buildInvokeChain(ctx)
-	s.initStreamMiddlewares(ctx)
-	s.buildStreamInvokeChain()
 }
 
 func fillContext(opt *internal_server.Options) context.Context {
@@ -146,7 +150,17 @@ func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinf
 }
 
 func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
+	// 1. unary middleware
+	s.opt.UnaryOptions.InitMiddlewares(ctx)
+
+	// 2. stream middleware
+	s.opt.Streaming.InitMiddlewares(ctx)
+	s.opt.StreamOptions.EventHandler = s.opt.TracerCtl.GetStreamEventHandler()
+	s.opt.StreamOptions.InitMiddlewares(ctx)
+
+	// 3. universal middleware
 	var mws []endpoint.Middleware
+	mws = append(mws, s.wrapStreamMiddleware())
 	// register server timeout middleware
 	// prepend for adding timeout to the context for all middlewares and the handler
 	if s.opt.EnableContextTimeout {
@@ -177,8 +191,7 @@ func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 
 func (s *server) buildInvokeChain(ctx context.Context) {
 	mws := s.buildMiddlewares(ctx)
-	innerHandlerEp := s.invokeHandleEndpoint()
-	s.eps = endpoint.Chain(mws...)(innerHandlerEp)
+	s.eps = endpoint.Chain(mws...)(s.lastCompatibleEndpoint(ctx))
 }
 
 // buildStreamCtxInjectMiddleware is a workaround to resolve stream ctx diverge problem in server side
@@ -375,7 +388,20 @@ func (s *server) buildCoreMiddleware() endpoint.Middleware {
 	}
 }
 
-func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
+func (s *server) lastCompatibleEndpoint(ctx context.Context) endpoint.Endpoint {
+	unaryEp := endpoint.UnaryChain(s.opt.UnaryOptions.UnaryMiddlewares...)(s.invokeHandleEndpoint())
+	streamEp := sep.StreamChain(s.opt.StreamOptions.StreamMiddlewares...)(s.streamHandleEndpoint())
+
+	return func(ctx context.Context, req, resp interface{}) (err error) {
+		if st, ok := req.(*streaming.Args); ok {
+			return streamEp(ctx, st.ServerStream)
+		} else {
+			return unaryEp(ctx, req, resp)
+		}
+	}
+}
+
+func (s *server) invokeHandleEndpoint() endpoint.UnaryEndpoint {
 	return func(ctx context.Context, args, resp interface{}) (err error) {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		methodName := ri.Invocation().MethodName()
@@ -404,8 +430,54 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		// set session
 		backup.BackupCtx(ctx)
-
 		err = implHandlerFunc(ctx, svc.handler, args, resp)
+		if err != nil {
+			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
+				if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+					setter.SetBizStatusErr(bizErr)
+					return nil
+				}
+			}
+			err = kerrors.ErrBiz.WithCause(err)
+		}
+		return err
+	}
+}
+
+func (s *server) streamHandleEndpoint() sep.StreamEndpoint {
+	return func(ctx context.Context, st streamx.ServerStream) (err error) {
+		ri := rpcinfo.GetRPCInfo(ctx)
+		methodName := ri.Invocation().MethodName()
+		serviceName := ri.Invocation().ServiceName()
+		svc := s.svcs.svcMap[serviceName]
+		svcInfo := svc.svcInfo
+		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {
+			return errors.New("method name is empty in rpcinfo, should not happen")
+		}
+		defer func() {
+			if handlerErr := recover(); handlerErr != nil {
+				err = kerrors.ErrPanic.WithCauseAndStack(
+					fmt.Errorf(
+						"[happened in biz handler, method=%s.%s, please check the panic at the server side] %s",
+						svcInfo.ServiceName, methodName, handlerErr),
+					string(debug.Stack()))
+				rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
+				rpcStats.SetPanicked(err)
+			}
+			rpcinfo.Record(ctx, ri, stats.ServerHandleFinish, err)
+			// clear session
+			backup.ClearCtx()
+		}()
+		implHandlerFunc := svcInfo.MethodInfo(methodName).Handler()
+		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
+		// set session
+		backup.BackupCtx(ctx)
+		args := &streaming.Args{ServerStream: st}
+		if grpcStreamGetter, ok := st.(streaming.GRPCStreamGetter); ok {
+			// for compatible with gRPC
+			args.Stream = grpcStreamGetter.GetGRPCStream()
+		}
+		err = implHandlerFunc(ctx, svc.handler, args, nil)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
 				if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {

@@ -23,7 +23,9 @@ import (
 	"github.com/bytedance/gopkg/cloud/circuitbreaker"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 // Parameter contains parameters for circuit breaker.
@@ -89,6 +91,26 @@ func NewCircuitBreakerMW(control Control, panel circuitbreaker.Panel) endpoint.M
 
 			err = next(ctx, request, response)
 			RecordStat(ctx, request, response, err, key, &control, panel)
+			return
+		}
+	}
+}
+
+// NewCircuitBreakerMW creates a circuit breaker MW for streaming using the given Control strategy and Panel.
+func NewStreamCircuitBreakerMW(control Control, panel circuitbreaker.Panel) cep.StreamMiddleware {
+	return func(next cep.StreamEndpoint) cep.StreamEndpoint {
+		return func(ctx context.Context) (stream streamx.ClientStream, err error) {
+			key, enabled := control.GetKey(ctx, nil)
+			if !enabled {
+				return next(ctx)
+			}
+
+			if !panel.IsAllowed(key) {
+				return nil, control.DecorateError(ctx, nil, kerrors.ErrCircuitBreak)
+			}
+
+			stream, err = next(ctx)
+			RecordStat(ctx, nil, nil, err, key, &control, panel)
 			return
 		}
 	}

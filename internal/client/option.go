@@ -23,6 +23,8 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
+	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
+
 	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -59,6 +61,92 @@ func init() {
 	remote.PutPayloadCode(serviceinfo.Protobuf, protobuf.NewProtobufCodec())
 }
 
+type UnaryOption struct {
+	F func(o *UnaryOptions, di *utils.Slice)
+}
+
+type UnaryOptions struct {
+	opts *Options
+
+	// middlewares
+	UnaryMiddlewares        []endpoint.UnaryMiddleware
+	UnaryMiddlewareBuilders []endpoint.UnaryMiddlewareBuilder
+
+	// retry policy
+	RetryMethodPolicies map[string]retry.Policy
+	RetryContainer      *retry.Container
+	RetryWithResult     *retry.ShouldResultRetry
+
+	// fallback policy
+	Fallback *fallback.Policy
+}
+
+func (o *UnaryOptions) InitMiddlewares(ctx context.Context) {
+	if len(o.UnaryMiddlewareBuilders) > 0 {
+		unaryMiddlewares := make([]endpoint.UnaryMiddleware, 0, len(o.UnaryMiddlewareBuilders))
+		for _, mwb := range o.UnaryMiddlewareBuilders {
+			unaryMiddlewares = append(unaryMiddlewares, mwb(ctx))
+		}
+		o.UnaryMiddlewares = append(o.UnaryMiddlewares, unaryMiddlewares...)
+	}
+}
+
+func (o *UnaryOptions) SetUnaryRPCTimeout(d time.Duration) {
+	rpcinfo.AsMutableRPCConfig(o.opts.Configs).SetRPCTimeout(d)
+	o.opts.Locks.Bits |= rpcinfo.BitRPCTimeout
+}
+
+type StreamOption struct {
+	F func(o *StreamOptions, di *utils.Slice)
+}
+
+type StreamOptions struct {
+	EventHandler                 stream.StreamEventHandler
+	RecvTimeout                  time.Duration
+	StreamMiddlewares            []cep.StreamMiddleware
+	StreamMiddlewareBuilders     []cep.StreamMiddlewareBuilder
+	StreamRecvMiddlewares        []cep.StreamRecvMiddleware
+	StreamRecvMiddlewareBuilders []cep.StreamRecvMiddlewareBuilder
+	StreamSendMiddlewares        []cep.StreamSendMiddleware
+	StreamSendMiddlewareBuilders []cep.StreamSendMiddlewareBuilder
+}
+
+func (o *StreamOptions) InitMiddlewares(ctx context.Context) {
+	if len(o.StreamMiddlewareBuilders) > 0 {
+		streamMiddlewares := make([]cep.StreamMiddleware, 0, len(o.StreamMiddlewareBuilders))
+		for _, mwb := range o.StreamMiddlewareBuilders {
+			streamMiddlewares = append(streamMiddlewares, mwb(ctx))
+		}
+		o.StreamMiddlewares = append(o.StreamMiddlewares, streamMiddlewares...)
+	}
+	if len(o.StreamRecvMiddlewareBuilders) > 0 {
+		streamRecvMiddlewares := make([]cep.StreamRecvMiddleware, 0, len(o.StreamRecvMiddlewareBuilders))
+		for _, mwb := range o.StreamRecvMiddlewareBuilders {
+			streamRecvMiddlewares = append(streamRecvMiddlewares, mwb(ctx))
+		}
+		o.StreamRecvMiddlewares = append(o.StreamRecvMiddlewares, streamRecvMiddlewares...)
+	}
+	if len(o.StreamSendMiddlewareBuilders) > 0 {
+		streamSendMiddlewares := make([]cep.StreamSendMiddleware, 0, len(o.StreamSendMiddlewareBuilders))
+		for _, mwb := range o.StreamSendMiddlewareBuilders {
+			streamSendMiddlewares = append(streamSendMiddlewares, mwb(ctx))
+		}
+		o.StreamSendMiddlewares = append(o.StreamSendMiddlewares, streamSendMiddlewares...)
+	}
+}
+
+func (o *StreamOptions) BuildRecvChain() cep.StreamRecvEndpoint {
+	return cep.StreamRecvChain(o.StreamRecvMiddlewares...)(func(ctx context.Context, stream streamx.ClientStream, message interface{}) (err error) {
+		return stream.RecvMsg(ctx, message)
+	})
+}
+
+func (o *StreamOptions) BuildSendChain() cep.StreamSendEndpoint {
+	return cep.StreamSendChain(o.StreamSendMiddlewares...)(func(ctx context.Context, stream streamx.ClientStream, message interface{}) (err error) {
+		return stream.SendMsg(ctx, message)
+	})
+}
+
 // Options is used to initialize a client.
 type Options struct {
 	Cli     *rpcinfo.EndpointBasicInfo
@@ -66,6 +154,9 @@ type Options struct {
 	Configs rpcinfo.RPCConfig
 	Locks   *ConfigLocks
 	Once    *configutil.OptionOnce
+
+	UnaryOptions  UnaryOptions
+	StreamOptions StreamOptions
 
 	MetaHandlers []remote.MetaHandler
 
@@ -98,14 +189,6 @@ type Options struct {
 	TracerCtl  *rpcinfo.TraceController
 	StatsLevel *stats.Level
 
-	// retry policy
-	RetryMethodPolicies map[string]retry.Policy
-	RetryContainer      *retry.Container
-	RetryWithResult     *retry.ShouldResultRetry
-
-	// fallback policy
-	Fallback *fallback.Policy
-
 	CloseCallbacks []func() error
 	WarmUpOption   *warmup.ClientOption
 
@@ -120,8 +203,7 @@ type Options struct {
 	// Context backup
 	CtxBackupHandler backup.BackupHandler
 
-	Streaming stream.StreamingConfig
-	StreamX   StreamXOptions
+	Streaming stream.StreamingConfig // deprecated, use StreamOptions instead
 }
 
 // Apply applies all options.
@@ -156,12 +238,13 @@ func NewOptions(opts []Option) *Options {
 
 		GRPCConnectOpts: new(grpc.ConnectOptions),
 	}
+	o.UnaryOptions.opts = o
 	o.Apply(opts)
 
 	o.initRemoteOpt()
 
-	if o.RetryContainer != nil && o.DebugService != nil {
-		o.DebugService.RegisterProbeFunc(diagnosis.RetryPolicyKey, o.RetryContainer.Dump)
+	if o.UnaryOptions.RetryContainer != nil && o.DebugService != nil {
+		o.DebugService.RegisterProbeFunc(diagnosis.RetryPolicyKey, o.UnaryOptions.RetryContainer.Dump)
 	}
 
 	if o.StatsLevel == nil {
@@ -207,16 +290,8 @@ func (o *Options) initRemoteOpt() {
 
 // InitRetryContainer init retry container and add close callback
 func (o *Options) InitRetryContainer() {
-	if o.RetryContainer == nil {
-		o.RetryContainer = retry.NewRetryContainerWithPercentageLimit()
-		o.CloseCallbacks = append(o.CloseCallbacks, o.RetryContainer.Close)
+	if o.UnaryOptions.RetryContainer == nil {
+		o.UnaryOptions.RetryContainer = retry.NewRetryContainerWithPercentageLimit()
+		o.CloseCallbacks = append(o.CloseCallbacks, o.UnaryOptions.RetryContainer.Close)
 	}
-}
-
-// StreamXOptions define the client options
-type StreamXOptions struct {
-	RecvTimeout   time.Duration
-	StreamMWs     []streamx.StreamMiddleware
-	StreamRecvMWs []streamx.StreamRecvMiddleware
-	StreamSendMWs []streamx.StreamSendMiddleware
 }

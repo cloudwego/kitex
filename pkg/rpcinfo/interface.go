@@ -92,7 +92,6 @@ type Invocation interface {
 	PackageName() string
 	ServiceName() string
 	MethodName() string
-	StreamingMode() serviceinfo.StreamingMode
 	SeqID() int32
 	BizStatusErr() kerrors.BizStatusErrorIface
 	Extra(key string) interface{}

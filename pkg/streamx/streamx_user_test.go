@@ -32,6 +32,8 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/streamxclient"
 	istreamxclient "github.com/cloudwego/kitex/internal/streamx/streamxclient"
@@ -168,7 +170,7 @@ func TestStreamingBasic(t *testing.T) {
 							test.Assert(t, validateMetadata(ctx))
 
 							switch ri.Invocation().StreamingMode() {
-							case streamx.StreamingUnary:
+							case serviceinfo.StreamingUnary:
 								test.Assert(t, reqArgs.Req() != nil)
 								test.Assert(t, resArgs.Res() == nil)
 								err = next(ctx, streamArgs, reqArgs, resArgs)
@@ -177,7 +179,7 @@ func TestStreamingBasic(t *testing.T) {
 									res := resArgs.Res().(*Response)
 									test.DeepEqual(t, req.Message, res.Message)
 								}
-							case streamx.StreamingClient:
+							case serviceinfo.StreamingClient:
 								test.Assert(t, reqArgs.Req() == nil)
 								test.Assert(t, resArgs.Res() == nil)
 								err = next(ctx, streamArgs, reqArgs, resArgs)
@@ -185,7 +187,7 @@ func TestStreamingBasic(t *testing.T) {
 									res := resArgs.Res().(*Response)
 									test.Assert(t, res.Message != "")
 								}
-							case streamx.StreamingServer:
+							case serviceinfo.StreamingServer:
 								test.Assert(t, reqArgs.Req() != nil)
 								test.Assert(t, resArgs.Res() == nil)
 								err = next(ctx, streamArgs, reqArgs, resArgs)
@@ -195,7 +197,7 @@ func TestStreamingBasic(t *testing.T) {
 									req := reqArgs.Req().(*Request)
 									test.Assert(t, req.Message != "")
 								}
-							case streamx.StreamingBidirectional:
+							case serviceinfo.StreamingBidirectional:
 								test.Assert(t, reqArgs.Req() == nil)
 								test.Assert(t, resArgs.Res() == nil)
 								err = next(ctx, streamArgs, reqArgs, resArgs)
@@ -267,19 +269,19 @@ func TestStreamingBasic(t *testing.T) {
 						test.Assert(t, streamArgs.Stream() != nil)
 						if err == nil {
 							switch ri.Invocation().StreamingMode() {
-							case streamx.StreamingUnary:
+							case serviceinfo.StreamingUnary:
 								test.Assert(t, reqArgs.Req() != nil)
 								test.Assert(t, resArgs.Res() != nil)
 								req := reqArgs.Req().(*Request)
 								res := resArgs.Res().(*Response)
 								test.DeepEqual(t, req.Message, res.Message)
-							case streamx.StreamingClient:
+							case serviceinfo.StreamingClient:
 								test.Assert(t, reqArgs.Req() == nil, reqArgs.Req())
 								test.Assert(t, resArgs.Res() == nil)
-							case streamx.StreamingServer:
+							case serviceinfo.StreamingServer:
 								test.Assert(t, reqArgs.Req() != nil)
 								test.Assert(t, resArgs.Res() == nil)
-							case streamx.StreamingBidirectional:
+							case serviceinfo.StreamingBidirectional:
 								test.Assert(t, reqArgs.Req() == nil)
 								test.Assert(t, resArgs.Res() == nil)
 							default:

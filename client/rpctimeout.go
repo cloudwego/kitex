@@ -81,13 +81,13 @@ func isBusinessTimeout(start time.Time, kitexTimeout time.Duration, actualDDL ti
 	return actualDDL.Add(threshold).Before(kitexDDL)
 }
 
-func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
+func rpcTimeoutMW(mwCtx context.Context) endpoint.UnaryMiddleware {
 	var moreTimeout time.Duration
 	if v, ok := mwCtx.Value(rpctimeout.TimeoutAdjustKey).(*time.Duration); ok && v != nil {
 		moreTimeout = *v
 	}
 
-	return func(next endpoint.Endpoint) endpoint.Endpoint {
+	return func(next endpoint.UnaryEndpoint) endpoint.UnaryEndpoint {
 		backgroundEP := func(ctx context.Context, request, response interface{}) error {
 			err := next(ctx, request, response)
 			if err != nil && ctx.Err() != nil &&
@@ -112,9 +112,6 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 		}
 		return func(ctx context.Context, request, response interface{}) error {
 			ri := rpcinfo.GetRPCInfo(ctx)
-			if ri.Config().InteractionMode() == rpcinfo.Streaming {
-				return next(ctx, request, response)
-			}
 			tm := ri.Config().RPCTimeout()
 			if tm > 0 {
 				tm += moreTimeout
