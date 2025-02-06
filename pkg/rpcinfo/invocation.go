@@ -40,7 +40,6 @@ type InvocationSetter interface {
 	SetPackageName(name string)
 	SetServiceName(name string)
 	SetMethodName(name string)
-	SetStreamingMode(mode serviceinfo.StreamingMode)
 	SetSeqID(seqID int32)
 	SetBizStatusErr(err kerrors.BizStatusErrorIface)
 	SetExtra(key string, value interface{})
@@ -122,16 +121,6 @@ func (i *invocation) MethodName() string {
 // SetMethodName implements the InvocationSetter interface.
 func (i *invocation) SetMethodName(name string) {
 	i.methodName = name
-}
-
-// StreamingMode implements the Invocation interface.
-func (i *invocation) StreamingMode() serviceinfo.StreamingMode {
-	return i.streamingMode
-}
-
-// SetStreamingMode implements the InvocationSetter interface.
-func (i *invocation) SetStreamingMode(mode serviceinfo.StreamingMode) {
-	i.streamingMode = mode
 }
 
 // BizStatusErr implements the Invocation interface.
