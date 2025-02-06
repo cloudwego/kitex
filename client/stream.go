@@ -93,18 +93,6 @@ func (kc *kClient) StreamX(ctx context.Context, method string) (context.Context,
 	return ctx, cs, err
 }
 
-func (kc *kClient) invokeSendEndpoint() endpoint.SendEndpoint {
-	return func(stream streaming.Stream, req interface{}) (err error) {
-		return stream.SendMsg(req)
-	}
-}
-
-func (kc *kClient) invokeRecvEndpoint() endpoint.RecvEndpoint {
-	return func(stream streaming.Stream, resp interface{}) (err error) {
-		return stream.RecvMsg(resp)
-	}
-}
-
 func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 	handler, err := kc.opt.RemoteOpt.CliHandlerFactory.NewTransHandler(kc.opt.RemoteOpt)
 	if err != nil {
@@ -113,8 +101,12 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 
 	recvEP := kc.opt.StreamOptions.BuildRecvChain()
 	sendEP := kc.opt.StreamOptions.BuildSendChain()
-	grpcRecvEP := kc.opt.Streaming.BuildRecvInvokeChain(kc.invokeRecvEndpoint())
-	grpcSendEP := kc.opt.Streaming.BuildSendInvokeChain(kc.invokeSendEndpoint())
+	grpcRecvEP := kc.opt.Streaming.BuildRecvInvokeChain(func(stream streaming.Stream, resp interface{}) (err error) {
+		return stream.RecvMsg(resp)
+	})
+	grpcSendEP := kc.opt.Streaming.BuildSendInvokeChain(func(stream streaming.Stream, req interface{}) (err error) {
+		return stream.SendMsg(req)
+	})
 
 	return func(ctx context.Context, req, resp interface{}) (err error) {
 		// req and resp as &streaming.Stream
@@ -170,6 +162,7 @@ func newStream(ctx context.Context, s streamx.ClientStream, scm *remotecli.Strea
 		streamingMode: mode,
 		recv:          recvEP,
 		send:          sendEP,
+		eventHandler:  eventHandler,
 	}
 	if grpcStreamGetter, ok := s.(streaming.GRPCStreamGetter); ok {
 		grpcStream := grpcStreamGetter.GetGRPCStream()

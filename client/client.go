@@ -136,7 +136,6 @@ func (kc *kClient) init() (err error) {
 	}
 	ctx := kc.initContext()
 	kc.initMiddlewares(ctx)
-	kc.initStreamMiddlewares(ctx)
 	kc.initDebugService()
 	kc.richRemoteOption()
 	if err = kc.buildInvokeChain(); err != nil {
@@ -164,13 +163,13 @@ func (kc *kClient) initCircuitBreaker() error {
 }
 
 func (kc *kClient) initRetryer() error {
-	if kc.opt.RetryContainer == nil {
-		if kc.opt.RetryMethodPolicies == nil {
+	if kc.opt.UnaryOptions.RetryContainer == nil {
+		if kc.opt.UnaryOptions.RetryMethodPolicies == nil {
 			return nil
 		}
 		kc.opt.InitRetryContainer()
 	}
-	return kc.opt.RetryContainer.Init(kc.opt.RetryMethodPolicies, kc.opt.RetryWithResult)
+	return kc.opt.UnaryOptions.RetryContainer.Init(kc.opt.UnaryOptions.RetryMethodPolicies, kc.opt.UnaryOptions.RetryWithResult)
 }
 
 func (kc *kClient) initContext() context.Context {
@@ -280,6 +279,7 @@ func (kc *kClient) initLBCache() error {
 }
 
 func (kc *kClient) initMiddlewares(ctx context.Context) {
+	// 1. normal middlewares
 	builderMWs := richMWsWithBuilder(ctx, kc.opt.MWBs)
 	// integrate xds if enabled
 	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {
@@ -299,9 +299,11 @@ func (kc *kClient) initMiddlewares(ctx context.Context) {
 		kc.mws = append(kc.mws, newProxyMW(kc.opt.Proxy))
 	}
 	kc.mws = append(kc.mws, newIOErrorHandleMW(kc.opt.ErrHandle))
-}
 
-func (kc *kClient) initStreamMiddlewares(ctx context.Context) {
+	// 2. unary middlewares
+	kc.opt.UnaryOptions.InitMiddlewares(ctx)
+
+	// 3. stream middlewares
 	kc.opt.Streaming.InitMiddlewares(ctx)
 	kc.opt.StreamOptions.EventHandler = kc.opt.TracerCtl.GetStreamEventHandler()
 	kc.opt.StreamOptions.InitMiddlewares(ctx)
@@ -364,7 +366,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	}()
 
 	callOptRetry := getCalloptRetryPolicy(callOpts)
-	if kc.opt.RetryContainer == nil && callOptRetry != nil && callOptRetry.Enable {
+	if kc.opt.UnaryOptions.RetryContainer == nil && callOptRetry != nil && callOptRetry.Enable {
 		// setup retry in callopt
 		kc.opt.InitRetryContainer()
 	}
@@ -372,7 +374,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	// Add necessary keys to context for isolation between kitex client method calls
 	ctx = retry.PrepareRetryContext(ctx)
 
-	if kc.opt.RetryContainer == nil {
+	if kc.opt.UnaryOptions.RetryContainer == nil {
 		// call without retry policy
 		err = kc.eps(ctx, request, response)
 		if err == nil {
@@ -380,7 +382,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 		}
 	} else {
 		var lastRI rpcinfo.RPCInfo
-		lastRI, recycleRI, err = kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
+		lastRI, recycleRI, err = kc.opt.UnaryOptions.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
 		if ri != lastRI {
 			// reset ri of ctx to lastRI
 			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, lastRI)
@@ -389,7 +391,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	}
 
 	// do fallback if with setup
-	err, reportErr = doFallbackIfNeeded(ctx, ri, request, response, err, kc.opt.Fallback, callOpts)
+	err, reportErr = doFallbackIfNeeded(ctx, ri, request, response, err, kc.opt.UnaryOptions.Fallback, callOpts)
 	return err
 }
 
@@ -750,9 +752,6 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 		rpcStats.ImmutableView(),
 	)
 
-	if mi != nil {
-		ri.Invocation().(rpcinfo.InvocationSetter).SetStreamingMode(mi.StreamingMode())
-	}
 	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
 		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))
 	}

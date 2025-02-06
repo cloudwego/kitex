@@ -66,7 +66,40 @@ type UnaryOption struct {
 }
 
 type UnaryOptions struct {
-	UnaryMiddlewares []endpoint.UnaryMiddleware
+	opts *Options
+
+	// middlewares
+	UnaryMiddlewares        []endpoint.UnaryMiddleware
+	UnaryMiddlewareBuilders []endpoint.UnaryMiddlewareBuilder
+
+	// retry policy
+	RetryMethodPolicies map[string]retry.Policy
+	RetryContainer      *retry.Container
+	RetryWithResult     *retry.ShouldResultRetry
+
+	// fallback policy
+	Fallback *fallback.Policy
+}
+
+func NewUnaryOptions(opts *Options) *UnaryOptions {
+	return &UnaryOptions{
+		opts: opts,
+	}
+}
+
+func (o *UnaryOptions) InitMiddlewares(ctx context.Context) {
+	if len(o.UnaryMiddlewareBuilders) > 0 {
+		unaryMiddlewares := make([]endpoint.UnaryMiddleware, 0, len(o.UnaryMiddlewareBuilders))
+		for _, mwb := range o.UnaryMiddlewareBuilders {
+			unaryMiddlewares = append(unaryMiddlewares, mwb(ctx))
+		}
+		o.UnaryMiddlewares = append(o.UnaryMiddlewares, unaryMiddlewares...)
+	}
+}
+
+func (o *UnaryOptions) SetUnaryRPCTimeout(d time.Duration) {
+	rpcinfo.AsMutableRPCConfig(o.opts.Configs).SetRPCTimeout(d)
+	o.opts.Locks.Bits |= rpcinfo.BitRPCTimeout
 }
 
 type StreamOption struct {
@@ -128,8 +161,8 @@ type Options struct {
 	Locks   *ConfigLocks
 	Once    *configutil.OptionOnce
 
-	UnaryOptions  *UnaryOptions
-	StreamOptions *StreamOptions
+	UnaryOptions  UnaryOptions
+	StreamOptions StreamOptions
 
 	MetaHandlers []remote.MetaHandler
 
@@ -161,14 +194,6 @@ type Options struct {
 	// Observability
 	TracerCtl  *rpcinfo.TraceController
 	StatsLevel *stats.Level
-
-	// retry policy
-	RetryMethodPolicies map[string]retry.Policy
-	RetryContainer      *retry.Container
-	RetryWithResult     *retry.ShouldResultRetry
-
-	// fallback policy
-	Fallback *fallback.Policy
 
 	CloseCallbacks []func() error
 	WarmUpOption   *warmup.ClientOption
@@ -219,12 +244,13 @@ func NewOptions(opts []Option) *Options {
 
 		GRPCConnectOpts: new(grpc.ConnectOptions),
 	}
+	o.UnaryOptions.opts = o
 	o.Apply(opts)
 
 	o.initRemoteOpt()
 
-	if o.RetryContainer != nil && o.DebugService != nil {
-		o.DebugService.RegisterProbeFunc(diagnosis.RetryPolicyKey, o.RetryContainer.Dump)
+	if o.UnaryOptions.RetryContainer != nil && o.DebugService != nil {
+		o.DebugService.RegisterProbeFunc(diagnosis.RetryPolicyKey, o.UnaryOptions.RetryContainer.Dump)
 	}
 
 	if o.StatsLevel == nil {
@@ -270,8 +296,8 @@ func (o *Options) initRemoteOpt() {
 
 // InitRetryContainer init retry container and add close callback
 func (o *Options) InitRetryContainer() {
-	if o.RetryContainer == nil {
-		o.RetryContainer = retry.NewRetryContainerWithPercentageLimit()
-		o.CloseCallbacks = append(o.CloseCallbacks, o.RetryContainer.Close)
+	if o.UnaryOptions.RetryContainer == nil {
+		o.UnaryOptions.RetryContainer = retry.NewRetryContainerWithPercentageLimit()
+		o.CloseCallbacks = append(o.CloseCallbacks, o.UnaryOptions.RetryContainer.Close)
 	}
 }

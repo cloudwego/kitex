@@ -10,14 +10,10 @@ import (
 
 // WithStreamOptions add stream options for client.
 // It is used to isolate options that are only effective for streaming methods.
-// The options injected through it have no effect on unary/ping pong methods.
 func WithStreamOptions(opts ...StreamOption) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
-		if o.StreamOptions == nil {
-			o.StreamOptions = &StreamOptions{}
-		}
 		for _, opt := range opts {
-			opt.F(o.StreamOptions, nil)
+			opt.F(&o.StreamOptions, nil)
 		}
 	}}
 }
