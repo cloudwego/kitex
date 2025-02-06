@@ -24,12 +24,12 @@ type (
 	streamKey struct{}
 )
 
-// Deprecated, use streamx.NewCtxWithServerStream instead.
+// Deprecated.
 func NewCtxWithStream(ctx context.Context, stream Stream) context.Context {
 	return context.WithValue(ctx, streamKey{}, stream)
 }
 
-// Deprecated, use streamx.GetServerStream instead.
+// Deprecated.
 func GetStream(ctx context.Context) Stream {
 	if s, ok := ctx.Value(streamKey{}).(Stream); ok {
 		return s

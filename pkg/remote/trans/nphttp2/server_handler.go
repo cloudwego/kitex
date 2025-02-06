@@ -226,10 +226,8 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 	rawStream := newServerStream(rCtx, svcInfo, newServerConn(tr, s), t)
 	// inject rawStream so that GetServerConn only relies on it
 	rCtx = context.WithValue(rCtx, serverConnKey{}, rawStream)
-	st := newStreamWithMiddleware(rawStream, t.opt.StreamRecvEndpoint, t.opt.StreamSendEndpoint, t.opt.RecvEndpoint, t.opt.SendEndpoint)
 	// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
-	rCtx = streaming.NewCtxWithStream(rCtx, st.grpcStream)
-	rCtx = streamx.NewCtxWithServerStream(rCtx, st)
+	rCtx = streaming.NewCtxWithStream(rCtx, rawStream.grpcStream)
 	// GetServerConn could retrieve rawStream by Stream.Context().Value(serverConnKey{})
 	rawStream.ctx = rCtx
 
@@ -237,7 +235,7 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 		unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
 		if unknownServiceHandlerFunc != nil {
 			rpcinfo.Record(rCtx, ri, stats.ServerHandleStart, nil)
-			err = unknownServiceHandlerFunc(rCtx, methodName, st.grpcStream)
+			err = unknownServiceHandlerFunc(rCtx, methodName, rawStream.grpcStream)
 			if err != nil {
 				err = kerrors.ErrBiz.WithCause(err)
 			}
@@ -255,8 +253,8 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 			err = invokeStreamUnaryHandler(rCtx, rawStream, methodInfo, t.inkHdlFunc, ri)
 		} else {
 			args := &streaming.Args{
-				ServerStream: st,
-				Stream:       st.grpcStream,
+				ServerStream: rawStream,
+				Stream:       rawStream.grpcStream,
 			}
 			err = t.inkHdlFunc(rCtx, args, nil)
 		}
