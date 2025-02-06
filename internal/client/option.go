@@ -81,12 +81,6 @@ type UnaryOptions struct {
 	Fallback *fallback.Policy
 }
 
-func NewUnaryOptions(opts *Options) *UnaryOptions {
-	return &UnaryOptions{
-		opts: opts,
-	}
-}
-
 func (o *UnaryOptions) InitMiddlewares(ctx context.Context) {
 	if len(o.UnaryMiddlewareBuilders) > 0 {
 		unaryMiddlewares := make([]endpoint.UnaryMiddleware, 0, len(o.UnaryMiddlewareBuilders))

@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -134,6 +135,15 @@ func (s *CBSuite) ServiceCBMW() endpoint.Middleware {
 	}
 	s.initServiceCB()
 	return NewCircuitBreakerMW(*s.serviceControl, s.servicePanel)
+}
+
+// StreamingServiceCBMW return a new service level CircuitBreakerMW for streaming.
+func (s *CBSuite) StreamingServiceCBMW() cep.StreamMiddleware {
+	if s == nil {
+		return nil
+	}
+	s.initServiceCB()
+	return NewStreamCircuitBreakerMW(*s.serviceControl, s.servicePanel)
 }
 
 // InstanceCBMW return a new instance level CircuitBreakerMW.

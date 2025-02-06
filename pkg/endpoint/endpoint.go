@@ -47,6 +47,12 @@ func Build(mws []Middleware) Middleware {
 	}
 }
 
+func (mw Middleware) ToUnaryMiddleware() UnaryMiddleware {
+	return func(next UnaryEndpoint) UnaryEndpoint {
+		return UnaryEndpoint(mw(Endpoint(next)))
+	}
+}
+
 // DummyMiddleware is a dummy middleware.
 func DummyMiddleware(next Endpoint) Endpoint {
 	return next
