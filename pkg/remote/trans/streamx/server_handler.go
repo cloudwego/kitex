@@ -25,14 +25,19 @@ import (
 	"runtime/debug"
 	"sync"
 
-	istreamx "github.com/cloudwego/kitex/internal/streamx"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
+
+type StreamInfo interface {
+	Service() string
+	Method() string
+}
 
 /*  trans_server.go only use the following interface in remote.ServerTransHandler:
 - OnRead
@@ -132,15 +137,6 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 // - process server stream
 // - close   server stream
 func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss streamx.ServerStream) (err error) {
-	// inkHdlFunc includes all middlewares and serviceInfo.methodHandler
-	// streamx still reuse the server endpoint.Endpoint and all server level middlewares
-	sargs := streamx.NewStreamArgs(ss)
-	msargs := streamx.AsMutableStreamArgs(sargs)
-	msargs.SetStreamRecvMiddleware(t.opt.StreamRecvMiddleware)
-	msargs.SetStreamSendMiddleware(t.opt.StreamSendMiddleware)
-	msargs.SetStreamMiddleware(t.opt.StreamMiddleware)
-	ctx = streamx.WithStreamArgsContext(ctx, sargs)
-
 	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	defer func() {
@@ -151,7 +147,7 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 	}()
 
 	ink := ri.Invocation().(rpcinfo.InvocationSetter)
-	if si, ok := ss.(istreamx.StreamInfo); ok {
+	if si, ok := ss.(StreamInfo); ok {
 		sinfo := t.opt.SvcSearcher.SearchService(si.Service(), si.Method(), false)
 		if sinfo == nil {
 			return remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", si.Service()))
@@ -162,7 +158,6 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 		}
 		ink.SetServiceName(sinfo.ServiceName)
 		ink.SetMethodName(si.Method())
-		ink.SetStreamingMode(minfo.StreamingMode())
 		if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
 			_ = mutableTo.SetMethod(si.Method())
 		}
@@ -181,9 +176,10 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 		t.finishTracer(ctx, ri, err, panicErr)
 	}()
 
-	reqArgs := streamx.NewStreamReqArgs(nil)
-	resArgs := streamx.NewStreamResArgs(nil)
-	serr := t.inkHdlFunc(ctx, reqArgs, resArgs)
+	args := &streaming.Args{
+		ServerStream: ss,
+	}
+	serr := t.inkHdlFunc(ctx, args, nil)
 	if serr == nil {
 		if bizErr := ri.Invocation().BizStatusErr(); bizErr != nil {
 			serr = bizErr
