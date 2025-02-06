@@ -18,6 +18,8 @@ package streamx
 
 import (
 	"context"
+
+	"github.com/cloudwego/kitex/pkg/stats"
 )
 
 type (
@@ -26,3 +28,6 @@ type (
 	ServerStreamingHandler[Req, Res any] func(ctx context.Context, req *Req, stream ServerStreamingServer[Res]) error
 	BidiStreamingHandler[Req, Res any]   func(ctx context.Context, stream BidiStreamingServer[Req, Res]) error
 )
+
+// EventHandler define stats event handler
+type EventHandler func(ctx context.Context, evt stats.Event, err error)
