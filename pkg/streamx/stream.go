@@ -215,19 +215,3 @@ func (x *GenericServerStream[Req, Res]) Recv(ctx context.Context) (m *Req, err e
 	}
 	return m, nil
 }
-
-type (
-	serverStreamKey struct{}
-	clientStreamKey struct{}
-)
-
-func NewCtxWithServerStream(ctx context.Context, stream ServerStream) context.Context {
-	return context.WithValue(ctx, serverStreamKey{}, stream)
-}
-
-func GetServerStream(ctx context.Context) ServerStream {
-	if s, ok := ctx.Value(serverStreamKey{}).(ServerStream); ok {
-		return s
-	}
-	return nil
-}

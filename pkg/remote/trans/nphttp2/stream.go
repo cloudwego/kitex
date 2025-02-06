@@ -20,8 +20,6 @@ import (
 	"context"
 	"net"
 
-	ep "github.com/cloudwego/kitex/pkg/endpoint"
-	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -31,9 +29,7 @@ import (
 )
 
 type grpcServerStream struct {
-	grpcRecv ep.RecvEndpoint
-	grpcSend ep.SendEndpoint
-	sx       *serverStream
+	sx *serverStream
 }
 
 type serverStream struct {
@@ -41,8 +37,6 @@ type serverStream struct {
 	svcInfo *serviceinfo.ServiceInfo
 	conn    net.Conn // clientConn or serverConn
 	handler remote.TransReadWriter
-	recv    sep.StreamRecvEndpoint
-	send    sep.StreamSendEndpoint
 	// for grpc compatibility
 	grpcStream *grpcServerStream
 }

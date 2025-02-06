@@ -160,6 +160,7 @@ func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 
 	// 3. universal middleware
 	var mws []endpoint.Middleware
+	mws = append(mws, s.wrapStreamMiddleware())
 	// register server timeout middleware
 	// prepend for adding timeout to the context for all middlewares and the handler
 	if s.opt.EnableContextTimeout {
@@ -191,12 +192,6 @@ func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 func (s *server) buildInvokeChain(ctx context.Context) {
 	mws := s.buildMiddlewares(ctx)
 	s.eps = endpoint.Chain(mws...)(s.lastCompatibleEndpoint(ctx))
-
-	// for stream recv/send
-	s.opt.RemoteOpt.StreamRecvEndpoint = s.opt.StreamOptions.BuildRecvChain()
-	s.opt.RemoteOpt.StreamSendEndpoint = s.opt.StreamOptions.BuildSendChain()
-	s.opt.RemoteOpt.RecvEndpoint = s.opt.Streaming.BuildRecvInvokeChain(s.invokeRecvEndpoint())
-	s.opt.RemoteOpt.SendEndpoint = s.opt.Streaming.BuildSendInvokeChain(s.invokeSendEndpoint())
 }
 
 // buildStreamCtxInjectMiddleware is a workaround to resolve stream ctx diverge problem in server side
@@ -398,7 +393,7 @@ func (s *server) lastCompatibleEndpoint(ctx context.Context) endpoint.Endpoint {
 	streamEp := sep.StreamChain(s.opt.StreamOptions.StreamMiddlewares...)(s.streamHandleEndpoint())
 
 	return func(ctx context.Context, req, resp interface{}) (err error) {
-		if st, ok := req.(streaming.Args); ok {
+		if st, ok := req.(*streaming.Args); ok {
 			return streamEp(ctx, st.ServerStream)
 		} else {
 			return unaryEp(ctx, req, resp)
