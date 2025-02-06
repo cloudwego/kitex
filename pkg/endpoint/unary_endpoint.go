@@ -32,3 +32,9 @@ func UnaryChain(mws ...UnaryMiddleware) UnaryMiddleware {
 		return next
 	}
 }
+
+func (mw UnaryMiddleware) ToMiddleware() Middleware {
+	return func(next Endpoint) Endpoint {
+		return Endpoint(mw(UnaryEndpoint(next)))
+	}
+}
