@@ -101,8 +101,6 @@ func (s *server) init() {
 	// init invoker chain here since we need to get some svc information to add MW
 	// register stream recv/send middlewares
 	s.buildInvokeChain(ctx)
-	s.initStreamMiddlewares(ctx)
-	s.buildStreamInvokeChain()
 }
 
 func fillContext(opt *internal_server.Options) context.Context {
@@ -152,6 +150,15 @@ func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinf
 }
 
 func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
+	// 1. unary middleware
+	s.opt.UnaryOptions.InitMiddlewares(ctx)
+
+	// 2. stream middleware
+	s.opt.Streaming.InitMiddlewares(ctx)
+	s.opt.StreamOptions.EventHandler = s.opt.TracerCtl.GetStreamEventHandler()
+	s.opt.StreamOptions.InitMiddlewares(ctx)
+
+	// 3. universal middleware
 	var mws []endpoint.Middleware
 	// register server timeout middleware
 	// prepend for adding timeout to the context for all middlewares and the handler
@@ -184,6 +191,12 @@ func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 func (s *server) buildInvokeChain(ctx context.Context) {
 	mws := s.buildMiddlewares(ctx)
 	s.eps = endpoint.Chain(mws...)(s.lastCompatibleEndpoint(ctx))
+
+	// for stream recv/send
+	s.opt.RemoteOpt.StreamRecvEndpoint = s.opt.StreamOptions.BuildRecvChain()
+	s.opt.RemoteOpt.StreamSendEndpoint = s.opt.StreamOptions.BuildSendChain()
+	s.opt.RemoteOpt.RecvEndpoint = s.opt.Streaming.BuildRecvInvokeChain(s.invokeRecvEndpoint())
+	s.opt.RemoteOpt.SendEndpoint = s.opt.Streaming.BuildSendInvokeChain(s.invokeSendEndpoint())
 }
 
 // buildStreamCtxInjectMiddleware is a workaround to resolve stream ctx diverge problem in server side
@@ -393,7 +406,7 @@ func (s *server) lastCompatibleEndpoint(ctx context.Context) endpoint.Endpoint {
 	}
 }
 
-func (s *server) invokeHandleEndpoint() sep.UnaryEndpoint {
+func (s *server) invokeHandleEndpoint() endpoint.UnaryEndpoint {
 	return func(ctx context.Context, args, resp interface{}) (err error) {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		methodName := ri.Invocation().MethodName()

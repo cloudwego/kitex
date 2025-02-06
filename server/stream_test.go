@@ -41,7 +41,7 @@ func Test_server_initStreamMiddlewares(t *testing.T) {
 			Streaming: stream.StreamingConfig{},
 		},
 	}
-	s.initStreamMiddlewares(context.Background())
+	s.buildMiddlewares(context.Background())
 
 	test.Assert(t, len(s.opt.Streaming.RecvMiddlewares) > 0, "init middlewares failed")
 	test.Assert(t, len(s.opt.Streaming.SendMiddlewares) > 0, "init middlewares failed")

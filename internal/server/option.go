@@ -60,7 +60,18 @@ type UnaryOption struct {
 }
 
 type UnaryOptions struct {
-	UnaryMiddlewares []endpoint.UnaryMiddleware
+	UnaryMiddlewares        []endpoint.UnaryMiddleware
+	UnaryMiddlewareBuilders []endpoint.UnaryMiddlewareBuilder
+}
+
+func (o *UnaryOptions) InitMiddlewares(ctx context.Context) {
+	if len(o.UnaryMiddlewareBuilders) > 0 {
+		unaryMiddlewares := make([]endpoint.UnaryMiddleware, 0, len(o.UnaryMiddlewareBuilders))
+		for _, mwb := range o.UnaryMiddlewareBuilders {
+			unaryMiddlewares = append(unaryMiddlewares, mwb(ctx))
+		}
+		o.UnaryMiddlewares = append(o.UnaryMiddlewares, unaryMiddlewares...)
+	}
 }
 
 type StreamOption struct {
@@ -68,13 +79,37 @@ type StreamOption struct {
 }
 
 type StreamOptions struct {
-	EventHandler          streamx.EventHandler
-	StreamMiddlewares     []sep.StreamMiddleware
-	StreamRecvMiddlewares []sep.StreamRecvMiddleware
-	StreamSendMiddlewares []sep.StreamSendMiddleware
+	EventHandler                 streamx.EventHandler
+	StreamMiddlewares            []sep.StreamMiddleware
+	StreamMiddlewareBuilders     []sep.StreamMiddlewareBuilder
+	StreamRecvMiddlewares        []sep.StreamRecvMiddleware
+	StreamRecvMiddlewareBuilders []sep.StreamRecvMiddlewareBuilder
+	StreamSendMiddlewares        []sep.StreamSendMiddleware
+	StreamSendMiddlewareBuilders []sep.StreamSendMiddlewareBuilder
 }
 
 func (o *StreamOptions) InitMiddlewares(ctx context.Context) {
+	if len(o.StreamMiddlewareBuilders) > 0 {
+		streamMiddlewares := make([]sep.StreamMiddleware, 0, len(o.StreamMiddlewareBuilders))
+		for _, mwb := range o.StreamMiddlewareBuilders {
+			streamMiddlewares = append(streamMiddlewares, mwb(ctx))
+		}
+		o.StreamMiddlewares = append(o.StreamMiddlewares, streamMiddlewares...)
+	}
+	if len(o.StreamRecvMiddlewareBuilders) > 0 {
+		streamRecvMiddlewares := make([]sep.StreamRecvMiddleware, 0, len(o.StreamRecvMiddlewareBuilders))
+		for _, mwb := range o.StreamRecvMiddlewareBuilders {
+			streamRecvMiddlewares = append(streamRecvMiddlewares, mwb(ctx))
+		}
+		o.StreamRecvMiddlewares = append(o.StreamRecvMiddlewares, streamRecvMiddlewares...)
+	}
+	if len(o.StreamSendMiddlewareBuilders) > 0 {
+		streamSendMiddlewares := make([]sep.StreamSendMiddleware, 0, len(o.StreamSendMiddlewareBuilders))
+		for _, mwb := range o.StreamSendMiddlewareBuilders {
+			streamSendMiddlewares = append(streamSendMiddlewares, mwb(ctx))
+		}
+		o.StreamSendMiddlewares = append(o.StreamSendMiddlewares, streamSendMiddlewares...)
+	}
 }
 
 func (o *StreamOptions) BuildRecvChain() sep.StreamRecvEndpoint {
@@ -101,8 +136,8 @@ type Options struct {
 	LockBits int
 	Once     *configutil.OptionOnce
 
-	UnaryOptions  *UnaryOptions
-	StreamOptions *StreamOptions
+	UnaryOptions  UnaryOptions
+	StreamOptions StreamOptions
 
 	MetaHandlers []remote.MetaHandler
 
