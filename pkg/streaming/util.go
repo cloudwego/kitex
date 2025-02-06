@@ -21,6 +21,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 // KitexUnusedProtection may be anonymously referenced in another package to avoid build error
@@ -38,7 +39,25 @@ func UnaryCompatibleMiddleware(mode serviceinfo.StreamingMode, allow bool) bool 
 // for the io.EOF (which triggers the DoFinish automatically).
 // Note: if you're to wrap the original stream in a Client middleware, you should also implement
 // WithDoFinish in your Stream implementation.
+// Deprecated: use FinishClientStream instead, this requires enabling the streamx feature.
 func FinishStream(s Stream, err error) {
+	if st, ok := s.(WithDoFinish); ok {
+		st.DoFinish(err)
+		return
+	}
+	// A gentle (only once) warning for existing implementation of streaming.Stream(s)
+	userStreamNotImplementingWithDoFinish.Do(func() {
+		klog.Warnf("Failed to record the RPCFinish event, due to"+
+			" the stream type [%T] does not implement streaming.WithDoFinish", s)
+	})
+}
+
+// FinishClientStream records the end of stream
+// you can call it manually when all business logic is done, and you don't want to call Recv/Send
+// for the io.EOF (which triggers the DoFinish automatically).
+// Note: if you're to wrap the original stream in a Client middleware, you should also implement
+// WithDoFinish in your ClientStream implementation.
+func FinishClientStream(s streamx.ClientStream, err error) {
 	if st, ok := s.(WithDoFinish); ok {
 		st.DoFinish(err)
 		return

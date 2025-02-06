@@ -117,7 +117,6 @@ type MethodInfo interface {
 	OneWay() bool
 	IsStreaming() bool
 	StreamingMode() StreamingMode
-	Extra() map[string]string
 }
 
 // MethodHandler is corresponding to the handler wrapper func that in generated code
@@ -134,12 +133,6 @@ func WithStreamingMode(mode StreamingMode) MethodInfoOption {
 	}
 }
 
-func WithMethodExtra(k, v string) MethodInfoOption {
-	return func(m *methodInfo) {
-		m.extra[k] = v
-	}
-}
-
 // NewMethodInfo is called in generated code to build method info
 func NewMethodInfo(methodHandler MethodHandler, newArgsFunc, newResultFunc func() interface{}, oneWay bool, opts ...MethodInfoOption) MethodInfo {
 	mi := methodInfo{
@@ -149,7 +142,6 @@ func NewMethodInfo(methodHandler MethodHandler, newArgsFunc, newResultFunc func(
 		oneWay:        oneWay,
 		isStreaming:   false,
 		streamingMode: StreamingNone,
-		extra:         make(map[string]string),
 	}
 	for _, opt := range opts {
 		opt(&mi)
@@ -164,7 +156,6 @@ type methodInfo struct {
 	oneWay        bool
 	isStreaming   bool
 	streamingMode StreamingMode
-	extra         map[string]string
 }
 
 // Handler implements the MethodInfo interface.
@@ -193,10 +184,6 @@ func (m methodInfo) IsStreaming() bool {
 
 func (m methodInfo) StreamingMode() StreamingMode {
 	return m.streamingMode
-}
-
-func (m methodInfo) Extra() map[string]string {
-	return m.extra
 }
 
 // String prints human-readable information.
