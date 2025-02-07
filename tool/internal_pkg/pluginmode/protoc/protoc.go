@@ -73,38 +73,13 @@ func GenKitex(req *pluginpb.CodeGeneratorRequest, opts protogen.Options) (*plugi
 	pp := new(protocPlugin)
 	pp.init()
 	args := strings.Split(req.GetParameter(), ",")
-	err := pp.Unpack(args)
-	if err != nil {
+	if err := pp.Unpack(args); err != nil {
 		return nil, fmt.Errorf("%s: unpack args: %w", PluginName, err)
 	}
 
-	pp.parseM()
-
-	// unify go_package
-	pe := &pathElements{
-		module: pp.ModuleName,
-		prefix: pp.PackagePrefix,
-	}
-	for _, f := range req.ProtoFile {
-		if f == nil {
-			return nil, errors.New("ERROR: got nil ProtoFile")
-		}
-
-		gopkg, ok := pp.importPaths[f.GetName()]
-		if ok {
-			f.Options.GoPackage = &gopkg
-			log.Infof("[INFO] option specified import path for %q: %q\n", f.GetName(), gopkg)
-		} else {
-			if f.Options == nil || f.Options.GoPackage == nil {
-				return nil, fmt.Errorf("ERROR: go_package is missing in proto file %q", f.GetName())
-			}
-			gopkg = f.GetOptions().GetGoPackage()
-		}
-		if dirPath, ns, ok := pe.getImportPathAndNamespace(gopkg); ok {
-			f.Options.GoPackage = &dirPath
-			pp.namespaces[f.GetName()] = ns
-			log.Infof("[INFO] update import path for %q: %q -> %q\n", f.GetName(), gopkg, dirPath)
-		}
+	// parse M and process go_package
+	if err := pp.processGoPackage(req); err != nil {
+		return nil, err
 	}
 
 	// generate files
@@ -117,4 +92,36 @@ func GenKitex(req *pluginpb.CodeGeneratorRequest, opts protogen.Options) (*plugi
 	// construct plugin response
 	resp := gen.Response()
 	return resp, nil
+}
+
+func (pp *protocPlugin) processGoPackage(req *pluginpb.CodeGeneratorRequest) error {
+	pp.parseM()
+
+	// unify go_package
+	pe := &pathElements{
+		module: pp.ModuleName,
+		prefix: pp.PackagePrefix,
+	}
+	for _, f := range req.ProtoFile {
+		if f == nil {
+			return errors.New("ERROR: got nil ProtoFile")
+		}
+
+		gopkg, ok := pp.importPaths[f.GetName()]
+		if ok {
+			f.Options.GoPackage = &gopkg
+			log.Infof("[INFO] option specified import path for %q: %q\n", f.GetName(), gopkg)
+		} else {
+			if f.Options == nil || f.Options.GoPackage == nil {
+				return fmt.Errorf("ERROR: go_package is missing in proto file %q", f.GetName())
+			}
+			gopkg = f.GetOptions().GetGoPackage()
+		}
+		if dirPath, ns, ok := pe.getImportPathAndNamespace(gopkg); ok {
+			f.Options.GoPackage = &dirPath
+			pp.namespaces[f.GetName()] = ns
+			log.Infof("[INFO] update import path for %q: %q -> %q\n", f.GetName(), gopkg, dirPath)
+		}
+	}
+	return nil
 }

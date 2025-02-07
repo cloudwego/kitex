@@ -41,7 +41,7 @@ type protocPlugin struct {
 	kg          generator.Generator
 	err         error
 	importPaths map[string]string // file -> import path
-	namespaces  map[string]string // file name -> go_package in idl
+	namespaces  map[string]string // file name -> namespace(extracted from go_package)
 }
 
 // Name implements the protobuf_generator.Plugin interface.
@@ -129,9 +129,9 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 	if parts := strings.Split(gopkg, ";"); len(parts) > 1 {
 		gopkg = parts[0] // remove package alias from file path
 	}
-	// extract original go_package from idl
-	pp.Namespace = pp.namespaces[file.Proto.GetName()]
-	pp.IDLName = util.IDLName(pp.Config.IDL)
+	// namespace has been extracted in GenKitex
+	pp.PackageInfo.Namespace = pp.namespaces[file.Proto.GetName()]
+	pp.PackageInfo.IDLName = util.IDLName(pp.Config.IDL)
 
 	ss := pp.convertTypes(file)
 	pp.Services = append(pp.Services, ss...)
@@ -143,7 +143,7 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 	hasStreaming := false
 	// generate service package
 	for _, si := range ss {
-		pp.ServiceInfo = si
+		pp.PackageInfo.ServiceInfo = si
 		fs, err := pp.kg.GenerateService(&pp.PackageInfo)
 		if err != nil {
 			pp.err = err
@@ -205,6 +205,7 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 	// iterate over all proto files
 	idl := gen.Request.FileToGenerate[0]
 	for _, f := range gen.Files {
+		// if -use is specified, do not need to generate kitex_gen
 		if pp.Config.Use != "" && f.Proto.GetName() != idl {
 			continue
 		}
@@ -218,7 +219,7 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 		}
 		if !pp.IsUsingMultipleServicesTpl() {
 			// if -tpl multiple_services is not set, specify the last service as the target service
-			pp.ServiceInfo = pp.Services[len(pp.Services)-1]
+			pp.PackageInfo.ServiceInfo = pp.Services[len(pp.Services)-1]
 		} else {
 			var svcs []*generator.ServiceInfo
 			for _, svc := range pp.Services {
