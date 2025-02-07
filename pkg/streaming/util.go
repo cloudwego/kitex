@@ -22,7 +22,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 // KitexUnusedProtection may be anonymously referenced in another package to avoid build error
@@ -58,7 +57,7 @@ func FinishStream(s Stream, err error) {
 // for the io.EOF (which triggers the DoFinish automatically).
 // Note: if you're to wrap the original stream in a Client middleware, you should also implement
 // WithDoFinish in your ClientStream implementation.
-func FinishClientStream(s streamx.ClientStream, err error) {
+func FinishClientStream(s ClientStream, err error) {
 	if st, ok := s.(WithDoFinish); ok {
 		st.DoFinish(err)
 		return
@@ -71,12 +70,12 @@ func FinishClientStream(s streamx.ClientStream, err error) {
 }
 
 // GetServerStream gets streamx.ServerStream from the arg. It's for kitex gen code ONLY.
-func GetServerStreamFromArg(arg interface{}) (streamx.ServerStream, error) {
-	var st streamx.ServerStream
+func GetServerStreamFromArg(arg interface{}) (ServerStream, error) {
+	var st ServerStream
 	switch rarg := arg.(type) {
 	case *Args:
 		st = rarg.ServerStream
-	case streamx.ServerStream:
+	case ServerStream:
 		st = rarg
 	default:
 		return nil, fmt.Errorf("cannot get streamx.ServerStream from type: %T", arg)

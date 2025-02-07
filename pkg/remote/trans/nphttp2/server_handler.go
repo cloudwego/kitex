@@ -31,8 +31,6 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
-	"github.com/cloudwego/kitex/pkg/streamx"
-
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -282,7 +280,7 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 // invokeStreamUnaryHandler allows unary APIs over HTTP2 to use the same server middleware as non-streaming APIs.
 // For thrift unary APIs over HTTP2, it's enabled by default.
 // For grpc(protobuf) unary APIs, it's disabled by default to keep backward compatibility.
-func invokeStreamUnaryHandler(ctx context.Context, st streamx.ServerStream, mi serviceinfo.MethodInfo,
+func invokeStreamUnaryHandler(ctx context.Context, st streaming.ServerStream, mi serviceinfo.MethodInfo,
 	handler endpoint.Endpoint, ri rpcinfo.RPCInfo,
 ) (err error) {
 	realArgs, realResp := mi.NewArgs(), mi.NewResult()

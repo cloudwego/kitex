@@ -19,7 +19,7 @@ package ttstream
 import (
 	"context"
 
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 var _ ServerStreamMeta = (*serverStream)(nil)
@@ -33,18 +33,18 @@ type serverStream struct {
 	*stream
 }
 
-func (s *serverStream) SetHeader(hd streamx.Header) error {
+func (s *serverStream) SetHeader(hd streaming.Header) error {
 	return s.writeHeader(hd)
 }
 
-func (s *serverStream) SendHeader(hd streamx.Header) error {
+func (s *serverStream) SendHeader(hd streaming.Header) error {
 	if err := s.writeHeader(hd); err != nil {
 		return err
 	}
 	return s.stream.sendHeader()
 }
 
-func (s *serverStream) SetTrailer(tl streamx.Trailer) error {
+func (s *serverStream) SetTrailer(tl streaming.Trailer) error {
 	return s.writeTrailer(tl)
 }
 

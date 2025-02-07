@@ -19,11 +19,11 @@ package client
 import (
 	"context"
 
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // StreamEndpoint represent one Stream call, it returns a stream.
-type StreamEndpoint func(ctx context.Context) (st streamx.ClientStream, err error)
+type StreamEndpoint func(ctx context.Context) (st streaming.ClientStream, err error)
 
 // StreamMiddleware deal with input StreamEndpoint and output StreamEndpoint.
 type StreamMiddleware func(next StreamEndpoint) StreamEndpoint
@@ -32,7 +32,7 @@ type StreamMiddleware func(next StreamEndpoint) StreamEndpoint
 type StreamMiddlewareBuilder func(ctx context.Context) StreamMiddleware
 
 // StreamRecvEndpoint represent one Stream Recv call, the inner endpoint will call stream.RecvMsg(ctx, message).
-type StreamRecvEndpoint func(ctx context.Context, stream streamx.ClientStream, message interface{}) (err error)
+type StreamRecvEndpoint func(ctx context.Context, stream streaming.ClientStream, message interface{}) (err error)
 
 // StreamRecvMiddleware deal with input StreamRecvEndpoint and output StreamRecvEndpoint.
 type StreamRecvMiddleware func(next StreamRecvEndpoint) StreamRecvEndpoint
@@ -41,7 +41,7 @@ type StreamRecvMiddleware func(next StreamRecvEndpoint) StreamRecvEndpoint
 type StreamRecvMiddlewareBuilder func(ctx context.Context) StreamRecvMiddleware
 
 // StreamSendEndpoint represent one Stream Send call.
-type StreamSendEndpoint func(ctx context.Context, stream streamx.ClientStream, message interface{}) (err error)
+type StreamSendEndpoint func(ctx context.Context, stream streaming.ClientStream, message interface{}) (err error)
 
 // StreamSendMiddleware deal with input StreamSendEndpoint and output StreamSendEndpoint.
 type StreamSendMiddleware func(next StreamSendEndpoint) StreamSendEndpoint

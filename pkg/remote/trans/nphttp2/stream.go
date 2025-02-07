@@ -25,7 +25,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 type grpcServerStream struct {
@@ -101,17 +100,17 @@ func (s *grpcServerStream) Close() error {
 	return s.sx.conn.Close()
 }
 
-func (s *serverStream) SetHeader(hd streamx.Header) error {
+func (s *serverStream) SetHeader(hd streaming.Header) error {
 	sc := s.conn.(*serverConn)
 	return sc.s.SetHeader(streamingHeaderToHTTP2MD(hd))
 }
 
-func (s *serverStream) SendHeader(hd streamx.Header) error {
+func (s *serverStream) SendHeader(hd streaming.Header) error {
 	sc := s.conn.(*serverConn)
 	return sc.s.SendHeader(streamingHeaderToHTTP2MD(hd))
 }
 
-func (s *serverStream) SetTrailer(tl streamx.Trailer) error {
+func (s *serverStream) SetTrailer(tl streaming.Trailer) error {
 	sc := s.conn.(*serverConn)
 	return sc.s.SetTrailer(streamingTrailerToHTTP2MD(tl))
 }
@@ -181,7 +180,7 @@ func (s *clientStream) GetGRPCStream() streaming.Stream {
 }
 
 // NewClientStream ...
-func NewClientStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn net.Conn, handler remote.TransReadWriter) streamx.ClientStream {
+func NewClientStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn net.Conn, handler remote.TransReadWriter) streaming.ClientStream {
 	sx := &clientStream{
 		ctx:     ctx,
 		svcInfo: svcInfo,
@@ -234,7 +233,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) error {
 	return s.sx.SendMsg(context.Background(), m)
 }
 
-func (s *clientStream) Header() (streamx.Header, error) {
+func (s *clientStream) Header() (streaming.Header, error) {
 	sc := s.conn.(*clientConn)
 	hd, err := sc.Header()
 	if err != nil {
@@ -243,7 +242,7 @@ func (s *clientStream) Header() (streamx.Header, error) {
 	return http2MDToStreamingHeader(hd), nil
 }
 
-func (s *clientStream) Trailer() (streamx.Trailer, error) {
+func (s *clientStream) Trailer() (streaming.Trailer, error) {
 	sc := s.conn.(*clientConn)
 	tl := sc.Trailer()
 	return http2MDToStreamingTrailer(tl), nil
@@ -304,7 +303,7 @@ func (s *clientStream) getPayloadCodecFromContentType() (serviceinfo.PayloadCode
 	}
 }
 
-func streamingHeaderToHTTP2MD(header streamx.Header) metadata.MD {
+func streamingHeaderToHTTP2MD(header streaming.Header) metadata.MD {
 	md := metadata.MD{}
 	for k, v := range header {
 		md.Append(k, v)
@@ -312,7 +311,7 @@ func streamingHeaderToHTTP2MD(header streamx.Header) metadata.MD {
 	return md
 }
 
-func streamingTrailerToHTTP2MD(trailer streamx.Trailer) metadata.MD {
+func streamingTrailerToHTTP2MD(trailer streaming.Trailer) metadata.MD {
 	md := metadata.MD{}
 	for k, v := range trailer {
 		md.Append(k, v)
@@ -320,8 +319,8 @@ func streamingTrailerToHTTP2MD(trailer streamx.Trailer) metadata.MD {
 	return md
 }
 
-func http2MDToStreamingHeader(md metadata.MD) streamx.Header {
-	header := streamx.Header{}
+func http2MDToStreamingHeader(md metadata.MD) streaming.Header {
+	header := streaming.Header{}
 	for k, v := range md {
 		if len(v) > 1 {
 			panic("cannot convert http2 metadata to streaming header, because the value of key " + k + " is more than one")
@@ -331,8 +330,8 @@ func http2MDToStreamingHeader(md metadata.MD) streamx.Header {
 	return header
 }
 
-func http2MDToStreamingTrailer(md metadata.MD) streamx.Trailer {
-	trailer := streamx.Trailer{}
+func http2MDToStreamingTrailer(md metadata.MD) streaming.Trailer {
+	trailer := streaming.Trailer{}
 	for k, v := range md {
 		if len(v) > 1 {
 			panic("cannot convert http2 metadata to streaming trailer, because the value of key " + k + " is more than one")

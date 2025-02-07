@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
-package streamx
+package streaming
 
 import (
 	"context"
+
+	"github.com/cloudwego/kitex/pkg/stats"
 )
 
 /* Streaming Mode
@@ -71,14 +73,14 @@ type (
 )
 
 // Stream define stream APIs
-type Stream interface {
+type StreamX interface {
 	SendMsg(ctx context.Context, m any) error
 	RecvMsg(ctx context.Context, m any) error
 }
 
 // ClientStream define client stream APIs
 type ClientStream interface {
-	Stream
+	StreamX
 	Header() (Header, error)
 	Trailer() (Trailer, error)
 	CloseSend(ctx context.Context) error
@@ -87,7 +89,7 @@ type ClientStream interface {
 
 // ServerStream define server stream APIs
 type ServerStream interface {
-	Stream
+	StreamX
 	SetHeader(hd Header) error
 	SendHeader(hd Header) error
 	SetTrailer(hd Trailer) error
@@ -234,3 +236,6 @@ func (s *bidiStreamingServerImpl[Req, Res]) Recv(ctx context.Context) (*Req, err
 func (s *bidiStreamingServerImpl[Req, Res]) Send(ctx context.Context, res *Res) error {
 	return s.ServerStream.SendMsg(ctx, res)
 }
+
+// EventHandler define stats event handler
+type EventHandler func(ctx context.Context, evt stats.Event, err error)

@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 var _ ClientStreamMeta = (*clientStream)(nil)
@@ -34,11 +34,11 @@ type clientStream struct {
 	*stream
 }
 
-func (s *clientStream) Header() (streamx.Header, error) {
+func (s *clientStream) Header() (streaming.Header, error) {
 	sig := <-s.headerSig
 	switch sig {
 	case streamSigNone:
-		return make(streamx.Header), nil
+		return make(streaming.Header), nil
 	case streamSigActive:
 		return s.header, nil
 	case streamSigInactive:
@@ -49,11 +49,11 @@ func (s *clientStream) Header() (streamx.Header, error) {
 	return nil, errors.New("invalid stream signal")
 }
 
-func (s *clientStream) Trailer() (streamx.Trailer, error) {
+func (s *clientStream) Trailer() (streaming.Trailer, error) {
 	sig := <-s.trailerSig
 	switch sig {
 	case streamSigNone:
-		return make(streamx.Trailer), nil
+		return make(streaming.Trailer), nil
 	case streamSigActive:
 		return s.trailer, nil
 	case streamSigInactive:

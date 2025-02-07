@@ -25,8 +25,6 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
-	"github.com/cloudwego/kitex/pkg/streamx"
-
 	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -46,6 +44,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -79,7 +78,7 @@ type StreamOption struct {
 }
 
 type StreamOptions struct {
-	EventHandler                 streamx.EventHandler
+	EventHandler                 streaming.EventHandler
 	StreamMiddlewares            []sep.StreamMiddleware
 	StreamMiddlewareBuilders     []sep.StreamMiddlewareBuilder
 	StreamRecvMiddlewares        []sep.StreamRecvMiddleware
@@ -113,13 +112,13 @@ func (o *StreamOptions) InitMiddlewares(ctx context.Context) {
 }
 
 func (o *StreamOptions) BuildRecvChain() sep.StreamRecvEndpoint {
-	return sep.StreamRecvChain(o.StreamRecvMiddlewares...)(func(ctx context.Context, stream streamx.ServerStream, message interface{}) (err error) {
+	return sep.StreamRecvChain(o.StreamRecvMiddlewares...)(func(ctx context.Context, stream streaming.ServerStream, message interface{}) (err error) {
 		return stream.RecvMsg(ctx, message)
 	})
 }
 
 func (o *StreamOptions) BuildSendChain() sep.StreamSendEndpoint {
-	return sep.StreamSendChain(o.StreamSendMiddlewares...)(func(ctx context.Context, stream streamx.ServerStream, message interface{}) (err error) {
+	return sep.StreamSendChain(o.StreamSendMiddlewares...)(func(ctx context.Context, stream streaming.ServerStream, message interface{}) (err error) {
 		return stream.SendMsg(ctx, message)
 	})
 }

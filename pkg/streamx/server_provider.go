@@ -19,6 +19,8 @@ package streamx
 import (
 	"context"
 	"net"
+
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 /* How it works
@@ -63,7 +65,7 @@ type ServerProvider interface {
 	// OnInactive called then conn disconnect
 	OnInactive(ctx context.Context, conn net.Conn) (context.Context, error)
 	// OnStream should read conn data and return a server stream
-	OnStream(ctx context.Context, conn net.Conn) (context.Context, ServerStream, error)
+	OnStream(ctx context.Context, conn net.Conn) (context.Context, streaming.ServerStream, error)
 	// OnStreamFinish should be called when user server handler returned, typically provide should close the stream
-	OnStreamFinish(ctx context.Context, ss ServerStream, err error) (context.Context, error)
+	OnStreamFinish(ctx context.Context, ss streaming.ServerStream, err error) (context.Context, error)
 }

@@ -20,7 +20,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 type HeaderFrameHandler interface {
@@ -37,7 +37,7 @@ type HeaderFrameReadHandler interface {
 }
 
 type MetaFrameHandler interface {
-	OnMetaFrame(smeta StreamMeta, intHeader IntHeader, header streamx.Header, payload []byte) error
+	OnMetaFrame(smeta StreamMeta, intHeader IntHeader, header streaming.Header, payload []byte) error
 }
 
 // StreamMeta is a kv storage for meta frame handler

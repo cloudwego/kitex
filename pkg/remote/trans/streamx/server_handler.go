@@ -136,7 +136,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 // - create  server stream
 // - process server stream
 // - close   server stream
-func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss streamx.ServerStream) (err error) {
+func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss streaming.ServerStream) (err error) {
 	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	defer func() {

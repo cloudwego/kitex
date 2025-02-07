@@ -23,11 +23,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // NewStream create a client side stream
-func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTransHandler, opt *remote.ClientOption) (streamx.ClientStream, *StreamConnManager, error) {
+func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTransHandler, opt *remote.ClientOption) (streaming.ClientStream, *StreamConnManager, error) {
 	cm := NewConnWrapper(opt.ConnPool)
 	var err error
 	for _, shdlr := range opt.StreamingMetaHandlers {

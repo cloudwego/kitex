@@ -31,14 +31,13 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 // Streaming client streaming interface for code generate
 type Streaming interface {
 	// Deprecated, use StreamX instead
 	Stream(ctx context.Context, method string, request, response interface{}) error
-	StreamX(ctx context.Context, method string) (streamx.ClientStream, error)
+	StreamX(ctx context.Context, method string) (streaming.ClientStream, error)
 }
 
 // Stream implements the Streaming interface
@@ -72,7 +71,7 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 }
 
 // StreamX implements the Streaming interface
-func (kc *kClient) StreamX(ctx context.Context, method string) (streamx.ClientStream, error) {
+func (kc *kClient) StreamX(ctx context.Context, method string) (streaming.ClientStream, error) {
 	if !kc.inited {
 		panic("client not initialized")
 	}
@@ -129,7 +128,7 @@ func (kc *kClient) getStreamingMode(ri rpcinfo.RPCInfo) serviceinfo.StreamingMod
 }
 
 type stream struct {
-	streamx.ClientStream
+	streaming.ClientStream
 	grpcStream   *grpcStream
 	ctx          context.Context
 	scm          *remotecli.StreamConnManager
@@ -146,7 +145,7 @@ type stream struct {
 
 var _ streaming.WithDoFinish = (*stream)(nil)
 
-func newStream(ctx context.Context, s streamx.ClientStream, scm *remotecli.StreamConnManager, kc *kClient, ri rpcinfo.RPCInfo, mode serviceinfo.StreamingMode,
+func newStream(ctx context.Context, s streaming.ClientStream, scm *remotecli.StreamConnManager, kc *kClient, ri rpcinfo.RPCInfo, mode serviceinfo.StreamingMode,
 	sendEP cep.StreamSendEndpoint, recvEP cep.StreamRecvEndpoint, eventHandler internal_stream.StreamEventHandler, grpcSendEP endpoint.SendEndpoint, grpcRecvEP endpoint.RecvEndpoint,
 ) *stream {
 	st := &stream{

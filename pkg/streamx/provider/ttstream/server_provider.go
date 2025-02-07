@@ -29,6 +29,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -88,7 +89,7 @@ func (s serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context.
 	return ctx, nil
 }
 
-func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Context, streamx.ServerStream, error) {
+func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Context, streaming.ServerStream, error) {
 	trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
 	if trans == nil {
 		return nil, nil, fmt.Errorf("server transport is nil")
@@ -118,7 +119,7 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 	return ctx, ss, nil
 }
 
-func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStream, err error) (context.Context, error) {
+func (s serverProvider) OnStreamFinish(ctx context.Context, ss streaming.ServerStream, err error) (context.Context, error) {
 	sst := ss.(*serverStream)
 	var exception error
 	if err != nil {
@@ -127,13 +128,13 @@ func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStr
 			bizStatus := strconv.Itoa(int(terr.BizStatusCode()))
 			bizMsg := terr.BizMessage()
 			if terr.BizExtra() == nil {
-				err = sst.writeTrailer(streamx.Trailer{
+				err = sst.writeTrailer(streaming.Trailer{
 					"biz-status":  bizStatus,
 					"biz-message": bizMsg,
 				})
 			} else {
 				bizExtra, _ := utils.Map2JSONStr(terr.BizExtra())
-				err = sst.writeTrailer(streamx.Trailer{
+				err = sst.writeTrailer(streaming.Trailer{
 					"biz-status":  bizStatus,
 					"biz-message": bizMsg,
 					"biz-extra":   bizExtra,

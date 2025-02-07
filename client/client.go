@@ -52,7 +52,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
 	"github.com/cloudwego/kitex/transport"
@@ -480,7 +479,7 @@ func (kc *kClient) buildInvokeChain() error {
 		return err
 	}
 	sEps := endpoint.Chain(kc.smws...)(innerStreamingEp)
-	kc.sEps = cep.StreamChain(kc.opt.StreamOptions.StreamMiddlewares...)(func(ctx context.Context) (st streamx.ClientStream, err error) {
+	kc.sEps = cep.StreamChain(kc.opt.StreamOptions.StreamMiddlewares...)(func(ctx context.Context) (st streaming.ClientStream, err error) {
 		resp := &streaming.Result{}
 		err = sEps(ctx, nil, resp)
 		if err != nil {

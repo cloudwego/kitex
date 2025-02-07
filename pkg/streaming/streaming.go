@@ -22,11 +22,10 @@ import (
 	"io"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
-	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 // Stream both client and server stream
-// Deprecated: It's only for gRPC, use ClientStream/ServerStream instead.
+// Deprecated: It's only for gRPC, use ClientStream or ServerStream instead.
 type Stream interface {
 	// SetHeader sets the header metadata. It may be called multiple times.
 	// When call multiple times, all the provided metadata will be merged.
@@ -70,16 +69,16 @@ type WithDoFinish interface {
 
 // Args endpoint request
 type Args struct {
-	ServerStream streamx.ServerStream
-	ClientStream streamx.ClientStream
+	ServerStream ServerStream
+	ClientStream ClientStream
 	// for gRPC compatible
 	Stream Stream
 }
 
 // Result endpoint response
 type Result struct {
-	ServerStream streamx.ServerStream
-	ClientStream streamx.ClientStream
+	ServerStream ServerStream
+	ClientStream ClientStream
 	// for gRPC compatible
 	Stream Stream
 }

@@ -19,7 +19,7 @@ package ttstream
 import (
 	"errors"
 
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 var (
@@ -31,20 +31,20 @@ var (
 // only for meta frame handler
 type (
 	IntHeader map[uint16]string
-	StrHeader = streamx.Header
+	StrHeader = streaming.Header
 )
 
 // ClientStreamMeta cannot send header directly, should send from ctx
 type ClientStreamMeta interface {
-	streamx.ClientStream
-	Header() (streamx.Header, error)
-	Trailer() (streamx.Trailer, error)
+	streaming.ClientStream
+	Header() (streaming.Header, error)
+	Trailer() (streaming.Trailer, error)
 }
 
 // ServerStreamMeta cannot read header directly, should read from ctx
 type ServerStreamMeta interface {
-	streamx.ServerStream
-	SetHeader(hd streamx.Header) error
-	SendHeader(hd streamx.Header) error
-	SetTrailer(hd streamx.Trailer) error
+	streaming.ServerStream
+	SetHeader(hd streaming.Header) error
+	SendHeader(hd streaming.Header) error
+	SetTrailer(hd streaming.Trailer) error
 }

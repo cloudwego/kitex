@@ -23,8 +23,6 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
-	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
-
 	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -33,6 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/http"
@@ -49,7 +48,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
@@ -136,13 +135,13 @@ func (o *StreamOptions) InitMiddlewares(ctx context.Context) {
 }
 
 func (o *StreamOptions) BuildRecvChain() cep.StreamRecvEndpoint {
-	return cep.StreamRecvChain(o.StreamRecvMiddlewares...)(func(ctx context.Context, stream streamx.ClientStream, message interface{}) (err error) {
+	return cep.StreamRecvChain(o.StreamRecvMiddlewares...)(func(ctx context.Context, stream streaming.ClientStream, message interface{}) (err error) {
 		return stream.RecvMsg(ctx, message)
 	})
 }
 
 func (o *StreamOptions) BuildSendChain() cep.StreamSendEndpoint {
-	return cep.StreamSendChain(o.StreamSendMiddlewares...)(func(ctx context.Context, stream streamx.ClientStream, message interface{}) (err error) {
+	return cep.StreamSendChain(o.StreamSendMiddlewares...)(func(ctx context.Context, stream streaming.ClientStream, message interface{}) (err error) {
 		return stream.SendMsg(ctx, message)
 	})
 }

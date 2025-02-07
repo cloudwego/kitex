@@ -29,17 +29,12 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
-	"github.com/cloudwego/kitex/pkg/streamx"
-
-	"github.com/cloudwego/kitex/pkg/streaming"
-
-	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
-
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -51,6 +46,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // Server is an abstraction of an RPC server. It accepts connections and dispatches them to the service
@@ -445,7 +441,7 @@ func (s *server) invokeHandleEndpoint() endpoint.UnaryEndpoint {
 }
 
 func (s *server) streamHandleEndpoint() sep.StreamEndpoint {
-	return func(ctx context.Context, st streamx.ServerStream) (err error) {
+	return func(ctx context.Context, st streaming.ServerStream) (err error) {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		methodName := ri.Invocation().MethodName()
 		serviceName := ri.Invocation().ServiceName()

@@ -24,7 +24,6 @@ import (
 	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 func (s *server) wrapStreamMiddleware() endpoint.Middleware {
@@ -44,7 +43,7 @@ func (s *server) wrapStreamMiddleware() endpoint.Middleware {
 	}
 }
 
-func newStream(ctx context.Context, s streamx.ServerStream, sendEP sep.StreamSendEndpoint, recvEP sep.StreamRecvEndpoint,
+func newStream(ctx context.Context, s streaming.ServerStream, sendEP sep.StreamSendEndpoint, recvEP sep.StreamRecvEndpoint,
 	eventHandler internal_stream.StreamEventHandler, grpcSendEP endpoint.SendEndpoint, grpcRecvEP endpoint.RecvEndpoint,
 ) *stream {
 	st := &stream{
@@ -63,7 +62,7 @@ func newStream(ctx context.Context, s streamx.ServerStream, sendEP sep.StreamSen
 }
 
 type stream struct {
-	streamx.ServerStream
+	streaming.ServerStream
 	grpcStream   *grpcStream
 	ctx          context.Context
 	eventHandler internal_stream.StreamEventHandler

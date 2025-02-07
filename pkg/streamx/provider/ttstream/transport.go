@@ -30,7 +30,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 )
 
@@ -287,7 +287,7 @@ func genStreamID() int32 {
 // it's typically used by client side
 // newStream is concurrency safe
 func (t *transport) WriteStream(
-	ctx context.Context, method string, intHeader IntHeader, strHeader streamx.Header,
+	ctx context.Context, method string, intHeader IntHeader, strHeader streaming.Header,
 ) (*stream, error) {
 	if t.kind != clientTransport {
 		return nil, fmt.Errorf("transport already be used as other kind")

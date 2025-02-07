@@ -27,17 +27,16 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 )
 
 var (
-	_ streamx.ClientStream = (*clientStream)(nil)
-	_ streamx.ServerStream = (*serverStream)(nil)
-	_ StreamMeta           = (*stream)(nil)
+	_ streaming.ClientStream = (*clientStream)(nil)
+	_ streaming.ServerStream = (*serverStream)(nil)
+	_ StreamMeta             = (*stream)(nil)
 )
 
 func newStream(ctx context.Context, writer streamWriter, smeta streamFrame) *stream {
@@ -47,8 +46,8 @@ func newStream(ctx context.Context, writer streamWriter, smeta streamFrame) *str
 	s.StreamMeta = newStreamMeta()
 	s.reader = newStreamReader()
 	s.writer = writer
-	s.wheader = make(streamx.Header)
-	s.wtrailer = make(streamx.Trailer)
+	s.wheader = make(streaming.Header)
+	s.wtrailer = make(streaming.Trailer)
 	s.headerSig = make(chan int32, 1)
 	s.trailerSig = make(chan int32, 1)
 	return s
@@ -59,8 +58,8 @@ type streamFrame struct {
 	sid     int32
 	method  string
 	meta    IntHeader
-	header  streamx.Header // key:value, key is full name
-	trailer streamx.Trailer
+	header  streaming.Header // key:value, key is full name
+	trailer streaming.Trailer
 }
 
 const (
@@ -77,8 +76,8 @@ type stream struct {
 	ctx      context.Context
 	reader   *streamReader
 	writer   streamWriter
-	wheader  streamx.Header  // wheader == nil means it already be sent
-	wtrailer streamx.Trailer // wtrailer == nil means it already be sent
+	wheader  streaming.Header  // wheader == nil means it already be sent
+	wtrailer streaming.Trailer // wtrailer == nil means it already be sent
 
 	headerSig  chan int32
 	trailerSig chan int32
@@ -221,13 +220,13 @@ func (s *stream) tryRunCloseCallback(exception error) {
 	_ = s.writer.CloseStream(s.sid)
 }
 
-func (s *stream) writeFrame(ftype int32, header streamx.Header, trailer streamx.Trailer, payload []byte) (err error) {
+func (s *stream) writeFrame(ftype int32, header streaming.Header, trailer streaming.Trailer, payload []byte) (err error) {
 	fr := newFrame(streamFrame{sid: s.sid, method: s.method, header: header, trailer: trailer}, ftype, payload)
 	return s.writer.WriteFrame(fr)
 }
 
 // writeHeader copy kvs into s.wheader
-func (s *stream) writeHeader(hd streamx.Header) error {
+func (s *stream) writeHeader(hd streaming.Header) error {
 	if s.wheader == nil {
 		return fmt.Errorf("stream header already sent")
 	}
@@ -249,7 +248,7 @@ func (s *stream) sendHeader() (err error) {
 }
 
 // writeTrailer write trailer to peer
-func (s *stream) writeTrailer(tl streamx.Trailer) (err error) {
+func (s *stream) writeTrailer(tl streaming.Trailer) (err error) {
 	if s.wtrailer == nil {
 		return fmt.Errorf("stream trailer already sent")
 	}

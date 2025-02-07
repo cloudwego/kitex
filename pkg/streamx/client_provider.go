@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 /* How it works
@@ -42,5 +43,5 @@ res := stream.Recv(...)
 // ClientProvider define client provider API
 type ClientProvider interface {
 	// NewStream create a stream based on rpcinfo and callOptions
-	NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (ClientStream, error)
+	NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (streaming.ClientStream, error)
 }
