@@ -98,10 +98,37 @@ type ServerStreamingClient[Res any] interface {
 	ClientStream
 }
 
+// NewServerStreamingClient creates an implementation of ServerStreamingClient[Res].
+func NewServerStreamingClient[Res any](st ClientStream) ServerStreamingClient[Res] {
+	return &serverStreamingClientImpl[Res]{ClientStream: st}
+}
+
+type serverStreamingClientImpl[Res any] struct {
+	ClientStream
+}
+
+func (s *serverStreamingClientImpl[Res]) Recv(ctx context.Context) (*Res, error) {
+	m := new(Res)
+	return m, s.ClientStream.RecvMsg(ctx, m)
+}
+
 // ServerStreamingServer define server side server streaming APIs
 type ServerStreamingServer[Res any] interface {
 	Send(ctx context.Context, res *Res) error
 	ServerStream
+}
+
+// NewServerStreamingServer creates an implementation of ServerStreamingServer[Res].
+func NewServerStreamingServer[Res any](st ServerStream) ServerStreamingServer[Res] {
+	return &serverStreamingServerImpl[Res]{ServerStream: st}
+}
+
+type serverStreamingServerImpl[Res any] struct {
+	ServerStream
+}
+
+func (s *serverStreamingServerImpl[Res]) Send(ctx context.Context, res *Res) error {
+	return s.ServerStream.SendMsg(ctx, res)
 }
 
 // ClientStreamingClient define client side client streaming APIs
@@ -111,11 +138,50 @@ type ClientStreamingClient[Req, Res any] interface {
 	ClientStream
 }
 
+// NewClientStreamingClient creates an implementation of ClientStreamingClient[Req, Res].
+func NewClientStreamingClient[Req, Res any](st ClientStream) ClientStreamingClient[Req, Res] {
+	return &clientStreamingClientImpl[Req, Res]{ClientStream: st}
+}
+
+type clientStreamingClientImpl[Req, Res any] struct {
+	ClientStream
+}
+
+func (s *clientStreamingClientImpl[Req, Res]) Send(ctx context.Context, req *Req) error {
+	return s.ClientStream.SendMsg(ctx, req)
+}
+
+func (s *clientStreamingClientImpl[Req, Res]) CloseAndRecv(ctx context.Context) (*Res, error) {
+	if err := s.ClientStream.CloseSend(ctx); err != nil {
+		return nil, err
+	}
+	m := new(Res)
+	return m, s.ClientStream.RecvMsg(ctx, m)
+}
+
 // ClientStreamingServer define server side client streaming APIs
 type ClientStreamingServer[Req, Res any] interface {
 	Recv(ctx context.Context) (*Req, error)
 	SendAndClose(ctx context.Context, res *Res) error
 	ServerStream
+}
+
+// NewClientStreamingServer creates an implementation of ClientStreamingServer[Req, Res].
+func NewClientStreamingServer[Req, Res any](st ServerStream) ClientStreamingServer[Req, Res] {
+	return &clientStreamingServerImpl[Req, Res]{ServerStream: st}
+}
+
+type clientStreamingServerImpl[Req, Res any] struct {
+	ServerStream
+}
+
+func (s *clientStreamingServerImpl[Req, Res]) Recv(ctx context.Context) (*Req, error) {
+	m := new(Req)
+	return m, s.ServerStream.RecvMsg(ctx, m)
+}
+
+func (s *clientStreamingServerImpl[Req, Res]) SendAndClose(ctx context.Context, res *Res) error {
+	return s.ServerStream.SendMsg(ctx, res)
 }
 
 // BidiStreamingClient define client side bidi streaming APIs
@@ -125,9 +191,45 @@ type BidiStreamingClient[Req, Res any] interface {
 	ClientStream
 }
 
+// NewBidiStreamingClient creates an implementation of BidiStreamingClient[Req, Res].
+func NewBidiStreamingClient[Req, Res any](st ClientStream) BidiStreamingClient[Req, Res] {
+	return &bidiStreamingClientImpl[Req, Res]{ClientStream: st}
+}
+
+type bidiStreamingClientImpl[Req, Res any] struct {
+	ClientStream
+}
+
+func (s *bidiStreamingClientImpl[Req, Res]) Send(ctx context.Context, req *Req) error {
+	return s.ClientStream.SendMsg(ctx, req)
+}
+
+func (s *bidiStreamingClientImpl[Req, Res]) Recv(ctx context.Context) (*Res, error) {
+	m := new(Res)
+	return m, s.ClientStream.RecvMsg(ctx, m)
+}
+
 // BidiStreamingServer define server side bidi streaming APIs
 type BidiStreamingServer[Req, Res any] interface {
 	Recv(ctx context.Context) (*Req, error)
 	Send(ctx context.Context, res *Res) error
 	ServerStream
+}
+
+// NewBidiStreamingServer creates an implementation of BidiStreamingServer[Req, Res].
+func NewBidiStreamingServer[Req, Res any](st ServerStream) BidiStreamingServer[Req, Res] {
+	return &bidiStreamingServerImpl[Req, Res]{ServerStream: st}
+}
+
+type bidiStreamingServerImpl[Req, Res any] struct {
+	ServerStream
+}
+
+func (s *bidiStreamingServerImpl[Req, Res]) Recv(ctx context.Context) (*Req, error) {
+	m := new(Req)
+	return m, s.ServerStream.RecvMsg(ctx, m)
+}
+
+func (s *bidiStreamingServerImpl[Req, Res]) Send(ctx context.Context, res *Res) error {
+	return s.ServerStream.SendMsg(ctx, res)
 }
