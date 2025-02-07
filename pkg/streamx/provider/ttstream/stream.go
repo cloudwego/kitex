@@ -42,6 +42,7 @@ var (
 
 func newStream(ctx context.Context, writer streamWriter, smeta streamFrame) *stream {
 	s := new(stream)
+	s.ctx = ctx
 	s.streamFrame = smeta
 	s.StreamMeta = newStreamMeta()
 	s.reader = newStreamReader()
@@ -73,6 +74,7 @@ const (
 type stream struct {
 	streamFrame
 	StreamMeta
+	ctx      context.Context
 	reader   *streamReader
 	writer   streamWriter
 	wheader  streamx.Header  // wheader == nil means it already be sent

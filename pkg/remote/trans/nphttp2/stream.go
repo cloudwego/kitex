@@ -283,6 +283,10 @@ func (s *clientStream) CloseSend(ctx context.Context) error {
 	return s.conn.Close()
 }
 
+func (s *clientStream) Context() context.Context {
+	return s.ctx
+}
+
 func (s *clientStream) getPayloadCodecFromContentType() (serviceinfo.PayloadCodec, error) {
 	// TODO: handle other protocols in the future. currently only supports grpc
 	var subType string

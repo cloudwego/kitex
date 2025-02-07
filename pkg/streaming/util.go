@@ -17,6 +17,7 @@
 package streaming
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -67,4 +68,18 @@ func FinishClientStream(s streamx.ClientStream, err error) {
 		klog.Warnf("Failed to record the RPCFinish event, due to"+
 			" the stream type [%T] does not implement streaming.WithDoFinish", s)
 	})
+}
+
+// GetServerStream gets streamx.ServerStream from the arg. It's for kitex gen code ONLY.
+func GetServerStreamFromArg(arg interface{}) (streamx.ServerStream, error) {
+	var st streamx.ServerStream
+	switch rarg := arg.(type) {
+	case *Args:
+		st = rarg.ServerStream
+	case streamx.ServerStream:
+		st = rarg
+	default:
+		return nil, fmt.Errorf("cannot get streamx.ServerStream from type: %T", arg)
+	}
+	return st, nil
 }

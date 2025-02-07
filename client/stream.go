@@ -38,7 +38,7 @@ import (
 type Streaming interface {
 	// Deprecated, use StreamX instead
 	Stream(ctx context.Context, method string, request, response interface{}) error
-	StreamX(ctx context.Context, method string) (context.Context, streamx.ClientStream, error)
+	StreamX(ctx context.Context, method string) (streamx.ClientStream, error)
 }
 
 // Stream implements the Streaming interface
@@ -72,7 +72,7 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 }
 
 // StreamX implements the Streaming interface
-func (kc *kClient) StreamX(ctx context.Context, method string) (context.Context, streamx.ClientStream, error) {
+func (kc *kClient) StreamX(ctx context.Context, method string) (streamx.ClientStream, error) {
 	if !kc.inited {
 		panic("client not initialized")
 	}
@@ -90,7 +90,7 @@ func (kc *kClient) StreamX(ctx context.Context, method string) (context.Context,
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	cs, err := kc.sEps(ctx)
-	return ctx, cs, err
+	return cs, err
 }
 
 func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {

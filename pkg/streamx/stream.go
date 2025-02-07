@@ -82,6 +82,7 @@ type ClientStream interface {
 	Header() (Header, error)
 	Trailer() (Trailer, error)
 	CloseSend(ctx context.Context) error
+	Context() context.Context
 }
 
 // ServerStream define server stream APIs

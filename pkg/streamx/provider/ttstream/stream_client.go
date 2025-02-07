@@ -73,6 +73,10 @@ func (s *clientStream) CloseSend(ctx context.Context) error {
 	return s.closeSend(nil)
 }
 
+func (s *clientStream) Context() context.Context {
+	return s.ctx
+}
+
 func clientStreamFinalizer(s *clientStream) {
 	// it's safe to call CloseSend twice
 	// we do CloseSend here to ensure stream can be closed normally
