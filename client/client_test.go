@@ -200,7 +200,7 @@ func TestWithRetryOption(t *testing.T) {
 	mockRetryContainer := retry.NewRetryContainer()
 	cli := newMockClient(t, ctrl, WithRetryContainer(mockRetryContainer))
 
-	test.Assert(t, cli.(*kcFinalizerClient).opt.RetryContainer == mockRetryContainer)
+	test.Assert(t, cli.(*kcFinalizerClient).opt.UnaryOptions.RetryContainer == mockRetryContainer)
 }
 
 func BenchmarkCall(b *testing.B) {

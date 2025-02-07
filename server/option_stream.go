@@ -30,15 +30,21 @@ import (
 // It is used to isolate options that are only effective for streaming methods.
 func WithStreamOptions(opts ...StreamOption) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		var udi utils.Slice
 		for _, opt := range opts {
-			opt.F(&o.StreamOptions, nil)
+			opt.F(&o.StreamOptions, &udi)
 		}
+		di.Push(map[string]interface{}{
+			"WithStreamOptions": udi,
+		})
 	}}
 }
 
 // WithStreamMiddleware add middleware for stream.
 func WithStreamMiddleware(mw sep.StreamMiddleware) StreamOption {
 	return StreamOption{F: func(o *StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamMiddleware(%+v)", utils.GetFuncName(mw)))
+
 		o.StreamMiddlewares = append(o.StreamMiddlewares, mw)
 	}}
 }
@@ -46,6 +52,8 @@ func WithStreamMiddleware(mw sep.StreamMiddleware) StreamOption {
 // WithStreamMiddlewareBuilder add middleware builder for stream.
 func WithStreamMiddlewareBuilder(mwb sep.StreamMiddlewareBuilder) StreamOption {
 	return StreamOption{F: func(o *StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamMiddlewareBuilder(%+v)", utils.GetFuncName(mwb)))
+
 		o.StreamMiddlewareBuilders = append(o.StreamMiddlewareBuilders, mwb)
 	}}
 }
@@ -53,6 +61,8 @@ func WithStreamMiddlewareBuilder(mwb sep.StreamMiddlewareBuilder) StreamOption {
 // WithStreamRecvMiddleware add recv middleware for stream.
 func WithStreamRecvMiddleware(mw sep.StreamRecvMiddleware) StreamOption {
 	return StreamOption{F: func(o *internal_server.StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamRecvMiddleware(%+v)", utils.GetFuncName(mw)))
+
 		o.StreamRecvMiddlewares = append(o.StreamRecvMiddlewares, mw)
 	}}
 }
@@ -60,6 +70,8 @@ func WithStreamRecvMiddleware(mw sep.StreamRecvMiddleware) StreamOption {
 // WithStreamRecvMiddlewareBuilder add recv middleware builder for stream.
 func WithStreamRecvMiddlewareBuilder(mwb sep.StreamRecvMiddlewareBuilder) StreamOption {
 	return StreamOption{F: func(o *internal_server.StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamRecvMiddlewareBuilder(%+v)", utils.GetFuncName(mwb)))
+
 		o.StreamRecvMiddlewareBuilders = append(o.StreamRecvMiddlewareBuilders, mwb)
 	}}
 }
@@ -67,6 +79,8 @@ func WithStreamRecvMiddlewareBuilder(mwb sep.StreamRecvMiddlewareBuilder) Stream
 // WithStreamSendMiddleware add send middleware for stream.
 func WithStreamSendMiddleware(mw sep.StreamSendMiddleware) StreamOption {
 	return StreamOption{F: func(o *internal_server.StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamSendMiddleware(%+v)", utils.GetFuncName(mw)))
+
 		o.StreamSendMiddlewares = append(o.StreamSendMiddlewares, mw)
 	}}
 }
@@ -74,6 +88,8 @@ func WithStreamSendMiddleware(mw sep.StreamSendMiddleware) StreamOption {
 // WithStreamSendMiddlewareBuilder add send middleware builder for stream.
 func WithStreamSendMiddlewareBuilder(mwb sep.StreamSendMiddlewareBuilder) StreamOption {
 	return StreamOption{F: func(o *internal_server.StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamSendMiddlewareBuilder(%+v)", utils.GetFuncName(mwb)))
+
 		o.StreamSendMiddlewareBuilders = append(o.StreamSendMiddlewareBuilders, mwb)
 	}}
 }

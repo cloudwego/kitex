@@ -14,21 +14,20 @@
  * limitations under the License.
  */
 
-package client
+package server
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/cloudwego/kitex/internal/client"
+	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-// WithUnaryOptions add unary options for client.
+// WithUnaryOptions add unary options for server.
 // It is used to isolate options that are only effective for unary/pingpong methods.
 func WithUnaryOptions(opts ...UnaryOption) Option {
-	return Option{F: func(o *client.Options, di *utils.Slice) {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		var udi utils.Slice
 		for _, opt := range opts {
 			opt.F(&o.UnaryOptions, &udi)
@@ -36,15 +35,6 @@ func WithUnaryOptions(opts ...UnaryOption) Option {
 		di.Push(map[string]interface{}{
 			"WithUnaryOptions": udi,
 		})
-	}}
-}
-
-// WithUnaryRPCTimeout add rpc timeout for unary method.
-func WithUnaryRPCTimeout(d time.Duration) UnaryOption {
-	return UnaryOption{F: func(o *UnaryOptions, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithUnaryRPCTimeout(%dms)", d.Milliseconds()))
-
-		o.SetUnaryRPCTimeout(d)
 	}}
 }
 
