@@ -21,7 +21,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -51,13 +50,7 @@ type httpThriftCodec struct {
 	useRawBodyForHTTPResp  bool
 	svcName                string
 	extra                  map[string]string
-	cachedReaderWriterData atomic.Value // *cachedHTTPReaderWriterData
-	sync.Mutex
-}
-
-type cachedHTTPReaderWriterData struct {
-	svcDsc       *descriptor.ServiceDescriptor
-	readerWriter *thrift.HTTPReaderWriter
+	readerWriter           atomic.Value // *thrift.HTTPReaderWriter
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
@@ -81,6 +74,7 @@ func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
 	}
 	c.setCombinedServices(svc.IsCombinedServices)
 	c.svcDsc.Store(svc)
+	c.configureMessageReaderWriter(thrift.NewHTTPReaderWriter(svc))
 	go c.update()
 	return c
 }
@@ -94,7 +88,24 @@ func (c *httpThriftCodec) update() {
 		c.svcName = svc.Name
 		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
+		c.configureMessageReaderWriter(thrift.NewHTTPReaderWriter(svc))
 	}
+}
+
+func (c *httpThriftCodec) updateMessageReaderWriter() error {
+	mrw := c.getMessageReaderWriter()
+	if rw, ok := mrw.(*thrift.HTTPReaderWriter); !ok {
+		return mrw.(error)
+	} else {
+		c.configureMessageReaderWriter(rw)
+		return nil
+	}
+}
+
+func (c *httpThriftCodec) configureMessageReaderWriter(rw *thrift.HTTPReaderWriter) {
+	c.configureHTTPRequestWriter(rw.WriteHTTPRequest)
+	c.configureHTTPResponseReader(rw.ReadHTTPResponse)
+	c.readerWriter.Store(rw)
 }
 
 func (c *httpThriftCodec) setCombinedServices(isCombinedServices bool) {
@@ -106,29 +117,11 @@ func (c *httpThriftCodec) setCombinedServices(isCombinedServices bool) {
 }
 
 func (c *httpThriftCodec) getMessageReaderWriter() interface{} {
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser ServiceDescriptor failed")
+	if rw, ok := c.readerWriter.Load().(*thrift.HTTPReaderWriter); !ok {
+		return errors.New("get readerWriter failed")
+	} else {
+		return rw
 	}
-
-	cachedData := c.cachedReaderWriterData.Load()
-	if cachedData != nil {
-		if cd, ok := cachedData.(*cachedHTTPReaderWriterData); ok && cd.svcDsc == svcDsc {
-			return cd.readerWriter
-		}
-	}
-
-	c.Lock()
-	defer c.Unlock()
-	rw := thrift.NewHTTPReaderWriter(svcDsc)
-	c.configureHTTPRequestWriter(rw.WriteHTTPRequest)
-	c.configureHTTPResponseReader(rw.ReadHTTPResponse)
-	newCache := &cachedHTTPReaderWriterData{
-		svcDsc:       svcDsc,
-		readerWriter: rw,
-	}
-	c.cachedReaderWriterData.Store(newCache)
-	return rw
 }
 
 func (c *httpThriftCodec) configureHTTPRequestWriter(writer *thrift.WriteHTTPRequest) {

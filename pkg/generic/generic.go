@@ -142,6 +142,7 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 			c.codec.convOpts.NoBase64Binary = !enable
 			c.codec.convOptsWithThriftBase.NoBase64Binary = !enable
 		}
+		c.codec.updateMessageReaderWriter()
 	case *jsonThriftGeneric:
 		if c.codec == nil {
 			return fmt.Errorf("empty codec for %#v", c)
@@ -152,11 +153,13 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 			c.codec.convOptsWithThriftBase.NoBase64Binary = !enable
 			c.codec.convOptsWithException.NoBase64Binary = !enable
 		}
+		c.codec.updateMessageReaderWriter()
 	case *mapThriftGeneric:
 		if c.codec == nil {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
 		c.codec.binaryWithBase64 = enable
+		c.codec.updateMessageReaderWriter()
 	default:
 		return fmt.Errorf("Base64Binary is unavailable for %#v", g)
 	}
@@ -171,6 +174,7 @@ func SetBinaryWithByteSlice(g Generic, enable bool) error {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
 		c.codec.binaryWithByteSlice = enable
+		c.codec.updateMessageReaderWriter()
 	default:
 		return fmt.Errorf("returning []byte for binary fields is unavailable for %#v", g)
 	}
@@ -202,6 +206,7 @@ func EnableSetFieldsForEmptyStruct(g Generic, mode SetFieldsForEmptyStructMode) 
 			return fmt.Errorf("empty codec for %#v", c)
 		}
 		c.codec.setFieldsForEmptyStruct = uint8(mode)
+		c.codec.updateMessageReaderWriter()
 	default:
 		return fmt.Errorf("SetFieldsForEmptyStruct only supports map-generic at present")
 	}
