@@ -71,8 +71,6 @@ func TestHTTPPbThriftCodec(t *testing.T) {
 	test.Assert(t, htc.extra[CombineServiceKey] == "false")
 
 	rw := htc.getMessageReaderWriter()
-	_, ok := rw.(thrift.MessageWriter)
-	test.Assert(t, ok)
-	_, ok = rw.(thrift.MessageReader)
+	_, ok := rw.(*thrift.HTTPPbReaderWriter)
 	test.Assert(t, ok)
 }

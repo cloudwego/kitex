@@ -22,7 +22,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/jhump/protoreflect/desc"
@@ -38,20 +37,13 @@ import (
 var _ Closer = &httpPbThriftCodec{}
 
 type httpPbThriftCodec struct {
-	svcDsc                 atomic.Value // *idl
-	pbSvcDsc               atomic.Value // *pbIdl
-	provider               DescriptorProvider
-	pbProvider             PbDescriptorProvider
-	svcName                string
-	extra                  map[string]string
-	cachedReaderWriterData atomic.Value // *cachedHTTPPbReaderWriterData
-	sync.Mutex
-}
-
-type cachedHTTPPbReaderWriterData struct {
-	svcDsc       *descriptor.ServiceDescriptor
-	pbSvcDsc     *desc.ServiceDescriptor
-	readerWriter *thrift.HTTPPbReaderWriter
+	svcDsc       atomic.Value // *idl
+	pbSvcDsc     atomic.Value // *pbIdl
+	provider     DescriptorProvider
+	pbProvider   PbDescriptorProvider
+	svcName      string
+	extra        map[string]string
+	readerWriter atomic.Value // *thrift.HTTPPbReaderWriter
 }
 
 func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider) *httpPbThriftCodec {
@@ -66,6 +58,7 @@ func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider) *httpP
 	c.setCombinedServices(svc.IsCombinedServices)
 	c.svcDsc.Store(svc)
 	c.pbSvcDsc.Store(pbSvc)
+	c.readerWriter.Store(thrift.NewHTTPPbReaderWriter(svc, pbSvc))
 	go c.update()
 	return c
 }
@@ -86,6 +79,7 @@ func (c *httpPbThriftCodec) update() {
 		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
 		c.pbSvcDsc.Store(pbSvc)
+		c.readerWriter.Store(thrift.NewHTTPPbReaderWriter(svc, pbSvc))
 	}
 }
 
@@ -114,32 +108,11 @@ func (c *httpPbThriftCodec) getMethod(req interface{}) (*Method, error) {
 }
 
 func (c *httpPbThriftCodec) getMessageReaderWriter() interface{} {
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser ServiceDescriptor failed")
+	if rw, ok := c.readerWriter.Load().(*thrift.HTTPPbReaderWriter); !ok {
+		return errors.New("get readerWriter failed")
+	} else {
+		return rw
 	}
-	pbSvcDsc, ok := c.pbSvcDsc.Load().(*desc.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser PbServiceDescriptor failed")
-	}
-
-	cachedData := c.cachedReaderWriterData.Load()
-	if cachedData != nil {
-		if cd, ok := cachedData.(*cachedHTTPPbReaderWriterData); ok && cd.svcDsc == svcDsc {
-			return cd.readerWriter
-		}
-	}
-
-	c.Lock()
-	defer c.Unlock()
-	rw := thrift.NewHTTPPbReaderWriter(svcDsc, pbSvcDsc)
-	newCache := &cachedHTTPPbReaderWriterData{
-		svcDsc:       svcDsc,
-		pbSvcDsc:     pbSvcDsc,
-		readerWriter: rw,
-	}
-	c.cachedReaderWriterData.Store(newCache)
-	return rw
 }
 
 func (c *httpPbThriftCodec) Name() string {

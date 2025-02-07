@@ -46,9 +46,7 @@ func TestJsonThriftCodec(t *testing.T) {
 	test.Assert(t, jtc.extra[CombineServiceKey] == "false")
 
 	rw := jtc.getMessageReaderWriter()
-	_, ok := rw.(thrift.MessageWriter)
-	test.Assert(t, ok)
-	_, ok = rw.(thrift.MessageReader)
+	_, ok := rw.(*thrift.JSONReaderWriter)
 	test.Assert(t, ok)
 }
 
@@ -76,9 +74,7 @@ func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
 	test.Assert(t, jtc.extra[CombineServiceKey] == "false")
 
 	rw := jtc.getMessageReaderWriter()
-	_, ok := rw.(thrift.MessageWriter)
-	test.Assert(t, ok)
-	_, ok = rw.(thrift.MessageReader)
+	_, ok := rw.(*thrift.JSONReaderWriter)
 	test.Assert(t, ok)
 }
 

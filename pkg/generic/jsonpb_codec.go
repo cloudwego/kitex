@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -36,20 +35,14 @@ import (
 var _ Closer = &jsonPbCodec{}
 
 type jsonPbCodec struct {
-	svcDsc                 atomic.Value // *idl
-	provider               PbDescriptorProviderDynamicGo
-	opts                   *Options
-	convOpts               conv.Options // used for dynamicgo conversion
-	dynamicgoEnabled       bool         // currently set to true by default
-	svcName                string
-	extra                  map[string]string
-	cachedReaderWriterData atomic.Value // *cachedJSONPbReaderWriter
-	sync.Mutex
-}
-
-type cachedJSONPbReaderWriter struct {
-	svcDsc       *dproto.ServiceDescriptor
-	readerWriter *proto.JSONReaderWriter
+	svcDsc           atomic.Value // *idl
+	provider         PbDescriptorProviderDynamicGo
+	opts             *Options
+	convOpts         conv.Options // used for dynamicgo conversion
+	dynamicgoEnabled bool         // currently set to true by default
+	svcName          string
+	extra            map[string]string
+	readerWriter     atomic.Value // *proto.JSONReaderWriter
 }
 
 func newJsonPbCodec(p PbDescriptorProviderDynamicGo, opts *Options) *jsonPbCodec {
@@ -65,8 +58,8 @@ func newJsonPbCodec(p PbDescriptorProviderDynamicGo, opts *Options) *jsonPbCodec
 	c.convOpts = convOpts
 	c.setCombinedServices(svc.IsCombinedServices())
 	c.setPackageName(svc.PackageName())
-
 	c.svcDsc.Store(svc)
+	c.readerWriter.Store(proto.NewJsonReaderWriter(svc, &convOpts))
 	go c.update()
 	return c
 }
@@ -80,6 +73,7 @@ func (c *jsonPbCodec) update() {
 		c.svcName = svc.Name()
 		c.setCombinedServices(svc.IsCombinedServices())
 		c.svcDsc.Store(svc)
+		c.readerWriter.Store(proto.NewJsonReaderWriter(svc, &c.convOpts))
 	}
 }
 
@@ -96,27 +90,11 @@ func (c *jsonPbCodec) setPackageName(pkg string) {
 }
 
 func (c *jsonPbCodec) getMessageReaderWriter() interface{} {
-	pbSvc, ok := c.svcDsc.Load().(*dproto.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser dynamicgo ServiceDescriptor failed")
+	if rw, ok := c.readerWriter.Load().(*proto.JSONReaderWriter); !ok {
+		return errors.New("get readerWriter failed")
+	} else {
+		return rw
 	}
-
-	cachedData := c.cachedReaderWriterData.Load()
-	if cachedData != nil {
-		if cd, ok := cachedData.(*cachedJSONPbReaderWriter); ok && cd.svcDsc == pbSvc {
-			return cd.readerWriter
-		}
-	}
-
-	c.Lock()
-	defer c.Unlock()
-	rw := proto.NewJsonReaderWriter(pbSvc, &c.convOpts)
-	newCache := &cachedJSONPbReaderWriter{
-		svcDsc:       pbSvc,
-		readerWriter: rw,
-	}
-	c.cachedReaderWriterData.Store(newCache)
-	return rw
 }
 
 func (c *jsonPbCodec) getMethod(req interface{}, method string) (*Method, error) {

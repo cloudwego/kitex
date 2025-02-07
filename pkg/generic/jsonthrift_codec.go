@@ -19,7 +19,6 @@ package generic
 import (
 	"context"
 	"errors"
-	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -44,13 +43,7 @@ type jsonThriftCodec struct {
 	convOptsWithException  conv.Options // used for dynamicgo conversion with ConvertException turned on
 	svcName                string
 	extra                  map[string]string
-	cachedReaderWriterData atomic.Value // *cachedJSONReaderWriterData
-	sync.Mutex
-}
-
-type cachedJSONReaderWriterData struct {
-	svcDsc       *descriptor.ServiceDescriptor
-	readerWriter *thrift.JSONReaderWriter
+	readerWriter           atomic.Value // *thrift.JSONReaderWriter
 }
 
 func newJsonThriftCodec(p DescriptorProvider, opts *Options) *jsonThriftCodec {
@@ -80,6 +73,7 @@ func newJsonThriftCodec(p DescriptorProvider, opts *Options) *jsonThriftCodec {
 		c.convOptsWithException = convOptsWithException
 	}
 	c.svcDsc.Store(svc)
+	c.configureMessageReaderWriter(thrift.NewJsonReaderWriter(svc))
 	go c.update()
 	return c
 }
@@ -93,7 +87,24 @@ func (c *jsonThriftCodec) update() {
 		c.svcName = svc.Name
 		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
+		c.configureMessageReaderWriter(thrift.NewJsonReaderWriter(svc))
 	}
+}
+
+func (c *jsonThriftCodec) updateMessageReaderWriter() error {
+	mrw := c.getMessageReaderWriter()
+	if rw, ok := mrw.(*thrift.JSONReaderWriter); !ok {
+		return mrw.(error)
+	} else {
+		c.configureMessageReaderWriter(rw)
+		return nil
+	}
+}
+
+func (c *jsonThriftCodec) configureMessageReaderWriter(rw *thrift.JSONReaderWriter) {
+	c.configureJSONWriter(rw.WriteJSON)
+	c.configureJSONReader(rw.ReadJSON)
+	c.readerWriter.Store(rw)
 }
 
 func (c *jsonThriftCodec) setCombinedServices(isCombinedServices bool) {
@@ -105,29 +116,11 @@ func (c *jsonThriftCodec) setCombinedServices(isCombinedServices bool) {
 }
 
 func (c *jsonThriftCodec) getMessageReaderWriter() interface{} {
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser ServiceDescriptor failed")
+	if rw, ok := c.readerWriter.Load().(*thrift.JSONReaderWriter); !ok {
+		return errors.New("get readerWriter failed")
+	} else {
+		return rw
 	}
-
-	cachedData := c.cachedReaderWriterData.Load()
-	if cachedData != nil {
-		if cd, ok := cachedData.(*cachedJSONReaderWriterData); ok && cd.svcDsc == svcDsc {
-			return cd.readerWriter
-		}
-	}
-
-	c.Lock()
-	defer c.Unlock()
-	rw := thrift.NewJsonReaderWriter(svcDsc)
-	c.configureJSONWriter(rw.WriteJSON)
-	c.configureJSONReader(rw.ReadJSON)
-	newCache := &cachedJSONReaderWriterData{
-		svcDsc:       svcDsc,
-		readerWriter: rw,
-	}
-	c.cachedReaderWriterData.Store(newCache)
-	return rw
 }
 
 func (c *jsonThriftCodec) configureJSONWriter(writer *thrift.WriteJSON) {
