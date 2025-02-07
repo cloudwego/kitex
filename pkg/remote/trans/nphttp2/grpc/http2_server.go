@@ -550,6 +550,7 @@ func (t *http2Server) handleData(f *grpcframe.DataFrame) {
 		return
 	}
 	if size > 0 {
+		s.isReceiveFromClient = true
 		if err := s.fc.onData(size); err != nil {
 			t.closeStream(s, true, http2.ErrCodeFlowControl, false)
 			return
@@ -570,6 +571,14 @@ func (t *http2Server) handleData(f *grpcframe.DataFrame) {
 		}
 	}
 	if f.Header().Flags.Has(http2.FlagDataEndStream) {
+		if !s.isReceiveFromClient {
+			md, ctxOK := metadata.FromIncomingContext(s.ctx)
+			if ctxOK {
+				klog.CtxInfof(s.ctx, "receive EOS flag directly, md: %+v", md)
+			} else {
+				klog.CtxInfof(s.ctx, "receive EOS flag directly")
+			}
+		}
 		// Received the end of stream from the client.
 		s.compareAndSwapState(streamActive, streamReadDone)
 		s.write(recvMsg{err: io.EOF})

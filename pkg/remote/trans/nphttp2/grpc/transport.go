@@ -285,6 +285,8 @@ type Stream struct {
 	// contentSubtype is the content-subtype for requests.
 	// this must be lowercase or the behavior is undefined.
 	contentSubtype string
+
+	isReceiveFromClient bool // indicates whether receiving data from the client
 }
 
 // isHeaderSent is only valid on the server-side.
