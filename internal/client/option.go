@@ -49,6 +49,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
@@ -195,6 +196,9 @@ type Options struct {
 	GRPCConnPoolSize uint32
 	GRPCConnectOpts  *grpc.ConnectOptions
 
+	// TTHeaderStreaming
+	TTHeaderStreamingOptions TTHeaderStreamingOptions
+
 	// XDS
 	XDSEnabled          bool
 	XDSRouterMiddleware endpoint.Middleware
@@ -259,6 +263,7 @@ func NewOptions(opts []Option) *Options {
 func (o *Options) initRemoteOpt() {
 	var zero connpool2.IdleConfig
 
+	// configure grpc
 	if o.Configs.TransportProtocol()&transport.GRPC == transport.GRPC {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
 			// grpc unary short connection
@@ -266,6 +271,14 @@ func (o *Options) initRemoteOpt() {
 		}
 		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
+	}
+	// configure ttheader streaming
+	if o.Configs.TransportProtocol()&transport.TTHeaderStreaming == transport.TTHeaderStreaming {
+		if o.PoolCfg != nil && *o.PoolCfg == zero {
+			// configure short conn pool
+			o.TTHeaderStreamingOptions.ProviderOptions = append(o.TTHeaderStreamingOptions.ProviderOptions, ttstream.WithClientShortConnPool())
+		}
+		o.RemoteOpt.Provider = ttstream.NewClientProvider(o.TTHeaderStreamingOptions.ProviderOptions...)
 	}
 	if o.RemoteOpt.ConnPool == nil {
 		if o.PoolCfg != nil {

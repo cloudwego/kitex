@@ -27,12 +27,14 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/gonet"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
+	streamxstrans "github.com/cloudwego/kitex/pkg/remote/trans/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 )
 
 func newServerRemoteOption() *remote.ServerOption {
 	return &remote.ServerOption{
 		TransServerFactory:    gonet.NewTransServerFactory(),
-		SvrHandlerFactory:     detection.NewSvrTransHandlerFactory(gonet.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()),
+		SvrHandlerFactory:     detection.NewSvrTransHandlerFactory(gonet.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory(), streamxstrans.NewSvrTransHandlerFactory(ttstream.NewServerProvider())),
 		Codec:                 codec.NewDefaultCodec(),
 		Address:               defaultAddress,
 		ExitWaitTime:          defaultExitWaitTime,

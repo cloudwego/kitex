@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 CloudWeGo Authors
+ * Copyright 2025 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package streamxclient
+package client
 
 import (
-	internal_client "github.com/cloudwego/kitex/internal/client"
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-// Deprecated: Note that it maybe refactor in the next version
-func WithProvider(pvd streamx.ClientProvider) internal_client.Option {
-	return internal_client.Option{F: func(o *internal_client.Options, di *utils.Slice) {
-		o.RemoteOpt.Provider = pvd
-	}}
+type TTHeaderStreamingOption struct {
+	F func(o *TTHeaderStreamingOptions, di *utils.Slice)
+}
+
+type TTHeaderStreamingOptions struct {
+	ProviderOptions []ttstream.ClientProviderOption
 }
