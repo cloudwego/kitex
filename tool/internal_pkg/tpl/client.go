@@ -28,10 +28,6 @@ import (
 			{{- end}}
 		{{- end}}
 	{{- end}}
-	{{- if .HasStreaming}}
-	"github.com/cloudwego/kitex/client/streamclient"
-	"github.com/cloudwego/kitex/client/callopt/streamcall"
-	{{- end}}
 )
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {

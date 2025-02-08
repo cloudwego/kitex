@@ -32,7 +32,11 @@ import (
 )
 
 // NewInvoker creates a server.Invoker with the given handler and options.
+{{- if .StreamX}}
+func NewInvoker(handler {{.ServiceName}}, opts ...server.Option) server.Invoker {
+{{- else}}
 func NewInvoker(handler {{call .ServiceTypeName}}, opts ...server.Option) server.Invoker {
+{{- end}}
 	var options []server.Option
     {{template "@invoker.go-NewInvoker-option" .}}
 	options = append(options, opts...)

@@ -452,7 +452,7 @@ func (c *converter) makeMethod(si *generator.ServiceInfo, f *golang.Function) (*
 		ServerStreaming:    st.ServerStreaming,
 		ArgsLength:         len(f.Arguments()),
 	}
-	if st.IsStreaming {
+	if st.ClientStreaming || st.ServerStreaming {
 		si.HasStreaming = true
 	}
 

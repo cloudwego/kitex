@@ -17,6 +17,7 @@ package generator
 import (
 	"bytes"
 	"fmt"
+	"github.com/cloudwego/thriftgo/generator/golang/streaming"
 	"strings"
 	"text/template"
 
@@ -50,6 +51,7 @@ type PackageInfo struct {
 	Protocol         transport.Protocol
 	IDLName          string
 	ServerPkg        string
+	StreamX          bool
 }
 
 // AddImport .
