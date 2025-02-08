@@ -157,8 +157,6 @@ type ServiceInfo struct {
 	RefName string
 	// identify whether this service would generate a corresponding handler.
 	GenerateHandler bool
-	// whether to generate StreamX interface code
-	StreamX bool
 }
 
 // AllMethods returns all methods that the service have.
@@ -195,24 +193,24 @@ func (s *ServiceInfo) HasStreamingRecursive() bool {
 
 // MethodInfo .
 type MethodInfo struct {
-	PkgInfo
-	ServiceName            string
-	Name                   string
-	RawName                string
-	Oneway                 bool
-	Void                   bool
-	Args                   []*Parameter
-	ArgsLength             int
-	Resp                   *Parameter
-	Exceptions             []*Parameter
-	ArgStructName          string
-	ResStructName          string
-	IsResponseNeedRedirect bool // int -> int*
-	GenArgResultStruct     bool
-	IsStreaming            bool
-	ClientStreaming        bool
-	ServerStreaming        bool
-	StreamX                bool
+	PkgInfo                `json:"pkg_info"`
+	ServiceName            string               `json:"service_name,omitempty"`
+	Name                   string               `json:"name,omitempty"`
+	RawName                string               `json:"raw_name,omitempty"`
+	Oneway                 bool                 `json:"oneway,omitempty"`
+	Void                   bool                 `json:"void,omitempty"`
+	Args                   []*Parameter         `json:"args,omitempty"`
+	ArgsLength             int                  `json:"args_length,omitempty"`
+	Resp                   *Parameter           `json:"resp,omitempty"`
+	Exceptions             []*Parameter         `json:"exceptions,omitempty"`
+	ArgStructName          string               `json:"arg_struct_name,omitempty"`
+	ResStructName          string               `json:"res_struct_name,omitempty"`
+	IsResponseNeedRedirect bool                 `json:"is_response_need_redirect,omitempty"` // int -> int*
+	GenArgResultStruct     bool                 `json:"gen_arg_result_struct,omitempty"`
+	IsStreaming            bool                 `json:"is_streaming,omitempty"`
+	ClientStreaming        bool                 `json:"client_streaming,omitempty"`
+	ServerStreaming        bool                 `json:"server_streaming,omitempty"`
+	Streaming              *streaming.Streaming `json:"streaming,omitempty"`
 }
 
 func (m *MethodInfo) StreamingMode() string {
@@ -249,7 +247,6 @@ var funcs = map[string]interface{}{
 	"HasFeature":    HasFeature,
 	"FilterImports": FilterImports,
 	"backquoted":    BackQuoted,
-	"getStreamxRef": ToStreamxRef,
 }
 
 func AddTemplateFunc(key string, f interface{}) {
@@ -412,13 +409,4 @@ func FilterImports(Imports map[string]map[string]bool, ms []*MethodInfo) map[str
 
 func BackQuoted(s string) string {
 	return "`" + s + "`"
-}
-
-func ToStreamxRef(protocol transport.Protocol) string {
-	switch protocol {
-	case transport.TTHeader:
-		return streamxTTHeaderRef
-	default:
-		return ""
-	}
 }

@@ -28,7 +28,7 @@ import (
 			{{- end}}
 		{{- end}}
 	{{- end}}
-	{{- if and .HasStreaming (not .StreamX) }}
+	{{- if .HasStreaming}}
 	"github.com/cloudwego/kitex/client/streamclient"
 	"github.com/cloudwego/kitex/client/callopt/streamcall"
 	{{- end}}
@@ -43,23 +43,9 @@ type Client interface {
 	{{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{.Type}}{{end}}, callOptions ...callopt.Option ) ({{if not .Void}}r {{.Resp.Type}}, {{end}}err error)
 	{{- end}}
 {{- end}}
-{{- /* Streamx interface for streaming method */}}
-{{- if and .StreamX (eq $.Codec "thrift") .IsStreaming}}
-{{- $streamingUnary := (eq .StreamingMode "unary")}}
-{{- $clientSide := (eq .StreamingMode "client")}}
-{{- $serverSide := (eq .StreamingMode "server")}}
-{{- $bidiSide := (eq .StreamingMode "bidirectional")}}
-{{- $arg := index .Args 0}}
-    {{.Name}}{{- if $streamingUnary}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (r {{.Resp.Type}}, err error)
-             {{- else if $clientSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error)
-             {{- else if $serverSide}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ServerStreamingClient[{{NotPtr .Resp.Type}}], error)
-             {{- else if $bidiSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.BidiStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error)
-             {{- end}}
-{{- end}}{{- /* if and .StreamX (eq $.Codec "thrift") .IsStreaming end */}}
 {{- end}}
 }
 
-{{- if not .StreamX}}
 {{- if .HasStreaming}}
 // StreamClient is designed to provide Interface for Streaming APIs.
 type StreamClient interface {
@@ -89,7 +75,6 @@ type {{.ServiceName}}_{{.RawName}}Client interface {
 }
 {{- end}}
 {{end}}
-{{- end}}{{- /* if not .StreamX end */}}
 
 // NewClient creates a client for the service defined in IDL.
 func NewClient(destService string, opts ...client.Option) (Client, error) {
@@ -146,27 +131,8 @@ func (p *k{{$.ServiceName}}Client) {{.Name}}(ctx context.Context {{range .Args}}
 }
 {{- end}}
 {{- end}}
-{{- /* Streamx interface for streaming method */}}
-{{- if and .StreamX (eq $.Codec "thrift") .IsStreaming}}
-{{- $streamingUnary := (eq .StreamingMode "unary")}}
-{{- $clientSide := (eq .StreamingMode "client")}}
-{{- $serverSide := (eq .StreamingMode "server")}}
-{{- $bidiSide := (eq .StreamingMode "bidirectional")}}
-{{- $arg := index .Args 0}}
-func (p *k{{$.ServiceName}}Client) {{.Name}}{{- if $streamingUnary}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (r {{.Resp.Type}}, err error) {
-    return p.kClient.{{.Name}}(ctx, req, callOptions...)
-             {{- else if $clientSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error) {
-    return p.kClient.{{.Name}}(ctx, callOptions...)
-			 {{- else if $serverSide}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ServerStreamingClient[{{NotPtr .Resp.Type}}], error) {
-	return p.kClient.{{.Name}}(ctx, req, callOptions...)
-			 {{- else if $bidiSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.BidiStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error) {
-	return p.kClient.{{.Name}}(ctx, callOptions...)
-             {{- end}}
-}
-{{- end}}{{- /* if and .StreamX (eq $.Codec "thrift") .IsStreaming end */}}
 {{end}}
 
-{{- if not .StreamX}}
 {{- if .HasStreaming}}
 // NewStreamClient creates a stream client for the service's streaming APIs defined in IDL.
 func NewStreamClient(destService string, opts ...streamclient.Option) (StreamClient, error) {
@@ -215,6 +181,5 @@ func (p *k{{$.ServiceName}}StreamClient) {{.Name}}(ctx context.Context {{range .
 {{- end}}
 {{end}}
 {{- end}}
-{{- end}}{{- /* if not .StreamX end */}}
 {{template "@client.go-EOF" .}}
 `
