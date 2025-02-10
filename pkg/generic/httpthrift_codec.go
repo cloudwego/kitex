@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -53,7 +52,6 @@ type httpThriftCodec struct {
 	svcName                string
 	extra                  map[string]string
 	readerWriter           atomic.Value // *thrift.HTTPReaderWriter
-	sync.Mutex
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
@@ -77,7 +75,7 @@ func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
 	}
 	c.setCombinedServices(svc.IsCombinedServices)
 	c.svcDsc.Store(svc)
-	c.configureMessageReaderWriter(thrift.NewHTTPReaderWriter(svc))
+	c.configureMessageReaderWriter(svc)
 	go c.update()
 	return c
 }
@@ -91,25 +89,21 @@ func (c *httpThriftCodec) update() {
 		c.svcName = svc.Name
 		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
-		c.configureMessageReaderWriter(thrift.NewHTTPReaderWriter(svc))
+		c.configureMessageReaderWriter(svc)
 	}
 }
 
 func (c *httpThriftCodec) updateMessageReaderWriter() (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic in getMessageReaderWriter: %v", r)
-		}
-	}()
-
-	mrw := c.getMessageReaderWriter()
-	c.configureMessageReaderWriter(mrw.(*thrift.HTTPReaderWriter))
+	svc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+	c.configureMessageReaderWriter(svc)
 	return nil
 }
 
-func (c *httpThriftCodec) configureMessageReaderWriter(rw *thrift.HTTPReaderWriter) {
-	c.Lock()
-	defer c.Unlock()
+func (c *httpThriftCodec) configureMessageReaderWriter(svc *descriptor.ServiceDescriptor) {
+	rw := thrift.NewHTTPReaderWriter(svc)
 	c.configureHTTPRequestWriter(rw.WriteHTTPRequest)
 	c.configureHTTPResponseReader(rw.ReadHTTPResponse)
 	c.readerWriter.Store(rw)
