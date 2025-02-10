@@ -19,6 +19,7 @@ package generic
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -37,12 +38,13 @@ import (
 var _ Closer = &httpPbThriftCodec{}
 
 type httpPbThriftCodec struct {
-	svcDsc     atomic.Value // *idl
-	pbSvcDsc   atomic.Value // *pbIdl
-	provider   DescriptorProvider
-	pbProvider PbDescriptorProvider
-	svcName    string
-	extra      map[string]string
+	svcDsc       atomic.Value // *idl
+	pbSvcDsc     atomic.Value // *pbIdl
+	provider     DescriptorProvider
+	pbProvider   PbDescriptorProvider
+	svcName      string
+	extra        map[string]string
+	readerWriter atomic.Value // *thrift.HTTPPbReaderWriter
 }
 
 func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider) *httpPbThriftCodec {
@@ -57,6 +59,7 @@ func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider) *httpP
 	c.setCombinedServices(svc.IsCombinedServices)
 	c.svcDsc.Store(svc)
 	c.pbSvcDsc.Store(pbSvc)
+	c.readerWriter.Store(thrift.NewHTTPPbReaderWriter(svc, pbSvc))
 	go c.update()
 	return c
 }
@@ -77,6 +80,7 @@ func (c *httpPbThriftCodec) update() {
 		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
 		c.pbSvcDsc.Store(pbSvc)
+		c.readerWriter.Store(thrift.NewHTTPPbReaderWriter(svc, pbSvc))
 	}
 }
 
@@ -105,16 +109,12 @@ func (c *httpPbThriftCodec) getMethod(req interface{}) (*Method, error) {
 }
 
 func (c *httpPbThriftCodec) getMessageReaderWriter() interface{} {
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser ServiceDescriptor failed")
+	v := c.readerWriter.Load()
+	if rw, ok := v.(*thrift.HTTPPbReaderWriter); !ok {
+		panic(fmt.Sprintf("get readerWriter failed: expected *thrift.HTTPPbReaderWriter, got %T", v))
+	} else {
+		return rw
 	}
-	pbSvcDsc, ok := c.pbSvcDsc.Load().(*desc.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser PbServiceDescriptor failed")
-	}
-
-	return thrift.NewHTTPPbReaderWriter(svcDsc, pbSvcDsc)
 }
 
 func (c *httpPbThriftCodec) Name() string {
