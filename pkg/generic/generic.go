@@ -163,7 +163,6 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 	default:
 		return fmt.Errorf("Base64Binary is unavailable for %#v", g)
 	}
-	return nil
 }
 
 // SetBinaryWithByteSlice enable/disable returning []byte for binary field.
@@ -178,7 +177,6 @@ func SetBinaryWithByteSlice(g Generic, enable bool) error {
 	default:
 		return fmt.Errorf("returning []byte for binary fields is unavailable for %#v", g)
 	}
-	return nil
 }
 
 // SetFieldsForEmptyStructMode is a enum for EnableSetFieldsForEmptyStruct()
@@ -210,7 +208,6 @@ func EnableSetFieldsForEmptyStruct(g Generic, mode SetFieldsForEmptyStructMode) 
 	default:
 		return fmt.Errorf("SetFieldsForEmptyStruct only supports map-generic at present")
 	}
-	return nil
 }
 
 var thriftCodec = thrift.NewThriftCodec()
