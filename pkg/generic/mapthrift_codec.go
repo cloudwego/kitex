@@ -19,6 +19,8 @@ package generic
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -40,6 +42,7 @@ type mapThriftCodec struct {
 	svcName                 string
 	extra                   map[string]string
 	readerWriter            atomic.Value // *thrift.StructReaderWriter
+	sync.Mutex
 }
 
 func newMapThriftCodec(p DescriptorProvider) *mapThriftCodec {
@@ -87,17 +90,21 @@ func (c *mapThriftCodec) initializeMessageReaderWriter(svc *descriptor.ServiceDe
 	c.configureMessageReaderWriter(rw)
 }
 
-func (c *mapThriftCodec) updateMessageReaderWriter() error {
+func (c *mapThriftCodec) updateMessageReaderWriter() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in getMessageReaderWriter: %v", r)
+		}
+	}()
+
 	mrw := c.getMessageReaderWriter()
-	if rw, ok := mrw.(*thrift.StructReaderWriter); !ok {
-		return mrw.(error)
-	} else {
-		c.configureMessageReaderWriter(rw)
-		return nil
-	}
+	c.configureMessageReaderWriter(mrw.(*thrift.StructReaderWriter))
+	return nil
 }
 
 func (c *mapThriftCodec) configureMessageReaderWriter(rw *thrift.StructReaderWriter) {
+	defer c.Unlock()
+	c.Lock()
 	c.configureStructWriter(rw.WriteStruct)
 	c.configureStructReader(rw.ReadStruct)
 	c.readerWriter.Store(rw)
@@ -112,8 +119,9 @@ func (c *mapThriftCodec) setCombinedServices(isCombinedServices bool) {
 }
 
 func (c *mapThriftCodec) getMessageReaderWriter() interface{} {
-	if rw, ok := c.readerWriter.Load().(*thrift.StructReaderWriter); !ok {
-		return errors.New("get readerWriter failed")
+	v := c.readerWriter.Load()
+	if rw, ok := v.(*thrift.StructReaderWriter); !ok {
+		panic(fmt.Sprintf("get readerWriter failed: expected *thrift.StructReaderWriter, got %T", v))
 	} else {
 		return rw
 	}

@@ -18,7 +18,6 @@ package generic
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync/atomic"
 
@@ -90,8 +89,9 @@ func (c *jsonPbCodec) setPackageName(pkg string) {
 }
 
 func (c *jsonPbCodec) getMessageReaderWriter() interface{} {
-	if rw, ok := c.readerWriter.Load().(*proto.JSONReaderWriter); !ok {
-		return errors.New("get readerWriter failed")
+	v := c.readerWriter.Load()
+	if rw, ok := v.(*proto.JSONReaderWriter); !ok {
+		panic(fmt.Sprintf("get readerWriter failed: expected *proto.JSONReaderWriter, got %T", v))
 	} else {
 		return rw
 	}

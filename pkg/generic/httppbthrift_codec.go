@@ -19,6 +19,7 @@ package generic
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -108,8 +109,9 @@ func (c *httpPbThriftCodec) getMethod(req interface{}) (*Method, error) {
 }
 
 func (c *httpPbThriftCodec) getMessageReaderWriter() interface{} {
-	if rw, ok := c.readerWriter.Load().(*thrift.HTTPPbReaderWriter); !ok {
-		return errors.New("get readerWriter failed")
+	v := c.readerWriter.Load()
+	if rw, ok := v.(*thrift.HTTPPbReaderWriter); !ok {
+		panic(fmt.Sprintf("get readerWriter failed: expected *thrift.HTTPPbReaderWriter, got %T", v))
 	} else {
 		return rw
 	}

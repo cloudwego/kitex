@@ -19,8 +19,10 @@ package generic
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -51,6 +53,7 @@ type httpThriftCodec struct {
 	svcName                string
 	extra                  map[string]string
 	readerWriter           atomic.Value // *thrift.HTTPReaderWriter
+	sync.Mutex
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
@@ -92,17 +95,21 @@ func (c *httpThriftCodec) update() {
 	}
 }
 
-func (c *httpThriftCodec) updateMessageReaderWriter() error {
+func (c *httpThriftCodec) updateMessageReaderWriter() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in getMessageReaderWriter: %v", r)
+		}
+	}()
+
 	mrw := c.getMessageReaderWriter()
-	if rw, ok := mrw.(*thrift.HTTPReaderWriter); !ok {
-		return mrw.(error)
-	} else {
-		c.configureMessageReaderWriter(rw)
-		return nil
-	}
+	c.configureMessageReaderWriter(mrw.(*thrift.HTTPReaderWriter))
+	return nil
 }
 
 func (c *httpThriftCodec) configureMessageReaderWriter(rw *thrift.HTTPReaderWriter) {
+	c.Lock()
+	defer c.Unlock()
 	c.configureHTTPRequestWriter(rw.WriteHTTPRequest)
 	c.configureHTTPResponseReader(rw.ReadHTTPResponse)
 	c.readerWriter.Store(rw)
@@ -117,8 +124,9 @@ func (c *httpThriftCodec) setCombinedServices(isCombinedServices bool) {
 }
 
 func (c *httpThriftCodec) getMessageReaderWriter() interface{} {
-	if rw, ok := c.readerWriter.Load().(*thrift.HTTPReaderWriter); !ok {
-		return errors.New("get readerWriter failed")
+	v := c.readerWriter.Load()
+	if rw, ok := v.(*thrift.HTTPReaderWriter); !ok {
+		panic(fmt.Sprintf("get readerWriter failed: expected *thrift.HTTPReaderWriter, got %T", v))
 	} else {
 		return rw
 	}
