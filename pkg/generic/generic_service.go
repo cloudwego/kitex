@@ -92,8 +92,8 @@ func getMethodInfo(g Generic, serviceName string) (methods map[string]serviceinf
 	return
 }
 
-/*
-// GetMethodInfo is only used in kitex, please DON'T USE IT. This method may be removed in the future
+// GetMethodInfo is only used in kitex, please DON'T USE IT.
+// DEPRECATED: this method is no longer used. This method will be removed in the future
 func GetMethodInfo(messageReaderWriter interface{}, serviceName string) (methods map[string]serviceinfo.MethodInfo, svcName string) {
 	if messageReaderWriter == nil {
 		// note: binary generic cannot be used with multi-service feature
@@ -122,7 +122,6 @@ func GetMethodInfo(messageReaderWriter interface{}, serviceName string) (methods
 	}
 	return
 }
-*/
 
 func callHandler(ctx context.Context, handler, arg, result interface{}) error {
 	realArg := arg.(*Args)
