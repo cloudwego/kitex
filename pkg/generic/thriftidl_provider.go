@@ -199,7 +199,8 @@ func NewThriftContentProviderWithDynamicGo(main string, includes map[string]stri
 	return p, nil
 }
 
-// UpdateIDL ...
+// UpdateIDL updates idl
+// NOTE: Since an IDL update is asynchronous, it may not be applied immediately, potentially causing a temporary data inconsistency.
 func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]string) error {
 	var svc *descriptor.ServiceDescriptor
 	tree, err := ParseContent(defaultMainIDLPath, main, includes, false)
@@ -376,7 +377,8 @@ func NewThriftContentWithAbsIncludePathProviderWithDynamicGo(mainIDLPath string,
 	return p, nil
 }
 
-// UpdateIDL update idl by given args
+// UpdateIDL updates idl
+// NOTE: Since an IDL update is asynchronous, it may not be applied immediately, potentially causing a temporary data inconsistency.
 func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, includes map[string]string) error {
 	mainIDLContent, ok := includes[mainIDLPath]
 	if !ok {
