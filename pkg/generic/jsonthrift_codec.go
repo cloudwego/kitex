@@ -18,7 +18,8 @@ package generic
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -44,6 +45,7 @@ type jsonThriftCodec struct {
 	svcName                string
 	extra                  map[string]string
 	readerWriter           atomic.Value // *thrift.JSONReaderWriter
+	sync.Mutex
 }
 
 func newJsonThriftCodec(p DescriptorProvider, opts *Options) *jsonThriftCodec {
@@ -91,17 +93,21 @@ func (c *jsonThriftCodec) update() {
 	}
 }
 
-func (c *jsonThriftCodec) updateMessageReaderWriter() error {
+func (c *jsonThriftCodec) updateMessageReaderWriter() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in getMessageReaderWriter: %v", r)
+		}
+	}()
+
 	mrw := c.getMessageReaderWriter()
-	if rw, ok := mrw.(*thrift.JSONReaderWriter); !ok {
-		return mrw.(error)
-	} else {
-		c.configureMessageReaderWriter(rw)
-		return nil
-	}
+	c.configureMessageReaderWriter(mrw.(*thrift.JSONReaderWriter))
+	return nil
 }
 
 func (c *jsonThriftCodec) configureMessageReaderWriter(rw *thrift.JSONReaderWriter) {
+	c.Lock()
+	defer c.Unlock()
 	c.configureJSONWriter(rw.WriteJSON)
 	c.configureJSONReader(rw.ReadJSON)
 	c.readerWriter.Store(rw)
@@ -116,8 +122,9 @@ func (c *jsonThriftCodec) setCombinedServices(isCombinedServices bool) {
 }
 
 func (c *jsonThriftCodec) getMessageReaderWriter() interface{} {
-	if rw, ok := c.readerWriter.Load().(*thrift.JSONReaderWriter); !ok {
-		return errors.New("get readerWriter failed")
+	v := c.readerWriter.Load()
+	if rw, ok := v.(*thrift.JSONReaderWriter); !ok {
+		panic(fmt.Sprintf("get readerWriter failed: expected *thrift.JSONReaderWriter, got %T", v))
 	} else {
 		return rw
 	}
