@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -42,7 +41,6 @@ type mapThriftCodec struct {
 	svcName                 string
 	extra                   map[string]string
 	readerWriter            atomic.Value // *thrift.StructReaderWriter
-	sync.Mutex
 }
 
 func newMapThriftCodec(p DescriptorProvider) *mapThriftCodec {
@@ -56,7 +54,7 @@ func newMapThriftCodec(p DescriptorProvider) *mapThriftCodec {
 	}
 	c.setCombinedServices(svc.IsCombinedServices)
 	c.svcDsc.Store(svc)
-	c.initializeMessageReaderWriter(svc)
+	c.configureMessageReaderWriter(svc)
 	go c.update()
 	return c
 }
@@ -76,35 +74,26 @@ func (c *mapThriftCodec) update() {
 		c.svcName = svc.Name
 		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
-		c.initializeMessageReaderWriter(svc)
+		c.configureMessageReaderWriter(svc)
 	}
 }
 
-func (c *mapThriftCodec) initializeMessageReaderWriter(svc *descriptor.ServiceDescriptor) {
+func (c *mapThriftCodec) updateMessageReaderWriter() (err error) {
+	svc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+	c.configureMessageReaderWriter(svc)
+	return nil
+}
+
+func (c *mapThriftCodec) configureMessageReaderWriter(svc *descriptor.ServiceDescriptor) {
 	var rw *thrift.StructReaderWriter
 	if c.forJSON {
 		rw = thrift.NewStructReaderWriterForJSON(svc)
 	} else {
 		rw = thrift.NewStructReaderWriter(svc)
 	}
-	c.configureMessageReaderWriter(rw)
-}
-
-func (c *mapThriftCodec) updateMessageReaderWriter() (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic in getMessageReaderWriter: %v", r)
-		}
-	}()
-
-	mrw := c.getMessageReaderWriter()
-	c.configureMessageReaderWriter(mrw.(*thrift.StructReaderWriter))
-	return nil
-}
-
-func (c *mapThriftCodec) configureMessageReaderWriter(rw *thrift.StructReaderWriter) {
-	defer c.Unlock()
-	c.Lock()
 	c.configureStructWriter(rw.WriteStruct)
 	c.configureStructReader(rw.ReadStruct)
 	c.readerWriter.Store(rw)

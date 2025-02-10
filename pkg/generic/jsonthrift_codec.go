@@ -18,8 +18,8 @@ package generic
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -45,7 +45,6 @@ type jsonThriftCodec struct {
 	svcName                string
 	extra                  map[string]string
 	readerWriter           atomic.Value // *thrift.JSONReaderWriter
-	sync.Mutex
 }
 
 func newJsonThriftCodec(p DescriptorProvider, opts *Options) *jsonThriftCodec {
@@ -75,7 +74,7 @@ func newJsonThriftCodec(p DescriptorProvider, opts *Options) *jsonThriftCodec {
 		c.convOptsWithException = convOptsWithException
 	}
 	c.svcDsc.Store(svc)
-	c.configureMessageReaderWriter(thrift.NewJsonReaderWriter(svc))
+	c.configureMessageReaderWriter(svc)
 	go c.update()
 	return c
 }
@@ -89,25 +88,21 @@ func (c *jsonThriftCodec) update() {
 		c.svcName = svc.Name
 		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
-		c.configureMessageReaderWriter(thrift.NewJsonReaderWriter(svc))
+		c.configureMessageReaderWriter(svc)
 	}
 }
 
 func (c *jsonThriftCodec) updateMessageReaderWriter() (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic in getMessageReaderWriter: %v", r)
-		}
-	}()
-
-	mrw := c.getMessageReaderWriter()
-	c.configureMessageReaderWriter(mrw.(*thrift.JSONReaderWriter))
+	svc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+	c.configureMessageReaderWriter(svc)
 	return nil
 }
 
-func (c *jsonThriftCodec) configureMessageReaderWriter(rw *thrift.JSONReaderWriter) {
-	c.Lock()
-	defer c.Unlock()
+func (c *jsonThriftCodec) configureMessageReaderWriter(svc *descriptor.ServiceDescriptor) {
+	rw := thrift.NewJsonReaderWriter(svc)
 	c.configureJSONWriter(rw.WriteJSON)
 	c.configureJSONReader(rw.ReadJSON)
 	c.readerWriter.Store(rw)
