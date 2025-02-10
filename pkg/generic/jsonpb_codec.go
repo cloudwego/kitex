@@ -18,7 +18,6 @@ package generic
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync/atomic"
 
@@ -42,6 +41,7 @@ type jsonPbCodec struct {
 	dynamicgoEnabled bool         // currently set to true by default
 	svcName          string
 	extra            map[string]string
+	readerWriter     atomic.Value // *proto.JSONReaderWriter
 }
 
 func newJsonPbCodec(p PbDescriptorProviderDynamicGo, opts *Options) *jsonPbCodec {
@@ -57,8 +57,8 @@ func newJsonPbCodec(p PbDescriptorProviderDynamicGo, opts *Options) *jsonPbCodec
 	c.convOpts = convOpts
 	c.setCombinedServices(svc.IsCombinedServices())
 	c.setPackageName(svc.PackageName())
-
 	c.svcDsc.Store(svc)
+	c.readerWriter.Store(proto.NewJsonReaderWriter(svc, &convOpts))
 	go c.update()
 	return c
 }
@@ -72,6 +72,7 @@ func (c *jsonPbCodec) update() {
 		c.svcName = svc.Name()
 		c.setCombinedServices(svc.IsCombinedServices())
 		c.svcDsc.Store(svc)
+		c.readerWriter.Store(proto.NewJsonReaderWriter(svc, &c.convOpts))
 	}
 }
 
@@ -88,12 +89,12 @@ func (c *jsonPbCodec) setPackageName(pkg string) {
 }
 
 func (c *jsonPbCodec) getMessageReaderWriter() interface{} {
-	pbSvc, ok := c.svcDsc.Load().(*dproto.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser dynamicgo ServiceDescriptor failed")
+	v := c.readerWriter.Load()
+	if rw, ok := v.(*proto.JSONReaderWriter); !ok {
+		panic(fmt.Sprintf("get readerWriter failed: expected *proto.JSONReaderWriter, got %T", v))
+	} else {
+		return rw
 	}
-
-	return proto.NewJsonReaderWriter(pbSvc, &c.convOpts)
 }
 
 func (c *jsonPbCodec) getMethod(req interface{}, method string) (*Method, error) {

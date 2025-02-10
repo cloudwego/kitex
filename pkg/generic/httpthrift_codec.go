@@ -19,6 +19,7 @@ package generic
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"sync/atomic"
@@ -50,6 +51,7 @@ type httpThriftCodec struct {
 	useRawBodyForHTTPResp  bool
 	svcName                string
 	extra                  map[string]string
+	readerWriter           atomic.Value // *thrift.HTTPReaderWriter
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
@@ -73,6 +75,7 @@ func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
 	}
 	c.setCombinedServices(svc.IsCombinedServices)
 	c.svcDsc.Store(svc)
+	c.configureMessageReaderWriter(svc)
 	go c.update()
 	return c
 }
@@ -86,7 +89,24 @@ func (c *httpThriftCodec) update() {
 		c.svcName = svc.Name
 		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
+		c.configureMessageReaderWriter(svc)
 	}
+}
+
+func (c *httpThriftCodec) updateMessageReaderWriter() (err error) {
+	svc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+	c.configureMessageReaderWriter(svc)
+	return nil
+}
+
+func (c *httpThriftCodec) configureMessageReaderWriter(svc *descriptor.ServiceDescriptor) {
+	rw := thrift.NewHTTPReaderWriter(svc)
+	c.configureHTTPRequestWriter(rw.WriteHTTPRequest)
+	c.configureHTTPResponseReader(rw.ReadHTTPResponse)
+	c.readerWriter.Store(rw)
 }
 
 func (c *httpThriftCodec) setCombinedServices(isCombinedServices bool) {
@@ -98,14 +118,12 @@ func (c *httpThriftCodec) setCombinedServices(isCombinedServices bool) {
 }
 
 func (c *httpThriftCodec) getMessageReaderWriter() interface{} {
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser ServiceDescriptor failed")
+	v := c.readerWriter.Load()
+	if rw, ok := v.(*thrift.HTTPReaderWriter); !ok {
+		panic(fmt.Sprintf("get readerWriter failed: expected *thrift.HTTPReaderWriter, got %T", v))
+	} else {
+		return rw
 	}
-	rw := thrift.NewHTTPReaderWriter(svcDsc)
-	c.configureHTTPRequestWriter(rw.WriteHTTPRequest)
-	c.configureHTTPResponseReader(rw.ReadHTTPResponse)
-	return rw
 }
 
 func (c *httpThriftCodec) configureHTTPRequestWriter(writer *thrift.WriteHTTPRequest) {
