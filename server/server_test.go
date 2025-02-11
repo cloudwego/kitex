@@ -742,9 +742,9 @@ func TestServerBoundHandler(t *testing.T) {
 }
 
 func TestInvokeHandlerWithContextBackup(t *testing.T) {
-	testInvokeHandlerWithSession(t, true, "localhost:8888")
+	testInvokeHandlerWithSession(t, true, "localhost:0")
 	os.Setenv(localsession.SESSION_CONFIG_KEY, "true,100,1h")
-	testInvokeHandlerWithSession(t, false, "localhost:8889")
+	testInvokeHandlerWithSession(t, false, "localhost:0")
 }
 
 func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
@@ -891,7 +891,7 @@ func TestInvokeHandlerExec(t *testing.T) {
 		},
 		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
 			var err error
-			ln, err = net.Listen("tcp", "localhost:8888")
+			ln, err = net.Listen("tcp", "localhost:0")
 			return ln, err
 		},
 	}
@@ -954,7 +954,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 		},
 		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
 			var err error
-			ln, err = net.Listen("tcp", "localhost:8888")
+			ln, err = net.Listen("tcp", "localhost:0")
 			return ln, err
 		},
 	}
@@ -1093,7 +1093,7 @@ func TestRegisterServiceWithMiddleware(t *testing.T) {
 		},
 		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
 			var err error
-			ln, err = net.Listen("tcp", "localhost:8888")
+			ln, err = net.Listen("tcp", "localhost:0")
 			return ln, err
 		},
 	}
