@@ -17,7 +17,6 @@ package generator
 import (
 	"bytes"
 	"fmt"
-	"github.com/cloudwego/thriftgo/generator/golang/streaming"
 	"strings"
 	"text/template"
 
@@ -196,23 +195,22 @@ func (s *ServiceInfo) HasStreamingRecursive() bool {
 // MethodInfo .
 type MethodInfo struct {
 	PkgInfo                `json:"pkg_info"`
-	ServiceName            string               `json:"service_name,omitempty"`
-	Name                   string               `json:"name,omitempty"`
-	RawName                string               `json:"raw_name,omitempty"`
-	Oneway                 bool                 `json:"oneway,omitempty"`
-	Void                   bool                 `json:"void,omitempty"`
-	Args                   []*Parameter         `json:"args,omitempty"`
-	ArgsLength             int                  `json:"args_length,omitempty"`
-	Resp                   *Parameter           `json:"resp,omitempty"`
-	Exceptions             []*Parameter         `json:"exceptions,omitempty"`
-	ArgStructName          string               `json:"arg_struct_name,omitempty"`
-	ResStructName          string               `json:"res_struct_name,omitempty"`
-	IsResponseNeedRedirect bool                 `json:"is_response_need_redirect,omitempty"` // int -> int*
-	GenArgResultStruct     bool                 `json:"gen_arg_result_struct,omitempty"`
-	IsStreaming            bool                 `json:"is_streaming,omitempty"`
-	ClientStreaming        bool                 `json:"client_streaming,omitempty"`
-	ServerStreaming        bool                 `json:"server_streaming,omitempty"`
-	Streaming              *streaming.Streaming `json:"streaming,omitempty"`
+	ServiceName            string       `json:"service_name,omitempty"`
+	Name                   string       `json:"name,omitempty"`
+	RawName                string       `json:"raw_name,omitempty"`
+	Oneway                 bool         `json:"oneway,omitempty"`
+	Void                   bool         `json:"void,omitempty"`
+	Args                   []*Parameter `json:"args,omitempty"`
+	ArgsLength             int          `json:"args_length,omitempty"`
+	Resp                   *Parameter   `json:"resp,omitempty"`
+	Exceptions             []*Parameter `json:"exceptions,omitempty"`
+	ArgStructName          string       `json:"arg_struct_name,omitempty"`
+	ResStructName          string       `json:"res_struct_name,omitempty"`
+	IsResponseNeedRedirect bool         `json:"is_response_need_redirect,omitempty"` // int -> int*
+	GenArgResultStruct     bool         `json:"gen_arg_result_struct,omitempty"`
+	IsStreaming            bool         `json:"is_streaming,omitempty"`
+	ClientStreaming        bool         `json:"client_streaming,omitempty"`
+	ServerStreaming        bool         `json:"server_streaming,omitempty"`
 }
 
 func (m *MethodInfo) StreamingMode() string {

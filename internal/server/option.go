@@ -171,7 +171,6 @@ type Options struct {
 	BackupOpt backup.Options
 
 	Streaming stream.StreamingConfig // deprecated, use StreamOptions instead
-	StreamX   StreamXOptions         // deprecated
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool

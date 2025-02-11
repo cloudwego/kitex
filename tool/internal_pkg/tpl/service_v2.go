@@ -54,7 +54,7 @@ var serviceMethods = map[string]kitex.MethodInfo{
 				{{- else if .ServerStreaming -}} kitex.StreamingServer
 				{{- else if .ClientStreaming -}} kitex.StreamingClient
 				{{- else -}}
-					 {{- if or (eq $.Codec "protobuf") (eq .Streaming.Mode "unary") -}} kitex.StreamingUnary
+					 {{- if or (eq $.Codec "protobuf") (eq .StreamingMode "unary") -}} kitex.StreamingUnary
 					 {{- else -}} kitex.StreamingNone
 					 {{- end -}}
 				{{- end}}),

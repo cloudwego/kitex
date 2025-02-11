@@ -38,7 +38,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/kitex/server/streamxserver"
 )
 
 var testServiceInfo = &serviceinfo.ServiceInfo{

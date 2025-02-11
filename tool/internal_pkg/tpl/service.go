@@ -195,7 +195,7 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 	{{- end}} {{/* $unary end */}}
 	{{- else}} {{/* thrift logic */}}
 	{{- if $unary}} {{/* unary logic */}}
-	{{- if eq .Streaming.Mode "unary"}}
+	{{- if eq .StreamingMode "unary"}}
 	if streaming.GetStream(ctx) == nil {
 		return errors.New("{{.ServiceName}}.{{.Name}} is a thrift streaming unary method, please call with Kitex StreamClient or remove the annotation streaming.mode")
 	}

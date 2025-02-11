@@ -551,16 +551,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 			pkg.AddImport("transport", "github.com/cloudwego/kitex/transport")
 			pkg.AddImport("streamcall", "github.com/cloudwego/kitex/client/callopt/streamcall")
 		}
-		if !g.StreamX && func() bool {
-			var need bool
-			for _, mt := range pkg.Methods {
-				if mt.IsStreaming {
-					need = true
-					break
-				}
-			}
-			return need
-		}() {
+		if !g.StreamX && pkg.HasStreaming {
 			pkg.AddImport("streamclient", "github.com/cloudwego/kitex/client/streamclient")
 		}
 		if len(pkg.AllMethods()) > 0 {
