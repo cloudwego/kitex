@@ -40,11 +40,20 @@ func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTra
 	// ttheader streaming
 	if ri.Config().TransportProtocol()&transport.TTHeaderStreaming == transport.TTHeaderStreaming {
 		// wrap internal client provider
-		cs, err := opt.Provider.NewStream(ctx, ri)
+		cs, err := opt.TTHeaderStreamingProvider.NewStream(ctx, ri)
 		if err != nil {
 			return nil, nil, err
 		}
 		return cs, nil, nil
+	}
+	// grpc streaming
+	if ri.Config().TransportProtocol()&transport.GRPCStreaming == transport.GRPCStreaming {
+		cm := NewConnWrapper(opt.GRPCStreamingConnPool)
+		rawConn, err := cm.GetConn(ctx, opt.Dialer, ri)
+		if err != nil {
+			return nil, nil, err
+		}
+		return nphttp2.NewClientStream(ctx, opt.SvcInfo, rawConn, handler), &StreamConnManager{cm}, nil
 	}
 
 	// default is grpc streaming

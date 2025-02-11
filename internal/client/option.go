@@ -272,13 +272,22 @@ func (o *Options) initRemoteOpt() {
 		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
+	// configure grpc streaming
+	if o.Configs.TransportProtocol()&transport.GRPCStreaming == transport.GRPCStreaming {
+		if o.PoolCfg != nil && *o.PoolCfg == zero {
+			// grpc unary short connection
+			o.GRPCConnectOpts.ShortConn = true
+		}
+		o.RemoteOpt.GRPCStreamingConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
+		o.RemoteOpt.GRPCStreamingCliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
+	}
 	// configure ttheader streaming
 	if o.Configs.TransportProtocol()&transport.TTHeaderStreaming == transport.TTHeaderStreaming {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
 			// configure short conn pool
 			o.TTHeaderStreamingOptions.ProviderOptions = append(o.TTHeaderStreamingOptions.ProviderOptions, ttstream.WithClientShortConnPool())
 		}
-		o.RemoteOpt.Provider = ttstream.NewClientProvider(o.TTHeaderStreamingOptions.ProviderOptions...)
+		o.RemoteOpt.TTHeaderStreamingProvider = ttstream.NewClientProvider(o.TTHeaderStreamingOptions.ProviderOptions...)
 	}
 	if o.RemoteOpt.ConnPool == nil {
 		if o.PoolCfg != nil {

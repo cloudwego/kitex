@@ -24,15 +24,15 @@ type Protocol int
 const (
 	PurePayload Protocol = 0
 
-	TTHeader Protocol = 1 << iota
-	Framed
-	HTTP
-	GRPC
-	HESSIAN2
-	STREAMING
+	TTHeader          Protocol = 1 << iota // unary methods only
+	Framed                                 // unary methods only
+	HTTP                                   // unary methods only
+	GRPC                                   // both support unary and streaming methods
+	HESSIAN2                               // unary methods only
+	TTHeaderStreaming                      // streaming methods only
+	GRPCStreaming                          // streaming methods only
 
-	TTHeaderFramed    = TTHeader | Framed
-	TTHeaderStreaming = TTHeader | STREAMING
+	TTHeaderFramed = TTHeader | Framed // unary methods only
 )
 
 // Unknown indicates the protocol is unknown.
@@ -40,23 +40,30 @@ const Unknown = "Unknown"
 
 // String prints human readable information.
 func (tp Protocol) String() string {
-	switch tp {
-	case PurePayload:
-		return "PurePayload"
-	case TTHeader:
-		return "TTHeader"
-	case Framed:
-		return "Framed"
-	case HTTP:
-		return "HTTP"
-	case TTHeaderFramed:
-		return "TTHeaderFramed"
-	case GRPC:
-		return "GRPC"
-	case HESSIAN2:
-		return "Hessian2"
-	case TTHeaderStreaming:
-		return "TTHeaderStreaming"
+	var s string
+	if tp&TTHeader == TTHeader {
+		s += "TTHeader|"
 	}
-	return Unknown
+	if tp&Framed == Framed {
+		s += "Framed|"
+	}
+	if tp&HTTP == HTTP {
+		s += "HTTP|"
+	}
+	if tp&GRPC == GRPC {
+		s += "GRPC|"
+	}
+	if tp&HESSIAN2 == HESSIAN2 {
+		s += "Hessian2|"
+	}
+	if tp&TTHeaderStreaming == TTHeaderStreaming {
+		s += "TTHeaderStreaming|"
+	}
+	if tp&GRPCStreaming == GRPCStreaming {
+		s += "GRPCStreaming|"
+	}
+	if s != "" {
+		return s[:len(s)-1]
+	}
+	return "PurePayload"
 }

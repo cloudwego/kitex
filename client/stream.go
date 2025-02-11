@@ -25,12 +25,14 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/kitex/transport"
 )
 
 // Streaming client streaming interface for code generate
@@ -93,7 +95,13 @@ func (kc *kClient) StreamX(ctx context.Context, method string) (streaming.Client
 }
 
 func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
-	handler, err := kc.opt.RemoteOpt.CliHandlerFactory.NewTransHandler(kc.opt.RemoteOpt)
+	var handler remote.ClientTransHandler
+	var err error
+	if kc.opt.Configs.TransportProtocol()&transport.GRPCStreaming == transport.GRPCStreaming {
+		handler, err = kc.opt.RemoteOpt.GRPCStreamingCliHandlerFactory.NewTransHandler(kc.opt.RemoteOpt)
+	} else {
+		handler, err = kc.opt.RemoteOpt.CliHandlerFactory.NewTransHandler(kc.opt.RemoteOpt)
+	}
 	if err != nil {
 		return nil, err
 	}

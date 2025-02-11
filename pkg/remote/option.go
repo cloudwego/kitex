@@ -138,5 +138,9 @@ type ClientOption struct {
 
 	EnableConnPoolReporter bool
 
-	Provider streamx.ClientProvider
+	// for grpc streaming, only used for streaming call
+	GRPCStreamingCliHandlerFactory ClientTransHandlerFactory
+	GRPCStreamingConnPool          ConnPool
+	// for ttheader streaming, only used for streaming call
+	TTHeaderStreamingProvider streamx.ClientProvider
 }
