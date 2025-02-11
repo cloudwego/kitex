@@ -78,7 +78,7 @@ func NewServiceInfo() *kitex.ServiceInfo {
 
 func newServiceInfo() *kitex.ServiceInfo {
 	serviceName := "{{.RawServiceName}}"
-	handlerType := (*{{.ServiceName}})(nil)
+	handlerType := (*{{call .ServiceTypeName}})(nil)
 	extra := map[string]interface{}{
 		"PackageName":	 "{{.PkgInfo.PkgName}}",
 		{{- if $UseThriftReflection }}
@@ -125,13 +125,13 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 		if err := st.RecvMsg(req); err != nil {
 			return err
 		}
-		resp, err := handler.({{.ServiceName}}).{{.Name}}(ctx, req)
+		resp, err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx, req)
 		if err != nil {
 			return err
 		}
 		return st.SendMsg(resp)
 	case *{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ArgStructName}}:
-		success, err := handler.({{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, s.{{.Name}}{{end}})
+		success, err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, s.{{.Name}}{{end}})
 		if err != nil {
 			return err
 		}
@@ -144,8 +144,8 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 	{{- else}} {{/* thrift logic */}}
 	{{if gt .ArgsLength 0}}realArg := {{else}}_ = {{end}}arg.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ArgStructName}})
 	{{if or (not .Void) .Exceptions}}realResult := result.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ResStructName}}){{end}}
-	{{if .Void}}err := handler.({{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, realArg.{{.Name}}{{end}})
-	{{else}}success, err := handler.({{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, realArg.{{.Name}}{{end}})
+	{{if .Void}}err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, realArg.{{.Name}}{{end}})
+	{{else}}success, err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, realArg.{{.Name}}{{end}})
 	{{end -}}
 	if err != nil {
 	{{- if $HandlerReturnKeepResp }}
@@ -187,7 +187,7 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 		return err
 	}
 	{{- end}}
-	return handler.({{.ServiceName}}).{{.Name}}(ctx, {{if $serverSide}}req, {{end}}stream)
+	return handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx, {{if $serverSide}}req, {{end}}stream)
 	{{- end}}
 }
 

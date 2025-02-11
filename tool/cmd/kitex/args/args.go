@@ -168,6 +168,9 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 	if err = f.Parse(kitexArgs); err != nil {
 		return err
 	}
+	if a.StreamX {
+		a.ThriftOptions = append(a.ThriftOptions, "streamx")
+	}
 
 	if a.Record {
 		a.RecordCmd = os.Args

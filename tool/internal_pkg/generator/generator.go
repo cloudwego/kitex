@@ -586,35 +586,16 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 				}
 			}
 		}
-	case ServerFileName:
+	case ServerFileName, InvokerFileName:
 		if len(pkg.CombineServices) == 0 {
-			if !g.StreamX || len(pkg.AllMethods()) > 0 {
-				pkg.AddImport(pkg.ServiceInfo.PkgRefName, pkg.ServiceInfo.ImportPath)
-			}
-		}
-		if g.StreamX {
-			if len(pkg.AllMethods()) > 0 {
-				pkg.AddImports("context")
-			}
-			if pkg.HasStreaming {
-				pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
-			}
-		}
-		pkg.AddImports("server")
-	case InvokerFileName:
-		if !g.StreamX {
-			if len(pkg.CombineServices) == 0 {
-				pkg.AddImport(pkg.ServiceInfo.PkgRefName, pkg.ServiceInfo.ImportPath)
-			}
+			pkg.AddImport(pkg.ServiceInfo.PkgRefName, pkg.ServiceInfo.ImportPath)
 		}
 		pkg.AddImports("server")
 	case ServiceFileName:
 		pkg.AddImports("errors")
 		pkg.AddImports("client")
 		pkg.AddImport("kitex", "github.com/cloudwego/kitex/pkg/serviceinfo")
-		if !g.StreamX || len(pkg.AllMethods()) > 0 {
-			pkg.AddImport(pkg.ServiceInfo.PkgRefName, pkg.ServiceInfo.ImportPath)
-		}
+		pkg.AddImport(pkg.ServiceInfo.PkgRefName, pkg.ServiceInfo.ImportPath)
 		if len(pkg.AllMethods()) > 0 {
 			pkg.AddImports("context")
 		}

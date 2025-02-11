@@ -18,6 +18,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync/atomic"
 
@@ -68,8 +69,10 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 	result.ClientStream = cs
 	if getter, ok := cs.(streaming.GRPCStreamGetter); ok {
 		result.Stream = getter.GetGRPCStream()
+		return nil
+	} else {
+		return fmt.Errorf("ClientStream does not implement streaming.GRPCStreamGetter interface: %T", cs)
 	}
-	return nil
 }
 
 // StreamX implements the Streaming interface

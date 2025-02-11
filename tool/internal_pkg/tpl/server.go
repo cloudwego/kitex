@@ -30,37 +30,8 @@ import (
 	{{- end}}
 )
 
-{{- if .StreamX}}
-type {{.ServiceName}} interface {
-{{- range .AllMethods}}
-{{- if (or .ClientStreaming .ServerStreaming)}}
-	{{.Name}}(ctx context.Context {{if not .ClientStreaming}}{{range .Args}}, {{.RawName}} {{.Type}}{{end}}{{end}}, stream {{.ServiceName}}_{{.RawName}}Server) (err error)
-{{- else}}
-	{{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{.Type}}{{end}}) ({{if not .Void}}r {{.Resp.Type}}, {{end}}err error)
-{{- end}}
-{{- end}}
-}
-
-{{range .Methods}}
-{{- if or .ClientStreaming .ServerStreaming}}
-{{$arg := index .Args 0}}
-{{- if and .ClientStreaming .ServerStreaming}}
-type {{.ServiceName}}_{{.Name}}Server streaming.BidiStreamingServer[{{NotPtr $arg.Type}},{{NotPtr .Resp.Type}}]
-{{- else if .ClientStreaming}}
-type {{.ServiceName}}_{{.Name}}Server streaming.ClientStreamingServer[{{NotPtr $arg.Type}},{{NotPtr .Resp.Type}}]
-{{- else}}
-type {{.ServiceName}}_{{.Name}}Server streaming.ServerStreamingServer[{{NotPtr .Resp.Type}}]
-{{- end}}
-{{- end}}
-{{end}}
-{{- end}}
-
 // NewServer creates a server.Server with the given handler and options.
-{{- if .StreamX}}
-func NewServer(handler {{.ServiceName}}, opts ...server.Option) server.Server {
-{{- else}}
 func NewServer(handler {{call .ServiceTypeName}}, opts ...server.Option) server.Server {
-{{- end}}
     var options []server.Option
     {{template "@server.go-NewServer-option" .}}
     options = append(options, opts...)
@@ -79,11 +50,7 @@ func NewServer(handler {{call .ServiceTypeName}}, opts ...server.Option) server.
 }
 {{template "@server.go-EOF" .}}
 
-{{- if .StreamX}}
-func RegisterService(svr server.Server, handler {{.ServiceName}}, opts ...server.RegisterOption) error {
-{{- else}}
 func RegisterService(svr server.Server, handler {{call .ServiceTypeName}}, opts ...server.RegisterOption) error {
-{{- end}}
 	return svr.RegisterService(serviceInfo(), handler, opts...)
 }
 `
