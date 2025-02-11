@@ -15,7 +15,6 @@
 package args
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -24,10 +23,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
@@ -128,10 +124,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Specify a protocol for codec")
 	f.BoolVar(&a.NoDependencyCheck, "no-dependency-check", false,
 		"Skip dependency checking.")
-	f.BoolVar(&a.Rapid, "rapid", false,
-		"Try some experimental features to generate code faster.")
-	f.BoolVar(&a.LocalThriftgo, "local_thriftgo", false,
-		"Use local thriftgo exec instead of kitex embedded thriftgo.")
+	f.BoolVar(&a.LocalThriftgo, "local-thriftgo", false,
+		"Use local thriftgo exec instead of kitex embedded thriftgo. This is mainly used for debugging, you need to ensure that thriftgo is installed correctly.")
 	f.Var(&a.BuiltinTpl, "tpl", "Specify kitex built-in template.")
 	f.BoolVar(&a.StreamX, "streamx", false,
 		"Generate streaming code with streamx interface",
@@ -335,7 +329,7 @@ func (a *Arguments) checkPath(curpath string) error {
 			}
 			a.PackagePrefix = path.Join(a.ModuleName, filepath.ToSlash(refPath), genPath)
 		} else {
-			if err := initGoMod(a.ModuleName); err != nil {
+			if err := initGoMod(curpath, a.ModuleName); err != nil {
 				return fmt.Errorf("init go mod failed: %w", err)
 			}
 			a.PackagePrefix = path.Join(a.ModuleName, genPath)
@@ -458,91 +452,18 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
-// ValidateCMD check if the path exists and if the version is satisfied
+// ValidateCMD check if the path exists and if the version is satisfied. Thriftgo is embedded, only validate protoc.
 func ValidateCMD(path, idlType string) error {
-	// check if the path exists
-	if _, err := os.Stat(path); err != nil {
-		tool := "thriftgo"
-		if idlType == "protobuf" {
-			tool = "protoc"
-		}
-
-		if idlType == "thrift" {
-			_, err = runCommand("go install github.com/cloudwego/thriftgo@latest")
-			if err != nil {
-				return fmt.Errorf("[ERROR] %s is also unavailable, please install %s first.\n"+
-					"Refer to https://github.com/cloudwego/thriftgo, or simple run:\n"+
-					"  go install -v github.com/cloudwego/thriftgo@latest", path, tool)
-			}
-		} else {
-			return fmt.Errorf("[ERROR] %s is also unavailable, please install %s first.\n"+
-				"Refer to https://github.com/protocolbuffers/protobuf", path, tool)
+	if idlType == "protobuf" {
+		if _, err := os.Stat(path); err != nil {
+			return fmt.Errorf("[ERROR] %s is also unavailable, please install protoc first.\n"+
+				"Refer to https://github.com/protocolbuffers/protobuf", path)
 		}
 	}
-
-	// check if the version is satisfied
 	if idlType == "thrift" {
-		// run `thriftgo -versions and get the output
-		cmd := exec.Command(path, "-version")
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("failed to get thriftgo version: %s", err.Error())
-		}
-		if !strings.HasPrefix(string(out), "thriftgo ") {
-			return fmt.Errorf("thriftgo -version returns '%s', please reinstall thriftgo first", string(out))
-		}
-		version := strings.Replace(strings.TrimSuffix(string(out), "\n"), "thriftgo ", "", 1)
-		if !versionSatisfied(version, requiredThriftGoVersion) {
-			_, err = runCommand("go install github.com/cloudwego/thriftgo@latest")
-			if err != nil {
-				return fmt.Errorf("[ERROR] thriftgo version(%s) not satisfied, please install version >= %s",
-					version, requiredThriftGoVersion)
-			}
-		}
-		return nil
+		log.Warnf("You are using local thriftgo: %s. Please make sure the version is matched with kitex tool by yourself.", path)
 	}
 	return nil
-}
-
-var versionSuffixPattern = regexp.MustCompile(`-.*$`)
-
-func removeVersionPrefixAndSuffix(version string) string {
-	version = strings.TrimPrefix(version, "v")
-	version = strings.TrimSuffix(version, "\n")
-	version = versionSuffixPattern.ReplaceAllString(version, "")
-	return version
-}
-
-func versionSatisfied(current, required string) bool {
-	currentSegments := strings.SplitN(removeVersionPrefixAndSuffix(current), ".", 3)
-	requiredSegments := strings.SplitN(removeVersionPrefixAndSuffix(required), ".", 3)
-
-	requiredHasSuffix := versionSuffixPattern.MatchString(required)
-	if requiredHasSuffix {
-		return false // required version should be a formal version
-	}
-
-	for i := 0; i < 3; i++ {
-		var currentSeg, minimalSeg int
-		var err error
-		if currentSeg, err = strconv.Atoi(currentSegments[i]); err != nil {
-			log.Warnf("invalid current version: %s, seg=%v, err=%v", current, currentSegments[i], err)
-			return false
-		}
-		if minimalSeg, err = strconv.Atoi(requiredSegments[i]); err != nil {
-			log.Warnf("invalid required version: %s, seg=%v, err=%v", required, requiredSegments[i], err)
-			return false
-		}
-		if currentSeg > minimalSeg {
-			return true
-		} else if currentSeg < minimalSeg {
-			return false
-		}
-	}
-	if currentHasSuffix := versionSuffixPattern.MatchString(current); currentHasSuffix {
-		return false
-	}
-	return true
 }
 
 // LookupTool returns the compiler path found in $PATH; if not found, returns $GOPATH/bin/$tool
@@ -568,7 +489,7 @@ func LookupTool(idlType, compilerPath string) string {
 	return path
 }
 
-func initGoMod(module string) error {
+func initGoMod(curpath, module string) error {
 	if util.Exists("go.mod") {
 		return nil
 	}
@@ -577,6 +498,7 @@ func initGoMod(module string) error {
 		return err
 	}
 	cmd := &exec.Cmd{
+		Dir:    curpath,
 		Path:   pathToGo,
 		Args:   []string{"go", "mod", "init", module},
 		Stdin:  os.Stdin,
@@ -584,22 +506,4 @@ func initGoMod(module string) error {
 		Stderr: os.Stderr,
 	}
 	return cmd.Run()
-}
-
-func runCommand(input string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	arr := strings.Split(input, " ")
-	var cmd *exec.Cmd
-	if len(arr) > 1 {
-		cmd = exec.CommandContext(ctx, arr[0], arr[1:]...)
-	} else {
-		cmd = exec.CommandContext(ctx, arr[0])
-	}
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	result := strings.TrimSpace(string(output))
-	return result, nil
 }
