@@ -38,7 +38,7 @@ func (s *server) wrapStreamMiddleware() endpoint.Middleware {
 				st.ServerStream = nst
 				st.Stream = nst.GetGRPCStream()
 			}
-			return nil
+			return next(ctx, req, resp)
 		}
 	}
 }
