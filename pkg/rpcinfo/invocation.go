@@ -21,7 +21,6 @@ import (
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var (
@@ -46,13 +45,12 @@ type InvocationSetter interface {
 	Reset()
 }
 type invocation struct {
-	packageName   string
-	serviceName   string
-	methodName    string
-	streamingMode serviceinfo.StreamingMode
-	seqID         int32
-	bizErr        kerrors.BizStatusErrorIface
-	extra         map[string]interface{}
+	packageName string
+	serviceName string
+	methodName  string
+	seqID       int32
+	bizErr      kerrors.BizStatusErrorIface
+	extra       map[string]interface{}
 }
 
 // NewInvocation creates a new Invocation with the given service, method and optional package.

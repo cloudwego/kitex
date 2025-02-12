@@ -140,18 +140,6 @@ func (s *grpcStream) SendMsg(m interface{}) (err error) {
 	return
 }
 
-func (s *server) invokeRecvEndpoint() endpoint.RecvEndpoint {
-	return func(stream streaming.Stream, resp interface{}) (err error) {
-		return stream.RecvMsg(resp)
-	}
-}
-
-func (s *server) invokeSendEndpoint() endpoint.SendEndpoint {
-	return func(stream streaming.Stream, req interface{}) (err error) {
-		return stream.SendMsg(req)
-	}
-}
-
 // contextStream is responsible for solving ctx diverge in server side streaming.
 // it receives the ctx from previous middlewares and the Stream that exposed to users，then rewrite
 // Context() method so that users could call Stream.Context() in handler to get the processed ctx.

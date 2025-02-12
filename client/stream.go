@@ -158,9 +158,11 @@ type stream struct {
 	finished      uint32
 }
 
-var _ streaming.GRPCStreamGetter = (*stream)(nil)
-var _ streaming.WithDoFinish = (*stream)(nil)
-var _ streaming.WithDoFinish = (*grpcStream)(nil)
+var (
+	_ streaming.GRPCStreamGetter = (*stream)(nil)
+	_ streaming.WithDoFinish     = (*stream)(nil)
+	_ streaming.WithDoFinish     = (*grpcStream)(nil)
+)
 
 func newStream(ctx context.Context, s streaming.ClientStream, scm *remotecli.StreamConnManager, kc *kClient, ri rpcinfo.RPCInfo, mode serviceinfo.StreamingMode,
 	sendEP cep.StreamSendEndpoint, recvEP cep.StreamRecvEndpoint, eventHandler internal_stream.StreamEventHandler, grpcSendEP endpoint.SendEndpoint, grpcRecvEP endpoint.RecvEndpoint,
