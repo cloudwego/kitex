@@ -180,7 +180,7 @@ func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 
 func (s *server) buildInvokeChain(ctx context.Context) {
 	mws := s.buildMiddlewares(ctx)
-	s.eps = endpoint.Chain(mws...)(s.lastCompatibleEndpoint(ctx))
+	s.eps = endpoint.Chain(mws...)(s.unaryOrStreamEndpoint(ctx))
 }
 
 // RegisterService should not be called by users directly.
@@ -364,7 +364,7 @@ func (s *server) buildCoreMiddleware() endpoint.Middleware {
 	}
 }
 
-func (s *server) lastCompatibleEndpoint(ctx context.Context) endpoint.Endpoint {
+func (s *server) unaryOrStreamEndpoint(ctx context.Context) endpoint.Endpoint {
 	unaryEp := endpoint.UnaryChain(s.opt.UnaryOptions.UnaryMiddlewares...)(s.invokeHandleEndpoint())
 	streamEp := sep.StreamChain(s.opt.StreamOptions.StreamMiddlewares...)(s.streamHandleEndpoint())
 
