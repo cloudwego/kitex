@@ -40,6 +40,8 @@ type serverStream struct {
 	grpcStream *grpcServerStream
 }
 
+var _ streaming.GRPCStreamGetter = (*serverStream)(nil)
+
 func (s *serverStream) GetGRPCStream() streaming.Stream {
 	return s.grpcStream
 }
@@ -174,6 +176,8 @@ type clientStream struct {
 	// for grpc compatibility
 	grpcStream *grpcClientStream
 }
+
+var _ streaming.GRPCStreamGetter = (*clientStream)(nil)
 
 func (s *clientStream) GetGRPCStream() streaming.Stream {
 	return s.grpcStream

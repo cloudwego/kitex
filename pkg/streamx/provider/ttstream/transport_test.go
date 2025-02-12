@@ -37,20 +37,14 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 var testServiceInfo = &serviceinfo.ServiceInfo{
 	ServiceName: "kitex.service.streaming",
 	Methods: map[string]serviceinfo.MethodInfo{
 		"Bidi": serviceinfo.NewMethodInfo(
-			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamxserver.InvokeBidiStreamHandler[testRequest, testResponse](
-					ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs),
-					func(ctx context.Context, stream streaming.BidiStreamingServer[testRequest, testResponse]) error {
-						return nil
-					},
-				)
+			func(ctx context.Context, handler, arg, res interface{}) error {
+				return nil
 			},
 			nil,
 			nil,

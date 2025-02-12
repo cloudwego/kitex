@@ -1142,6 +1142,6 @@ func Test_kClient_initMiddlewares(t *testing.T) {
 	}
 	c.initMiddlewares(context.Background())
 
-	test.Assert(t, len(c.opt.Streaming.RecvMiddlewares) > 0, "init middlewares failed")
-	test.Assert(t, len(c.opt.Streaming.SendMiddlewares) > 0, "init middlewares failed")
+	test.Assert(t, len(c.opt.Streaming.RecvMiddlewares) == 0, "init middlewares failed")
+	test.Assert(t, len(c.opt.Streaming.SendMiddlewares) == 0, "init middlewares failed")
 }

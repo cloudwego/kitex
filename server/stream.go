@@ -54,9 +54,10 @@ func newStream(ctx context.Context, s streaming.ServerStream, sendEP sep.StreamS
 		eventHandler: eventHandler,
 	}
 	if grpcStreamGetter, ok := s.(streaming.GRPCStreamGetter); ok {
-		grpcStream := grpcStreamGetter.GetGRPCStream()
-		st.grpcStream = newGRPCStream(grpcStream, grpcSendEP, grpcRecvEP)
-		st.grpcStream.st = st
+		if grpcStream := grpcStreamGetter.GetGRPCStream(); grpcStream != nil {
+			st.grpcStream = newGRPCStream(grpcStream, grpcSendEP, grpcRecvEP)
+			st.grpcStream.st = st
+		}
 	}
 	return st
 }
@@ -70,6 +71,8 @@ type stream struct {
 	recv sep.StreamRecvEndpoint
 	send sep.StreamSendEndpoint
 }
+
+var _ streaming.GRPCStreamGetter = (*stream)(nil)
 
 func (s *stream) GetGRPCStream() streaming.Stream {
 	if s.grpcStream == nil {

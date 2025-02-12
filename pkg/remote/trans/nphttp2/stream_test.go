@@ -40,8 +40,8 @@ func TestStream(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	ctx := newMockCtxWithRPCInfo()
 
-	// test NewStream()
-	stream := NewStream(ctx, &serviceinfo.ServiceInfo{
+	// test newServerStream()
+	stream := newServerStream(ctx, &serviceinfo.ServiceInfo{
 		PackageName:     "",
 		ServiceName:     "",
 		HandlerType:     nil,
@@ -53,20 +53,20 @@ func TestStream(t *testing.T) {
 	}, serverConn, handler)
 
 	// test Context()
-	strCtx := stream.Context()
+	strCtx := stream.GetGRPCStream().Context()
 	test.Assert(t, strCtx == ctx)
 
 	// test recvMsg()
 	msg := newMockNewMessage().Data()
 	newMockStreamRecvHelloRequest(s)
-	err = stream.RecvMsg(msg)
+	err = stream.RecvMsg(ctx, msg)
 	test.Assert(t, err == nil, err)
 
 	// test SendMsg()
-	err = stream.SendMsg(msg)
+	err = stream.SendMsg(ctx, msg)
 	test.Assert(t, err == nil, err)
 
 	// test Close()
-	err = stream.Close()
+	err = stream.GetGRPCStream().Close()
 	test.Assert(t, err == nil, err)
 }

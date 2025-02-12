@@ -72,15 +72,10 @@ type (
 	Trailer map[string]string
 )
 
-// Stream define stream APIs
-type StreamX interface {
-	SendMsg(ctx context.Context, m any) error
-	RecvMsg(ctx context.Context, m any) error
-}
-
 // ClientStream define client stream APIs
 type ClientStream interface {
-	StreamX
+	SendMsg(ctx context.Context, m any) error
+	RecvMsg(ctx context.Context, m any) error
 	Header() (Header, error)
 	Trailer() (Trailer, error)
 	CloseSend(ctx context.Context) error
@@ -89,7 +84,8 @@ type ClientStream interface {
 
 // ServerStream define server stream APIs
 type ServerStream interface {
-	StreamX
+	SendMsg(ctx context.Context, m any) error
+	RecvMsg(ctx context.Context, m any) error
 	SetHeader(hd Header) error
 	SendHeader(hd Header) error
 	SetTrailer(hd Trailer) error

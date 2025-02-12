@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
-	"github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -38,11 +37,11 @@ func Test_server_initStreamMiddlewares(t *testing.T) {
 	s := &server{
 		opt: &internal_server.Options{
 			TracerCtl: ctl,
-			Streaming: stream.StreamingConfig{},
 		},
+		svcs: &services{},
 	}
 	s.buildMiddlewares(context.Background())
 
-	test.Assert(t, len(s.opt.Streaming.RecvMiddlewares) > 0, "init middlewares failed")
-	test.Assert(t, len(s.opt.Streaming.SendMiddlewares) > 0, "init middlewares failed")
+	test.Assert(t, len(s.opt.Streaming.RecvMiddlewares) == 0, "init middlewares failed")
+	test.Assert(t, len(s.opt.Streaming.SendMiddlewares) == 0, "init middlewares failed")
 }

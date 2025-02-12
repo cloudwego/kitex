@@ -68,7 +68,11 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 	result := response.(*streaming.Result)
 	result.ClientStream = cs
 	if getter, ok := cs.(streaming.GRPCStreamGetter); ok {
-		result.Stream = getter.GetGRPCStream()
+		grpcStream := getter.GetGRPCStream()
+		if grpcStream == nil {
+			return fmt.Errorf("ClientStream.GetGRPCStream() returns nil: %T", cs)
+		}
+		result.Stream = grpcStream
 		return nil
 	} else {
 		return fmt.Errorf("ClientStream does not implement streaming.GRPCStreamGetter interface: %T", cs)
@@ -154,7 +158,9 @@ type stream struct {
 	finished      uint32
 }
 
+var _ streaming.GRPCStreamGetter = (*stream)(nil)
 var _ streaming.WithDoFinish = (*stream)(nil)
+var _ streaming.WithDoFinish = (*grpcStream)(nil)
 
 func newStream(ctx context.Context, s streaming.ClientStream, scm *remotecli.StreamConnManager, kc *kClient, ri rpcinfo.RPCInfo, mode serviceinfo.StreamingMode,
 	sendEP cep.StreamSendEndpoint, recvEP cep.StreamRecvEndpoint, eventHandler internal_stream.StreamEventHandler, grpcSendEP endpoint.SendEndpoint, grpcRecvEP endpoint.RecvEndpoint,
@@ -171,11 +177,20 @@ func newStream(ctx context.Context, s streaming.ClientStream, scm *remotecli.Str
 		eventHandler:  eventHandler,
 	}
 	if grpcStreamGetter, ok := s.(streaming.GRPCStreamGetter); ok {
-		grpcStream := grpcStreamGetter.GetGRPCStream()
-		st.grpcStream = newGRPCStream(grpcStream, grpcSendEP, grpcRecvEP)
-		st.grpcStream.st = st
+		if grpcStream := grpcStreamGetter.GetGRPCStream(); grpcStream != nil {
+			st.grpcStream = newGRPCStream(grpcStream, grpcSendEP, grpcRecvEP)
+			st.grpcStream.st = st
+		}
 	}
 	return st
+}
+
+// Header returns the header data sent by the server if any.
+func (s *stream) Header() (hd streaming.Header, err error) {
+	if hd, err = s.ClientStream.Header(); err != nil {
+		s.DoFinish(err)
+	}
+	return
 }
 
 // RecvMsg receives a message from the server.
