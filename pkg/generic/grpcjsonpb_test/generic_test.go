@@ -158,7 +158,9 @@ func initStreamingClient(t *testing.T, ctx context.Context, addr, idl string, cl
 
 func initMockTestServer(handler mock.Mock, address string) server.Server {
 	addr, _ := net.ResolveTCPAddr("tcp", address)
-	return newMockTestServer(handler, addr)
+	svr := newMockTestServer(handler, addr)
+	test.WaitServerStart(addr.String())
+	return svr
 }
 
 func Test_invocationContainsPackage(t *testing.T) {
