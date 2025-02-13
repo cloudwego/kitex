@@ -148,7 +148,6 @@ type Config struct {
 	Rapid             bool
 	LocalThriftgo     bool
 
-	GenFrugal    bool
 	FrugalStruct util.StringSlice
 	NoRecurse    bool
 
