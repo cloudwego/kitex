@@ -19,6 +19,7 @@ package generic
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -39,6 +40,7 @@ type mapThriftCodec struct {
 	setFieldsForEmptyStruct uint8
 	svcName                 string
 	extra                   map[string]string
+	readerWriter            atomic.Value // *thrift.StructReaderWriter
 }
 
 func newMapThriftCodec(p DescriptorProvider) *mapThriftCodec {
@@ -52,6 +54,7 @@ func newMapThriftCodec(p DescriptorProvider) *mapThriftCodec {
 	}
 	c.setCombinedServices(svc.IsCombinedServices)
 	c.svcDsc.Store(svc)
+	c.configureMessageReaderWriter(svc)
 	go c.update()
 	return c
 }
@@ -71,7 +74,29 @@ func (c *mapThriftCodec) update() {
 		c.svcName = svc.Name
 		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
+		c.configureMessageReaderWriter(svc)
 	}
+}
+
+func (c *mapThriftCodec) updateMessageReaderWriter() (err error) {
+	svc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+	c.configureMessageReaderWriter(svc)
+	return nil
+}
+
+func (c *mapThriftCodec) configureMessageReaderWriter(svc *descriptor.ServiceDescriptor) {
+	var rw *thrift.StructReaderWriter
+	if c.forJSON {
+		rw = thrift.NewStructReaderWriterForJSON(svc)
+	} else {
+		rw = thrift.NewStructReaderWriter(svc)
+	}
+	c.configureStructWriter(rw.WriteStruct)
+	c.configureStructReader(rw.ReadStruct)
+	c.readerWriter.Store(rw)
 }
 
 func (c *mapThriftCodec) setCombinedServices(isCombinedServices bool) {
@@ -83,19 +108,12 @@ func (c *mapThriftCodec) setCombinedServices(isCombinedServices bool) {
 }
 
 func (c *mapThriftCodec) getMessageReaderWriter() interface{} {
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser ServiceDescriptor failed")
-	}
-	var rw *thrift.StructReaderWriter
-	if c.forJSON {
-		rw = thrift.NewStructReaderWriterForJSON(svcDsc)
+	v := c.readerWriter.Load()
+	if rw, ok := v.(*thrift.StructReaderWriter); !ok {
+		panic(fmt.Sprintf("get readerWriter failed: expected *thrift.StructReaderWriter, got %T", v))
 	} else {
-		rw = thrift.NewStructReaderWriter(svcDsc)
+		return rw
 	}
-	c.configureStructWriter(rw.WriteStruct)
-	c.configureStructReader(rw.ReadStruct)
-	return rw
 }
 
 func (c *mapThriftCodec) configureStructWriter(writer *thrift.WriteStruct) {

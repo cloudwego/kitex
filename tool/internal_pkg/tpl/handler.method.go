@@ -17,11 +17,11 @@ package tpl
 // HandlerMethodsTpl is the template for generating methods in handler.go.
 var HandlerMethodsTpl string = `{{define "HandlerMethod"}}
 {{range .AllMethods}}
-{{- if and .StreamX .Streaming.IsStreaming}}
-{{- $streamingUnary := (eq .Streaming.Mode "unary")}}
-{{- $clientSide := (eq .Streaming.Mode "client")}}
-{{- $serverSide := (eq .Streaming.Mode "server")}}
-{{- $bidiSide := (eq .Streaming.Mode "bidirectional")}}
+{{- if and .StreamX .IsStreaming}}
+{{- $streamingUnary := (eq .StreamingMode "unary")}}
+{{- $clientSide := (eq .StreamingMode "client")}}
+{{- $serverSide := (eq .StreamingMode "server")}}
+{{- $bidiSide := (eq .StreamingMode "bidirectional")}}
 {{- $arg := index .Args 0}}
 func (s *{{.ServiceName}}Impl) {{.Name}}{{- if $streamingUnary}}(ctx context.Context, req {{$arg.Type}}) (resp {{.Resp.Type}}, err error) {
              {{- else if $clientSide}}(ctx context.Context, stream streamx.ClientStreamingServer[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}]) (resp {{.Resp.Type}}, err error) {
@@ -57,7 +57,7 @@ func (s *{{$.ServiceName}}Impl) {{.Name}}(ctx context.Context {{range .Args}}, {
 }
 {{end}}{{/* if .Void end */}}
 {{end}}{{/* if or .ClientStreaming .ServerStreaming end */}}
-{{end}}{{/* if and .StreamX .Streaming.IsStreaming end */}}
+{{end}}{{/* if and .StreamX .IsStreaming end */}}
 {{end}}{{/* range .AllMethods end */}}
 {{end}}{{/* define "HandlerMethod" */}}
 `

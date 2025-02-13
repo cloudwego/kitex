@@ -19,6 +19,7 @@ package generic
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -43,6 +44,7 @@ type jsonThriftCodec struct {
 	convOptsWithException  conv.Options // used for dynamicgo conversion with ConvertException turned on
 	svcName                string
 	extra                  map[string]string
+	readerWriter           atomic.Value // *thrift.JSONReaderWriter
 }
 
 func newJsonThriftCodec(p DescriptorProvider, opts *Options) *jsonThriftCodec {
@@ -72,6 +74,7 @@ func newJsonThriftCodec(p DescriptorProvider, opts *Options) *jsonThriftCodec {
 		c.convOptsWithException = convOptsWithException
 	}
 	c.svcDsc.Store(svc)
+	c.configureMessageReaderWriter(svc)
 	go c.update()
 	return c
 }
@@ -85,7 +88,24 @@ func (c *jsonThriftCodec) update() {
 		c.svcName = svc.Name
 		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
+		c.configureMessageReaderWriter(svc)
 	}
+}
+
+func (c *jsonThriftCodec) updateMessageReaderWriter() (err error) {
+	svc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+	c.configureMessageReaderWriter(svc)
+	return nil
+}
+
+func (c *jsonThriftCodec) configureMessageReaderWriter(svc *descriptor.ServiceDescriptor) {
+	rw := thrift.NewJsonReaderWriter(svc)
+	c.configureJSONWriter(rw.WriteJSON)
+	c.configureJSONReader(rw.ReadJSON)
+	c.readerWriter.Store(rw)
 }
 
 func (c *jsonThriftCodec) setCombinedServices(isCombinedServices bool) {
@@ -97,15 +117,12 @@ func (c *jsonThriftCodec) setCombinedServices(isCombinedServices bool) {
 }
 
 func (c *jsonThriftCodec) getMessageReaderWriter() interface{} {
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser ServiceDescriptor failed")
+	v := c.readerWriter.Load()
+	if rw, ok := v.(*thrift.JSONReaderWriter); !ok {
+		panic(fmt.Sprintf("get readerWriter failed: expected *thrift.JSONReaderWriter, got %T", v))
+	} else {
+		return rw
 	}
-
-	rw := thrift.NewJsonReaderWriter(svcDsc)
-	c.configureJSONWriter(rw.WriteJSON)
-	c.configureJSONReader(rw.ReadJSON)
-	return rw
 }
 
 func (c *jsonThriftCodec) configureJSONWriter(writer *thrift.WriteJSON) {

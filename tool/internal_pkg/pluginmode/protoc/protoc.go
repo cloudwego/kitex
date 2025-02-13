@@ -93,7 +93,7 @@ func GenKitex(req *pluginpb.CodeGeneratorRequest, opts protogen.Options) (*plugi
 		gopkg, ok := pp.importPaths[f.GetName()]
 		if ok {
 			f.Options.GoPackage = &gopkg
-			log.Infof("[INFO] option specified import path for %q: %q\n", f.GetName(), gopkg)
+			log.Debugf("option specified import path for %q: %q\n", f.GetName(), gopkg)
 		} else {
 			if f.Options == nil || f.Options.GoPackage == nil {
 				return nil, fmt.Errorf("ERROR: go_package is missing in proto file %q", f.GetName())
@@ -102,7 +102,7 @@ func GenKitex(req *pluginpb.CodeGeneratorRequest, opts protogen.Options) (*plugi
 		}
 		if path, ok := pe.getImportPath(gopkg); ok {
 			f.Options.GoPackage = &path
-			log.Infof("[INFO] update import path for %q: %q -> %q\n", f.GetName(), gopkg, path)
+			log.Debugf("update import path for %q: %q -> %q\n", f.GetName(), gopkg, path)
 		}
 	}
 

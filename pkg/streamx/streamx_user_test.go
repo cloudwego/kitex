@@ -619,18 +619,20 @@ func TestStreamingException(t *testing.T) {
 					}
 				}),
 			)
-			octx := context.Background()
 
 			// assert circuitBreaker error
+			octx := context.Background()
 			atomic.StoreInt32(&circuitBreaker, 1)
 			_, _, err = cli.BidiStream(octx)
 			test.Assert(t, errors.Is(err, circuitBreakerErr), err)
 			atomic.StoreInt32(&circuitBreaker, 0)
 
 			// assert context deadline error
-			ctx, cancel := context.WithTimeout(octx, 10*time.Millisecond)
-			ctx, bs, err := cli.BidiStream(ctx)
+			octx = context.Background()
+			ctx, bs, err := cli.BidiStream(octx)
 			test.Assert(t, err == nil, err)
+			// ctx timeout should be injected before invoking Recv and after creating stream
+			ctx, cancel := context.WithTimeout(ctx, time.Millisecond)
 			res, err := bs.Recv(ctx)
 			cancel()
 			test.Assert(t, res == nil && err != nil, res, err)
@@ -803,13 +805,12 @@ func TestStreamingTracing(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	defer svr.Stop()
 	tracer := &mockTracer{}
-	var finished sync.WaitGroup
+	finishedChan := make(chan struct{}, 1)
 	tracer.start = func(ctx context.Context) context.Context {
-		finished.Add(1)
 		return ctx
 	}
 	tracer.finish = func(ctx context.Context) {
-		finished.Done()
+		finishedChan <- struct{}{}
 	}
 	cli, err := NewClient(
 		"kitex.echo.service",
@@ -830,7 +831,7 @@ func TestStreamingTracing(t *testing.T) {
 		test.Assert(t, ri.Stats().Error() == nil, ri.Stats().Error())
 		_, err = stream.Recv(ctx)
 		test.Assert(t, err != nil, err)
-		finished.Wait()
+		<-finishedChan
 		// stream has been closed, Tracer.Finish should be called
 		// err set in rpcinfo.Stats() should be the same as the err returned to users
 		test.Assert(t, ri.Stats().Error() == err, ri.Stats().Error())
@@ -848,7 +849,7 @@ func TestStreamingTracing(t *testing.T) {
 		test.Assert(t, ri.Stats().Error() == nil, ri.Stats().Error())
 		_, err = stream.CloseAndRecv(ctx)
 		test.Assert(t, err != nil, err)
-		finished.Wait()
+		<-finishedChan
 		// stream has been closed, Tracer.Finish should be called
 		// err set in rpcinfo.Stats() should be the same as the err returned to users
 		test.Assert(t, ri.Stats().Error() == err, ri.Stats().Error())
@@ -868,7 +869,7 @@ func TestStreamingTracing(t *testing.T) {
 		test.Assert(t, err == nil, err)
 		_, err = stream.Recv(ctx)
 		test.Assert(t, err != nil, err)
-		finished.Wait()
+		<-finishedChan
 		// stream has been closed, Tracer.Finish should be called
 		// err set in rpcinfo.Stats() should be the same as the err returned to users
 		test.Assert(t, ri.Stats().Error() == err, ri.Stats().Error())

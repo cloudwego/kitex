@@ -17,7 +17,6 @@ package thriftgo
 import (
 	"fmt"
 	"go/format"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -31,7 +30,7 @@ import (
 	"github.com/cloudwego/thriftgo/semantic"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
-	internal_log "github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -80,20 +79,9 @@ func (c *converter) initLogs() backend.LogFunc {
 		lf.Info = lf.Warn
 	}
 
-	internal_log.SetDefaultLogger(internal_log.Logger{
-		Println: func(w io.Writer, a ...interface{}) (n int, err error) {
-			if w != os.Stdout || c.Config.Verbose {
-				c.Warnings = append(c.Warnings, fmt.Sprint(a...))
-			}
-			return 0, nil
-		},
-		Printf: func(w io.Writer, format string, a ...interface{}) (n int, err error) {
-			if w != os.Stdout || c.Config.Verbose {
-				c.Warnings = append(c.Warnings, fmt.Sprintf(format, a...))
-			}
-			return 0, nil
-		},
-	})
+	log.SetDefaultLogger(log.LoggerFunc(func(format string, a ...interface{}) {
+		c.Warnings = append(c.Warnings, fmt.Sprintf(format, a...))
+	}))
 	return lf
 }
 
@@ -295,17 +283,9 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 
 	c.svc2ast = make(map[*generator.ServiceInfo]*parser.Thrift)
 
-	var trees chan *parser.Thrift
-	if req.Recursive {
-		trees = req.AST.DepthFirstSearch()
-	} else {
-		trees = make(chan *parser.Thrift, 1)
-		trees <- req.AST
-		close(trees)
-	}
 	mainAST := req.AST
 
-	for ast := range trees {
+	for ast := range req.AST.DepthFirstSearch() {
 		ref, pkg, pth := c.Utils.ParseNamespace(ast)
 		// make the current ast as an include to produce correct type references.
 		fake := c.copyTreeWithRef(ast, ref)
@@ -411,7 +391,9 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 			c.svc2ast[si] = ast
 		}
 
-		c.Services = append(c.Services, all[ast.Filename]...)
+		if req.Recursive || ast == mainAST {
+			c.Services = append(c.Services, all[ast.Filename]...)
+		}
 	}
 	return nil
 }
@@ -473,7 +455,7 @@ func (c *converter) makeMethod(si *generator.ServiceInfo, f *golang.Function) (*
 		Void:               f.Void,
 		ArgStructName:      f.ArgType().GoName().String(),
 		GenArgResultStruct: false,
-		Streaming:          st,
+		IsStreaming:        st.IsStreaming,
 		ClientStreaming:    st.ClientStreaming,
 		ServerStreaming:    st.ServerStreaming,
 		ArgsLength:         len(f.Arguments()),
@@ -522,13 +504,13 @@ func (c *converter) persist(res *plugin.Response) error {
 		content := []byte(c.Content)
 		if filepath.Ext(full) == ".go" {
 			if formatted, err := format.Source([]byte(c.Content)); err != nil {
-				internal_log.Warn(fmt.Sprintf("Failed to format %s: %s", full, err.Error()))
+				log.Warnf("Failed to format %s: %s", full, err)
 			} else {
 				content = formatted
 			}
 		}
 
-		internal_log.Info("Write", full)
+		log.Debug("Write", full)
 		path := filepath.Dir(full)
 		if err := os.MkdirAll(path, 0o755); err != nil && !os.IsExist(err) {
 			return fmt.Errorf("failed to create path '%s': %w", path, err)

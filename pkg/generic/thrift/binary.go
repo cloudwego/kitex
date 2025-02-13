@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 )
 
@@ -31,5 +32,10 @@ func NewWriteBinary() *WriteBinary {
 }
 
 func (w *WriteBinary) Write(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+	bw := thrift.NewBufferWriter(out)
+	defer bw.Recycle()
+	if err := bw.WriteFieldStop(); err != nil {
+		return err
+	}
 	return nil
 }

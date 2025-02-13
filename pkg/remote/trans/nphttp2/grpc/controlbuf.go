@@ -560,7 +560,7 @@ const minBatchSize = 1000
 // if the batch size is too low to give stream goroutines a chance to fill it up.
 func (l *loopyWriter) run(remoteAddr string) (err error) {
 	defer func() {
-		if err == ErrConnClosing {
+		if isIgnorable(err) {
 			// Don't log ErrConnClosing as error since it happens
 			// 1. When the connection is closed by some other known issue.
 			// 2. User closed the connection.

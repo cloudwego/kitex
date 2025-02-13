@@ -24,7 +24,6 @@ import (
 	"text/template"
 
 	genfastpb "github.com/cloudwego/fastpb/protoc-gen-fastpb/generator"
-	"github.com/cloudwego/thriftgo/generator/golang/streaming"
 	gengo "google.golang.org/protobuf/cmd/protoc-gen-go/internal_gengo"
 	"google.golang.org/protobuf/compiler/protogen"
 
@@ -122,11 +121,12 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 	}
 	gopkg := file.Proto.GetOptions().GetGoPackage()
 	if !strings.HasPrefix(gopkg, pp.PackagePrefix) {
-		log.Warnf("[WARN] %q is skipped because its import path %q is not located in ./kitex_gen. Change the go_package option or use '--protobuf M%s=A-Import-Path-In-kitex_gen' to override it if you want this file to be generated under kitex_gen.\n",
+		log.Warnf("%q is skipped because its import path %q is not located in ./kitex_gen.\n"+
+			"Change the go_package option or use '--protobuf M%s=A-Import-Path-In-kitex_gen' to override it if you want this file to be generated under kitex_gen.\n",
 			file.Proto.GetName(), gopkg, file.Proto.GetName())
 		return
 	}
-	log.Infof("[INFO] Generate %q at %q\n", file.Proto.GetName(), gopkg)
+	log.Debugf("Generate %q at %q\n", file.Proto.GetName(), gopkg)
 
 	if parts := strings.Split(gopkg, ";"); len(parts) > 1 {
 		gopkg = parts[0] // remove package alias from file path
@@ -296,12 +296,10 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 				ServerStreaming:    m.Desc.IsStreamingServer(),
 			}
 			si.Methods = append(si.Methods, mi)
-			if !si.HasStreaming && (mi.ClientStreaming || mi.ServerStreaming) {
+			if mi.ClientStreaming || mi.ServerStreaming {
+				mi.IsStreaming = true
 				si.HasStreaming = true
 			}
-		}
-		for _, m := range si.Methods {
-			BuildStreaming(m, si.HasStreaming)
 		}
 		if file.Generate {
 			si.GenerateHandler = true
@@ -320,7 +318,7 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 		mm := make(map[string]*generator.MethodInfo)
 		for _, m := range methods {
 			if _, ok := mm[m.Name]; ok {
-				log.Warnf("[WARN] combine service method %s in %s conflicts with %s in %s\n",
+				log.Warnf("combine service method %s in %s conflicts with %s in %s\n",
 					m.Name, m.ServiceName, m.Name, mm[m.Name].ServiceName)
 				return
 			}
@@ -345,29 +343,6 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 		ss = append(ss, si)
 	}
 	return
-}
-
-// BuildStreaming builds protobuf MethodInfo.Streaming as for Thrift, to simplify codegen
-func BuildStreaming(mi *generator.MethodInfo, serviceHasStreaming bool) {
-	s := &streaming.Streaming{
-		// pb: if one method is streaming, then the service is streaming, making all methods streaming
-		IsStreaming: serviceHasStreaming,
-	}
-	if mi.ClientStreaming && mi.ServerStreaming {
-		s.Mode = streaming.StreamingBidirectional
-		s.BidirectionalStreaming = true
-		s.ClientStreaming = true
-		s.ServerStreaming = true
-	} else if mi.ClientStreaming && !mi.ServerStreaming {
-		s.Mode = streaming.StreamingClientSide
-		s.ClientStreaming = true
-	} else if !mi.ClientStreaming && mi.ServerStreaming {
-		s.Mode = streaming.StreamingServerSide
-		s.ServerStreaming = true
-	} else if serviceHasStreaming {
-		s.Mode = streaming.StreamingUnary // Unary APIs over HTTP2
-	}
-	mi.Streaming = s
 }
 
 func (pp *protocPlugin) getCombineServiceName(name string, svcs []*generator.ServiceInfo) string {

@@ -72,9 +72,7 @@ func TestHttpThriftCodec(t *testing.T) {
 	test.Assert(t, !ok)
 
 	rw = htc.getMessageReaderWriter()
-	_, ok = rw.(thrift.MessageWriter)
-	test.Assert(t, ok)
-	_, ok = rw.(thrift.MessageReader)
+	_, ok = rw.(*thrift.HTTPReaderWriter)
 	test.Assert(t, ok)
 }
 
@@ -105,9 +103,7 @@ func TestHttpThriftCodecWithDynamicGo(t *testing.T) {
 	test.Assert(t, htc.extra[CombineServiceKey] == "false")
 
 	rw := htc.getMessageReaderWriter()
-	_, ok := rw.(thrift.MessageWriter)
-	test.Assert(t, ok)
-	_, ok = rw.(thrift.MessageReader)
+	_, ok := rw.(*thrift.HTTPReaderWriter)
 	test.Assert(t, ok)
 }
 
