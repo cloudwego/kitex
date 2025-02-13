@@ -127,6 +127,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.BoolVar(&a.NoDependencyCheck, "no-dependency-check", false,
 		"Skip dependency checking.")
 	f.BoolVar(&a.NoRecurse, "no-recurse", false, `Don't generate thrift files recursively, just generate the given file.'`)
+	f.Var(&a.FrugalStruct, "frugal-struct", "Replace fastCodec code to frugal. Use `-frugal-struct @all` for all, `-frugal-struct @auto` for annotated structs (go.codec=\"frugal\"), or specify multiple structs (e.g., `-frugal-struct A -frugal-struct B`).")
 	a.RecordCmd = os.Args
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,

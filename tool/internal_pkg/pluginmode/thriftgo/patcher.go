@@ -61,6 +61,8 @@ type patcher struct {
 	protocol              string
 	handlerReturnKeepResp bool
 
+	frugalStruct []string
+
 	fileTpl *template.Template
 	libs    map[string]string
 }
@@ -87,6 +89,7 @@ func (p *patcher) buildTemplates() (err error) {
 	m["GenerateDeepCopyAPIs"] = func() bool { return p.deepCopyAPI }
 	m["GenerateArgsResultTypes"] = func() bool { return p.utils.Template() == "slim" }
 	m["ImportPathTo"] = generator.ImportPathTo
+	m["UseFrugalForStruct"] = p.UseFrugalForStruct
 	m["Str"] = func(id int32) string {
 		if id < 0 {
 			return "_" + strconv.Itoa(-int(id))
@@ -483,4 +486,25 @@ var typeIDToGoType = map[string]string{
 	"Double": "float64",
 	"String": "string",
 	"Binary": "[]byte",
+}
+
+// UseFrugalForStruct judge if we need to replace fastCodec to frugal implementation. It's related to the argument '-frugal-struct'.
+func (p *patcher) UseFrugalForStruct(st *golang.StructLike) bool {
+	// '@all' matches all structs
+	// '@auto' matches those with annotation (go.codec="frugal")
+	// otherwise, check if the given name matches the struct's name
+	for _, structName := range p.frugalStruct {
+		if structName == "@all" || st.GetName() == structName {
+			return true
+		}
+		if structName == "@auto" {
+			// find annotation go.codec="frugal"
+			for _, anno := range st.Annotations {
+				if anno.GetKey() == "go.codec" && len(anno.GetValues()) > 0 && anno.GetValues()[0] == "frugal" {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
