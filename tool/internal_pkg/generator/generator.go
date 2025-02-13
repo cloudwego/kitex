@@ -141,7 +141,8 @@ type Config struct {
 
 	NoDependencyCheck bool
 
-	NoRecurse bool
+	FrugalStruct util.StringSlice
+	NoRecurse    bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
