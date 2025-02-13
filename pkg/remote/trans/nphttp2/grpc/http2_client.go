@@ -52,7 +52,8 @@ import (
 // ticker is used to manage closeStreamTask.
 // it triggers and cleans up actively cancelled streams every 5s.
 // Streaming QPS is generally not too high, if there is a requirement for timeliness, then consider making it configurable.
-var ticker = utils.NewSharedTicker(5 * time.Second)
+// To reduce the overhead of goroutines in a multi-connection scenario, use the Sync SharedTicker
+var ticker = utils.NewSyncSharedTicker(5 * time.Second)
 
 // http2Client implements the ClientTransport interface with HTTP2.
 type http2Client struct {

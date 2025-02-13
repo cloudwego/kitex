@@ -2162,7 +2162,7 @@ func Test_isIgnorable(t *testing.T) {
 
 func Test_closeStreamTask(t *testing.T) {
 	// replace ticker to reduce test time
-	ticker = utils.NewSharedTicker(10 * time.Millisecond)
+	ticker = utils.NewSyncSharedTicker(10 * time.Millisecond)
 	server, ct := setUp(t, 0, math.MaxUint32, cancel)
 	callHdr := &CallHdr{
 		Host:   "localhost",

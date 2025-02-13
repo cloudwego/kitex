@@ -32,35 +32,40 @@ func TestSharedTickerAdd(t *testing.T) {
 
 	rt := mockutils.NewMockTickerTask(ctrl)
 	rt.EXPECT().Tick().AnyTimes()
-	st := NewSharedTicker(1)
-	st.Add(nil)
-	test.Assert(t, len(st.tasks) == 0)
-	st.Add(rt)
-	test.Assert(t, len(st.tasks) == 1)
-	test.Assert(t, !st.Closed())
+
+	sts := []*SharedTicker{NewSharedTicker(1), NewSyncSharedTicker(1)}
+	for _, st := range sts {
+		st.Add(nil)
+		test.Assert(t, len(st.tasks) == 0)
+		st.Add(rt)
+		test.Assert(t, len(st.tasks) == 1)
+		test.Assert(t, !st.Closed())
+	}
 }
 
 func TestSharedTickerDeleteAndClose(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	st := NewSharedTicker(1)
-	var (
-		num   = 10
-		tasks = make([]TickerTask, num)
-	)
-	for i := 0; i < num; i++ {
-		rt := mockutils.NewMockTickerTask(ctrl)
-		rt.EXPECT().Tick().AnyTimes()
-		tasks[i] = rt
-		st.Add(rt)
+	sts := []*SharedTicker{NewSharedTicker(1), NewSyncSharedTicker(1)}
+	for _, st := range sts {
+		var (
+			num   = 10
+			tasks = make([]TickerTask, num)
+		)
+		for i := 0; i < num; i++ {
+			rt := mockutils.NewMockTickerTask(ctrl)
+			rt.EXPECT().Tick().AnyTimes()
+			tasks[i] = rt
+			st.Add(rt)
+		}
+		test.Assert(t, len(st.tasks) == num)
+		for i := 0; i < num; i++ {
+			st.Delete(tasks[i])
+		}
+		test.Assert(t, len(st.tasks) == 0)
+		test.Assert(t, st.Closed())
 	}
-	test.Assert(t, len(st.tasks) == num)
-	for i := 0; i < num; i++ {
-		st.Delete(tasks[i])
-	}
-	test.Assert(t, len(st.tasks) == 0)
-	test.Assert(t, st.Closed())
 }
 
 func TestSharedTickerTick(t *testing.T) {
@@ -68,16 +73,18 @@ func TestSharedTickerTick(t *testing.T) {
 	defer ctrl.Finish()
 
 	duration := 100 * time.Millisecond
-	st := NewSharedTicker(duration)
-	var (
-		num   = 10
-		tasks = make([]TickerTask, num)
-	)
-	for i := 0; i < num; i++ {
-		rt := mockutils.NewMockTickerTask(ctrl)
-		rt.EXPECT().Tick().MinTimes(1) // all tasks should be refreshed once during the test
-		tasks[i] = rt
-		st.Add(rt)
+	sts := []*SharedTicker{NewSharedTicker(duration), NewSyncSharedTicker(duration)}
+	for _, st := range sts {
+		var (
+			num   = 10
+			tasks = make([]TickerTask, num)
+		)
+		for i := 0; i < num; i++ {
+			rt := mockutils.NewMockTickerTask(ctrl)
+			rt.EXPECT().Tick().MinTimes(1) // all tasks should be refreshed once during the test
+			tasks[i] = rt
+			st.Add(rt)
+		}
+		time.Sleep(150 * time.Millisecond)
 	}
-	time.Sleep(150 * time.Millisecond)
 }
