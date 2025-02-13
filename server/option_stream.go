@@ -133,8 +133,7 @@ func WithSendMiddlewareBuilder(mwb endpoint.SendMiddlewareBuilder) Option {
 }
 
 // WithCompatibleMiddlewareForUnary allows Unary APIs to use the same middleware as non-streaming APIs
-// For thrift unary APIs over HTTP2, it's enabled by default.
-// For grpc(protobuf) streaming, it's disabled by default for backward compatibility, and can be enabled manually.
+// For unary APIs over HTTP2, it's enabled by default.
 // With this option, the req/resp passed to the middleware are the real args and result;
 // For Unary APIs requests, recv/send middlewares will be skipped (still effective for other streaming API requests)
 func WithCompatibleMiddlewareForUnary() Option {

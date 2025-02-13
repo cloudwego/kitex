@@ -40,7 +40,7 @@ func WithStreamOptions(opts ...StreamOption) Option {
 }
 
 // WithStreamRecvTimeout add recv timeout for stream.Recv function.
-// NOTICE: ONLY effective for ttheader streaming protocol.
+// NOTICE: ONLY effective for ttheader streaming protocol for now.
 func WithStreamRecvTimeout(d time.Duration) StreamOption {
 	return StreamOption{F: func(o *client.StreamOptions, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithStreamRecvTimeout(%dms)", d.Milliseconds()))
