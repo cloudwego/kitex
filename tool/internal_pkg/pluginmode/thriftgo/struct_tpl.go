@@ -150,6 +150,7 @@ RequiredFieldNotSetError:
 
 const StructLikeFastReadField = `
 {{define "StructLikeFastReadField"}}
+{{- if not (UseFrugalForStruct .) }}
 {{- $TypeName := .GoName}}
 {{- range .Fields}}
 {{$FieldName := .GoName}}
@@ -177,6 +178,7 @@ func (p *{{$TypeName}}) FastReadField{{Str .ID}}(buf []byte) (int, error) {
 	return offset, nil
 }
 {{- end}}{{/* range .Fields */}}
+{{- end}}{{/* if not (UseFrugalForStruct .) */}}
 {{- end}}{{/* define "StructLikeFastReadField" */}}
 `
 
@@ -265,6 +267,10 @@ const StructLikeLength = `
 {{define "StructLikeLength"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) BLength() int {
+{{- if UseFrugalForStruct .}}
+	{{- UseLib "github.com/cloudwego/frugal" "frugal"}}
+	return frugal.EncodedSize(p)
+{{- else}}
 	l := 0
 	{{- if eq .Category "union"}}
 	var c int
@@ -289,12 +295,14 @@ func (p *{{$TypeName}}) BLength() int {
 CountSetFieldsError:
 	panic(fmt.Errorf("%T write union: exactly one field must be set (%d set).", p, c))
 {{- end}}
+{{- end}}{{/* frugal */}}
 }
 {{- end}}{{/* define "StructLikeLength" */}}
 `
 
 const StructLikeFastWriteField = `
 {{define "StructLikeFastWriteField"}}
+{{- if not (UseFrugalForStruct .) }}
 {{- $TypeName := .GoName}}
 {{- range .Fields}}
 {{- $FieldName := .GoName}}
@@ -333,11 +341,13 @@ func (p *{{$TypeName}}) fastWriteField{{Str .ID}}(buf []byte, w thrift.NocopyWri
 	return offset
 }
 {{end}}{{/* range .Fields */}}
+{{- end}}{{/* if not (UseFrugalForStruct .) */}}
 {{- end}}{{/* define "StructLikeFastWriteField" */}}
 `
 
 const StructLikeFieldLength = `
 {{define "StructLikeFieldLength"}}
+{{- if not (UseFrugalForStruct .) }}
 {{- $TypeName := .GoName}}
 {{- range .Fields}}
 {{- $FieldName := .GoName}}
@@ -376,6 +386,7 @@ func (p *{{$TypeName}}) field{{Str .ID}}Length() int {
 	return l
 }
 {{end}}{{/* range .Fields */}}
+{{- end}}{{/* if not (UseFrugalForStruct .) */}}
 {{- end}}{{/* define "StructLikeFieldLength" */}}
 `
 

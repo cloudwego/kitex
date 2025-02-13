@@ -147,7 +147,6 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 		deepCopyAPI:           conv.Config.DeepCopyAPI,
 		protocol:              conv.Config.Protocol,
 		handlerReturnKeepResp: conv.Config.HandlerReturnKeepResp,
-		genFrugal:             conv.Config.GenFrugal,
 		frugalStruct:          conv.Config.FrugalStruct,
 	}
 	// for cmd without setting -module

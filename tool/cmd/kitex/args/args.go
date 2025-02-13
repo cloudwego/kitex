@@ -131,8 +131,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Generate streaming code with streamx interface",
 	)
 
-	f.BoolVar(&a.GenFrugal, "gen-frugal", false, `Gen frugal codec for those structs with (go.codec="frugal")`)
-	f.Var(&a.FrugalStruct, "frugal-struct", "Gen frugal codec for given struct")
+	f.Var(&a.FrugalStruct, "frugal-struct", "Replace fastCodec code to frugal. Use `-frugal-struct @all` for all, `-frugal-struct @auto` for annotated structs (go.codec=\"frugal\"), or specify multiple structs (e.g., `-frugal-struct A -frugal-struct B`).")
 
 	f.BoolVar(&a.NoRecurse, "no-recurse", false, `Don't generate thrift files recursively, just generate the given file.'`)
 
