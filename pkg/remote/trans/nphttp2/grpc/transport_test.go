@@ -46,6 +46,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/testutils"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 type server struct {
@@ -99,6 +100,7 @@ const (
 	pingpong
 
 	gracefulShutdown
+	cancel
 )
 
 func (h *testStreamHandler) handleStreamAndNotify(s *Stream) {
@@ -317,6 +319,17 @@ func (h *testStreamHandler) gracefulShutdown(t *testing.T, s *Stream) {
 	test.Assert(t, st.Code() == codes.Unavailable, st)
 }
 
+func (h *testStreamHandler) handleStreamCancel(t *testing.T, s *Stream) {
+	header := make([]byte, 5)
+	_, err := s.Read(header)
+	test.Assert(t, err != nil, err)
+	st, ok := status.FromError(err)
+	test.Assert(t, ok)
+	test.Assert(t, st.Code() == codes.Canceled, st.Code())
+	test.Assert(t, strings.Contains(st.Message(), "transport: RSTStream Frame received with error code"), st.Message())
+	close(h.srv.srvReady)
+}
+
 // start starts server. Other goroutines should block on s.readyChan for further operations.
 func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hType) {
 	// 创建 listener
@@ -416,6 +429,12 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 					}()
 				}, func(ctx context.Context, method string) context.Context { return ctx })
 			}()
+		case cancel:
+			go transport.HandleStreams(func(s *Stream) {
+				go h.handleStreamCancel(t, s)
+			}, func(ctx context.Context, method string) context.Context {
+				return ctx
+			})
 		default:
 			go func() {
 				transport.HandleStreams(func(s *Stream) {
@@ -1527,8 +1546,11 @@ func TestEncodingRequiredStatus(t *testing.T) {
 		return
 	}
 	opts := Options{Last: true}
-	if err := ct.Write(s, nil, expectedRequest, &opts); err != nil && err != errStreamDone {
-		t.Fatalf("Failed to write the request: %v", err)
+	if err := ct.Write(s, nil, expectedRequest, &opts); err != nil {
+		// in case server-side returns earlier, Write also returns a status error.
+		if err != errStatusStreamDone || !testutils.StatusErrEqual(s.Status().Err(), encodingTestStatus.Err()) {
+			t.Fatalf("Failed to write the request: %v", err)
+		}
 	}
 	p := make([]byte, http2MaxFrameLen)
 	if _, err := s.trReader.(*transportReader).Read(p); err != io.EOF {
@@ -2136,4 +2158,31 @@ func Test_isIgnorable(t *testing.T) {
 	test.Assert(t, !isIgnorable(err))
 
 	test.Assert(t, isIgnorable(ErrConnClosing))
+}
+
+func Test_closeStreamTask(t *testing.T) {
+	// replace ticker to reduce test time
+	ticker = utils.NewSyncSharedTicker(10 * time.Millisecond)
+	server, ct := setUp(t, 0, math.MaxUint32, cancel)
+	callHdr := &CallHdr{
+		Host:   "localhost",
+		Method: "foo.Small",
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := ct.NewStream(ctx, callHdr)
+	if err != nil {
+		t.Fatalf("failed to open stream: %v", err)
+	}
+	cancel()
+	// wait for server receiving RstStream Frame
+	<-server.srvReady
+	state := stream.getState()
+	test.Assert(t, state == streamDone, state)
+	ct.mu.Lock()
+	streamNums := len(ct.activeStreams)
+	ct.mu.Unlock()
+	test.Assert(t, streamNums == 0, streamNums)
+
+	ct.Close(errSelfCloseForTest)
+	server.stop()
 }

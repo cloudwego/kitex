@@ -37,12 +37,21 @@ func NewSharedTicker(interval time.Duration) *SharedTicker {
 	}
 }
 
+// NewSyncSharedTicker constructs a SharedTicker with specified interval.
+// The Tick method will run tasks synchronously.
+func NewSyncSharedTicker(interval time.Duration) *SharedTicker {
+	t := NewSharedTicker(interval)
+	t.sync = true
+	return t
+}
+
 type SharedTicker struct {
 	sync.Mutex
 	started  bool
 	Interval time.Duration
 	tasks    map[TickerTask]struct{}
 	stopChan chan struct{}
+	sync     bool // identify whether Tick runs task synchronously
 }
 
 func (t *SharedTicker) Add(b TickerTask) {
@@ -82,25 +91,41 @@ func (t *SharedTicker) Closed() bool {
 }
 
 func (t *SharedTicker) Tick(interval time.Duration) {
-	var wg sync.WaitGroup
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			t.Lock()
-			for b := range t.tasks {
-				wg.Add(1)
-				task := b
-				gofunc.GoFunc(context.Background(), func() {
-					defer wg.Done()
-					task.Tick()
-				})
+			if t.sync {
+				t.syncExec()
+			} else {
+				t.asyncExec()
 			}
-			t.Unlock()
-			wg.Wait()
 		case <-t.stopChan:
 			return
 		}
 	}
+}
+
+func (t *SharedTicker) syncExec() {
+	t.Lock()
+	for task := range t.tasks {
+		task.Tick()
+	}
+	t.Unlock()
+}
+
+func (t *SharedTicker) asyncExec() {
+	var wg sync.WaitGroup
+	t.Lock()
+	for b := range t.tasks {
+		wg.Add(1)
+		task := b
+		gofunc.GoFunc(context.Background(), func() {
+			defer wg.Done()
+			task.Tick()
+		})
+	}
+	t.Unlock()
+	wg.Wait()
 }
