@@ -74,20 +74,54 @@ type (
 
 // ClientStream define client stream APIs
 type ClientStream interface {
+	// SendMsg send message to peer
+	// will block until an error or enough buffer to send
+	// not concurrent-safety
 	SendMsg(ctx context.Context, m any) error
+	// RecvMsg recvive message from peer
+	// will block until an error or a message received
+	// not concurrent-safety
 	RecvMsg(ctx context.Context, m any) error
+	// Header returns the header info received from the server if there
+	// is any. It blocks if the header info is not ready to read.  If the header info
+	// is nil and the error is also nil, then the stream was terminated without
+	// headers, and the error can be discovered by calling RecvMsg.
 	Header() (Header, error)
+	// Trailer returns the trailer info from the server, if there is any.
+	// It must only be called after stream.CloseAndRecv has returned, or
+	// stream.Recv has returned a non-nil error (including io.EOF).
 	Trailer() (Trailer, error)
+	// CloseSend closes the send direction of the stream. It closes the stream
+	// when non-nil error is met. It is also not safe to call CloseSend
+	// concurrently with SendMsg.
 	CloseSend(ctx context.Context) error
+	// Context the stream context.Context
 	Context() context.Context
 }
 
 // ServerStream define server stream APIs
 type ServerStream interface {
+	// SendMsg send message to peer
+	// will block until an error or enough buffer to send
+	// not concurrent-safety
 	SendMsg(ctx context.Context, m any) error
+	// RecvMsg recvive message from peer
+	// will block until an error or a message received
+	// not concurrent-safety
 	RecvMsg(ctx context.Context, m any) error
+	// SetHeader sets the header info. It may be called multiple times.
+	// When call multiple times, all the provided header info will be merged.
+	// All the header info will be sent out when one of the following happens:
+	//  - ServerStream.SendHeader() is called;
+	//  - The first response is sent out;
+	//  - The server handler returns (error or nil).
 	SetHeader(hd Header) error
+	// SendHeader sends the header info.
+	// The provided hd and headers set by SetHeader() will be sent.
+	// It fails if called multiple times or called after the first response is sent out.
 	SendHeader(hd Header) error
+	// SetTrailer sets the trailer info which will be sent with the RPC status.
+	// When called more than once, all the provided trailer info will be merged.
 	SetTrailer(hd Trailer) error
 }
 

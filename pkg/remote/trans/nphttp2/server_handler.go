@@ -245,6 +245,7 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 			}
 		}
 	} else {
+		ink.SetStreamingMode(methodInfo.StreamingMode())
 		if streaming.UnaryCompatibleMiddleware(methodInfo.StreamingMode(), t.opt.CompatibleMiddlewareForUnary) {
 			// making streaming unary APIs capable of using the same server middleware as non-streaming APIs
 			// note: rawStream skips recv/send middleware for unary API requests to avoid confusion

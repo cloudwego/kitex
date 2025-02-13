@@ -105,5 +105,8 @@ func (sh *serverHTTP2Handler) ReadMeta(ctx context.Context, msg remote.Message) 
 }
 
 func isGRPC(ri rpcinfo.RPCInfo) bool {
-	return ri.Config().TransportProtocol()&transport.GRPC == transport.GRPC
+	cfg := ri.Config()
+	tp := cfg.TransportProtocol()
+	isStream := cfg.InteractionMode() == rpcinfo.Streaming
+	return tp&transport.GRPC == transport.GRPC || (tp&transport.GRPCStreaming == transport.GRPCStreaming && isStream)
 }

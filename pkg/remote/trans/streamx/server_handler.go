@@ -32,11 +32,13 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/transport"
 )
 
 type StreamInfo interface {
 	Service() string
 	Method() string
+	TransportProtocol() transport.Protocol
 }
 
 /*  trans_server.go only use the following interface in remote.ServerTransHandler:
@@ -158,9 +160,11 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 		}
 		ink.SetServiceName(sinfo.ServiceName)
 		ink.SetMethodName(si.Method())
+		ink.SetStreamingMode(minfo.StreamingMode())
 		if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
 			_ = mutableTo.SetMethod(si.Method())
 		}
+		rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(si.TransportProtocol())
 	}
 
 	ctx = t.startTracer(ctx, ri)

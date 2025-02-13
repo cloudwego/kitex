@@ -31,6 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
+	ktransport "github.com/cloudwego/kitex/transport"
 )
 
 var (
@@ -99,6 +100,10 @@ func (s *stream) Service() string {
 
 func (s *stream) Method() string {
 	return s.method
+}
+
+func (s *stream) TransportProtocol() ktransport.Protocol {
+	return ktransport.TTHeaderStreaming
 }
 
 func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
