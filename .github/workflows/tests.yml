@@ -10,7 +10,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version: "1.23"
           cache: false
       - name: Scenario Tests
         run: |
@@ -28,7 +28,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version: "1.23"
       - name: Benchmark
         # we only use this CI to verify bench code works
         # setting benchtime=100ms is saving our time...
@@ -71,7 +71,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version: "1.23"
       - name: Prepare
         run: |  
           go install github.com/cloudwego/thriftgo@main
@@ -100,7 +100,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version: "1.23"
           cache: false # don't use cache for self-hosted runners
       - name: Windows compatibility test
         run: go test -run=^$ ./...
