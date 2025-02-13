@@ -23,7 +23,7 @@ import (
 	"github.com/bytedance/gopkg/cloud/circuitbreaker"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
-	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
+	"github.com/cloudwego/kitex/pkg/endpoint/cep"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )

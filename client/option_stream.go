@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/internal/client"
-	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
+	"github.com/cloudwego/kitex/pkg/endpoint/cep"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 

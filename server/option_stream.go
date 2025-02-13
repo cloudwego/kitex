@@ -22,7 +22,7 @@ import (
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/endpoint"
-	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
+	"github.com/cloudwego/kitex/pkg/endpoint/sep"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
