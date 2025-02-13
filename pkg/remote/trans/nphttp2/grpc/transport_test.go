@@ -1546,8 +1546,11 @@ func TestEncodingRequiredStatus(t *testing.T) {
 		return
 	}
 	opts := Options{Last: true}
-	if err := ct.Write(s, nil, expectedRequest, &opts); err != nil && err != errStreamDone {
-		t.Fatalf("Failed to write the request: %v", err)
+	if err := ct.Write(s, nil, expectedRequest, &opts); err != nil {
+		// in case server-side returns earlier, Write also returns a status error.
+		if err != errStatusStreamDone || !testutils.StatusErrEqual(s.Status().Err(), encodingTestStatus.Err()) {
+			t.Fatalf("Failed to write the request: %v", err)
+		}
 	}
 	p := make([]byte, http2MaxFrameLen)
 	if _, err := s.trReader.(*transportReader).Read(p); err != io.EOF {
