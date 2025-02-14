@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"net"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -231,6 +232,43 @@ func (p *connPool) Close() error {
 		return true
 	})
 	return nil
+}
+
+// Dump dumps the connection pool with the details of the underlying transport.
+func (p *connPool) Dump() interface{} {
+	defer func() {
+		if panicErr := recover(); panicErr != nil {
+			klog.Errorf("KITEX: dump gRPC client connection pool panic, err=%v, stack=%s", panicErr, string(debug.Stack()))
+		}
+	}()
+
+	// remoteAddress -> []clientTransport, where each clientTransport is a connection. Distinguish the connection via localAddress.
+	// If mesh egress is not enabled, toAddr should be the address of the callee service.
+	// Otherwise, toAddr will be the same, so you should check the remoteAddress in each stream, which is read from the header.
+	poolDump := make(map[string]interface{}, p.size)
+	p.conns.Range(func(k, v interface{}) bool {
+		addr := k.(string)
+		ts := v.(*transports)
+		for _, t := range ts.cliTransports {
+			if t == nil {
+				continue
+			}
+			dumper, ok := t.(interface{ Dump() interface{} })
+			if !ok {
+				continue
+			}
+			var curr []interface{}
+			if poolDump[addr] == nil {
+				curr = make([]interface{}, 0)
+			} else {
+				curr = poolDump[addr].([]interface{})
+			}
+			curr = append(curr, dumper.Dump())
+			poolDump[addr] = curr
+		}
+		return true
+	})
+	return poolDump
 }
 
 // newTLSConn constructs a client-side TLS connection and performs handshake.
