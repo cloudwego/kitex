@@ -115,7 +115,7 @@ type MethodInfo interface {
 	NewArgs() interface{}
 	NewResult() interface{}
 	OneWay() bool
-	IsStreaming() bool
+	IsStreaming() bool // deprecated
 	StreamingMode() StreamingMode
 }
 
@@ -129,6 +129,8 @@ type MethodInfoOption func(*methodInfo)
 func WithStreamingMode(mode StreamingMode) MethodInfoOption {
 	return func(m *methodInfo) {
 		m.streamingMode = mode
+		// The judgement logic is deprecated,
+		// and this field should be removed after all generated code is updated.
 		m.isStreaming = mode != StreamingNone
 	}
 }

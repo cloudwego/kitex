@@ -35,7 +35,9 @@ func NewServer(handler {{call .ServiceTypeName}}, opts ...server.Option) server.
     var options []server.Option
     {{template "@server.go-NewServer-option" .}}
     options = append(options, opts...)
+	{{- if or (eq $.Codec "thrift") .StreamX}}
 	options = append(options, server.WithCompatibleMiddlewareForUnary())
+	{{- end}}
 
     svr := server.NewServer(options...)
     if err := svr.RegisterService(serviceInfo(), handler); err != nil {
