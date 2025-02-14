@@ -27,4 +27,5 @@ const (
 	HTTPSourceMethod = "source-method"
 
 	HTTPStreamLogID = "stream-log-id"
+	HTTPRemoteIP    = "rip"
 )

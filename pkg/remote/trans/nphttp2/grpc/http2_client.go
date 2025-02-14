@@ -28,11 +28,14 @@ import (
 	"math"
 	"net"
 	"runtime/debug"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2"
@@ -312,6 +315,22 @@ func (task *closeStreamTask) Tick() {
 		task.toCloseStreams[i] = nil
 	}
 	task.toCloseStreams = task.toCloseStreams[:0]
+}
+
+type clientTransportDump struct {
+	LocalAddress       string         `json:"local_address"`
+	State              transportState `json:"transport_state"`
+	OutFlowControlSize int64          `json:"out_flow_control_size"`
+	ActiveStreams      []streamDump   `json:"active_streams"`
+}
+
+type streamDump struct {
+	ID                  uint32      `json:"id"`
+	RemoteAddress       string      `json:"remote_address"`
+	Method              string      `json:"method"`
+	State               streamState `json:"stream_state"`
+	WriteQuota          int32       `json:"write_quota"`
+	ValidHeaderReceived bool        `json:"valid_header_received"`
 }
 
 type preAllocatedStreamFields struct {
@@ -1289,4 +1308,61 @@ func (t *http2Client) IsActive() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.state == reachable
+}
+
+func (t *http2Client) Dump() interface{} {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	// sort the stream using streamID
+	as := make([]streamDump, 0, len(t.activeStreams))
+	ids := make([]uint32, 0, len(t.activeStreams))
+	for k := range t.activeStreams {
+		ids = append(ids, k)
+	}
+	sort.Slice(ids, func(i, j int) bool {
+		return ids[i] < ids[j]
+	})
+	for _, id := range ids {
+		v := t.activeStreams[id]
+		sd := streamDump{
+			ID:                  v.id,
+			Method:              v.method,
+			State:               v.state,
+			WriteQuota:          atomic.LoadInt32(&v.wq.quota),
+			ValidHeaderReceived: v.getHeaderValid(),
+		}
+		// get info from header
+		if md, ok := v.tryGetHeader(); ok {
+			if rip := md.Get(transmeta.HTTPRemoteIP); len(rip) > 0 && len(rip[0]) > 0 {
+				sd.RemoteAddress = rip[0]
+			}
+		}
+		as = append(as, sd)
+	}
+
+	dump := clientTransportDump{
+		State:              t.state,
+		ActiveStreams:      as,
+		OutFlowControlSize: t.getOutFlowWindow(),
+	}
+	if localAddress := t.localAddr; localAddress != nil {
+		dump.LocalAddress = localAddress.String()
+	}
+	return dump
+}
+
+func (t *http2Client) getOutFlowWindow() int64 {
+	resp := make(chan uint32, 1)
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
+	t.controlBuf.put(&outFlowControlSizeRequest{resp})
+	select {
+	case sz := <-resp:
+		return int64(sz)
+	case <-t.ctx.Done():
+		return -1
+	case <-timer.C:
+		return -2
+	}
 }
