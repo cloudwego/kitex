@@ -45,6 +45,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -123,6 +124,14 @@ func (o *StreamOptions) BuildSendChain() sep.StreamSendEndpoint {
 	})
 }
 
+type TTHeaderStreamingOption struct {
+	F func(o *TTHeaderStreamingOptions, di *utils.Slice)
+}
+
+type TTHeaderStreamingOptions struct {
+	ProviderOptions []ttstream.ServerProviderOption
+}
+
 // Option is the only way to config a server.
 type Option struct {
 	F func(o *Options, di *utils.Slice)
@@ -174,6 +183,9 @@ type Options struct {
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool
+
+	// TTHeaderStreaming
+	TTHeaderStreamingOptions TTHeaderStreamingOptions
 }
 
 type Limit struct {
@@ -190,12 +202,13 @@ type Limit struct {
 
 // NewOptions creates a default options.
 func NewOptions(opts []Option) *Options {
+	ropt, ttstreamProvider := newServerRemoteOption()
 	o := &Options{
 		Svr:          &rpcinfo.EndpointBasicInfo{},
 		Configs:      rpcinfo.NewRPCConfig(),
 		Once:         configutil.NewOptionOnce(),
 		MetaHandlers: []remote.MetaHandler{transmeta.MetainfoServerHandler},
-		RemoteOpt:    newServerRemoteOption(),
+		RemoteOpt:    ropt,
 		DebugService: diagnosis.NoopService,
 		ExitSignal:   DefaultSysExitSignal,
 
@@ -208,6 +221,9 @@ func NewOptions(opts []Option) *Options {
 		Registry:  registry.NoopRegistry,
 	}
 	ApplyOptions(opts, o)
+	// todo: must be removed in the future
+	ttstreamProvider.(ttstream.ServerProviderOptionApplier).ApplyServerProviderOption(o.TTHeaderStreamingOptions.ProviderOptions...)
+
 	rpcinfo.AsMutableRPCConfig(o.Configs).LockConfig(o.LockBits)
 	if o.StatsLevel == nil {
 		level := stats.LevelDisabled

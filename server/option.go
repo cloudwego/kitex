@@ -62,6 +62,8 @@ type StreamOption = internal_server.StreamOption
 
 type StreamOptions = internal_server.StreamOptions
 
+type TTHeaderStreamingOption = internal_server.TTHeaderStreamingOption
+
 // WithSuite adds an option suite for server.
 func WithSuite(suite Suite) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {

@@ -211,14 +211,25 @@ type Options struct {
 
 // Apply applies all options.
 func (o *Options) Apply(opts []Option) {
+	reorderOpts := make([]Option, 0, len(opts))
+	finalOpts := make([]Option, 0, len(opts))
 	for _, op := range opts {
+		if op.finalOption {
+			finalOpts = append(finalOpts, op)
+		} else {
+			reorderOpts = append(reorderOpts, op)
+		}
+	}
+	reorderOpts = append(reorderOpts, finalOpts...)
+	for _, op := range reorderOpts {
 		op.F(o, &o.DebugInfo)
 	}
 }
 
 // Option is the only way to config client.
 type Option struct {
-	F func(o *Options, di *utils.Slice)
+	F           func(o *Options, di *utils.Slice)
+	finalOption bool // just ignore it unless you clearly know what you are doing.
 }
 
 // NewOptions creates a new option.

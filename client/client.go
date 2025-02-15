@@ -769,7 +769,15 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 	)
 
 	if mi != nil {
-		ri.Invocation().(rpcinfo.InvocationSetter).SetStreamingMode(mi.StreamingMode())
+		sm := mi.StreamingMode()
+		ri.Invocation().(rpcinfo.InvocationSetter).SetStreamingMode(sm)
+		if sm == serviceinfo.StreamingClient || sm == serviceinfo.StreamingServer || sm == serviceinfo.StreamingBidirectional {
+			cfg.SetInteractionMode(rpcinfo.Streaming)
+		}
+	}
+	// add grpc transport protocol for better forward compatibility
+	if ri.Config().TransportProtocol() == transport.GRPCStreaming && ri.Config().InteractionMode() == rpcinfo.Streaming {
+		cfg.SetTransportProtocol(transport.GRPC)
 	}
 	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
 		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))

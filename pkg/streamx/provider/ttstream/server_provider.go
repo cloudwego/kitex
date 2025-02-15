@@ -56,8 +56,14 @@ type serverProvider struct {
 	headerHandler HeaderFrameReadHandler
 }
 
+func (s *serverProvider) ApplyServerProviderOption(opts ...ServerProviderOption) {
+	for _, opt := range opts {
+		opt(s)
+	}
+}
+
 // Available sniff the conn if provider can process
-func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
+func (s *serverProvider) Available(ctx context.Context, conn net.Conn) bool {
 	nconn, ok := conn.(netpoll.Connection)
 	if !ok {
 		return false
@@ -70,7 +76,7 @@ func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
 }
 
 // OnActive will be called when a connection accepted
-func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
+func (s *serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	nconn := conn.(netpoll.Connection)
 	trans := newTransport(serverTransport, nconn, nil)
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
@@ -80,7 +86,7 @@ func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Co
 	return context.WithValue(ctx, serverTransCtxKey{}, trans), nil
 }
 
-func (s serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context.Context, error) {
+func (s *serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
 	if trans == nil {
 		return ctx, nil
@@ -89,7 +95,7 @@ func (s serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context.
 	return ctx, nil
 }
 
-func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Context, streaming.ServerStream, error) {
+func (s *serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Context, streaming.ServerStream, error) {
 	trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
 	if trans == nil {
 		return nil, nil, fmt.Errorf("server transport is nil")
@@ -119,7 +125,7 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 	return ctx, ss, nil
 }
 
-func (s serverProvider) OnStreamFinish(ctx context.Context, ss streaming.ServerStream, err error) (context.Context, error) {
+func (s *serverProvider) OnStreamFinish(ctx context.Context, ss streaming.ServerStream, err error) (context.Context, error) {
 	sst := ss.(*serverStream)
 	var exception error
 	if err != nil {

@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package client
+package server
 
 import (
 	"fmt"
 
-	"github.com/cloudwego/kitex/internal/client"
+	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-// WithTTHeaderStreamingOptions add ttheader streaming options for client.
+// WithTTHeaderStreamingOptions add ttheader streaming options for server.
 func WithTTHeaderStreamingOptions(opts ...TTHeaderStreamingOption) Option {
-	return Option{F: func(o *client.Options, di *utils.Slice) {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		var udi utils.Slice
 		for _, opt := range opts {
 			opt.F(&o.TTHeaderStreamingOptions, &udi)
@@ -37,9 +37,9 @@ func WithTTHeaderStreamingOptions(opts ...TTHeaderStreamingOption) Option {
 	}}
 }
 
-// WithTTHeaderStreamingProviderOptions add ttheader streaming provider options for client.
-func WithTTHeaderStreamingProviderOptions(opt ...ttstream.ClientProviderOption) TTHeaderStreamingOption {
-	return TTHeaderStreamingOption{F: func(o *client.TTHeaderStreamingOptions, di *utils.Slice) {
+// WithTTHeaderStreamingProviderOptions add ttheader streaming provider options for server.
+func WithTTHeaderStreamingProviderOptions(opt ...ttstream.ServerProviderOption) TTHeaderStreamingOption {
+	return TTHeaderStreamingOption{F: func(o *internal_server.TTHeaderStreamingOptions, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithTTHeaderStreamingProviderOption(%T)", opt))
 
 		o.ProviderOptions = append(o.ProviderOptions, opt...)

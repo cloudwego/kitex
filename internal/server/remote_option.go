@@ -28,16 +28,18 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	streamxstrans "github.com/cloudwego/kitex/pkg/remote/trans/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 )
 
-func newServerRemoteOption() *remote.ServerOption {
+func newServerRemoteOption() (*remote.ServerOption, streamx.ServerProvider) {
+	ttstreamServerProvider := ttstream.NewServerProvider()
 	return &remote.ServerOption{
 		TransServerFactory: netpoll.NewTransServerFactory(),
 		SvrHandlerFactory: detection.NewSvrTransHandlerFactory(
 			netpoll.NewSvrTransHandlerFactory(),
 			nphttp2.NewSvrTransHandlerFactory(),
-			streamxstrans.NewSvrTransHandlerFactory(ttstream.NewServerProvider()),
+			streamxstrans.NewSvrTransHandlerFactory(ttstreamServerProvider),
 		),
 		Codec:                 codec.NewDefaultCodec(),
 		Address:               defaultAddress,
@@ -45,5 +47,5 @@ func newServerRemoteOption() *remote.ServerOption {
 		MaxConnectionIdleTime: defaultConnectionIdleTime,
 		AcceptFailedDelayTime: defaultAcceptFailedDelayTime,
 		GRPCCfg:               grpc.DefaultServerConfig(),
-	}
+	}, ttstreamServerProvider
 }
