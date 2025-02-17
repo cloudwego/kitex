@@ -654,11 +654,11 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 	case MainFileName:
 		pkg.AddImport("log", "log")
 		if !g.Config.IsUsingMultipleServicesTpl() {
-			pkg.AddImport(pkg.PkgRefName, util.JoinPath(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
+			pkg.AddImport(pkg.PkgInfo.PkgRefName, util.JoinPath(pkg.PkgInfo.ImportPath, strings.ToLower(pkg.ServiceInfo.ServiceName)))
 		} else {
 			pkg.AddImports("server")
 			for _, svc := range pkg.Services {
-				pkg.AddImport(svc.RefName, util.JoinPath(pkg.ImportPath, strings.ToLower(svc.ServiceName)))
+				pkg.AddImport(svc.RefName, util.JoinPath(svc.PkgInfo.ImportPath, strings.ToLower(svc.ServiceName)))
 			}
 		}
 	}
