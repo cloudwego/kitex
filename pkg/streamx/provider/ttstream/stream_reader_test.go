@@ -19,7 +19,6 @@ package ttstream
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -33,20 +32,20 @@ func TestStreamReader(t *testing.T) {
 
 	// basic IOs
 	sio := newStreamReader()
-	var done int32
+	doneCh := make(chan struct{})
 	go func() {
 		for i := 0; i < round; i++ {
 			sio.input(ctx, msg)
 		}
-		atomic.StoreInt32(&done, 1)
+		close(doneCh)
 	}()
 	for i := 0; i < round; i++ {
 		payload, err := sio.output(ctx)
 		test.Assert(t, err == nil, err)
 		test.DeepEqual(t, msg, payload)
 	}
-	test.Assert(t, atomic.LoadInt32(&done) == int32(1))
-
+	// wait for goroutine exited
+	<-doneCh
 	// exception IOs
 	sio.input(ctx, msg)
 	targetErr := errors.New("test")

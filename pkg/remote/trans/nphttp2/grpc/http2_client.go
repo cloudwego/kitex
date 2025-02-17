@@ -292,7 +292,7 @@ type closeStreamTask struct {
 	toCloseStreams []*Stream
 }
 
-func (task closeStreamTask) Tick() {
+func (task *closeStreamTask) Tick() {
 	trans := task.t
 	trans.mu.Lock()
 	for _, stream := range trans.activeStreams {
