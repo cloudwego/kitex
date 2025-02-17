@@ -776,7 +776,8 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 		}
 	}
 	// add grpc transport protocol for better forward compatibility
-	if ri.Config().TransportProtocol() == transport.GRPCStreaming && ri.Config().InteractionMode() == rpcinfo.Streaming {
+	if ri.Config().TransportProtocol()&(transport.GRPC|transport.GRPCStreaming) == transport.GRPCStreaming &&
+		ri.Config().InteractionMode() == rpcinfo.Streaming {
 		cfg.SetTransportProtocol(transport.GRPC)
 	}
 	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {

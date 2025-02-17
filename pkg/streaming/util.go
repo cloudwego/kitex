@@ -31,7 +31,7 @@ var userStreamNotImplementingWithDoFinish sync.Once
 
 // UnaryCompatibleMiddleware returns whether to use compatible middleware for unary.
 func UnaryCompatibleMiddleware(mode serviceinfo.StreamingMode, allow bool) bool {
-	return allow && mode == serviceinfo.StreamingUnary
+	return allow && (mode == serviceinfo.StreamingUnary || mode == serviceinfo.StreamingNone)
 }
 
 // FinishStream records the end of stream
