@@ -605,7 +605,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 					pkg.AddImport(dep.PkgRefName, dep.ImportPath)
 				}
 			}
-			if m.ClientStreaming || m.ServerStreaming || pkg.Codec == "protobuf" {
+			if m.ClientStreaming || m.ServerStreaming || (pkg.Codec == "protobuf" && !g.StreamX) {
 				// protobuf handler support both PingPong and Unary (streaming) requests
 				pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
 			}

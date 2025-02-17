@@ -118,29 +118,14 @@ func newServiceInfo() *kitex.ServiceInfo {
 func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	{{- if $unary}} {{/* unary logic */}}
 	{{- if eq $.Codec "protobuf"}} {{/* protobuf logic */}}
-	switch s := arg.(type) {
-	case *streaming.Args:
-		st := s.Stream
-		req := new({{NotPtr $arg.Type}})
-		if err := st.RecvMsg(req); err != nil {
-			return err
-		}
-		resp, err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx, req)
-		if err != nil {
-			return err
-		}
-		return st.SendMsg(resp)
-	case *{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ArgStructName}}:
-		success, err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, s.{{.Name}}{{end}})
-		if err != nil {
-			return err
-		}
-		realResult := result.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ResStructName}})
-		realResult.Success = {{if .IsResponseNeedRedirect}}&{{end}}success
-		return nil
-	default:
-		return errInvalidMessageType
+	s := arg.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ArgStructName}})
+	success, err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, s.{{.Name}}{{end}})
+	if err != nil {
+		return err
 	}
+	realResult := result.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ResStructName}})
+	realResult.Success = {{if .IsResponseNeedRedirect}}&{{end}}success
+	return nil
 	{{- else}} {{/* thrift logic */}}
 	{{if gt .ArgsLength 0}}realArg := {{else}}_ = {{end}}arg.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ArgStructName}})
 	{{if or (not .Void) .Exceptions}}realResult := result.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ResStructName}}){{end}}
