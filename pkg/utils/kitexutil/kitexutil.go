@@ -92,7 +92,7 @@ func GetCallerAddr(ctx context.Context) (net.Addr, bool) {
 	defer func() { recover() }()
 
 	ri := rpcinfo.GetRPCInfo(ctx)
-	if ri == nil {
+	if ri == nil || ri.From() == nil || ri.From().Address() == nil {
 		return nil, false
 	}
 	return ri.From().Address(), true
@@ -104,7 +104,7 @@ func GetCallerIP(ctx context.Context) (string, bool) {
 	defer func() { recover() }()
 
 	ri := rpcinfo.GetRPCInfo(ctx)
-	if ri == nil {
+	if ri == nil || ri.From() == nil || ri.From().Address() == nil {
 		return "", false
 	}
 	addrStr := ri.From().Address().String()
