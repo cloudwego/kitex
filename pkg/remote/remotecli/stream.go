@@ -23,10 +23,12 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/kitex/transport"
 )
 
 // NewStream create a client side stream
-func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTransHandler, opt *remote.ClientOption) (any, *StreamConnManager, error) {
+func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTransHandler, opt *remote.ClientOption) (streaming.ClientStream, *StreamConnManager, error) {
 	var err error
 	for _, shdlr := range opt.StreamingMetaHandlers {
 		ctx, err = shdlr.OnConnectStream(ctx)
@@ -35,23 +37,32 @@ func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTra
 		}
 	}
 
-	// streamx provider
-	if opt.Provider != nil {
+	// ttheader streaming
+	if ri.Config().TransportProtocol()&transport.TTHeaderStreaming == transport.TTHeaderStreaming {
 		// wrap internal client provider
-		cs, err := opt.Provider.NewStream(ctx, ri)
+		cs, err := opt.TTHeaderStreamingProvider.NewStream(ctx, ri)
 		if err != nil {
 			return nil, nil, err
 		}
 		return cs, nil, nil
 	}
+	// grpc streaming
+	if ri.Config().TransportProtocol()&transport.GRPCStreaming == transport.GRPCStreaming {
+		cm := NewConnWrapper(opt.GRPCStreamingConnPool)
+		rawConn, err := cm.GetConn(ctx, opt.Dialer, ri)
+		if err != nil {
+			return nil, nil, err
+		}
+		return nphttp2.NewClientStream(ctx, opt.SvcInfo, rawConn, handler), &StreamConnManager{cm}, nil
+	}
 
-	// old version streaming
+	// default is grpc streaming
 	cm := NewConnWrapper(opt.ConnPool)
 	rawConn, err := cm.GetConn(ctx, opt.Dialer, ri)
 	if err != nil {
 		return nil, nil, err
 	}
-	return nphttp2.NewStream(ctx, opt.SvcInfo, rawConn, handler), &StreamConnManager{cm}, nil
+	return nphttp2.NewClientStream(ctx, opt.SvcInfo, rawConn, handler), &StreamConnManager{cm}, nil
 }
 
 // NewStreamConnManager returns a new StreamConnManager

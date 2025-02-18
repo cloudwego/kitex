@@ -27,36 +27,30 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
-	istreamxclient "github.com/cloudwego/kitex/internal/streamx/streamxclient"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
+	ktransport "github.com/cloudwego/kitex/transport"
 )
 
 var (
-	_ streamx.ClientStream = (*clientStream)(nil)
-	_ streamx.ServerStream = (*serverStream)(nil)
-	_ StreamMeta           = (*stream)(nil)
+	_ streaming.ClientStream = (*clientStream)(nil)
+	_ streaming.ServerStream = (*serverStream)(nil)
+	_ StreamMeta             = (*stream)(nil)
 )
 
 func newStream(ctx context.Context, writer streamWriter, smeta streamFrame) *stream {
 	s := new(stream)
+	s.ctx = ctx
 	s.streamFrame = smeta
 	s.StreamMeta = newStreamMeta()
 	s.reader = newStreamReader()
 	s.writer = writer
-	s.wheader = make(streamx.Header)
-	s.wtrailer = make(streamx.Trailer)
+	s.wheader = make(streaming.Header)
+	s.wtrailer = make(streaming.Trailer)
 	s.headerSig = make(chan int32, 1)
 	s.trailerSig = make(chan int32, 1)
-
-	// register close callback
-	copts := istreamxclient.GetCallOptionsFromCtx(ctx)
-	if copts != nil && len(copts.StreamCloseCallback) > 0 {
-		s.closeCallback = append(s.closeCallback, copts.StreamCloseCallback...)
-	}
 	return s
 }
 
@@ -65,8 +59,8 @@ type streamFrame struct {
 	sid     int32
 	method  string
 	meta    IntHeader
-	header  streamx.Header // key:value, key is full name
-	trailer streamx.Trailer
+	header  streaming.Header // key:value, key is full name
+	trailer streaming.Trailer
 }
 
 const (
@@ -80,10 +74,11 @@ const (
 type stream struct {
 	streamFrame
 	StreamMeta
+	ctx      context.Context
 	reader   *streamReader
 	writer   streamWriter
-	wheader  streamx.Header  // wheader == nil means it already be sent
-	wtrailer streamx.Trailer // wtrailer == nil means it already be sent
+	wheader  streaming.Header  // wheader == nil means it already be sent
+	wtrailer streaming.Trailer // wtrailer == nil means it already be sent
 
 	headerSig  chan int32
 	trailerSig chan int32
@@ -94,7 +89,6 @@ type stream struct {
 
 	recvTimeout      time.Duration
 	metaFrameHandler MetaFrameHandler
-	closeCallback    []istreamxclient.StreamCloseCallback
 }
 
 func (s *stream) Service() string {
@@ -106,6 +100,10 @@ func (s *stream) Service() string {
 
 func (s *stream) Method() string {
 	return s.method
+}
+
+func (s *stream) TransportProtocol() ktransport.Protocol {
+	return ktransport.TTHeaderStreaming
 }
 
 func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
@@ -224,21 +222,16 @@ func (s *stream) tryRunCloseCallback(exception error) {
 	if atomic.AddInt32(&s.eofFlag, 1) != 2 {
 		return
 	}
-	if len(s.closeCallback) > 0 {
-		for _, cb := range s.closeCallback {
-			cb(exception)
-		}
-	}
 	_ = s.writer.CloseStream(s.sid)
 }
 
-func (s *stream) writeFrame(ftype int32, header streamx.Header, trailer streamx.Trailer, payload []byte) (err error) {
+func (s *stream) writeFrame(ftype int32, header streaming.Header, trailer streaming.Trailer, payload []byte) (err error) {
 	fr := newFrame(streamFrame{sid: s.sid, method: s.method, header: header, trailer: trailer}, ftype, payload)
 	return s.writer.WriteFrame(fr)
 }
 
 // writeHeader copy kvs into s.wheader
-func (s *stream) writeHeader(hd streamx.Header) error {
+func (s *stream) writeHeader(hd streaming.Header) error {
 	if s.wheader == nil {
 		return fmt.Errorf("stream header already sent")
 	}
@@ -260,7 +253,7 @@ func (s *stream) sendHeader() (err error) {
 }
 
 // writeTrailer write trailer to peer
-func (s *stream) writeTrailer(tl streamx.Trailer) (err error) {
+func (s *stream) writeTrailer(tl streaming.Trailer) (err error) {
 	if s.wtrailer == nil {
 		return fmt.Errorf("stream trailer already sent")
 	}

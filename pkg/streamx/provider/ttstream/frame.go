@@ -30,8 +30,7 @@ import (
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
 	"github.com/cloudwego/kitex/pkg/remote"
-
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 const (
@@ -137,8 +136,8 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	}
 
 	var ftype int32
-	var fheader streamx.Header
-	var ftrailer streamx.Trailer
+	var fheader streaming.Header
+	var ftrailer streaming.Trailer
 	fmeta := dp.IntInfo
 	switch dp.IntInfo[ttheader.FrameType] {
 	case ttheader.FrameTypeMeta:

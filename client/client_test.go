@@ -200,7 +200,7 @@ func TestWithRetryOption(t *testing.T) {
 	mockRetryContainer := retry.NewRetryContainer()
 	cli := newMockClient(t, ctrl, WithRetryContainer(mockRetryContainer))
 
-	test.Assert(t, cli.(*kcFinalizerClient).opt.RetryContainer == mockRetryContainer)
+	test.Assert(t, cli.(*kcFinalizerClient).opt.UnaryOptions.RetryContainer == mockRetryContainer)
 }
 
 func BenchmarkCall(b *testing.B) {
@@ -1131,7 +1131,7 @@ type mockTracerForInitMW struct {
 	rpcinfo.StreamEventReporter
 }
 
-func Test_kClient_initStreamMiddlewares(t *testing.T) {
+func Test_kClient_initMiddlewares(t *testing.T) {
 	ctl := &rpcinfo.TraceController{}
 	ctl.Append(mockTracerForInitMW{})
 	c := &kClient{
@@ -1140,8 +1140,8 @@ func Test_kClient_initStreamMiddlewares(t *testing.T) {
 			Streaming: internal_stream.StreamingConfig{},
 		},
 	}
-	c.initStreamMiddlewares(context.Background())
+	c.initMiddlewares(context.Background())
 
-	test.Assert(t, len(c.opt.Streaming.RecvMiddlewares) > 0, "init middlewares failed")
-	test.Assert(t, len(c.opt.Streaming.SendMiddlewares) > 0, "init middlewares failed")
+	test.Assert(t, len(c.opt.Streaming.RecvMiddlewares) == 0, "init middlewares failed")
+	test.Assert(t, len(c.opt.Streaming.SendMiddlewares) == 0, "init middlewares failed")
 }

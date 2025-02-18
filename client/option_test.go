@@ -586,7 +586,7 @@ func TestWithConnPool(t *testing.T) {
 func TestWithRetryContainer(t *testing.T) {
 	mockRetryContainer := &retry.Container{}
 	opts := client.NewOptions([]client.Option{WithRetryContainer(mockRetryContainer)})
-	test.Assert(t, opts.RetryContainer == mockRetryContainer)
+	test.Assert(t, opts.UnaryOptions.RetryContainer == mockRetryContainer)
 }
 
 func TestWithGeneric(t *testing.T) {
@@ -671,7 +671,7 @@ func TestWithSuite(t *testing.T) {
 	opts := client.NewOptions(options)
 	test.Assert(t, opts.Cli == mockEndpointBasicInfo)
 	test.Assert(t, reflect.DeepEqual(opts.DebugService, mockDiagnosisService))
-	test.Assert(t, opts.RetryContainer == mockRetryContainer)
+	test.Assert(t, opts.UnaryOptions.RetryContainer == mockRetryContainer)
 }
 
 func TestWithLongConnectionOption(t *testing.T) {

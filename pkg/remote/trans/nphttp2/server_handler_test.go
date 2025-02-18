@@ -147,24 +147,24 @@ func TestServerHandler(t *testing.T) {
 }
 
 type mockStream struct {
-	streaming.Stream
-	recv func(msg interface{}) error
-	send func(msg interface{}) error
+	streaming.ServerStream
+	recv func(ctx context.Context, msg interface{}) error
+	send func(ctx context.Context, msg interface{}) error
 }
 
-func (s *mockStream) RecvMsg(m interface{}) error {
-	return s.recv(m)
+func (s *mockStream) RecvMsg(ctx context.Context, m interface{}) error {
+	return s.recv(ctx, m)
 }
 
-func (s *mockStream) SendMsg(m interface{}) error {
-	return s.send(m)
+func (s *mockStream) SendMsg(ctx context.Context, m interface{}) error {
+	return s.send(ctx, m)
 }
 
 func Test_invokeStreamUnaryHandler(t *testing.T) {
 	t.Run("recv err", func(t *testing.T) {
 		expectedErr := errors.New("mock err")
 		s := &mockStream{
-			recv: func(msg interface{}) error {
+			recv: func(ctx context.Context, msg interface{}) error {
 				return expectedErr
 			},
 		}
@@ -194,7 +194,7 @@ func Test_invokeStreamUnaryHandler(t *testing.T) {
 		expectedErr := errors.New("mock err")
 		var newArgsCalled, newResultCalled, handlerCalled, recvCalled bool
 		s := &mockStream{
-			recv: func(msg interface{}) error {
+			recv: func(ctx context.Context, msg interface{}) error {
 				recvCalled = true
 				return nil
 			},
@@ -228,11 +228,11 @@ func Test_invokeStreamUnaryHandler(t *testing.T) {
 		expectedErr := kerrors.NewBizStatusError(100, "mock biz error")
 		var newArgsCalled, newResultCalled, handlerCalled, recvCalled, sendCalled bool
 		s := &mockStream{
-			recv: func(msg interface{}) error {
+			recv: func(ctx context.Context, msg interface{}) error {
 				recvCalled = true
 				return nil
 			},
-			send: func(msg interface{}) error {
+			send: func(ctx context.Context, msg interface{}) error {
 				sendCalled = true
 				return nil
 			},
@@ -271,11 +271,11 @@ func Test_invokeStreamUnaryHandler(t *testing.T) {
 		expectedErr := errors.New("mock err")
 		var newArgsCalled, newResultCalled, handlerCalled, recvCalled, sendCalled bool
 		s := &mockStream{
-			recv: func(msg interface{}) error {
+			recv: func(ctx context.Context, msg interface{}) error {
 				recvCalled = true
 				return nil
 			},
-			send: func(msg interface{}) error {
+			send: func(ctx context.Context, msg interface{}) error {
 				sendCalled = true
 				return expectedErr
 			},
