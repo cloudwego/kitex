@@ -56,6 +56,8 @@ func NewPbContentProvider(main string, includes map[string]string) (PbDescriptor
 	return p, nil
 }
 
+// UpdateIDL updates idl
+// NOTE: Since an IDL update is asynchronous, it may not be applied immediately, potentially causing a temporary data inconsistency.
 func (p *PbContentProvider) UpdateIDL(main string, includes map[string]string) error {
 	sd, err := parseProto(main, includes)
 	if err != nil {
@@ -140,6 +142,8 @@ func NewPbContentProviderWithDynamicGo(ctx context.Context, options dproto.Optio
 	return p, nil
 }
 
+// UpdateIDL updates idl
+// NOTE: Since an IDL update is asynchronous, it may not be applied immediately, potentially causing a temporary data inconsistency.
 func (p *PbFileProviderWithDynamicGo) UpdateIDL(ctx context.Context, options dproto.Options, mainPath, mainContent string, includes map[string]string) error {
 	sd, err := options.NewDesccriptorFromContent(ctx, mainPath, mainContent, includes)
 	if err != nil {

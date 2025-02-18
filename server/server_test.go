@@ -742,9 +742,9 @@ func TestServerBoundHandler(t *testing.T) {
 }
 
 func TestInvokeHandlerWithContextBackup(t *testing.T) {
-	testInvokeHandlerWithSession(t, true, "localhost:8888")
+	testInvokeHandlerWithSession(t, true, "localhost:0")
 	os.Setenv(localsession.SESSION_CONFIG_KEY, "true,100,1h")
-	testInvokeHandlerWithSession(t, false, "localhost:8889")
+	testInvokeHandlerWithSession(t, false, "localhost:0")
 }
 
 func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
@@ -891,7 +891,7 @@ func TestInvokeHandlerExec(t *testing.T) {
 		},
 		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
 			var err error
-			ln, err = net.Listen("tcp", "localhost:8888")
+			ln, err = net.Listen("tcp", "localhost:0")
 			return ln, err
 		},
 	}
@@ -954,7 +954,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 		},
 		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
 			var err error
-			ln, err = net.Listen("tcp", "localhost:8888")
+			ln, err = net.Listen("tcp", "localhost:0")
 			return ln, err
 		},
 	}
@@ -979,80 +979,86 @@ func TestInvokeHandlerPanic(t *testing.T) {
 }
 
 func TestRegisterService(t *testing.T) {
-	svr := NewServer()
-	time.AfterFunc(time.Second, func() {
-		err := svr.Stop()
-		test.Assert(t, err == nil, err)
-	})
+	{
+		svr := NewServer()
+		time.AfterFunc(time.Second, func() {
+			err := svr.Stop()
+			test.Assert(t, err == nil, err)
+		})
 
-	svr.Run()
+		svr.Run()
 
-	test.PanicAt(t, func() {
+		test.PanicAt(t, func() {
+			_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+		}, func(err interface{}) bool {
+			if errMsg, ok := err.(string); ok {
+				return strings.Contains(errMsg, "server is running")
+			}
+			return true
+		})
+		svr.Stop()
+	}
+
+	{
+		svr := NewServer()
+		time.AfterFunc(time.Second, func() {
+			err := svr.Stop()
+			test.Assert(t, err == nil, err)
+		})
+
+		test.PanicAt(t, func() {
+			_ = svr.RegisterService(nil, mocks.MyServiceHandler())
+		}, func(err interface{}) bool {
+			if errMsg, ok := err.(string); ok {
+				return strings.Contains(errMsg, "svcInfo is nil")
+			}
+			return true
+		})
+
+		test.PanicAt(t, func() {
+			_ = svr.RegisterService(mocks.ServiceInfo(), nil)
+		}, func(err interface{}) bool {
+			if errMsg, ok := err.(string); ok {
+				return strings.Contains(errMsg, "handler is nil")
+			}
+			return true
+		})
+
+		test.PanicAt(t, func() {
+			_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler(), WithFallbackService())
+			_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+		}, func(err interface{}) bool {
+			if errMsg, ok := err.(string); ok {
+				return strings.Contains(errMsg, "Service[MockService] is already defined")
+			}
+			return true
+		})
+
+		test.PanicAt(t, func() {
+			_ = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler(), WithFallbackService())
+		}, func(err interface{}) bool {
+			if errMsg, ok := err.(string); ok {
+				return strings.Contains(errMsg, "multiple fallback services cannot be registered")
+			}
+			return true
+		})
+		svr.Stop()
+	}
+
+	{
+		svr := NewServer()
+		time.AfterFunc(time.Second, func() {
+			err := svr.Stop()
+			test.Assert(t, err == nil, err)
+		})
+
 		_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
-	}, func(err interface{}) bool {
-		if errMsg, ok := err.(string); ok {
-			return strings.Contains(errMsg, "server is running")
-		}
-		return true
-	})
-	svr.Stop()
-
-	svr = NewServer()
-	time.AfterFunc(time.Second, func() {
-		err := svr.Stop()
-		test.Assert(t, err == nil, err)
-	})
-
-	test.PanicAt(t, func() {
-		_ = svr.RegisterService(nil, mocks.MyServiceHandler())
-	}, func(err interface{}) bool {
-		if errMsg, ok := err.(string); ok {
-			return strings.Contains(errMsg, "svcInfo is nil")
-		}
-		return true
-	})
-
-	test.PanicAt(t, func() {
-		_ = svr.RegisterService(mocks.ServiceInfo(), nil)
-	}, func(err interface{}) bool {
-		if errMsg, ok := err.(string); ok {
-			return strings.Contains(errMsg, "handler is nil")
-		}
-		return true
-	})
-
-	test.PanicAt(t, func() {
-		_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler(), WithFallbackService())
-		_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
-	}, func(err interface{}) bool {
-		if errMsg, ok := err.(string); ok {
-			return strings.Contains(errMsg, "Service[MockService] is already defined")
-		}
-		return true
-	})
-
-	test.PanicAt(t, func() {
-		_ = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler(), WithFallbackService())
-	}, func(err interface{}) bool {
-		if errMsg, ok := err.(string); ok {
-			return strings.Contains(errMsg, "multiple fallback services cannot be registered")
-		}
-		return true
-	})
-	svr.Stop()
-
-	svr = NewServer()
-	time.AfterFunc(time.Second, func() {
-		err := svr.Stop()
-		test.Assert(t, err == nil, err)
-	})
-
-	_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
-	_ = svr.RegisterService(mocks.Service3Info(), mocks.MyServiceHandler())
-	err := svr.Run()
-	test.Assert(t, err != nil)
-	test.Assert(t, err.Error() == "method name [mock] is conflicted between services but no fallback service is specified")
-	svr.Stop()
+		_ = svr.RegisterService(mocks.Service3Info(), mocks.MyServiceHandler())
+		err := svr.Run()
+		test.Assert(t, err != nil)
+		test.Assert(t, err.Error() == "method name [mock] is conflicted between services but no fallback service is specified")
+		svr.Stop()
+	}
 }
 
 func TestRegisterServiceWithMiddleware(t *testing.T) {
@@ -1087,7 +1093,7 @@ func TestRegisterServiceWithMiddleware(t *testing.T) {
 		},
 		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
 			var err error
-			ln, err = net.Listen("tcp", "localhost:8888")
+			ln, err = net.Listen("tcp", "localhost:0")
 			return ln, err
 		},
 	}

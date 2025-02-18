@@ -120,7 +120,7 @@ func TestTTHeaderServerReadMetainfo(t *testing.T) {
 
 func TestTTHeaderServerWriteMetainfo(t *testing.T) {
 	ctx := context.Background()
-	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""),
+	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil), rpcinfo.NewInvocation("", ""),
 		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
 

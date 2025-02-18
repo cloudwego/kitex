@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"runtime/debug"
+	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -49,13 +50,14 @@ func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.
 }
 
 type svrTransHandler struct {
-	opt           *remote.ServerOption
-	svcSearcher   remote.ServiceSearcher
-	targetSvcInfo *serviceinfo.ServiceInfo
-	inkHdlFunc    endpoint.Endpoint
-	codec         remote.Codec
-	transPipe     *remote.TransPipeline
-	ext           Extension
+	opt                *remote.ServerOption
+	svcSearcher        remote.ServiceSearcher
+	targetSvcInfo      *serviceinfo.ServiceInfo
+	inkHdlFunc         endpoint.Endpoint
+	codec              remote.Codec
+	transPipe          *remote.TransPipeline
+	ext                Extension
+	inGracefulShutdown uint32
 }
 
 // Write implements the remote.ServerTransHandler interface.
@@ -88,11 +90,19 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 // Read implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remote.Message) (nctx context.Context, err error) {
 	var bufReader remote.ByteBuffer
+	ri := recvMsg.RPCInfo()
 	defer func() {
+		if r := recover(); r != nil {
+			stack := string(debug.Stack())
+			panicErr := kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in Read] %s", r), stack)
+			rpcinfo.AsMutableRPCStats(ri.Stats()).SetPanicked(panicErr)
+			err = remote.NewTransError(remote.ProtocolError, panicErr)
+			nctx = ctx
+		}
 		t.ext.ReleaseBuffer(bufReader, err)
-		rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadFinish, err)
+		rpcinfo.Record(ctx, ri, stats.ReadFinish, err)
 	}()
-	rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadStart, nil)
+	rpcinfo.Record(ctx, ri, stats.ReadStart, nil)
 
 	bufReader = t.ext.NewReadByteBuffer(ctx, conn, recvMsg)
 	if codec, ok := t.codec.(remote.MetaDecoder); ok {
@@ -115,13 +125,22 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 }
 
 func (t *svrTransHandler) newCtxWithRPCInfo(ctx context.Context, conn net.Conn) (context.Context, rpcinfo.RPCInfo) {
+	var ri rpcinfo.RPCInfo
 	if rpcinfo.PoolEnabled() { // reuse per-connection rpcinfo
-		return ctx, rpcinfo.GetRPCInfo(ctx)
+		ri = rpcinfo.GetRPCInfo(ctx)
 		// delayed reinitialize for faster response
+	} else {
+		// new rpcinfo if reuse is disabled
+		ri = t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
+		ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	}
-	// new rpcinfo if reuse is disabled
-	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
-	return rpcinfo.NewCtxWithRPCInfo(ctx, ri), ri
+	if atomic.LoadUint32(&t.inGracefulShutdown) == 1 {
+		// If server is in graceful shutdown status, mark connection reset flag to all responses to let client close the connections.
+		if ei := rpcinfo.AsTaggable(ri.To()); ei != nil {
+			ei.SetTag(rpcinfo.ConnResetTag, "1")
+		}
+	}
+	return ctx, ri
 }
 
 // OnRead implements the remote.ServerTransHandler interface.
@@ -133,21 +152,19 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	var sendMsg remote.Message
 	closeConnOutsideIfErr := true
 	defer func() {
-		panicErr := recover()
-		var wrapErr error
-		if panicErr != nil {
+		var panicErr error
+		if r := recover(); r != nil {
 			stack := string(debug.Stack())
 			if conn != nil {
 				ri := rpcinfo.GetRPCInfo(ctx)
 				rService, rAddr := getRemoteInfo(ri, conn)
-				klog.CtxErrorf(ctx, "KITEX: panic happened, remoteAddress=%s, remoteService=%s, error=%v\nstack=%s", rAddr, rService, panicErr, stack)
+				klog.CtxErrorf(ctx, "KITEX: panic happened, remoteAddress=%s, remoteService=%s, error=%v\nstack=%s", rAddr, rService, r, stack)
 			} else {
-				klog.CtxErrorf(ctx, "KITEX: panic happened, error=%v\nstack=%s", panicErr, stack)
+				klog.CtxErrorf(ctx, "KITEX: panic happened, error=%v\nstack=%s", r, stack)
 			}
-			if err != nil {
-				wrapErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in OnRead] %s, last error=%s", panicErr, err.Error()), stack)
-			} else {
-				wrapErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in OnRead] %s", panicErr), stack)
+			panicErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in OnRead] %v", r), stack)
+			if err == nil {
+				err = panicErr
 			}
 		}
 		t.finishTracer(ctx, ri, err, panicErr)
@@ -158,10 +175,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		if rpcinfo.PoolEnabled() {
 			t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
 		}
-		if wrapErr != nil {
-			err = wrapErr
-		}
 		if err != nil && !closeConnOutsideIfErr {
+			// when error is not nil, outside will close conn,
+			// set err to nil to indicate that this kind of error does not require closing the connection
 			err = nil
 		}
 	}()
@@ -171,7 +187,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
 	if err != nil {
-		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
+		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true, true)
 		// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
 		return err
 	}
@@ -186,8 +202,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		// reply processing
 		var methodInfo serviceinfo.MethodInfo
 		if methodInfo, err = GetMethodInfo(ri, svcInfo); err != nil {
-			// it won't be err, because the method has been checked in decode, err check here just do defensive inspection
-			t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
+			// it won't be error, because the method has been checked in decode, err check here just do defensive inspection
+			t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true, true)
 			// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded,
 			// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
 			return err
@@ -203,7 +219,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 			// error cannot be wrapped to print here, so it must exec before NewTransError
 			t.OnError(ctx, err, conn)
 			err = remote.NewTransError(remote.InternalError, err)
-			if closeConn := t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, false); closeConn {
+			if closeConn := t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, false, false); closeConn {
 				return err
 			}
 			// connection don't need to be closed when the error is return by the server handler
@@ -272,7 +288,7 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 }
 
 func (t *svrTransHandler) writeErrorReplyIfNeeded(
-	ctx context.Context, recvMsg remote.Message, conn net.Conn, err error, ri rpcinfo.RPCInfo, doOnMessage bool,
+	ctx context.Context, recvMsg remote.Message, conn net.Conn, err error, ri rpcinfo.RPCInfo, doOnMessage, connReset bool,
 ) (shouldCloseConn bool) {
 	if cn, ok := conn.(remote.IsActive); ok && !cn.IsActive() {
 		// conn is closed, no need reply
@@ -296,6 +312,13 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 	if doOnMessage {
 		// if error happen before normal OnMessage, exec it to transfer header trans info into rpcinfo
 		t.transPipe.OnMessage(ctx, recvMsg, errMsg)
+	}
+	if connReset {
+		// if connection needs to be closed, set ConnResetTag to response header
+		// to ensure the client won't reuse the connection.
+		if ei := rpcinfo.AsTaggable(ri.To()); ei != nil {
+			ei.SetTag(rpcinfo.ConnResetTag, "1")
+		}
 	}
 	ctx, err = t.transPipe.Write(ctx, conn, errMsg)
 	if err != nil {
@@ -341,6 +364,11 @@ func (t *svrTransHandler) finishProfiler(ctx context.Context) {
 		return
 	}
 	t.opt.Profiler.Untag(ctx)
+}
+
+func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
+	atomic.StoreUint32(&t.inGracefulShutdown, 1)
+	return nil
 }
 
 func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {

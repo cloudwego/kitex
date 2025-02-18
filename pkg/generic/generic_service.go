@@ -32,7 +32,7 @@ type Service interface {
 // ServiceInfoWithGeneric create a generic ServiceInfo
 func ServiceInfoWithGeneric(g Generic) *serviceinfo.ServiceInfo {
 	isCombinedServices := getIsCombinedServices(g)
-	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName(), isCombinedServices)
+	return newServiceInfo(g, isCombinedServices)
 }
 
 func getIsCombinedServices(g Generic) bool {
@@ -44,16 +44,16 @@ func getIsCombinedServices(g Generic) bool {
 	return false
 }
 
-func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interface{}, serviceName string, isCombinedServices bool) *serviceinfo.ServiceInfo {
+func newServiceInfo(g Generic, isCombinedServices bool) *serviceinfo.ServiceInfo {
 	handlerType := (*Service)(nil)
 
-	methods, svcName := GetMethodInfo(messageReaderWriter, serviceName)
+	methods, svcName := getMethodInfo(g, g.IDLServiceName())
 
 	svcInfo := &serviceinfo.ServiceInfo{
 		ServiceName:  svcName,
 		HandlerType:  handlerType,
 		Methods:      methods,
-		PayloadCodec: pcType,
+		PayloadCodec: g.PayloadCodecType(),
 		Extra:        make(map[string]interface{}),
 	}
 	svcInfo.Extra["generic"] = true
@@ -63,7 +63,37 @@ func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interfa
 	return svcInfo
 }
 
-// GetMethodInfo is only used in kitex, please DON'T USE IT. This method may be removed in the future
+func getMethodInfo(g Generic, serviceName string) (methods map[string]serviceinfo.MethodInfo, svcName string) {
+	if g.PayloadCodec() != nil {
+		// note: binary generic cannot be used with multi-service feature
+		svcName = serviceinfo.GenericService
+		methods = map[string]serviceinfo.MethodInfo{
+			serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(callHandler, newGenericServiceCallArgs, newGenericServiceCallResult, false),
+		}
+	} else {
+		svcName = serviceName
+		methods = map[string]serviceinfo.MethodInfo{
+			serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(
+				callHandler,
+				func() interface{} {
+					args := &Args{}
+					args.SetCodec(g.MessageReaderWriter())
+					return args
+				},
+				func() interface{} {
+					result := &Result{}
+					result.SetCodec(g.MessageReaderWriter())
+					return result
+				},
+				false,
+			),
+		}
+	}
+	return
+}
+
+// GetMethodInfo is only used in kitex, please DON'T USE IT.
+// DEPRECATED: this method is no longer used. This method will be removed in the future
 func GetMethodInfo(messageReaderWriter interface{}, serviceName string) (methods map[string]serviceinfo.MethodInfo, svcName string) {
 	if messageReaderWriter == nil {
 		// note: binary generic cannot be used with multi-service feature

@@ -61,32 +61,31 @@ type patcher struct {
 	protocol              string
 	handlerReturnKeepResp bool
 
-	genFrugal    bool
 	frugalStruct []string
 
 	fileTpl *template.Template
 	libs    map[string]string
 }
 
+// UseFrugalForStruct judge if we need to replace fastCodec to frugal implementation. It's related to the argument '-frugal-struct'.
 func (p *patcher) UseFrugalForStruct(st *golang.StructLike) bool {
-	if len(p.frugalStruct) > 0 {
-		for _, structName := range p.frugalStruct {
-			if st.GetName() == structName {
-				return true
+	// '@all' matches all structs
+	// '@auto' matches those with annotation (go.codec="frugal")
+	// otherwise, check if the given name matches the struct's name
+	for _, structName := range p.frugalStruct {
+		if structName == "@all" || st.GetName() == structName {
+			return true
+		}
+		if structName == "@auto" {
+			// find annotation go.codec="frugal"
+			for _, anno := range st.Annotations {
+				if anno.GetKey() == "go.codec" && len(anno.GetValues()) > 0 && anno.GetValues()[0] == "frugal" {
+					return true
+				}
 			}
 		}
-		return false
-	} else {
-		if !p.genFrugal {
-			return false
-		}
-		for _, anno := range st.Annotations {
-			if anno.GetKey() == "go.codec" && len(anno.GetValues()) > 0 && anno.GetValues()[0] == "frugal" {
-				return true
-			}
-		}
-		return false
 	}
+	return false
 }
 
 func (p *patcher) UseLib(path, alias string) string {

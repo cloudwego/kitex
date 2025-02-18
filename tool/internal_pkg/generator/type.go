@@ -20,8 +20,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/cloudwego/thriftgo/generator/golang/streaming"
-
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -211,10 +209,26 @@ type MethodInfo struct {
 	ResStructName          string
 	IsResponseNeedRedirect bool // int -> int*
 	GenArgResultStruct     bool
+	IsStreaming            bool
 	ClientStreaming        bool
 	ServerStreaming        bool
-	Streaming              *streaming.Streaming
 	StreamX                bool
+}
+
+func (m *MethodInfo) StreamingMode() string {
+	if !m.IsStreaming {
+		return ""
+	}
+	if m.ClientStreaming {
+		if m.ServerStreaming {
+			return "bidirectional"
+		}
+		return "client"
+	}
+	if m.ServerStreaming {
+		return "server"
+	}
+	return "unary"
 }
 
 // Parameter .

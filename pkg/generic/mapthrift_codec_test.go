@@ -59,9 +59,7 @@ func TestMapThriftCodecSelfRef(t *testing.T) {
 	test.Assert(t, mtc.svcName == "Mock")
 
 	rw := mtc.getMessageReaderWriter()
-	_, ok := rw.(thrift.MessageWriter)
-	test.Assert(t, ok)
-	_, ok = rw.(thrift.MessageReader)
+	_, ok := rw.(*thrift.StructReaderWriter)
 	test.Assert(t, ok)
 }
 
@@ -79,8 +77,6 @@ func TestMapThriftCodecForJSON(t *testing.T) {
 	test.Assert(t, mtc.svcName == "Mock")
 
 	rw := mtc.getMessageReaderWriter()
-	_, ok := rw.(thrift.MessageWriter)
-	test.Assert(t, ok)
-	_, ok = rw.(thrift.MessageReader)
+	_, ok := rw.(*thrift.StructReaderWriter)
 	test.Assert(t, ok)
 }
