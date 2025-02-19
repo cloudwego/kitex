@@ -21,8 +21,6 @@ import (
 	"io"
 	"sync"
 
-	"github.com/cloudwego/netpoll"
-
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
@@ -35,8 +33,8 @@ func init() {
 var _ remote.ByteBuffer = &bufferReadWriter{}
 
 type bufferReadWriter struct {
-	reader netpoll.Reader
-	writer netpoll.Writer
+	reader *reader //netpoll.Reader
+	writer *writer // netpoll.Writer
 
 	ioReader io.Reader
 	ioWriter io.Writer
@@ -52,11 +50,12 @@ func newBufferReadWriter() interface{} {
 // NewBufferReader creates a new remote.ByteBuffer using the given netpoll.ZeroCopyReader.
 func NewBufferReader(ir io.Reader) remote.ByteBuffer {
 	rw := rwPool.Get().(*bufferReadWriter)
-	if npReader, ok := ir.(interface{ Reader() netpoll.Reader }); ok {
-		rw.reader = npReader.Reader()
-	} else {
-		rw.reader = netpoll.NewReaderReuseBuffer(ir)
-	}
+	//if npReader, ok := ir.(interface{ Reader() netpoll.Reader }); ok {
+	//	rw.reader = npReader.Reader()
+	//} else {
+	//	rw.reader = newReader(ir)
+	//}
+	rw.reader = newReader(ir)
 	rw.ioReader = ir
 	rw.status = remote.BitReadable
 	rw.readSize = 0
@@ -66,7 +65,7 @@ func NewBufferReader(ir io.Reader) remote.ByteBuffer {
 // NewBufferWriter creates a new remote.ByteBuffer using the given netpoll.ZeroCopyWriter.
 func NewBufferWriter(iw io.Writer) remote.ByteBuffer {
 	rw := rwPool.Get().(*bufferReadWriter)
-	rw.writer = netpoll.NewWriterReuseBuffer(iw)
+	rw.writer = newWriter(iw) // netpoll.NewWriterReuseBuffer(iw)
 	rw.ioWriter = iw
 	rw.status = remote.BitWritable
 	return rw
@@ -75,8 +74,8 @@ func NewBufferWriter(iw io.Writer) remote.ByteBuffer {
 // NewBufferReadWriter creates a new remote.ByteBuffer using the given netpoll.ZeroCopyReadWriter.
 func NewBufferReadWriter(irw io.ReadWriter) remote.ByteBuffer {
 	rw := rwPool.Get().(*bufferReadWriter)
-	rw.writer = netpoll.NewWriter(irw)
-	rw.reader = netpoll.NewReader(irw)
+	rw.writer = newWriter(irw) // netpoll.NewWriter(irw)
+	rw.reader = newReader(irw)
 	rw.ioWriter = irw
 	rw.ioReader = irw
 	rw.status = remote.BitWritable | remote.BitReadable

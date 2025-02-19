@@ -54,7 +54,7 @@ func TestBufferWrite(t *testing.T) {
 	testReadFailed(t, buf)
 
 	err := nbp.WriteDirect([]byte(msg), 11)
-	// check err not nil
+	//check err not nil
 	test.Assert(t, err != nil, err)
 }
 
