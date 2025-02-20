@@ -102,6 +102,9 @@ type Options struct {
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool
+
+	// Reflection
+	EnableGrpcReflection bool
 }
 
 type Limit struct {
