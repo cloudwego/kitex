@@ -26,6 +26,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/gopkg/concurrency/gopool"
+
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans"
@@ -82,7 +84,7 @@ func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
 			klog.Errorf("KITEX: BootstrapServer accept failed, err=%s", err.Error())
 			os.Exit(1)
 		}
-		go func() {
+		gopool.CtxGo(nil, func() {
 			var (
 				ctx = context.Background()
 				err error
@@ -90,22 +92,31 @@ func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
 			defer func() {
 				transRecover(ctx, conn, "OnRead")
 			}()
-			bc := newBufioConn(conn)
+			bc := conn //newBufioConn(conn)
 			ctx, err = ts.transHdlr.OnActive(ctx, bc)
 			if err != nil {
 				klog.CtxErrorf(ctx, "KITEX: OnActive error=%s", err)
 				return
 			}
+			ctxValueOnRead := &trans.CtxValueOnRead{}
+			ctx = context.WithValue(ctx, trans.CtxKeyOnRead{}, ctxValueOnRead)
+			onReadOnlyOnceCheck := false
 			for {
 				ts.refreshDeadline(rpcinfo.GetRPCInfo(ctx), bc)
 				err := ts.transHdlr.OnRead(ctx, bc)
+				if !onReadOnlyOnceCheck {
+					onReadOnlyOnceCheck = true
+					if ctxValueOnRead.GetOnlyOnce() {
+						break
+					}
+				}
 				if err != nil {
 					ts.onError(ctx, err, bc)
 					_ = bc.Close()
 					return
 				}
 			}
-		}()
+		})
 	}
 }
 
@@ -155,7 +166,7 @@ type bufioConn struct {
 func newBufioConn(c net.Conn) *bufioConn {
 	return &bufioConn{
 		conn: c,
-		r:    netpoll.NewReader(c),
+		r:    netpoll.NewReaderReuseBuffer(c),
 	}
 }
 
