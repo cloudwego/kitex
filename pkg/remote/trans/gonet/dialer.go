@@ -20,10 +20,13 @@ import (
 	"context"
 	"errors"
 	"net"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/klog"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 )
@@ -91,6 +94,14 @@ func (d *dialer) probe(c *connWithState) (closed bool) {
 	type syscaller interface {
 		SyscallConn() (syscall.RawConn, error)
 	}
+
+	defer func() {
+		if e := recover(); e != nil {
+			klog.Errorf("KITEX: go net dialer probe panic, stack=%s", string(debug.Stack()))
+			closed = true
+		}
+	}()
+
 	sysConn, ok := c.Conn.(syscaller)
 	if !ok {
 		return false
@@ -103,11 +114,15 @@ func (d *dialer) probe(c *connWithState) (closed bool) {
 				closed = true
 			}
 		})
-		if err != nil {
+
+		if err != nil && errors.Unwrap(err) != nil {
 			closed = true
 			// FIXME: how to handle error?
-			//klog.Errorf("KITEX: go net conn probe failed, err=%v", err)
+			klog.Errorf("KITEX: go net conn probe failed, err=%v", err)
 		}
+	}
+	if closed {
+		klog.Infof("KITEX: connection is closed, addr=%s", c.RemoteAddr())
 	}
 	return closed
 }
