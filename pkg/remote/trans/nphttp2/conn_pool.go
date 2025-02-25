@@ -158,7 +158,7 @@ func (p *connPool) Get(ctx context.Context, network, address string, opt remote.
 				klog.CtxInfof(ctx, "[KITEX gRPC Debug]: New grpc stream on given socket failed, network=%s, address=%s, error=%s", network, address, err.Error())
 			}
 		} else {
-			klog.CtxInfof(ctx, "[KITEX gRPC Debug]: Get trans from pool failed, network=%s, address=%s, error=%s", network, address, err.Error())
+			klog.CtxInfof(ctx, "[KITEX gRPC Debug]: Get trans from pool failed, network=%s, address=%s", network, address)
 		}
 	}
 	tr, err, _ := p.sfg.Do(address, func() (i interface{}, e error) {
