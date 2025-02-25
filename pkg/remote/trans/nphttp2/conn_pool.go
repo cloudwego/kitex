@@ -152,10 +152,13 @@ func (p *connPool) Get(ctx context.Context, network, address string, opt remote.
 				// Actually new a stream, reuse the connection (grpc.ClientTransport)
 				conn, err = newClientConn(ctx, tr, address)
 				if err == nil {
+					klog.CtxInfof(ctx, "[KITEX gRPC Debug]: New grpc stream on given socket success, network=%s, address=%s", network, address)
 					return conn, nil
 				}
-				klog.CtxDebugf(ctx, "KITEX: New grpc stream failed, network=%s, address=%s, error=%s", network, address, err.Error())
+				klog.CtxInfof(ctx, "[KITEX gRPC Debug]: New grpc stream on given socket failed, network=%s, address=%s, error=%s", network, address, err.Error())
 			}
+		} else {
+			klog.CtxInfof(ctx, "[KITEX gRPC Debug]: Get trans from pool failed, network=%s, address=%s, error=%s", network, address, err.Error())
 		}
 	}
 	tr, err, _ := p.sfg.Do(address, func() (i interface{}, e error) {
@@ -170,16 +173,17 @@ func (p *connPool) Get(ctx context.Context, network, address string, opt remote.
 				size:          p.size,
 				cliTransports: make([]grpc.ClientTransport, p.size),
 			}
+			klog.CtxInfof(ctx, "[KITEX gRPC Debug]: New connection pool created for new address, network=%s, address=%s, pool size=%d", network, address, p.size)
 		}
 		trans.put(tr) // the tr (connection) maybe not in the pool, but can be recycled by keepalive.
 		p.conns.Store(address, trans)
 		return tr, nil
 	})
 	if err != nil {
-		klog.CtxErrorf(ctx, "KITEX: New grpc client connection failed, network=%s, address=%s, error=%s", network, address, err.Error())
+		klog.CtxErrorf(ctx, "[KITEX gRPC Debug]: New grpc client connection failed, network=%s, address=%s, error=%s", network, address, err.Error())
 		return nil, err
 	}
-	klog.CtxDebugf(ctx, "KITEX: New grpc client connection succeed, network=%s, address=%s", network, address)
+	klog.CtxInfof(ctx, "[KITEX gRPC Debug]: New grpc client connection succeed, network=%s, address=%s", network, address)
 	return newClientConn(ctx, tr.(grpc.ClientTransport), address)
 }
 
