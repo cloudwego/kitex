@@ -103,7 +103,10 @@ func main() {
 	}
 
 	if args.IDLType == "thrift" && !args.LocalThriftgo {
-		err = sdk.InvokeThriftgoBySDK(curpath, cmd)
+		if err = sdk.InvokeThriftgoBySDK(curpath, cmd); err != nil {
+			// todo: optimize -use and remove error returned from thriftgo
+			out.WriteString(err.Error())
+		}
 	} else {
 		err = kargs.ValidateCMD(cmd.Path, args.IDLType)
 		if err != nil {
