@@ -131,42 +131,54 @@ func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
 		"a/z.thrift": "namespace go kitex.test.server",
 	}
 
+	treeTest := func(t *testing.T, p *ThriftContentWithAbsIncludePathProvider, svcName string, withDynamicgo, shouldClose bool) {
+		tree := <-p.Provide()
+		test.Assert(t, tree != nil)
+		test.Assert(t, tree.Name == svcName)
+		if !withDynamicgo {
+			test.Assert(t, tree.DynamicGoDsc == nil)
+		} else {
+			test.Assert(t, tree.DynamicGoDsc != nil)
+			test.Assert(t, tree.DynamicGoDsc.Name() == svcName)
+		}
+		if shouldClose {
+			p.Close()
+		}
+	}
+
 	p, err := NewThriftContentWithAbsIncludePathProvider(path, includes)
-	test.DeepEqual(t, nil, err)
-	defer p.Close()
+	test.Assert(t, err == nil)
 	test.Assert(t, !p.opts.DynamicGoEnabled)
-	tree := <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "InboxService")
-	test.Assert(t, tree.DynamicGoDsc == nil)
+	treeTest(t, p, "InboxService", false, false)
+	// update idl
 	includes[path] = newContent
 	err = p.UpdateIDL(path, includes)
 	test.Assert(t, err == nil)
-	defer p.Close()
-	tree = <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "UpdateService")
-	test.Assert(t, tree.DynamicGoDsc == nil)
+	treeTest(t, p, "UpdateService", false, true)
 
 	includes[path] = content
 	p, err = NewThriftContentWithAbsIncludePathProviderWithDynamicGo(path, includes)
 	test.Assert(t, err == nil)
-	defer p.Close()
 	test.Assert(t, p.opts.DynamicGoEnabled)
-	tree = <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "InboxService")
-	test.Assert(t, tree.DynamicGoDsc != nil)
-	test.Assert(t, tree.DynamicGoDsc.Name() == "InboxService")
+	treeTest(t, p, "InboxService", true, false)
+	// update idl
 	includes[path] = newContent
 	err = p.UpdateIDL(path, includes)
 	test.Assert(t, err == nil)
-	defer p.Close()
-	tree = <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "UpdateService")
-	test.Assert(t, tree.DynamicGoDsc != nil)
-	test.Assert(t, tree.DynamicGoDsc.Name() == "UpdateService")
+	treeTest(t, p, "UpdateService", true, true)
+
+	// with absolute path
+	delete(includes, "a/b/x.thrift")
+	includes["x.thrift"] = "namespace go kitex.test.server"
+
+	p, err = NewThriftContentWithAbsIncludePathProvider(path, includes)
+	test.Assert(t, err == nil)
+	treeTest(t, p, "UpdateService", false, true)
+
+	p, err = NewThriftContentWithAbsIncludePathProviderWithDynamicGo(path, includes)
+	test.Assert(t, err == nil)
+	test.Assert(t, p.opts.DynamicGoEnabled)
+	treeTest(t, p, "UpdateService", true, true)
 }
 
 func TestCircularDependency(t *testing.T) {
