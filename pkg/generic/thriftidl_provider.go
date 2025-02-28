@@ -266,7 +266,7 @@ func (p *ThriftContentProvider) newDynamicGoDsc(svc *descriptor.ServiceDescripto
 
 func parseIncludes(tree *parser.Thrift, parsed map[string]*parser.Thrift, sources map[string]string, isAbsIncludePath bool) (err error) {
 	for _, i := range tree.Includes {
-		var ps []string
+		ps := make([]string, 0, 2)
 		if isAbsIncludePath {
 			abs := absPath(tree.Filename, i.Path)
 			if abs != i.Path {

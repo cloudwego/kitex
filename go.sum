@@ -1,7 +1,7 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/Marina-Sakai/dynamicgo v0.0.0-20250228090623-f0afd440f57b h1:FrW2IYCBjeCLCVyRy4ahxoe19GmE8EEI2lzaaRPOYYA=
-github.com/Marina-Sakai/dynamicgo v0.0.0-20250228090623-f0afd440f57b/go.mod h1:DknfxjIMuGvXow409bS/AWycXONdc02HECBL0qpNqTY=
+github.com/Marina-Sakai/dynamicgo v0.0.0-20250228094420-7d81d39ba600 h1:685z1Mht/yk5Lo+6zCuuSQfXdPYS9YlG9FC17NAVM/g=
+github.com/Marina-Sakai/dynamicgo v0.0.0-20250228094420-7d81d39ba600/go.mod h1:DknfxjIMuGvXow409bS/AWycXONdc02HECBL0qpNqTY=
 github.com/bytedance/gopkg v0.1.0/go.mod h1:FtQG3YbQG9L/91pbKSw787yBQPutC+457AvDW77fgUQ=
 github.com/bytedance/gopkg v0.1.1 h1:3azzgSkiaw79u24a+w9arfH8OfnQQ4MHUt9lJFREEaE=
 github.com/bytedance/gopkg v0.1.1/go.mod h1:576VvJ+eJgyCzdjS+c4+77QF3p7ubbtiKARP3TxducM=
