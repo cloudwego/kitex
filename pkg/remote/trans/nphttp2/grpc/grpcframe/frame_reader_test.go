@@ -61,7 +61,8 @@ func getHTTP2FrameHeaderBytes() []byte {
 func Test_Framer_readAndCheckFrameHeader(t *testing.T) {
 	// mock netpoll.Reader
 	fr := &Framer{}
-	fr.SetMaxReadFrameSize(16384) //http2MaxFrameLen
+	http2MaxFrameLen := uint32(16384)
+	fr.SetMaxReadFrameSize(http2MaxFrameLen)
 	testcases := []struct {
 		desc                   string
 		reader                 netpoll.Reader
