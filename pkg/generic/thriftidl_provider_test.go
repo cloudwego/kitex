@@ -259,7 +259,7 @@ func TestThriftContentProvider(t *testing.T) {
 	service InboxService {}
 	`
 
-	p, err = NewThriftContentProvider(content, nil)
+	_, err = NewThriftContentProvider(content, nil)
 	test.Assert(t, err != nil)
 	test.Assert(t, err.Error() == "miss include path: a.thrift for file: main.thrift")
 }
