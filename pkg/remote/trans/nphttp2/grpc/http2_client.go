@@ -44,7 +44,14 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/peer"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
+
+// ticker is used to manage closeStreamTask.
+// it triggers and cleans up actively cancelled streams every 5s.
+// Streaming QPS is generally not too high, if there is a requirement for timeliness, then consider making it configurable.
+// To reduce the overhead of goroutines in a multi-connection scenario, use the Sync SharedTicker
+var ticker = utils.NewSyncSharedTicker(5 * time.Second)
 
 // http2Client implements the ClientTransport interface with HTTP2.
 type http2Client struct {
@@ -198,6 +205,13 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		}
 	}
 	t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst)
+	task := &closeStreamTask{t: t}
+	t.onClose = func() {
+		onClose()
+		// when http2Client has been closed, remove this task
+		ticker.Delete(task)
+	}
+	ticker.Add(task)
 
 	// Start the reader goroutine for incoming message. Each transport has
 	// a dedicated goroutine which reads HTTP2 frame from network. Then it
@@ -264,6 +278,34 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	}, gofunc.NewBasicInfo(remoteService, conn.RemoteAddr().String()))
 
 	return t, nil
+}
+
+// closeStreamTask is used to clean up streams that have been actively cancelled by users
+type closeStreamTask struct {
+	t              *http2Client
+	toCloseStreams []*Stream
+}
+
+func (task *closeStreamTask) Tick() {
+	trans := task.t
+	trans.mu.Lock()
+	for _, stream := range trans.activeStreams {
+		select {
+		// judge whether stream has been canceled
+		case <-stream.Context().Done():
+			task.toCloseStreams = append(task.toCloseStreams, stream)
+		default:
+		}
+	}
+	trans.mu.Unlock()
+
+	for i, stream := range task.toCloseStreams {
+		// uniformly converted to status error
+		sErr := ContextErr(stream.Context().Err())
+		trans.closeStream(stream, sErr, true, http2.ErrCodeCancel, status.Convert(sErr), nil, false)
+		task.toCloseStreams[i] = nil
+	}
+	task.toCloseStreams = task.toCloseStreams[:0]
 }
 
 type preAllocatedStreamFields struct {
