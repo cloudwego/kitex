@@ -145,12 +145,9 @@ func (fr *Framer) ErrorDetail() error {
 func (fr *Framer) ReadFrame() (http2.Frame, error) {
 	fr.errDetail = nil
 
-	fh, err := readFrameHeader(fr.reader)
+	fh, err := fr.readAndCheckFrameHeader()
 	if err != nil {
 		return nil, err
-	}
-	if fh.Length > fr.maxReadSize {
-		return nil, http2.ErrFrameTooLarge
 	}
 	// payload := fr.getReadBuf(fh.Length)
 	var f http2.Frame
@@ -370,16 +367,22 @@ func readUint32(p []byte) (remain []byte, v uint32, err error) {
 	return p[4:], binary.BigEndian.Uint32(p[:4]), nil
 }
 
-func readFrameHeader(r netpoll.Reader) (http2.FrameHeader, error) {
-	buf, err := r.Next(frameHeaderLen)
+func (fr *Framer) readAndCheckFrameHeader() (http2.FrameHeader, error) {
+	buf, err := fr.reader.Next(frameHeaderLen)
 	if err != nil {
 		return http2.FrameHeader{}, err
 	}
-	return http2.FrameHeader{
+	fh := http2.FrameHeader{
 		Length:   uint32(buf[0])<<16 | uint32(buf[1])<<8 | uint32(buf[2]),
 		Type:     http2.FrameType(buf[3]),
 		Flags:    http2.Flags(buf[4]),
 		StreamID: binary.BigEndian.Uint32(buf[5:]) & (1<<31 - 1),
 		// valid:    true,
-	}, nil
+	}
+	if fh.Length > fr.maxReadSize {
+		first4Bytes := binary.BigEndian.Uint32(buf[:4])
+		second4Bytes := binary.BigEndian.Uint32(buf[4:])
+		return http2.FrameHeader{}, fmt.Errorf("%s or invalid frame (first4Bytes=%#x, second4Bytes=%#x)", http2.ErrFrameTooLarge, first4Bytes, second4Bytes)
+	}
+	return fh, nil
 }
