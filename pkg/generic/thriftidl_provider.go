@@ -458,7 +458,6 @@ func (p *ThriftContentWithAbsIncludePathProvider) Option() ProviderOption {
 
 func (p *ThriftContentWithAbsIncludePathProvider) newDynamicGoDsc(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, parseMode thrift.ParseMode, goTag *goTagOption, serviceName string) {
 	if err := newDynamicGoDscFromContent(svc, path, content, includes, true, parseMode, goTag, serviceName); err != nil {
-		fmt.Println(err)
 		p.opts.DynamicGoEnabled = false
 	}
 }
