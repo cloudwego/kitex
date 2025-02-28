@@ -221,37 +221,47 @@ func TestThriftContentProvider(t *testing.T) {
 	service UpdateService {}
 	`
 
+	treeTest := func(t *testing.T, p *ThriftContentProvider, svcName string, withDynamicgo, shouldClose bool) {
+		tree := <-p.Provide()
+		test.Assert(t, tree != nil)
+		test.Assert(t, tree.Name == svcName)
+		if !withDynamicgo {
+			test.Assert(t, tree.DynamicGoDsc == nil)
+		} else {
+			test.Assert(t, tree.DynamicGoDsc != nil)
+			test.Assert(t, tree.DynamicGoDsc.Name() == svcName)
+		}
+		if shouldClose {
+			p.Close()
+		}
+	}
+
 	p, err = NewThriftContentProvider(content, nil)
 	test.Assert(t, err == nil, err)
-	defer p.Close()
 	test.Assert(t, !p.opts.DynamicGoEnabled)
-	tree := <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "InboxService")
-	test.Assert(t, tree.DynamicGoDsc == nil)
+	treeTest(t, p, "InboxService", false, false)
 	err = p.UpdateIDL(newContent, nil)
 	test.Assert(t, err == nil)
-	defer p.Close()
-	tree = <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "UpdateService")
-	test.Assert(t, tree.DynamicGoDsc == nil)
+	treeTest(t, p, "UpdateService", false, true)
 
 	p, err = NewThriftContentProviderWithDynamicGo(content, nil)
 	test.Assert(t, err == nil, err)
-	defer p.Close()
 	test.Assert(t, p.opts.DynamicGoEnabled)
-	tree = <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.DynamicGoDsc != nil)
+	treeTest(t, p, "InboxService", true, false)
 	err = p.UpdateIDL(newContent, nil)
 	test.Assert(t, err == nil)
-	defer p.Close()
-	tree = <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "UpdateService")
-	test.Assert(t, tree.DynamicGoDsc != nil)
-	test.Assert(t, tree.DynamicGoDsc.Name() == "UpdateService")
+	treeTest(t, p, "UpdateService", true, true)
+
+	content = `
+	namespace go kitex.test.server
+	include "a.thrift"
+	
+	service InboxService {}
+	`
+
+	p, err = NewThriftContentProvider(content, nil)
+	test.Assert(t, err != nil)
+	test.Assert(t, err.Error() == "miss include path: a.thrift for file: main.thrift")
 }
 
 func TestFallback(t *testing.T) {
