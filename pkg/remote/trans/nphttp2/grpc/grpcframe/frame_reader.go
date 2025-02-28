@@ -380,9 +380,7 @@ func (fr *Framer) readAndCheckFrameHeader() (http2.FrameHeader, error) {
 		// valid:    true,
 	}
 	if fh.Length > fr.maxReadSize {
-		first4Bytes := binary.BigEndian.Uint32(buf[:4])
-		second4Bytes := binary.BigEndian.Uint32(buf[4:])
-		return http2.FrameHeader{}, fmt.Errorf("%s or invalid frame (first4Bytes=%#x, second4Bytes=%#x)", http2.ErrFrameTooLarge, first4Bytes, second4Bytes)
+		return http2.FrameHeader{}, fmt.Errorf("%s or invalid frame (first4Bytes=%#x, second4Bytes=%#x)", http2.ErrFrameTooLarge, buf[:4], buf[4:8])
 	}
 	return fh, nil
 }
