@@ -266,13 +266,14 @@ func (p *ThriftContentProvider) newDynamicGoDsc(svc *descriptor.ServiceDescripto
 
 func parseIncludes(tree *parser.Thrift, parsed map[string]*parser.Thrift, sources map[string]string, isAbsIncludePath bool) (err error) {
 	for _, i := range tree.Includes {
-		ps := []string{i.Path}
+		var ps []string
 		if isAbsIncludePath {
 			abs := absPath(tree.Filename, i.Path)
 			if abs != i.Path {
 				ps = append(ps, abs)
 			}
 		}
+		ps = append(ps, i.Path)
 		for _, p := range ps {
 			ref, ok := parsed[p] // avoid infinite recursion
 			if ok {
