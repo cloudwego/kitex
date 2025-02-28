@@ -2,6 +2,8 @@ module github.com/cloudwego/kitex
 
 go 1.18
 
+replace github.com/cloudwego/dynamicgo => github.com/Marina-Sakai/dynamicgo v0.0.0-20250228094420-7d81d39ba600
+
 require (
 	github.com/bytedance/gopkg v0.1.1
 	github.com/bytedance/sonic v1.12.7
