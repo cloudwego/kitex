@@ -63,8 +63,9 @@ type patcher struct {
 
 	frugalStruct []string
 
-	fileTpl *template.Template
-	libs    map[string]string
+	fileTpl    *template.Template
+	libs       map[string]string
+	singleLibs map[*parser.StructLike]map[string]string
 }
 
 func (p *patcher) UseLib(path, alias string) string {
@@ -75,10 +76,22 @@ func (p *patcher) UseLib(path, alias string) string {
 	return ""
 }
 
+func (p *patcher) UseLibForSingleFile(st *golang.StructLike, path, alias string) string {
+	if p.singleLibs == nil {
+		p.singleLibs = make(map[*parser.StructLike]map[string]string)
+	}
+	if p.singleLibs[st.StructLike] == nil {
+		p.singleLibs[st.StructLike] = make(map[string]string)
+	}
+	p.singleLibs[st.StructLike][path] = alias
+	return ""
+}
+
 func (p *patcher) buildTemplates() (err error) {
 	m := p.utils.BuildFuncMap()
 	m["PrintImports"] = util.PrintlImports
 	m["UseLib"] = p.UseLib
+	m["UseLibForSingleFile"] = p.UseLibForSingleFile
 	m["ZeroWriter"] = ZeroWriter
 	m["ZeroBLength"] = ZeroBLength
 	m["ReorderStructFields"] = p.reorderStructFields
@@ -314,6 +327,19 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		for path, alias := range p.libs {
 			imps[path] = alias
 		}
+
+		// 如果当前的 ast 里，模板需要单独 import 某些变量，则加上
+
+		for golangStruct, singleLibs := range p.singleLibs {
+			for _, st := range ast.Structs {
+				if st == golangStruct {
+					for path, alias := range singleLibs {
+						imps[path] = alias
+					}
+				}
+			}
+		}
+
 		data.Imports = util.SortImports(imps, p.module)
 		data.Includes = p.extractLocalLibs(data.Imports)
 
@@ -490,6 +516,7 @@ var typeIDToGoType = map[string]string{
 
 // UseFrugalForStruct judge if we need to replace fastCodec to frugal implementation. It's related to the argument '-frugal-struct'.
 func (p *patcher) UseFrugalForStruct(st *golang.StructLike) bool {
+	// fmt.Println("invoked!!!!", st.Name)
 	// '@all' matches all structs
 	// '@auto' matches those with annotation (go.codec="frugal")
 	// otherwise, check if the given name matches the struct's name

@@ -43,7 +43,7 @@ const StructLikeFastRead = `
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 {{- if UseFrugalForStruct .}}
-	{{- UseLib "github.com/cloudwego/frugal" "frugal"}}
+	{{- UseLibForSingleFile . "github.com/cloudwego/frugal" "frugal"}}
 	return frugal.DecodeObject(buf, p)
 {{- else}}
 	var err error
@@ -251,7 +251,7 @@ const StructLikeFastWriteNocopy = `
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 {{- if UseFrugalForStruct .}}
-	{{- UseLib "github.com/cloudwego/frugal" "frugal"}}
+	{{- UseLibForSingleFile . "github.com/cloudwego/frugal" "frugal"}}
 	n, err := frugal.EncodeObject(buf, binaryWriter, p)
 	if err != nil {
 		return -1
@@ -294,7 +294,7 @@ const StructLikeLength = `
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) BLength() int {
 {{- if UseFrugalForStruct .}}
-	{{- UseLib "github.com/cloudwego/frugal" "frugal"}}
+	{{- UseLibForSingleFile . "github.com/cloudwego/frugal" "frugal"}}
 	return frugal.EncodedSize(p)
 {{- else}}
 	l := 0
