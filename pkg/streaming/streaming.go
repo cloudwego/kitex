@@ -49,11 +49,14 @@ type Stream interface {
 	Context() context.Context
 	// RecvMsg recvive message from peer
 	// will block until an error or a message received
-	// not concurrent-safety
+	// concurrent-safe to invoke RecvMsg and SendMsg for the same stream in different goroutines
+	// not concurrent-safe to invoke RecvMsg for the same stream in different goroutines
 	RecvMsg(m interface{}) error
 	// SendMsg send message to peer
 	// will block until an error or enough buffer to send
-	// not concurrent-safety
+	// concurrent-safe to invoke SendMsg and RecvMsg for the same stream in different goroutines
+	// not concurrent-safe to invoke SendMsg for the same stream in different goroutines
+	// not concurrent-safe to invoke SendMsg and Close for the same stream in different goroutines
 	SendMsg(m interface{}) error
 	// not concurrent-safety with SendMsg
 	io.Closer
