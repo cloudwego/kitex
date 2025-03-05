@@ -521,6 +521,8 @@ type loopyWriter struct {
 
 	// Side-specific handlers
 	ssGoAwayHandler func(*goAway) (bool, error)
+	// is used to remind the user that Send and Close cannot be called concurrently on a client stream.
+	logNonConcurrentSafetyOnce sync.Once
 }
 
 func newLoopyWriter(s side, fr *framer, cbuf *controlBuffer, bdpEst *bdpEstimator) *loopyWriter {
@@ -923,6 +925,11 @@ func (l *loopyWriter) processData() (bool, error) {
 			}
 		} else {
 			l.activeStreams.enqueue(str)
+			// In the client -> server direction, the empty Data Frame with EndofStream should be the last Frame
+			// if this branch is hit, it means that the user has called client Stream Send and Close concurrently.
+			l.logNonConcurrentSafetyOnce.Do(func() {
+				klog.Warn("KITEX: client Stream is not allowed to call Send and Close concurrently")
+			})
 		}
 		return false, nil
 	}
