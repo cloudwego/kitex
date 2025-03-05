@@ -186,7 +186,8 @@ type mockStream struct {
 	ctx    context.Context
 	close  func() error
 	header func() (streaming.Header, error)
-	recv   func(msg interface{}) error
+	recv   func(ctx context.Context, msg interface{}) error
+	send   func(ctx context.Context, msg interface{}) error
 }
 
 func (s *mockStream) Context() context.Context {
@@ -198,7 +199,11 @@ func (s *mockStream) Header() (streaming.Header, error) {
 }
 
 func (s *mockStream) RecvMsg(ctx context.Context, msg any) error {
-	return s.recv(msg)
+	return s.recv(ctx, msg)
+}
+
+func (s *mockStream) SendMsg(ctx context.Context, msg any) error {
+	return s.send(ctx, msg)
 }
 
 func (s *mockStream) CloseSend(ctx context.Context) error {
@@ -659,4 +664,49 @@ func Test_isRPCError(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		test.Assert(t, isRPCError(errors.New("error")))
 	})
+}
+
+func TestContextFallback(t *testing.T) {
+	mockRPCInfo := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), nil, nil)
+	mockSt := &mockStream{
+		recv: func(ctx context.Context, message interface{}) error {
+			test.Assert(t, ctx == context.Background())
+			return nil
+		},
+		send: func(ctx context.Context, message interface{}) error {
+			test.Assert(t, ctx == context.Background())
+			return nil
+		},
+	}
+	st := newStream(context.Background(), mockSt, nil, nil, mockRPCInfo, serviceinfo.StreamingBidirectional, sendEndpoint, recvEndpoint, nil, nil, nil)
+	err := st.RecvMsg(context.Background(), nil)
+	test.Assert(t, err == nil)
+	err = st.SendMsg(context.Background(), nil)
+	test.Assert(t, err == nil)
+
+	mockSt = &mockStream{
+		recv: func(ctx context.Context, message interface{}) error {
+			ri := rpcinfo.GetRPCInfo(ctx)
+			test.Assert(t, ri == mockRPCInfo)
+			return nil
+		},
+		send: func(ctx context.Context, message interface{}) error {
+			ri := rpcinfo.GetRPCInfo(ctx)
+			test.Assert(t, ri == mockRPCInfo)
+			return nil
+		},
+	}
+	st = newStream(context.Background(), mockSt, nil, nil, mockRPCInfo, serviceinfo.StreamingBidirectional, func(ctx context.Context, stream streaming.ClientStream, message interface{}) (err error) {
+		ri := rpcinfo.GetRPCInfo(ctx)
+		test.Assert(t, ri == mockRPCInfo)
+		return sendEndpoint(ctx, stream, message)
+	}, func(ctx context.Context, stream streaming.ClientStream, message interface{}) (err error) {
+		ri := rpcinfo.GetRPCInfo(ctx)
+		test.Assert(t, ri == mockRPCInfo)
+		return recvEndpoint(ctx, stream, message)
+	}, nil, nil, nil)
+	err = st.RecvMsg(context.Background(), nil)
+	test.Assert(t, err == nil)
+	err = st.SendMsg(context.Background(), nil)
+	test.Assert(t, err == nil)
 }

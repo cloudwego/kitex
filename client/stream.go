@@ -115,8 +115,8 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 	// recvEP and sendEP are the endpoints for the new stream interface,
 	// and grpcRecvEP and grpcSendEP are the endpoints for the old grpc stream interface,
 	// the latter two are going to be removed in the future.
-	recvEP := kc.opt.StreamOptions.BuildRecvChain()
-	sendEP := kc.opt.StreamOptions.BuildSendChain()
+	recvEP := kc.opt.StreamOptions.BuildRecvChain(recvEndpoint)
+	sendEP := kc.opt.StreamOptions.BuildSendChain(sendEndpoint)
 	grpcRecvEP := kc.opt.Streaming.BuildRecvInvokeChain()
 	grpcSendEP := kc.opt.Streaming.BuildSendInvokeChain()
 
@@ -203,6 +203,16 @@ func (s *stream) Header() (hd streaming.Header, err error) {
 // RecvMsg receives a message from the server.
 // If an error is returned, stream.DoFinish() will be called to record the end of stream
 func (s *stream) RecvMsg(ctx context.Context, m interface{}) (err error) {
+	if !s.recv.EqualsTo(recvEndpoint) {
+		// If the values are not equal, it indicates the presence of custom middleware.
+		// To prevent errors caused by middleware code that relies on rpcinfo when users
+		// incorrectly pass a context lacking rpcinfo, this safeguard logic is added to
+		// propagate the rpcinfo from the stream to the incoming context.
+		ri := rpcinfo.GetRPCInfo(ctx)
+		if ri != s.ri {
+			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, s.ri)
+		}
+	}
 	if s.eventHandler != nil {
 		defer func() {
 			s.eventHandler(s.ctx, stats.StreamRecv, err)
@@ -223,6 +233,13 @@ func (s *stream) RecvMsg(ctx context.Context, m interface{}) (err error) {
 // SendMsg sends a message to the server.
 // If an error is returned, stream.DoFinish() will be called to record the end of stream
 func (s *stream) SendMsg(ctx context.Context, m interface{}) (err error) {
+	if !s.send.EqualsTo(sendEndpoint) {
+		// same with RecvMsg
+		ri := rpcinfo.GetRPCInfo(ctx)
+		if ri != s.ri {
+			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, s.ri)
+		}
+	}
 	if s.eventHandler != nil {
 		defer func() {
 			s.eventHandler(s.ctx, stats.StreamSend, err)
@@ -329,3 +346,12 @@ func isRPCError(err error) bool {
 	// if a tracer needs to get the BizStatusError, it should read from rpcinfo.invocation.bizStatusErr
 	return !isBizStatusError
 }
+
+var (
+	recvEndpoint cep.StreamRecvEndpoint = func(ctx context.Context, stream streaming.ClientStream, m interface{}) error {
+		return stream.RecvMsg(ctx, m)
+	}
+	sendEndpoint cep.StreamSendEndpoint = func(ctx context.Context, stream streaming.ClientStream, m interface{}) error {
+		return stream.SendMsg(ctx, m)
+	}
+)

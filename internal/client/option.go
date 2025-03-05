@@ -48,7 +48,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
-	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -135,16 +134,12 @@ func (o *StreamOptions) InitMiddlewares(ctx context.Context) {
 	}
 }
 
-func (o *StreamOptions) BuildRecvChain() cep.StreamRecvEndpoint {
-	return cep.StreamRecvChain(o.StreamRecvMiddlewares...)(func(ctx context.Context, stream streaming.ClientStream, message interface{}) (err error) {
-		return stream.RecvMsg(ctx, message)
-	})
+func (o *StreamOptions) BuildRecvChain(recvEndpoint cep.StreamRecvEndpoint) cep.StreamRecvEndpoint {
+	return cep.StreamRecvChain(o.StreamRecvMiddlewares...)(recvEndpoint)
 }
 
-func (o *StreamOptions) BuildSendChain() cep.StreamSendEndpoint {
-	return cep.StreamSendChain(o.StreamSendMiddlewares...)(func(ctx context.Context, stream streaming.ClientStream, message interface{}) (err error) {
-		return stream.SendMsg(ctx, message)
-	})
+func (o *StreamOptions) BuildSendChain(sendEndpoint cep.StreamSendEndpoint) cep.StreamSendEndpoint {
+	return cep.StreamSendChain(o.StreamSendMiddlewares...)(sendEndpoint)
 }
 
 // Options is used to initialize a client.
