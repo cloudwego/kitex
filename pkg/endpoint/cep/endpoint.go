@@ -79,3 +79,8 @@ func StreamSendChain(mws ...StreamSendMiddleware) StreamSendMiddleware {
 		return next
 	}
 }
+
+// DummyDummyMiddleware is a dummy middleware.
+func DummyDummyMiddleware(next StreamEndpoint) StreamEndpoint {
+	return next
+}

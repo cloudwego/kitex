@@ -140,7 +140,7 @@ func (s *CBSuite) ServiceCBMW() endpoint.Middleware {
 // StreamingServiceCBMW return a new service level CircuitBreakerMW for streaming.
 func (s *CBSuite) StreamingServiceCBMW() cep.StreamMiddleware {
 	if s == nil {
-		return nil
+		return cep.DummyDummyMiddleware
 	}
 	s.initServiceCB()
 	return NewStreamCircuitBreakerMW(*s.serviceControl, s.servicePanel)
