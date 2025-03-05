@@ -24,11 +24,30 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 )
 
-func Test_refGoSrcPath(t *testing.T) {
+func TestArguments_refGoSrcPath(t *testing.T) {
 	gopath, _ := os.Getwd()
 	t.Setenv("GOPATH", gopath)
 	pkgpath := filepath.Join(gopath, "src", "github.com", "cloudwego", "kitex")
 	ret, ok := refGoSrcPath(pkgpath)
 	test.Assert(t, ok)
 	test.Assert(t, filepath.ToSlash(ret) == "github.com/cloudwego/kitex")
+}
+
+func TestArguments_guessIDLType(t *testing.T) {
+	var ok bool
+	a := &Arguments{}
+	a.IDL = "a.thrift"
+	a.IDLType, ok = guessIDLType(a.IDL)
+	test.Assert(t, ok)
+	test.Assert(t, a.IsThrift())
+
+	a.IDL = "a.proto"
+	a.IDLType, ok = guessIDLType(a.IDL)
+	test.Assert(t, ok)
+	test.Assert(t, a.IsProtobuf())
+
+	a.IDL = "a.txt"
+	a.IDLType, ok = guessIDLType(a.IDL)
+	test.Assert(t, ok == false)
+	test.Assert(t, !a.IsProtobuf() && !a.IsThrift())
 }

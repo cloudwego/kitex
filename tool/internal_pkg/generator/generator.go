@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/tpl"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util/env"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -120,8 +121,8 @@ type Config struct {
 	Hessian2Options       util.StringSlice
 	IDL                   string // the IDL file passed on the command line
 	OutputPath            string // the output path for main pkg and kitex_gen
-	PackagePrefix         string
-	CombineService        bool // combine services to one service
+	PackagePrefix         string // package prefix ends with `GenPath`, like: github.com/cloudwego/blabla/kitex_gen
+	CombineService        bool   // combine services to one service
 	CopyIDL               bool
 	ThriftPlugins         util.StringSlice
 	ProtobufPlugins       util.StringSlice
@@ -138,7 +139,7 @@ type Config struct {
 
 	TemplateDir string
 
-	GenPath string
+	GenPath string // default: "kitex_gen"
 
 	DeepCopyAPI           bool
 	Protocol              string
@@ -308,6 +309,14 @@ func (c *Config) IsUsingMultipleServicesTpl() bool {
 		}
 	}
 	return false
+}
+
+func (c *Config) PkgOutputPath(pkg string) string {
+	return filepath.Join(
+		c.OutputPath,
+		c.GenPath,
+		filepath.FromSlash(strings.TrimPrefix(pkg, c.PackagePrefix)),
+	)
 }
 
 // NewGenerator .
@@ -606,7 +615,12 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		}
 		for _, m := range pkg.ServiceInfo.AllMethods() {
 			if m.GenArgResultStruct {
-				pkg.AddImports("proto")
+				if env.UseProtoc() {
+					pkg.AddImports("proto")
+				} else {
+					// reuse "proto" so that no need to change code templates ...
+					pkg.AddImport("proto", "github.com/cloudwego/prutal")
+				}
 			} else {
 				// for method Arg and Result
 				pkg.AddImport(m.PkgRefName, m.ImportPath)
