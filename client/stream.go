@@ -186,6 +186,9 @@ func newStream(ctx context.Context, s streaming.ClientStream, scm *remotecli.Str
 			st.grpcStream.st = st
 		}
 	}
+	if register, ok := s.(streaming.CloseCallbackRegister); ok {
+		register.RegisterCloseCallback(st.DoFinish)
+	}
 	return st
 }
 

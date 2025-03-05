@@ -67,6 +67,11 @@ type WithDoFinish interface {
 	DoFinish(error)
 }
 
+// CloseCallbackRegister register a callback when stream closed.
+type CloseCallbackRegister interface {
+	RegisterCloseCallback(cb func(error))
+}
+
 // Args endpoint request
 type Args struct {
 	ServerStream ServerStream

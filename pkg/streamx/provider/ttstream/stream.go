@@ -35,9 +35,10 @@ import (
 )
 
 var (
-	_ streaming.ClientStream = (*clientStream)(nil)
-	_ streaming.ServerStream = (*serverStream)(nil)
-	_ StreamMeta             = (*stream)(nil)
+	_ streaming.ClientStream          = (*clientStream)(nil)
+	_ streaming.ServerStream          = (*serverStream)(nil)
+	_ StreamMeta                      = (*stream)(nil)
+	_ streaming.CloseCallbackRegister = (*stream)(nil)
 )
 
 func newStream(ctx context.Context, writer streamWriter, smeta streamFrame) *stream {
@@ -89,6 +90,7 @@ type stream struct {
 
 	recvTimeout      time.Duration
 	metaFrameHandler MetaFrameHandler
+	closeCallback    []func(error)
 }
 
 func (s *stream) Service() string {
@@ -148,6 +150,10 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 		}
 	}
 	return err
+}
+
+func (s *stream) RegisterCloseCallback(cb func(error)) {
+	s.closeCallback = append(s.closeCallback, cb)
 }
 
 // closeSend should be called when following cases happen:
@@ -221,6 +227,11 @@ func (s *stream) setMetaFrameHandler(metaHandler MetaFrameHandler) {
 func (s *stream) tryRunCloseCallback(exception error) {
 	if atomic.AddInt32(&s.eofFlag, 1) != 2 {
 		return
+	}
+	if len(s.closeCallback) > 0 {
+		for _, cb := range s.closeCallback {
+			cb(exception)
+		}
 	}
 	_ = s.writer.CloseStream(s.sid)
 }
