@@ -1,0 +1,153 @@
+// Copyright 2018 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Test Protobuf definitions with proto3 syntax.
+syntax = "proto3";
+
+package pb3;
+
+import "base.proto";
+
+option go_package = "pb/example2";
+
+enum FOO {
+    FOO_A = 0;
+}
+
+message InnerBase2 {
+    bool Bool = 1;
+    uint32 Uint32 = 2;
+    uint64 Uint64 = 3;
+    int32 Int32 = 4;
+    sint64 SInt64 = 5;
+    double Double = 6;
+    string String = 7;
+    repeated int32 ListInt32 = 8;
+    map<string, string> MapStringString = 9;
+    repeated sint64 ListSInt64 = 10;
+    FOO Foo = 11;
+    map<int32, string> MapInt32String = 12;
+    bytes Binary = 13;
+    map<uint32, string> MapUint32String = 14;
+    map<uint64, string> MapUint64String = 15;
+    map<int64, string> MapInt64String = 16;
+    map<int64, Base> MapInt64Base = 17;
+    map<string, Base> MapStringBase = 20;
+
+    repeated Base ListBase = 19;
+    repeated InnerBase2 ListInnerBase = 18;
+    repeated string ListString = 21;
+    
+
+    Base Base = 255;
+}
+
+
+message InnerBasePartial {
+    bool Bool = 1;
+    repeated int32 ListInt32 = 8;
+    map<string, string> MapStringString = 9;
+    map<string, BasePartial> MapStringBase = 20;
+    repeated InnerBasePartial ListInnerBase = 18;
+    repeated BasePartial ListBase = 19;
+
+    map<string, string> MapStringString2 = 127;
+}
+
+message BasePartial {
+    TrafficEnv TrafficEnv = 5;
+}
+
+
+message ExampleReq {
+    string Msg = 1;
+    int32 A = 2;
+    InnerBase2 InnerBase2 = 3;
+    Base Base = 255;
+    double Subfix = 32767;
+}
+
+
+message ExampleSuper {
+    string Msg = 1;
+    int32 A = 2;
+    InnerBase2 InnerBase2 = 3;
+    string Ex1 = 4;
+    string Ex2 = 5;
+    string Ex3 = 6;
+    string Ex4 = 7;
+    SelfRef SelfRef = 9;
+    Base Base = 255;
+    double Subfix = 32767;
+}
+
+message SelfRef {
+    SelfRef self = 1;
+}
+
+message ExampleReqPartial {
+    string Msg = 1;
+    InnerBasePartial InnerBase2 = 3;
+    BasePartial Base = 255;
+}
+
+
+message ExampleResp {
+    string Msg = 1;
+    string required_field = 2;
+    BaseResp BaseResp = 255;
+}
+
+message ExampleRespPartial {
+    string required_field = 2;
+    BaseResp BaseResp = 255;
+}
+
+message Exception {
+    int32 code = 1;
+    string msg = 255;
+}
+
+message A {
+    A self = 1;
+}
+
+message PingResponse {
+    string message = 1;
+}
+
+message OnewayRequest {
+    string msg = 1;
+}
+
+message VoidRequest {
+    string msg = 1;
+}
+
+message VoidResponse {
+    
+}
+
+message ExampleInt2Float {
+    int32 Int32 = 1;
+    double Float64 = 2;
+    string String = 3;
+    int64 Int64 = 4;
+    double Subfix = 32767;
+}
+
+
+
+// Test that RPC services work.
+service TestService2 {
+  rpc ExampleMethod(ExampleReq) returns (ExampleResp);
+  rpc ExamplePartialMethod(ExampleReqPartial) returns (A);
+  rpc ExamplePartialMethod2(ExampleReqPartial) returns (ExampleRespPartial);
+  rpc ExampleSuperMethod(ExampleSuper) returns (A);
+  rpc Int2FloatMethod(ExampleInt2Float) returns (ExampleInt2Float);
+  rpc Foo(A) returns (A);
+  rpc Ping(A) returns (PingResponse);
+  rpc Oneway(OnewayRequest) returns (VoidResponse);
+  rpc Void(VoidRequest) returns (VoidResponse);
+}
