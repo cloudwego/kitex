@@ -38,7 +38,8 @@ import (
 
 // Streaming client streaming interface for code generate
 type Streaming interface {
-	// Deprecated, use StreamX instead
+	// Deprecated, keep this method for compatibility with gen code with version < v0.13.0,
+	// regenerate code with kitex command with version >= v0.13.0 to use StreamX instead.
 	Stream(ctx context.Context, method string, request, response interface{}) error
 	StreamX(ctx context.Context, method string) (streaming.ClientStream, error)
 }
@@ -111,6 +112,9 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 		return nil, err
 	}
 
+	// recvEP and sendEP are the endpoints for the new stream interface,
+	// and grpcRecvEP and grpcSendEP are the endpoints for the old grpc stream interface,
+	// the latter two are going to be removed in the future.
 	recvEP := kc.opt.StreamOptions.BuildRecvChain()
 	sendEP := kc.opt.StreamOptions.BuildSendChain()
 	grpcRecvEP := kc.opt.Streaming.BuildRecvInvokeChain()

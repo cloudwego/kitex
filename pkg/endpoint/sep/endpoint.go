@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+// Package sep means server endpoint in short.
 package sep
 
 import (

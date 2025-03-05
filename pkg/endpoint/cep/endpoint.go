@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+// Package cep means client endpoint in short.
 package cep
 
 import (
