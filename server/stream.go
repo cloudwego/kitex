@@ -28,6 +28,9 @@ import (
 
 func (s *server) wrapStreamMiddleware() endpoint.Middleware {
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		// recvEP and sendEP are the endpoints for the new stream interface,
+		// and grpcRecvEP and grpcSendEP are the endpoints for the old grpc stream interface,
+		// the latter two are going to be removed in the future.
 		sendEP := s.opt.StreamOptions.BuildSendChain()
 		recvEP := s.opt.StreamOptions.BuildRecvChain()
 		grpcSendEP := s.opt.Streaming.BuildSendInvokeChain()
@@ -83,23 +86,19 @@ func (s *stream) GetGRPCStream() streaming.Stream {
 
 // RecvMsg receives a message from the client.
 func (s *stream) RecvMsg(ctx context.Context, m interface{}) (err error) {
-	if s.eventHandler != nil {
-		defer func() {
-			s.eventHandler(s.ctx, stats.StreamRecv, err)
-		}()
-	}
 	err = s.recv(ctx, s.ServerStream, m)
+	if s.eventHandler != nil {
+		s.eventHandler(s.ctx, stats.StreamRecv, err)
+	}
 	return
 }
 
 // SendMsg sends a message to the client.
 func (s *stream) SendMsg(ctx context.Context, m interface{}) (err error) {
-	if s.eventHandler != nil {
-		defer func() {
-			s.eventHandler(s.ctx, stats.StreamSend, err)
-		}()
-	}
 	err = s.send(ctx, s.ServerStream, m)
+	if s.eventHandler != nil {
+		s.eventHandler(s.ctx, stats.StreamSend, err)
+	}
 	return
 }
 
@@ -121,22 +120,18 @@ type grpcStream struct {
 }
 
 func (s *grpcStream) RecvMsg(m interface{}) (err error) {
-	if s.st.eventHandler != nil {
-		defer func() {
-			s.st.eventHandler(s.st.ctx, stats.StreamRecv, err)
-		}()
-	}
 	err = s.recvEndpoint(s.Stream, m)
+	if s.st.eventHandler != nil {
+		s.st.eventHandler(s.st.ctx, stats.StreamRecv, err)
+	}
 	return
 }
 
 func (s *grpcStream) SendMsg(m interface{}) (err error) {
-	if s.st.eventHandler != nil {
-		defer func() {
-			s.st.eventHandler(s.st.ctx, stats.StreamSend, err)
-		}()
-	}
 	err = s.sendEndpoint(s.Stream, m)
+	if s.st.eventHandler != nil {
+		s.st.eventHandler(s.st.ctx, stats.StreamSend, err)
+	}
 	return
 }
 

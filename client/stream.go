@@ -213,16 +213,14 @@ func (s *stream) RecvMsg(ctx context.Context, m interface{}) (err error) {
 			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, s.ri)
 		}
 	}
-	if s.eventHandler != nil {
-		defer func() {
-			s.eventHandler(s.ctx, stats.StreamRecv, err)
-		}()
-	}
 	err = s.recv(ctx, s.ClientStream, m)
 	if err == nil {
 		// BizStatusErr is returned by the server handle, meaning the stream is ended;
 		// And it should be returned to the calling business code for error handling
 		err = s.ri.Invocation().BizStatusErr()
+	}
+	if s.eventHandler != nil {
+		s.eventHandler(s.ctx, stats.StreamRecv, err)
 	}
 	if err != nil || s.streamingMode == serviceinfo.StreamingClient {
 		s.DoFinish(err)
@@ -240,12 +238,11 @@ func (s *stream) SendMsg(ctx context.Context, m interface{}) (err error) {
 			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, s.ri)
 		}
 	}
+	err = s.send(ctx, s.ClientStream, m)
 	if s.eventHandler != nil {
-		defer func() {
-			s.eventHandler(s.ctx, stats.StreamSend, err)
-		}()
+		s.eventHandler(s.ctx, stats.StreamSend, err)
 	}
-	if err = s.send(ctx, s.ClientStream, m); err != nil {
+	if err != nil {
 		s.DoFinish(err)
 	}
 	return
@@ -302,16 +299,14 @@ func (s *grpcStream) Header() (md metadata.MD, err error) {
 }
 
 func (s *grpcStream) RecvMsg(m interface{}) (err error) {
-	if s.st.eventHandler != nil {
-		defer func() {
-			s.st.eventHandler(s.st.ctx, stats.StreamRecv, err)
-		}()
-	}
 	err = s.recvEndpoint(s.Stream, m)
 	if err == nil {
 		// BizStatusErr is returned by the server handle, meaning the stream is ended;
 		// And it should be returned to the calling business code for error handling
 		err = s.st.ri.Invocation().BizStatusErr()
+	}
+	if s.st.eventHandler != nil {
+		s.st.eventHandler(s.st.ctx, stats.StreamRecv, err)
 	}
 	if err != nil || s.st.streamingMode == serviceinfo.StreamingClient {
 		s.st.DoFinish(err)
@@ -320,12 +315,11 @@ func (s *grpcStream) RecvMsg(m interface{}) (err error) {
 }
 
 func (s *grpcStream) SendMsg(m interface{}) (err error) {
+	err = s.sendEndpoint(s.Stream, m)
 	if s.st.eventHandler != nil {
-		defer func() {
-			s.st.eventHandler(s.st.ctx, stats.StreamSend, err)
-		}()
+		s.st.eventHandler(s.st.ctx, stats.StreamSend, err)
 	}
-	if err = s.sendEndpoint(s.Stream, m); err != nil {
+	if err != nil {
 		s.st.DoFinish(err)
 	}
 	return
