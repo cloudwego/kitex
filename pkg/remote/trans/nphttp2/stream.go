@@ -313,25 +313,25 @@ func streamingTrailerToHTTP2MD(trailer streaming.Trailer) metadata.MD {
 	return md
 }
 
-var handleStreamingMultipleValues func(k string, v []string) string
+var handleStreamingMetadataMultipleValues func(k string, v []string) string
 
-// HandleStreamingMultipleValues is used to register a handler to handle the scene
+// HandleStreamingMetadataMultipleValues is used to register a handler to handle the scene
 // when the value of the key is zero or more than one.
 // e.g.
 //
-//	nphttp2.HandleStreamingMultipleValues(func(k string, v []string) string {
+//	nphttp2.HandleStreamingMetadataMultipleValues(func(k string, v []string) string {
 //		return v[0]
 //	})
-func HandleStreamingMultipleValues(hd func(k string, v []string) string) {
-	handleStreamingMultipleValues = hd
+func HandleStreamingMetadataMultipleValues(hd func(k string, v []string) string) {
+	handleStreamingMetadataMultipleValues = hd
 }
 
 func http2MDToStreamingHeader(md metadata.MD) (streaming.Header, error) {
 	header := streaming.Header{}
 	for k, v := range md {
 		if len(v) > 1 || len(v) == 0 {
-			if handleStreamingMultipleValues != nil {
-				header[k] = handleStreamingMultipleValues(k, v)
+			if handleStreamingMetadataMultipleValues != nil {
+				header[k] = handleStreamingMetadataMultipleValues(k, v)
 				continue
 			}
 			return nil, errors.New("cannot convert http2 metadata to streaming header, because the value of key " + k + " is zero or more than one")
@@ -345,8 +345,8 @@ func http2MDToStreamingTrailer(md metadata.MD) (streaming.Trailer, error) {
 	trailer := streaming.Trailer{}
 	for k, v := range md {
 		if len(v) > 1 || len(v) == 0 {
-			if handleStreamingMultipleValues != nil {
-				trailer[k] = handleStreamingMultipleValues(k, v)
+			if handleStreamingMetadataMultipleValues != nil {
+				trailer[k] = handleStreamingMetadataMultipleValues(k, v)
 				continue
 			}
 			return nil, errors.New("cannot convert http2 metadata to streaming trailer, because the value of key " + k + " is zero or more than one")

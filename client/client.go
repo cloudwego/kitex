@@ -282,10 +282,13 @@ func (kc *kClient) initLBCache() error {
 // Therefore, in the streaming scenario, the xds router can be placed after the stream middleware.
 func (kc *kClient) initMiddlewares(ctx context.Context) (err error) {
 	var (
-		mws  []endpoint.Middleware      // only effective to unary methods
-		uMws []endpoint.UnaryMiddleware // only effective to unary methods
-		smws []endpoint.Middleware      // only effective to streaming methods
-		sMws []cep.StreamMiddleware     // only effective to streaming methods
+		// unary middleware
+		mws  []endpoint.Middleware      // wrap the mws at `context mw -> customized mws -> other mws`
+		uMws []endpoint.UnaryMiddleware // wrap the mws at `service cb mw -> xds router -> rpctimeout mw -> customized unary mws`
+
+		// streaming middleware
+		smws []endpoint.Middleware  // wrap the mws at `xds router -> context mw -> customized mws -> other mws`
+		sMws []cep.StreamMiddleware // wrap the mws at `service cb mw -> customized stream mws`
 	)
 
 	// 1. universal middlewares
