@@ -19,7 +19,6 @@ package nphttp2
 import (
 	"context"
 	"errors"
-	"net"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
@@ -36,7 +35,7 @@ type serverStream struct {
 	ctx     context.Context
 	rpcInfo rpcinfo.RPCInfo
 	svcInfo *serviceinfo.ServiceInfo
-	conn    net.Conn // clientConn or serverConn
+	conn    *serverConn
 	handler remote.TransReadWriter
 	// for grpc compatibility
 	grpcStream *grpcServerStream
@@ -49,7 +48,7 @@ func (s *serverStream) GetGRPCStream() streaming.Stream {
 }
 
 // newServerStream ...
-func newServerStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn net.Conn, handler remote.TransReadWriter) *serverStream {
+func newServerStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn *serverConn, handler remote.TransReadWriter) *serverStream {
 	sx := &serverStream{
 		ctx:     ctx,
 		rpcInfo: rpcinfo.GetRPCInfo(ctx),
@@ -77,28 +76,25 @@ func (s *grpcServerStream) Header() (metadata.MD, error) {
 
 // SendHeader is used for server side grpcServerStream
 func (s *grpcServerStream) SendHeader(md metadata.MD) error {
-	sc := s.sx.conn.(*serverConn)
-	return sc.s.SendHeader(md)
+	return s.sx.conn.s.SendHeader(md)
 }
 
 // SetHeader is used for server side grpcServerStream
 func (s *grpcServerStream) SetHeader(md metadata.MD) error {
-	sc := s.sx.conn.(*serverConn)
-	return sc.s.SetHeader(md)
+	return s.sx.conn.s.SetHeader(md)
 }
 
 // SetTrailer is used for server side grpcServerStream
 func (s *grpcServerStream) SetTrailer(md metadata.MD) {
-	sc := s.sx.conn.(*serverConn)
-	sc.s.SetTrailer(md)
+	s.sx.conn.s.SetTrailer(md)
 }
 
 func (s *grpcServerStream) RecvMsg(m interface{}) error {
-	return s.sx.RecvMsg(context.Background(), m)
+	return s.sx.RecvMsg(s.sx.ctx, m)
 }
 
 func (s *grpcServerStream) SendMsg(m interface{}) error {
-	return s.sx.SendMsg(context.Background(), m)
+	return s.sx.SendMsg(s.sx.ctx, m)
 }
 
 func (s *grpcServerStream) Close() error {
@@ -106,18 +102,15 @@ func (s *grpcServerStream) Close() error {
 }
 
 func (s *serverStream) SetHeader(hd streaming.Header) error {
-	sc := s.conn.(*serverConn)
-	return sc.s.SetHeader(streamingHeaderToHTTP2MD(hd))
+	return s.conn.s.SetHeader(streamingHeaderToHTTP2MD(hd))
 }
 
 func (s *serverStream) SendHeader(hd streaming.Header) error {
-	sc := s.conn.(*serverConn)
-	return sc.s.SendHeader(streamingHeaderToHTTP2MD(hd))
+	return s.conn.s.SendHeader(streamingHeaderToHTTP2MD(hd))
 }
 
 func (s *serverStream) SetTrailer(tl streaming.Trailer) error {
-	sc := s.conn.(*serverConn)
-	return sc.s.SetTrailer(streamingTrailerToHTTP2MD(tl))
+	return s.conn.s.SetTrailer(streamingTrailerToHTTP2MD(tl))
 }
 
 // RecvMsg receives a message from the client.
@@ -157,14 +150,7 @@ func (s *serverStream) SendMsg(ctx context.Context, m interface{}) error {
 }
 
 func (s *serverStream) getPayloadCodecFromContentType() (serviceinfo.PayloadCodec, error) {
-	// TODO: handle other protocols in the future. currently only supports grpc
-	var subType string
-	switch sc := s.conn.(type) {
-	case *clientConn:
-		subType = sc.s.ContentSubtype()
-	case *serverConn:
-		subType = sc.s.ContentSubtype()
-	}
+	subType := s.conn.s.ContentSubtype()
 	switch subType {
 	case contentSubTypeThrift:
 		return serviceinfo.Thrift, nil
@@ -181,7 +167,7 @@ type clientStream struct {
 	ctx     context.Context
 	rpcInfo rpcinfo.RPCInfo
 	svcInfo *serviceinfo.ServiceInfo
-	conn    net.Conn // clientConn or serverConn
+	conn    *clientConn
 	handler remote.TransReadWriter
 	// for grpc compatibility
 	grpcStream *grpcClientStream
@@ -194,7 +180,7 @@ func (s *clientStream) GetGRPCStream() streaming.Stream {
 }
 
 // NewClientStream ...
-func NewClientStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn net.Conn, handler remote.TransReadWriter) streaming.ClientStream {
+func NewClientStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn *clientConn, handler remote.TransReadWriter) streaming.ClientStream {
 	sx := &clientStream{
 		ctx:     ctx,
 		rpcInfo: rpcinfo.GetRPCInfo(ctx),
@@ -214,14 +200,12 @@ func (s *grpcClientStream) Context() context.Context {
 
 // Trailer is used for client side grpcServerStream
 func (s *grpcClientStream) Trailer() metadata.MD {
-	sc := s.sx.conn.(*clientConn)
-	return sc.s.Trailer()
+	return s.sx.conn.s.Trailer()
 }
 
 // Header is used for client side grpcServerStream
 func (s *grpcClientStream) Header() (metadata.MD, error) {
-	sc := s.sx.conn.(*clientConn)
-	return sc.s.Header()
+	return s.sx.conn.s.Header()
 }
 
 func (s *grpcClientStream) Close() error {
@@ -241,16 +225,15 @@ func (s *grpcClientStream) SetTrailer(md metadata.MD) {
 }
 
 func (s *grpcClientStream) RecvMsg(m interface{}) error {
-	return s.sx.RecvMsg(context.Background(), m)
+	return s.sx.RecvMsg(s.sx.ctx, m)
 }
 
 func (s *grpcClientStream) SendMsg(m interface{}) error {
-	return s.sx.SendMsg(context.Background(), m)
+	return s.sx.SendMsg(s.sx.ctx, m)
 }
 
 func (s *clientStream) Header() (streaming.Header, error) {
-	sc := s.conn.(*clientConn)
-	hd, err := sc.Header()
+	hd, err := s.conn.Header()
 	if err != nil {
 		return nil, err
 	}
@@ -258,8 +241,7 @@ func (s *clientStream) Header() (streaming.Header, error) {
 }
 
 func (s *clientStream) Trailer() (streaming.Trailer, error) {
-	sc := s.conn.(*clientConn)
-	tl := sc.Trailer()
+	tl := s.conn.Trailer()
 	return http2MDToStreamingTrailer(tl)
 }
 
@@ -306,14 +288,7 @@ func (s *clientStream) Context() context.Context {
 }
 
 func (s *clientStream) getPayloadCodecFromContentType() (serviceinfo.PayloadCodec, error) {
-	// TODO: handle other protocols in the future. currently only supports grpc
-	var subType string
-	switch sc := s.conn.(type) {
-	case *clientConn:
-		subType = sc.s.ContentSubtype()
-	case *serverConn:
-		subType = sc.s.ContentSubtype()
-	}
+	subType := s.conn.s.ContentSubtype()
 	switch subType {
 	case contentSubTypeThrift:
 		return serviceinfo.Thrift, nil

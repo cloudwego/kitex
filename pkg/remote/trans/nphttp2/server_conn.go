@@ -68,7 +68,7 @@ func GetServerConn(st streaming.Stream) (GRPCConn, error) {
 	if !ok {
 		return nil, status.Errorf(codes.Internal, "the ctx of Stream is not provided by Kitex Server")
 	}
-	return rawStream.conn.(GRPCConn), nil
+	return rawStream.conn, nil
 }
 
 // impl net.Conn
