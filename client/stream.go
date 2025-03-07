@@ -33,7 +33,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/transport"
 )
 
 // Streaming client streaming interface for code generate
@@ -103,7 +102,7 @@ func (kc *kClient) StreamX(ctx context.Context, method string) (streaming.Client
 func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 	var handler remote.ClientTransHandler
 	var err error
-	if kc.opt.Configs.TransportProtocol()&transport.GRPCStreaming == transport.GRPCStreaming {
+	if kc.opt.RemoteOpt.GRPCStreamingCliHandlerFactory != nil {
 		handler, err = kc.opt.RemoteOpt.GRPCStreamingCliHandlerFactory.NewTransHandler(kc.opt.RemoteOpt)
 	} else {
 		handler, err = kc.opt.RemoteOpt.CliHandlerFactory.NewTransHandler(kc.opt.RemoteOpt)

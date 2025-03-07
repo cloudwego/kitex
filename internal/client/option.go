@@ -279,7 +279,7 @@ func (o *Options) initRemoteOpt() {
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
 	// configure grpc streaming
-	if o.Configs.TransportProtocol()&transport.GRPCStreaming == transport.GRPCStreaming {
+	if o.Configs.TransportProtocol()&(transport.GRPC|transport.GRPCStreaming) == transport.GRPCStreaming {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
 			// grpc unary short connection
 			o.GRPCConnectOpts.ShortConn = true

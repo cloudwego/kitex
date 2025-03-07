@@ -46,18 +46,12 @@ func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTra
 		}
 		return cs, nil, nil
 	}
-	// grpc streaming
-	if ri.Config().TransportProtocol()&transport.GRPCStreaming == transport.GRPCStreaming {
-		cm := NewConnWrapper(opt.GRPCStreamingConnPool)
-		rawConn, err := cm.GetConn(ctx, opt.Dialer, ri)
-		if err != nil {
-			return nil, nil, err
-		}
-		return nphttp2.NewClientStream(ctx, opt.SvcInfo, rawConn, handler), &StreamConnManager{cm}, nil
-	}
-
 	// default is grpc streaming
-	cm := NewConnWrapper(opt.ConnPool)
+	connPool := opt.GRPCStreamingConnPool
+	if connPool == nil {
+		connPool = opt.ConnPool
+	}
+	cm := NewConnWrapper(connPool)
 	rawConn, err := cm.GetConn(ctx, opt.Dialer, ri)
 	if err != nil {
 		return nil, nil, err
