@@ -447,12 +447,16 @@ func (c *converter) makeMethod(si *generator.ServiceInfo, f *golang.Function) (*
 		Void:               f.Void,
 		ArgStructName:      f.ArgType().GoName().String(),
 		GenArgResultStruct: false,
-		IsStreaming:        st.IsStreaming,
 		ClientStreaming:    st.ClientStreaming,
 		ServerStreaming:    st.ServerStreaming,
 		ArgsLength:         len(f.Arguments()),
 	}
-	if st.ClientStreaming || st.ServerStreaming {
+	if c.Config.StreamX {
+		mi.IsStreaming = st.ClientStreaming || st.ServerStreaming
+	} else {
+		mi.IsStreaming = st.IsStreaming
+	}
+	if mi.IsStreaming {
 		si.HasStreaming = true
 	}
 

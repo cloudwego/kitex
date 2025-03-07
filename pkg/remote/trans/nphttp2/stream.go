@@ -19,6 +19,7 @@ package nphttp2
 import (
 	"context"
 	"errors"
+	"net"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
@@ -180,12 +181,12 @@ func (s *clientStream) GetGRPCStream() streaming.Stream {
 }
 
 // NewClientStream ...
-func NewClientStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn *clientConn, handler remote.TransReadWriter) streaming.ClientStream {
+func NewClientStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn net.Conn, handler remote.TransReadWriter) streaming.ClientStream {
 	sx := &clientStream{
 		ctx:     ctx,
 		rpcInfo: rpcinfo.GetRPCInfo(ctx),
 		svcInfo: svcInfo,
-		conn:    conn,
+		conn:    conn.(*clientConn),
 		handler: handler,
 	}
 	sx.grpcStream = &grpcClientStream{
