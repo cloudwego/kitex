@@ -18,7 +18,7 @@ package tpl
 var HandlerMethodsTpl string = `{{define "HandlerMethod"}}
 {{range .AllMethods}}
 {{- if or .ClientStreaming .ServerStreaming}}
-func (s *{{$.ServiceName}}Impl) {{.Name}}({{if not .ClientStreaming}}{{range .Args}}{{LowerFirst .Name}} {{.Type}}, {{end}}{{end}}stream {{.PkgRefName}}.{{.ServiceName}}_{{.RawName}}Server) (err error) {	
+func (s *{{$.ServiceName}}Impl) {{.Name}}({{if $.StreamX}}ctx context.Context, {{end}}{{if not .ClientStreaming}}{{range .Args}}{{LowerFirst .Name}} {{.Type}}, {{end}}{{end}}stream {{.PkgRefName}}.{{.ServiceName}}_{{.RawName}}Server) (err error) {	
 	println("{{.Name}} called")
 	return
 }

@@ -423,7 +423,8 @@ func (g *generator) generateHandler(pkg *PackageInfo, svc *ServiceInfo, handlerF
 		comp := newCompleter(
 			svc.AllMethods(),
 			handlerFilePath,
-			svc.ServiceName)
+			svc.ServiceName,
+			pkg.StreamX)
 		f, err := comp.CompleteMethods()
 		if err != nil && err != errNoNewMethod {
 			return nil, err

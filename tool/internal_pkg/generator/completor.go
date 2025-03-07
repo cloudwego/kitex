@@ -40,13 +40,15 @@ type completer struct {
 	allMethods  []*MethodInfo
 	handlerPath string
 	serviceName string
+	streamx     bool
 }
 
-func newCompleter(allMethods []*MethodInfo, handlerPath, serviceName string) *completer {
+func newCompleter(allMethods []*MethodInfo, handlerPath, serviceName string, streamx bool) *completer {
 	return &completer{
 		allMethods:  allMethods,
 		handlerPath: handlerPath,
 		serviceName: serviceName,
+		streamx:     streamx,
 	}
 }
 
@@ -99,9 +101,11 @@ func (c *completer) addImplementations(w io.Writer, newMethods []*MethodInfo) er
 	data := struct {
 		AllMethods  []*MethodInfo
 		ServiceName string
+		StreamX     bool
 	}{
 		AllMethods:  newMethods,
 		ServiceName: c.serviceName,
+		StreamX:     c.streamx,
 	}
 	var buf bytes.Buffer
 	if err := mt.ExecuteTemplate(&buf, HandlerFileName, data); err != nil {
