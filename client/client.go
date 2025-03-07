@@ -131,9 +131,12 @@ func (kc *kClient) init() (err error) {
 		return err
 	}
 	ctx := kc.initContext()
-	kc.initMiddlewares(ctx)
+	mw := kc.initMiddlewares(ctx)
 	kc.initDebugService()
 	kc.richRemoteOption()
+	if err = kc.buildInvokeChain(mw); err != nil {
+		return err
+	}
 	if err = kc.warmingUp(); err != nil {
 		return err
 	}
@@ -271,6 +274,16 @@ func (kc *kClient) initLBCache() error {
 	return nil
 }
 
+type middleware struct {
+	// unary middleware
+	mws  []endpoint.Middleware      // wrap the mws at `context mw -> customized mws -> other mws`
+	uMws []endpoint.UnaryMiddleware // wrap the mws at `service cb mw -> xds router -> rpctimeout mw -> customized unary mws`
+
+	// streaming middleware
+	smws []endpoint.Middleware  // wrap the mws at `xds router -> context mw -> customized mws -> other mws`
+	sMws []cep.StreamMiddleware // wrap the mws at `service cb mw -> customized stream mws`
+}
+
 // For unary:
 // service cb mw -> xds router -> rpctimeout mw -> customized unary mws -> context mw -> customized mws -> other mws
 
@@ -280,60 +293,44 @@ func (kc *kClient) initLBCache() error {
 // The reason why the xds router must be placed before the timeout middleware is that the timeout configuration is
 // obtained from the rds config, and the timeout middleware only takes effect in the unary scenario.
 // Therefore, in the streaming scenario, the xds router can be placed after the stream middleware.
-func (kc *kClient) initMiddlewares(ctx context.Context) (err error) {
-	var (
-		// unary middleware
-		mws  []endpoint.Middleware      // wrap the mws at `context mw -> customized mws -> other mws`
-		uMws []endpoint.UnaryMiddleware // wrap the mws at `service cb mw -> xds router -> rpctimeout mw -> customized unary mws`
-
-		// streaming middleware
-		smws []endpoint.Middleware  // wrap the mws at `xds router -> context mw -> customized mws -> other mws`
-		sMws []cep.StreamMiddleware // wrap the mws at `service cb mw -> customized stream mws`
-	)
-
+func (kc *kClient) initMiddlewares(ctx context.Context) (mw middleware) {
 	// 1. universal middlewares
 	builderMWs := richMWsWithBuilder(ctx, kc.opt.MWBs)
-	mws = append(mws, contextMW)
-	mws = append(mws, builderMWs...)
-	mws = append(mws, acl.NewACLMiddleware(kc.opt.ACLRules))
+	mw.mws = append(mw.mws, contextMW)
+	mw.mws = append(mw.mws, builderMWs...)
+	mw.mws = append(mw.mws, acl.NewACLMiddleware(kc.opt.ACLRules))
 	if kc.opt.Proxy == nil {
-		mws = append(mws, newResolveMWBuilder(kc.lbf)(ctx))
-		mws = append(mws, kc.opt.CBSuite.InstanceCBMW())
-		mws = append(mws, richMWsWithBuilder(ctx, kc.opt.IMWBs)...)
+		mw.mws = append(mw.mws, newResolveMWBuilder(kc.lbf)(ctx))
+		mw.mws = append(mw.mws, kc.opt.CBSuite.InstanceCBMW())
+		mw.mws = append(mw.mws, richMWsWithBuilder(ctx, kc.opt.IMWBs)...)
 	} else {
 		if kc.opt.Resolver != nil { // customized service discovery
-			mws = append(mws, newResolveMWBuilder(kc.lbf)(ctx))
+			mw.mws = append(mw.mws, newResolveMWBuilder(kc.lbf)(ctx))
 		}
-		mws = append(mws, newProxyMW(kc.opt.Proxy))
+		mw.mws = append(mw.mws, newProxyMW(kc.opt.Proxy))
 	}
-	mws = append(mws, newIOErrorHandleMW(kc.opt.ErrHandle))
+	mw.mws = append(mw.mws, newIOErrorHandleMW(kc.opt.ErrHandle))
 
 	// 2. unary middlewares
-	var umw []endpoint.UnaryMiddleware
-	umw = append(umw, kc.opt.CBSuite.ServiceCBMW().ToUnaryMiddleware())
+	mw.uMws = append(mw.uMws, kc.opt.CBSuite.ServiceCBMW().ToUnaryMiddleware())
 	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {
 		// integrate xds if enabled
-		umw = append(umw, kc.opt.XDSRouterMiddleware.ToUnaryMiddleware())
+		mw.uMws = append(mw.uMws, kc.opt.XDSRouterMiddleware.ToUnaryMiddleware())
 	}
-	umw = append(umw, rpcTimeoutMW(ctx))
+	mw.uMws = append(mw.uMws, rpcTimeoutMW(ctx))
 	kc.opt.UnaryOptions.InitMiddlewares(ctx)
-	uMws = append(umw, kc.opt.UnaryOptions.UnaryMiddlewares...)
+	mw.uMws = append(mw.uMws, kc.opt.UnaryOptions.UnaryMiddlewares...)
 
 	// 3. stream middlewares
 	kc.opt.Streaming.InitMiddlewares(ctx)
 	kc.opt.StreamOptions.EventHandler = kc.opt.TracerCtl.GetStreamEventHandler()
-	smws = mws
+	mw.smws = mw.mws
 	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {
 		// integrate xds if enabled
-		smws = append([]endpoint.Middleware{kc.opt.XDSRouterMiddleware}, smws...)
+		mw.smws = append([]endpoint.Middleware{kc.opt.XDSRouterMiddleware}, mw.smws...)
 	}
 	kc.opt.StreamOptions.InitMiddlewares(ctx)
-	sMws = append([]cep.StreamMiddleware{kc.opt.CBSuite.StreamingServiceCBMW()}, kc.opt.StreamOptions.StreamMiddlewares...)
-
-	// 4. build invoke chain
-	if err = kc.buildInvokeChain(mws, smws, uMws, sMws); err != nil {
-		return err
-	}
+	mw.sMws = append([]cep.StreamMiddleware{kc.opt.CBSuite.StreamingServiceCBMW()}, kc.opt.StreamOptions.StreamMiddlewares...)
 	return
 }
 
@@ -473,14 +470,14 @@ func (kc *kClient) richRemoteOption() {
 	}
 }
 
-func (kc *kClient) buildInvokeChain(mws, smws []endpoint.Middleware, uMws []endpoint.UnaryMiddleware, sMws []cep.StreamMiddleware) error {
+func (kc *kClient) buildInvokeChain(mw middleware) error {
 	innerHandlerEp, err := kc.invokeHandleEndpoint()
 	if err != nil {
 		return err
 	}
-	eps := endpoint.Chain(mws...)(innerHandlerEp)
+	eps := endpoint.Chain(mw.mws...)(innerHandlerEp)
 
-	kc.eps = endpoint.UnaryChain(uMws...)(func(ctx context.Context, req, resp interface{}) (err error) {
+	kc.eps = endpoint.UnaryChain(mw.uMws...)(func(ctx context.Context, req, resp interface{}) (err error) {
 		return eps(ctx, req, resp)
 	})
 
@@ -488,8 +485,8 @@ func (kc *kClient) buildInvokeChain(mws, smws []endpoint.Middleware, uMws []endp
 	if err != nil {
 		return err
 	}
-	sEps := endpoint.Chain(smws...)(innerStreamingEp)
-	kc.sEps = cep.StreamChain(sMws...)(func(ctx context.Context) (st streaming.ClientStream, err error) {
+	sEps := endpoint.Chain(mw.smws...)(innerStreamingEp)
+	kc.sEps = cep.StreamChain(mw.sMws...)(func(ctx context.Context) (st streaming.ClientStream, err error) {
 		resp := &streaming.Result{}
 		err = sEps(ctx, nil, resp)
 		if err != nil {
