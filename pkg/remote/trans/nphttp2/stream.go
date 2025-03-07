@@ -34,6 +34,7 @@ type grpcServerStream struct {
 
 type serverStream struct {
 	ctx     context.Context
+	rpcInfo rpcinfo.RPCInfo
 	svcInfo *serviceinfo.ServiceInfo
 	conn    net.Conn // clientConn or serverConn
 	handler remote.TransReadWriter
@@ -51,6 +52,7 @@ func (s *serverStream) GetGRPCStream() streaming.Stream {
 func newServerStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn net.Conn, handler remote.TransReadWriter) *serverStream {
 	sx := &serverStream{
 		ctx:     ctx,
+		rpcInfo: rpcinfo.GetRPCInfo(ctx),
 		svcInfo: svcInfo,
 		conn:    conn,
 		handler: handler,
@@ -118,8 +120,12 @@ func (s *serverStream) SetTrailer(tl streaming.Trailer) error {
 	return sc.s.SetTrailer(streamingTrailerToHTTP2MD(tl))
 }
 
+// RecvMsg receives a message from the client.
+// In order to avoid underlying execution errors when the context passed in by the user does not
+// contain information related to this RPC, the context specified when creating the stream is used
+// here, and the context passed in by the user is ignored.
 func (s *serverStream) RecvMsg(ctx context.Context, m interface{}) error {
-	ri := rpcinfo.GetRPCInfo(s.ctx)
+	ri := s.rpcInfo
 
 	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
 	payloadCodec, err := s.getPayloadCodecFromContentType()
@@ -133,8 +139,10 @@ func (s *serverStream) RecvMsg(ctx context.Context, m interface{}) error {
 	return err
 }
 
+// SendMsg sends a message to the client.
+// context handling logic is the same as RecvMsg.
 func (s *serverStream) SendMsg(ctx context.Context, m interface{}) error {
-	ri := rpcinfo.GetRPCInfo(s.ctx)
+	ri := s.rpcInfo
 
 	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
 	payloadCodec, err := s.getPayloadCodecFromContentType()
@@ -171,6 +179,7 @@ type grpcClientStream struct {
 
 type clientStream struct {
 	ctx     context.Context
+	rpcInfo rpcinfo.RPCInfo
 	svcInfo *serviceinfo.ServiceInfo
 	conn    net.Conn // clientConn or serverConn
 	handler remote.TransReadWriter
@@ -188,6 +197,7 @@ func (s *clientStream) GetGRPCStream() streaming.Stream {
 func NewClientStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn net.Conn, handler remote.TransReadWriter) streaming.ClientStream {
 	sx := &clientStream{
 		ctx:     ctx,
+		rpcInfo: rpcinfo.GetRPCInfo(ctx),
 		svcInfo: svcInfo,
 		conn:    conn,
 		handler: handler,
@@ -253,8 +263,10 @@ func (s *clientStream) Trailer() (streaming.Trailer, error) {
 	return http2MDToStreamingTrailer(tl)
 }
 
+// RecvMsg receives a message from the server.
+// context handling logic is the same as serverStream.RecvMsg.
 func (s *clientStream) RecvMsg(ctx context.Context, m interface{}) error {
-	ri := rpcinfo.GetRPCInfo(s.ctx)
+	ri := s.rpcInfo
 
 	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
 	payloadCodec, err := s.getPayloadCodecFromContentType()
@@ -268,8 +280,10 @@ func (s *clientStream) RecvMsg(ctx context.Context, m interface{}) error {
 	return err
 }
 
+// SendMsg sends a message to the server.
+// context handling logic is the same as serverStream.RecvMsg.
 func (s *clientStream) SendMsg(ctx context.Context, m interface{}) error {
-	ri := rpcinfo.GetRPCInfo(s.ctx)
+	ri := s.rpcInfo
 
 	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
 	payloadCodec, err := s.getPayloadCodecFromContentType()

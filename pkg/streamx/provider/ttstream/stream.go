@@ -44,6 +44,7 @@ var (
 func newStream(ctx context.Context, writer streamWriter, smeta streamFrame) *stream {
 	s := new(stream)
 	s.ctx = ctx
+	s.rpcInfo = rpcinfo.GetRPCInfo(ctx)
 	s.streamFrame = smeta
 	s.StreamMeta = newStreamMeta()
 	s.reader = newStreamReader()
@@ -76,6 +77,7 @@ type stream struct {
 	streamFrame
 	StreamMeta
 	ctx      context.Context
+	rpcInfo  rpcinfo.RPCInfo
 	reader   *streamReader
 	writer   streamWriter
 	wheader  streaming.Header  // wheader == nil means it already be sent
@@ -108,17 +110,21 @@ func (s *stream) TransportProtocol() ktransport.Protocol {
 	return ktransport.TTHeaderStreaming
 }
 
+// SendMsg send a message to peer.
+// In order to avoid underlying execution errors when the context passed in by the user does not
+// contain information related to this RPC, the context specified when creating the stream is used
+// here, and the context passed in by the user is ignored.
 func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
 	if atomic.LoadInt32(&s.selfEOF) != 0 {
 		return errIllegalOperation.WithCause(errors.New("stream is closed send"))
 	}
 	// encode payload
-	payload, err := EncodePayload(ctx, msg)
+	payload, err := EncodePayload(s.ctx, msg)
 	if err != nil {
 		return err
 	}
 	// tracing send size
-	ri := rpcinfo.GetRPCInfo(ctx)
+	ri := s.rpcInfo
 	if ri != nil && ri.Stats() != nil {
 		if rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats()); rpcStats != nil {
 			rpcStats.IncrSendSize(uint64(len(payload)))
@@ -143,7 +149,7 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 	mcache.Free(payload)
 
 	// tracing recv size
-	ri := rpcinfo.GetRPCInfo(ctx)
+	ri := s.rpcInfo
 	if ri != nil && ri.Stats() != nil {
 		if rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats()); rpcStats != nil {
 			rpcStats.IncrRecvSize(uint64(len(payload)))
