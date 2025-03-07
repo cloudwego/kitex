@@ -36,6 +36,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/server"
 )
 
@@ -174,9 +175,22 @@ func Test_invocationContainsPackage(t *testing.T) {
 			ri := rpcinfo.GetRPCInfo(ctx)
 			// make sure the package name has been injected into Invocation
 			test.Assert(t, ri.Invocation().PackageName() == "pbapi", ri.Invocation())
+			resp.(*streaming.Result).ClientStream = mockClientStream{}
 			return nil
 		}
 	}))
 	_, err := genericclient.NewClientStreaming(ctx, cli, "ClientStreamingTest")
 	test.Assert(t, err == nil, err)
+}
+
+type mockClientStream struct {
+	streaming.ClientStream
+}
+
+type mockGRPCStream struct {
+	streaming.Stream
+}
+
+func (m mockClientStream) GetGRPCStream() streaming.Stream {
+	return &mockGRPCStream{}
 }

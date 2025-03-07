@@ -32,7 +32,7 @@ func TestUnaryCompatibleMiddleware(t *testing.T) {
 		test.Assert(t, !UnaryCompatibleMiddleware(serviceinfo.StreamingUnary, false))
 	})
 	t.Run("not-unary+allow", func(t *testing.T) {
-		test.Assert(t, !UnaryCompatibleMiddleware(serviceinfo.StreamingNone, true))
+		test.Assert(t, UnaryCompatibleMiddleware(serviceinfo.StreamingNone, true))
 	})
 	t.Run("not-unary+not-allow", func(t *testing.T) {
 		test.Assert(t, !UnaryCompatibleMiddleware(serviceinfo.StreamingNone, false))

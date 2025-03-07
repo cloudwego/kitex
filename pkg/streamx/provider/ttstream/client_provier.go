@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
 )
@@ -51,7 +52,7 @@ type clientProvider struct {
 }
 
 // NewStream return a client stream
-func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (streamx.ClientStream, error) {
+func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (streaming.ClientStream, error) {
 	rconfig := ri.Config()
 	invocation := ri.Invocation()
 	method := invocation.MethodName()
@@ -60,7 +61,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 		return nil, kerrors.ErrNoDestAddress
 	}
 
-	var strHeader streamx.Header
+	var strHeader streaming.Header
 	var intHeader IntHeader
 	var err error
 	if c.headerHandler != nil {

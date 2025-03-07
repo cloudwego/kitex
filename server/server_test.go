@@ -1267,12 +1267,15 @@ func withGRPCTransport() Option {
 }
 
 type mockStream struct {
-	streaming.Stream
-	ctx context.Context
+	streaming.ServerStream
 }
 
-func (s *mockStream) Context() context.Context {
-	return s.ctx
+type mockGRPCStream struct {
+	streaming.Stream
+}
+
+func (s *mockStream) GetGRPCStream() streaming.Stream {
+	return &mockGRPCStream{}
 }
 
 type streamingMethodArg struct {
@@ -1364,10 +1367,8 @@ func TestStreamCtxDiverge(t *testing.T) {
 			ink.SetServiceName(testService)
 			ink.SetMethodName(tc.methodName)
 			ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-			mock := &mockStream{
-				ctx: ctx,
-			}
-			err := svr.eps(ctx, &streaming.Args{Stream: mock}, nil)
+			mock := &mockStream{}
+			err := svr.eps(ctx, &streaming.Args{ServerStream: mock}, nil)
 			test.Assert(t, err == nil, err)
 		})
 	}

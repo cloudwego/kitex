@@ -16,27 +16,25 @@
 
 package endpoint
 
-import (
-	"context"
+import "context"
 
-	"github.com/cloudwego/kitex/pkg/streaming"
-)
+type UnaryEndpoint Endpoint
 
-// SendEndpoint represent one Send call
-type SendEndpoint func(stream streaming.Stream, message interface{}) (err error)
+type UnaryMiddleware func(next UnaryEndpoint) UnaryEndpoint
 
-// SendMiddleware deal with input Endpoint and output Endpoint.
-type SendMiddleware func(next SendEndpoint) SendEndpoint
+type UnaryMiddlewareBuilder func(ctx context.Context) UnaryMiddleware
 
-// SendMiddlewareBuilder builds a middleware with information from a context.
-type SendMiddlewareBuilder func(ctx context.Context) SendMiddleware
-
-// SendChain connect middlewares into one middleware.
-func SendChain(mws ...SendMiddleware) SendMiddleware {
-	return func(next SendEndpoint) SendEndpoint {
+func UnaryChain(mws ...UnaryMiddleware) UnaryMiddleware {
+	return func(next UnaryEndpoint) UnaryEndpoint {
 		for i := len(mws) - 1; i >= 0; i-- {
 			next = mws[i](next)
 		}
 		return next
+	}
+}
+
+func (mw UnaryMiddleware) ToMiddleware() Middleware {
+	return func(next Endpoint) Endpoint {
+		return Endpoint(mw(UnaryEndpoint(next)))
 	}
 }

@@ -25,6 +25,7 @@ import (
 )
 
 // Stream both client and server stream
+// Deprecated: It's only for gRPC, use ClientStream or ServerStream instead.
 type Stream interface {
 	// SetHeader sets the header metadata. It may be called multiple times.
 	// When call multiple times, all the provided metadata will be merged.
@@ -66,12 +67,27 @@ type WithDoFinish interface {
 	DoFinish(error)
 }
 
+// CloseCallbackRegister register a callback when stream closed.
+type CloseCallbackRegister interface {
+	RegisterCloseCallback(cb func(error))
+}
+
 // Args endpoint request
 type Args struct {
+	ServerStream ServerStream
+	ClientStream ClientStream
+	// for gRPC compatible
 	Stream Stream
 }
 
 // Result endpoint response
 type Result struct {
+	ServerStream ServerStream
+	ClientStream ClientStream
+	// for gRPC compatible
 	Stream Stream
+}
+
+type GRPCStreamGetter interface {
+	GetGRPCStream() Stream
 }
