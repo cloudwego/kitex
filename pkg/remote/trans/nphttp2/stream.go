@@ -18,6 +18,7 @@ package nphttp2
 
 import (
 	"context"
+	"errors"
 	"net"
 
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -243,13 +244,13 @@ func (s *clientStream) Header() (streaming.Header, error) {
 	if err != nil {
 		return nil, err
 	}
-	return http2MDToStreamingHeader(hd), nil
+	return http2MDToStreamingHeader(hd)
 }
 
 func (s *clientStream) Trailer() (streaming.Trailer, error) {
 	sc := s.conn.(*clientConn)
 	tl := sc.Trailer()
-	return http2MDToStreamingTrailer(tl), nil
+	return http2MDToStreamingTrailer(tl)
 }
 
 func (s *clientStream) RecvMsg(ctx context.Context, m interface{}) error {
@@ -323,24 +324,45 @@ func streamingTrailerToHTTP2MD(trailer streaming.Trailer) metadata.MD {
 	return md
 }
 
-func http2MDToStreamingHeader(md metadata.MD) streaming.Header {
+var handleStreamingMultipleValues func(k string, v []string) string
+
+// HandleStreamingMultipleValues is used to register a handler to handle the scene
+// when the value of the key is zero or more than one.
+// e.g.
+//
+//	nphttp2.HandleStreamingMultipleValues(func(k string, v []string) string {
+//		return v[0]
+//	})
+func HandleStreamingMultipleValues(hd func(k string, v []string) string) {
+	handleStreamingMultipleValues = hd
+}
+
+func http2MDToStreamingHeader(md metadata.MD) (streaming.Header, error) {
 	header := streaming.Header{}
 	for k, v := range md {
-		if len(v) > 1 {
-			panic("cannot convert http2 metadata to streaming header, because the value of key " + k + " is more than one")
+		if len(v) > 1 || len(v) == 0 {
+			if handleStreamingMultipleValues != nil {
+				header[k] = handleStreamingMultipleValues(k, v)
+				continue
+			}
+			return nil, errors.New("cannot convert http2 metadata to streaming header, because the value of key " + k + " is zero or more than one")
 		}
 		header[k] = v[0]
 	}
-	return header
+	return header, nil
 }
 
-func http2MDToStreamingTrailer(md metadata.MD) streaming.Trailer {
+func http2MDToStreamingTrailer(md metadata.MD) (streaming.Trailer, error) {
 	trailer := streaming.Trailer{}
 	for k, v := range md {
-		if len(v) > 1 {
-			panic("cannot convert http2 metadata to streaming trailer, because the value of key " + k + " is more than one")
+		if len(v) > 1 || len(v) == 0 {
+			if handleStreamingMultipleValues != nil {
+				trailer[k] = handleStreamingMultipleValues(k, v)
+				continue
+			}
+			return nil, errors.New("cannot convert http2 metadata to streaming trailer, because the value of key " + k + " is zero or more than one")
 		}
 		trailer[k] = v[0]
 	}
-	return trailer
+	return trailer, nil
 }

@@ -18,7 +18,7 @@ package endpoint
 
 import "context"
 
-type UnaryEndpoint func(ctx context.Context, req, resp interface{}) (err error)
+type UnaryEndpoint Endpoint
 
 type UnaryMiddleware func(next UnaryEndpoint) UnaryEndpoint
 
