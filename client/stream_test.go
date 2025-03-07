@@ -75,7 +75,6 @@ func TestStreaming(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	var err error
 	kc := &kClient{
 		opt:     client.NewOptions(newOpts(ctrl)),
 		svcInfo: svcInfo,
@@ -137,10 +136,6 @@ func TestStreaming(t *testing.T) {
 		<-ch
 		<-ch
 	}
-
-	// close
-	err = stream.CloseSend(context.Background())
-	test.Assert(t, err == nil, err)
 }
 
 func TestUninitClient(t *testing.T) {

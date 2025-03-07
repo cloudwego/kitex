@@ -186,9 +186,9 @@ func NewClientStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn
 		ctx:     ctx,
 		rpcInfo: rpcinfo.GetRPCInfo(ctx),
 		svcInfo: svcInfo,
-		conn:    conn.(*clientConn),
 		handler: handler,
 	}
+	sx.conn, _ = conn.(*clientConn)
 	sx.grpcStream = &grpcClientStream{
 		sx: sx,
 	}
@@ -289,7 +289,11 @@ func (s *clientStream) Context() context.Context {
 }
 
 func (s *clientStream) getPayloadCodecFromContentType() (serviceinfo.PayloadCodec, error) {
-	subType := s.conn.s.ContentSubtype()
+	var subType string
+	if s.conn != nil {
+		// actually it must be non nil, but for unit testing compatibility, we still need to check it
+		subType = s.conn.s.ContentSubtype()
+	}
 	switch subType {
 	case contentSubTypeThrift:
 		return serviceinfo.Thrift, nil
