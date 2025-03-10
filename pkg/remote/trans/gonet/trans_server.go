@@ -157,7 +157,7 @@ type bufioConn struct {
 func newBufioConn(c net.Conn) *bufioConn {
 	return &bufioConn{
 		conn: c,
-		r:    netpoll.NewReaderReuseBuffer(c),
+		r:    netpoll.NewReader(c),
 	}
 }
 
