@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 CloudWeGo Authors
+ * Copyright 2025 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,19 +14,17 @@
  * limitations under the License.
  */
 
-package streamxserver
+package client
 
 import (
-	internal_server "github.com/cloudwego/kitex/internal/server"
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/cloudwego/kitex/server"
 )
 
-// WithStreamMiddleware currently is not open for users to use for now
-// so it's include in internal package
-func WithStreamMiddleware(mw streamx.StreamMiddleware) server.Option {
-	return server.Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		o.StreamX.StreamMiddlewares = append(o.StreamX.StreamMiddlewares, mw)
-	}}
+type TTHeaderStreamingOption struct {
+	F func(o *TTHeaderStreamingOptions, di *utils.Slice)
+}
+
+type TTHeaderStreamingOptions struct {
+	ProviderOptions []ttstream.ClientProviderOption
 }

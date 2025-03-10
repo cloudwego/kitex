@@ -32,24 +32,19 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/streaming"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/kitex/server/streamxserver"
 )
 
 var testServiceInfo = &serviceinfo.ServiceInfo{
 	ServiceName: "kitex.service.streaming",
 	Methods: map[string]serviceinfo.MethodInfo{
 		"Bidi": serviceinfo.NewMethodInfo(
-			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamxserver.InvokeBidiStreamHandler[testRequest, testResponse](
-					ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs),
-					func(ctx context.Context, stream streamx.BidiStreamingServer[testRequest, testResponse]) error {
-						return nil
-					},
-				)
+			func(ctx context.Context, handler, arg, res interface{}) error {
+				return nil
 			},
 			nil,
 			nil,
@@ -68,7 +63,7 @@ func TestTransportBasic(t *testing.T) {
 
 	intHeader := make(IntHeader)
 	intHeader[0] = "test"
-	strHeader := make(streamx.Header)
+	strHeader := make(streaming.Header)
 	strHeader["key"] = "val"
 	ctrans := newTransport(clientTransport, cconn, nil)
 	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", intHeader, strHeader)
@@ -137,7 +132,7 @@ func TestTransportServerStreaming(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	intHeader := make(IntHeader)
-	strHeader := make(streamx.Header)
+	strHeader := make(streaming.Header)
 	ctrans := newTransport(clientTransport, cconn, nil)
 	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", intHeader, strHeader)
 	test.Assert(t, err == nil, err)
@@ -203,7 +198,7 @@ func TestTransportException(t *testing.T) {
 
 	// server send data
 	ctrans := newTransport(clientTransport, cconn, nil)
-	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", make(IntHeader), make(streamx.Header))
+	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", make(IntHeader), make(streaming.Header))
 	test.Assert(t, err == nil, err)
 	strans := newTransport(serverTransport, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
@@ -233,7 +228,7 @@ func TestTransportException(t *testing.T) {
 	time.Sleep(time.Millisecond * 50)
 
 	// server send illegal frame
-	rawClientStream, err = ctrans.WriteStream(context.Background(), "Bidi", make(IntHeader), make(streamx.Header))
+	rawClientStream, err = ctrans.WriteStream(context.Background(), "Bidi", make(IntHeader), make(streaming.Header))
 	test.Assert(t, err == nil, err)
 	rawServerStream, err = strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)

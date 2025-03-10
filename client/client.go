@@ -25,8 +25,6 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	"github.com/cloudwego/kitex/pkg/streamx"
-
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession/backup"
 
@@ -37,6 +35,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/endpoint/cep"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -52,6 +51,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
 	"github.com/cloudwego/kitex/transport"
@@ -69,14 +69,8 @@ type Client interface {
 
 type kClient struct {
 	svcInfo *serviceinfo.ServiceInfo
-	mws     []endpoint.Middleware
-	eps     endpoint.Endpoint
-	sEps    endpoint.Endpoint
-
-	// streamx
-	sxStreamMW     streamx.StreamMiddleware
-	sxStreamRecvMW streamx.StreamRecvMiddleware
-	sxStreamSendMW streamx.StreamSendMiddleware
+	eps     endpoint.UnaryEndpoint
+	sEps    cep.StreamEndpoint
 
 	opt *client.Options
 	lbf *lbcache.BalancerFactory
@@ -137,11 +131,10 @@ func (kc *kClient) init() (err error) {
 		return err
 	}
 	ctx := kc.initContext()
-	kc.initMiddlewares(ctx)
-	kc.initStreamMiddlewares(ctx)
+	mw := kc.initMiddlewares(ctx)
 	kc.initDebugService()
 	kc.richRemoteOption()
-	if err = kc.buildInvokeChain(); err != nil {
+	if err = kc.buildInvokeChain(mw); err != nil {
 		return err
 	}
 	if err = kc.warmingUp(); err != nil {
@@ -166,13 +159,13 @@ func (kc *kClient) initCircuitBreaker() error {
 }
 
 func (kc *kClient) initRetryer() error {
-	if kc.opt.RetryContainer == nil {
-		if kc.opt.RetryMethodPolicies == nil {
+	if kc.opt.UnaryOptions.RetryContainer == nil {
+		if kc.opt.UnaryOptions.RetryMethodPolicies == nil {
 			return nil
 		}
 		kc.opt.InitRetryContainer()
 	}
-	return kc.opt.RetryContainer.Init(kc.opt.RetryMethodPolicies, kc.opt.RetryWithResult)
+	return kc.opt.UnaryOptions.RetryContainer.Init(kc.opt.UnaryOptions.RetryMethodPolicies, kc.opt.UnaryOptions.RetryWithResult)
 }
 
 func (kc *kClient) initContext() context.Context {
@@ -281,31 +274,64 @@ func (kc *kClient) initLBCache() error {
 	return nil
 }
 
-func (kc *kClient) initMiddlewares(ctx context.Context) {
-	builderMWs := richMWsWithBuilder(ctx, kc.opt.MWBs)
-	// integrate xds if enabled
-	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {
-		kc.mws = append(kc.mws, kc.opt.XDSRouterMiddleware)
-	}
-	kc.mws = append(kc.mws, kc.opt.CBSuite.ServiceCBMW(), rpcTimeoutMW(ctx), contextMW)
-	kc.mws = append(kc.mws, builderMWs...)
-	kc.mws = append(kc.mws, acl.NewACLMiddleware(kc.opt.ACLRules))
-	if kc.opt.Proxy == nil {
-		kc.mws = append(kc.mws, newResolveMWBuilder(kc.lbf)(ctx))
-		kc.mws = append(kc.mws, kc.opt.CBSuite.InstanceCBMW())
-		kc.mws = append(kc.mws, richMWsWithBuilder(ctx, kc.opt.IMWBs)...)
-	} else {
-		if kc.opt.Resolver != nil { // customized service discovery
-			kc.mws = append(kc.mws, newResolveMWBuilder(kc.lbf)(ctx))
-		}
-		kc.mws = append(kc.mws, newProxyMW(kc.opt.Proxy))
-	}
-	kc.mws = append(kc.mws, newIOErrorHandleMW(kc.opt.ErrHandle))
+type middleware struct {
+	// unary middleware
+	mws  []endpoint.Middleware      // wrap the mws at `context mw -> customized mws -> other mws`
+	uMws []endpoint.UnaryMiddleware // wrap the mws at `service cb mw -> xds router -> rpctimeout mw -> customized unary mws`
+
+	// streaming middleware
+	smws []endpoint.Middleware  // wrap the mws at `xds router -> context mw -> customized mws -> other mws`
+	sMws []cep.StreamMiddleware // wrap the mws at `service cb mw -> customized stream mws`
 }
 
-func (kc *kClient) initStreamMiddlewares(ctx context.Context) {
-	kc.opt.Streaming.EventHandler = kc.opt.TracerCtl.GetStreamEventHandler()
+// For unary:
+// service cb mw -> xds router -> rpctimeout mw -> customized unary mws -> context mw -> customized mws -> other mws
+
+// For streaming:
+// service cb mw -> customized stream mws -> xds router -> context mw -> customized mws -> other mws
+
+// The reason why the xds router must be placed before the timeout middleware is that the timeout configuration is
+// obtained from the rds config, and the timeout middleware only takes effect in the unary scenario.
+// Therefore, in the streaming scenario, the xds router can be placed after the stream middleware.
+func (kc *kClient) initMiddlewares(ctx context.Context) (mw middleware) {
+	// 1. universal middlewares
+	builderMWs := richMWsWithBuilder(ctx, kc.opt.MWBs)
+	mw.mws = append(mw.mws, contextMW)
+	mw.mws = append(mw.mws, builderMWs...)
+	mw.mws = append(mw.mws, acl.NewACLMiddleware(kc.opt.ACLRules))
+	if kc.opt.Proxy == nil {
+		mw.mws = append(mw.mws, newResolveMWBuilder(kc.lbf)(ctx))
+		mw.mws = append(mw.mws, kc.opt.CBSuite.InstanceCBMW())
+		mw.mws = append(mw.mws, richMWsWithBuilder(ctx, kc.opt.IMWBs)...)
+	} else {
+		if kc.opt.Resolver != nil { // customized service discovery
+			mw.mws = append(mw.mws, newResolveMWBuilder(kc.lbf)(ctx))
+		}
+		mw.mws = append(mw.mws, newProxyMW(kc.opt.Proxy))
+	}
+	mw.mws = append(mw.mws, newIOErrorHandleMW(kc.opt.ErrHandle))
+
+	// 2. unary middlewares
+	mw.uMws = append(mw.uMws, kc.opt.CBSuite.ServiceCBMW().ToUnaryMiddleware())
+	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {
+		// integrate xds if enabled
+		mw.uMws = append(mw.uMws, kc.opt.XDSRouterMiddleware.ToUnaryMiddleware())
+	}
+	mw.uMws = append(mw.uMws, rpcTimeoutMW(ctx))
+	kc.opt.UnaryOptions.InitMiddlewares(ctx)
+	mw.uMws = append(mw.uMws, kc.opt.UnaryOptions.UnaryMiddlewares...)
+
+	// 3. stream middlewares
 	kc.opt.Streaming.InitMiddlewares(ctx)
+	kc.opt.StreamOptions.EventHandler = kc.opt.TracerCtl.GetStreamEventHandler()
+	mw.smws = mw.mws
+	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {
+		// integrate xds if enabled
+		mw.smws = append([]endpoint.Middleware{kc.opt.XDSRouterMiddleware}, mw.smws...)
+	}
+	kc.opt.StreamOptions.InitMiddlewares(ctx)
+	mw.sMws = append([]cep.StreamMiddleware{kc.opt.CBSuite.StreamingServiceCBMW()}, kc.opt.StreamOptions.StreamMiddlewares...)
+	return
 }
 
 func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) (mws []endpoint.Middleware) {
@@ -365,7 +391,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	}()
 
 	callOptRetry := getCalloptRetryPolicy(callOpts)
-	if kc.opt.RetryContainer == nil && callOptRetry != nil && callOptRetry.Enable {
+	if kc.opt.UnaryOptions.RetryContainer == nil && callOptRetry != nil && callOptRetry.Enable {
 		// setup retry in callopt
 		kc.opt.InitRetryContainer()
 	}
@@ -373,7 +399,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	// Add necessary keys to context for isolation between kitex client method calls
 	ctx = retry.PrepareRetryContext(ctx)
 
-	if kc.opt.RetryContainer == nil {
+	if kc.opt.UnaryOptions.RetryContainer == nil {
 		// call without retry policy
 		err = kc.eps(ctx, request, response)
 		if err == nil {
@@ -381,7 +407,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 		}
 	} else {
 		var lastRI rpcinfo.RPCInfo
-		lastRI, recycleRI, err = kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
+		lastRI, recycleRI, err = kc.opt.UnaryOptions.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
 		if ri != lastRI {
 			// reset ri of ctx to lastRI
 			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, lastRI)
@@ -390,7 +416,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	}
 
 	// do fallback if with setup
-	err, reportErr = doFallbackIfNeeded(ctx, ri, request, response, err, kc.opt.Fallback, callOpts)
+	err, reportErr = doFallbackIfNeeded(ctx, ri, request, response, err, kc.opt.UnaryOptions.Fallback, callOpts)
 	return err
 }
 
@@ -444,20 +470,30 @@ func (kc *kClient) richRemoteOption() {
 	}
 }
 
-func (kc *kClient) buildInvokeChain() error {
-	mwchain := endpoint.Chain(kc.mws...)
-
+func (kc *kClient) buildInvokeChain(mw middleware) error {
 	innerHandlerEp, err := kc.invokeHandleEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.eps = mwchain(innerHandlerEp)
+	eps := endpoint.Chain(mw.mws...)(innerHandlerEp)
+
+	kc.eps = endpoint.UnaryChain(mw.uMws...)(func(ctx context.Context, req, resp interface{}) (err error) {
+		return eps(ctx, req, resp)
+	})
 
 	innerStreamingEp, err := kc.invokeStreamingEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.sEps = mwchain(innerStreamingEp)
+	sEps := endpoint.Chain(mw.smws...)(innerStreamingEp)
+	kc.sEps = cep.StreamChain(mw.sMws...)(func(ctx context.Context) (st streaming.ClientStream, err error) {
+		resp := &streaming.Result{}
+		err = sEps(ctx, nil, resp)
+		if err != nil {
+			return nil, err
+		}
+		return resp.ClientStream, nil
+	})
 	return nil
 }
 
@@ -740,7 +776,16 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 	)
 
 	if mi != nil {
-		ri.Invocation().(rpcinfo.InvocationSetter).SetStreamingMode(mi.StreamingMode())
+		sm := mi.StreamingMode()
+		ri.Invocation().(rpcinfo.InvocationSetter).SetStreamingMode(sm)
+		if sm == serviceinfo.StreamingClient || sm == serviceinfo.StreamingServer || sm == serviceinfo.StreamingBidirectional {
+			cfg.SetInteractionMode(rpcinfo.Streaming)
+		}
+	}
+	// add grpc transport protocol for better forward compatibility
+	if ri.Config().TransportProtocol()&(transport.GRPC|transport.GRPCStreaming) == transport.GRPCStreaming &&
+		ri.Config().InteractionMode() == rpcinfo.Streaming {
+		cfg.SetTransportProtocol(transport.GRPC)
 	}
 	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
 		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))
@@ -753,9 +798,7 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 			_ = cfg.SetReadWriteTimeout(c.ReadWriteTimeout())
 		}
 	}
-
-	// streamx config
-	sopt := opt.StreamX
+	sopt := opt.StreamOptions
 	if sopt.RecvTimeout > 0 {
 		cfg.SetStreamRecvTimeout(sopt.RecvTimeout)
 	}

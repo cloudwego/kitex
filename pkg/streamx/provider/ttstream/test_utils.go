@@ -24,7 +24,7 @@ import (
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 func newTestStreamPipe(sinfo *serviceinfo.ServiceInfo, method string) (*clientStream, *serverStream, error) {
@@ -39,7 +39,7 @@ func newTestStreamPipe(sinfo *serviceinfo.ServiceInfo, method string) (*clientSt
 	}
 
 	intHeader := make(IntHeader)
-	strHeader := make(streamx.Header)
+	strHeader := make(streaming.Header)
 	ctrans := newTransport(clientTransport, cconn, nil)
 	rawClientStream, err := ctrans.WriteStream(context.Background(), method, intHeader, strHeader)
 	if err != nil {

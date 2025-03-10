@@ -32,3 +32,9 @@ func WithServerHeaderFrameHandler(handler HeaderFrameReadHandler) ServerProvider
 		sp.headerHandler = handler
 	}
 }
+
+// ServerProviderOptionApplier is used to apply server provider options
+// TODO: remove this interface
+type ServerProviderOptionApplier interface {
+	ApplyServerProviderOption(opts ...ServerProviderOption)
+}

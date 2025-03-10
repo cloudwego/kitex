@@ -52,6 +52,18 @@ type Option = client.Option
 // Options is used to initialize a client.
 type Options = client.Options
 
+type UnaryOption = client.UnaryOption
+
+type UnaryOptions = client.UnaryOptions
+
+type StreamOption = client.StreamOption
+
+type StreamOptions = client.StreamOptions
+
+type TTHeaderStreamingOption = client.TTHeaderStreamingOption
+
+type TTHeaderStreamingOptions = client.TTHeaderStreamingOptions
+
 // A Suite is a collection of Options. It is useful to assemble multiple associated
 // Options as a single one to keep the order or presence in a desired manner.
 type Suite interface {
@@ -230,6 +242,9 @@ func WithLoadBalancer(lb loadbalance.Loadbalancer, opts ...*lbcache.Options) Opt
 }
 
 // WithRPCTimeout specifies the RPC timeout.
+//
+// Warning: WithRPCTimeout is only effective for unary methods.
+// It's recommended to use WithUnaryOptions(WithUnaryRPCTimeout(d)) instead.
 func WithRPCTimeout(d time.Duration) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithRPCTimeout(%dms)", d.Milliseconds()))
@@ -253,7 +268,7 @@ func WithConnectTimeout(d time.Duration) Option {
 // Note that the timeout settings provided by the TimeoutProvider
 // will be applied before the other timeout options in this package
 // and those in the callopt package. Thus it can not modify the
-// timeouts set by WithRPCTimeout or WithConnectTimeout.
+// timeouts set by WithRPCTimeout, WithUnaryRPCTimeout or WithConnectTimeout.
 func WithTimeoutProvider(p rpcinfo.TimeoutProvider) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithTimeoutProvider(%T(%+v))", p, p))
@@ -319,54 +334,63 @@ func WithConnReporterEnabled() Option {
 	}}
 }
 
-// WithFailureRetry sets the failure retry policy for client, it will take effect for all methods.
+// WithFailureRetry sets the failure retry policy for client.
+//
+// NOTICE: WithFailureRetry is only effective for all unary methods.
+// May provide WithUnaryOptions(WithUnaryFailureRetry(d)) option later which is more recommended.
 func WithFailureRetry(p *retry.FailurePolicy) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if p == nil {
 			return
 		}
 		di.Push(fmt.Sprintf("WithFailureRetry(%+v)", p))
-		if o.RetryMethodPolicies == nil {
-			o.RetryMethodPolicies = make(map[string]retry.Policy)
+		if o.UnaryOptions.RetryMethodPolicies == nil {
+			o.UnaryOptions.RetryMethodPolicies = make(map[string]retry.Policy)
 		}
-		if o.RetryMethodPolicies[retry.Wildcard].MixedPolicy != nil ||
-			o.RetryMethodPolicies[retry.Wildcard].BackupPolicy != nil {
+		if o.UnaryOptions.RetryMethodPolicies[retry.Wildcard].MixedPolicy != nil ||
+			o.UnaryOptions.RetryMethodPolicies[retry.Wildcard].BackupPolicy != nil {
 			panic("MixedPolicy or BackupPolicy has been setup, cannot support Failure Retry at same time")
 		}
-		o.RetryMethodPolicies[retry.Wildcard] = retry.BuildFailurePolicy(p)
+		o.UnaryOptions.RetryMethodPolicies[retry.Wildcard] = retry.BuildFailurePolicy(p)
 	}}
 }
 
-// WithBackupRequest sets the backup request policy for client, it will take effect for all methods.
+// WithBackupRequest sets the backup request policy for client.
+//
+// NOTICE: WithBackupRequest is only effective for all unary methods.
+// May provide WithUnaryOptions(WithUnaryBackupRequest(d)) option later which is more recommended.
 func WithBackupRequest(p *retry.BackupPolicy) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if p == nil {
 			return
 		}
 		di.Push(fmt.Sprintf("WithBackupRequest(%+v)", p))
-		if o.RetryMethodPolicies == nil {
-			o.RetryMethodPolicies = make(map[string]retry.Policy)
+		if o.UnaryOptions.RetryMethodPolicies == nil {
+			o.UnaryOptions.RetryMethodPolicies = make(map[string]retry.Policy)
 		}
-		if o.RetryMethodPolicies[retry.Wildcard].MixedPolicy != nil ||
-			o.RetryMethodPolicies[retry.Wildcard].FailurePolicy != nil {
+		if o.UnaryOptions.RetryMethodPolicies[retry.Wildcard].MixedPolicy != nil ||
+			o.UnaryOptions.RetryMethodPolicies[retry.Wildcard].FailurePolicy != nil {
 			panic("MixedPolicy or BackupPolicy has been setup, cannot support Failure Retry at same time")
 		}
-		o.RetryMethodPolicies[retry.Wildcard] = retry.BuildBackupRequest(p)
+		o.UnaryOptions.RetryMethodPolicies[retry.Wildcard] = retry.BuildBackupRequest(p)
 	}}
 }
 
-// WithMixedRetry sets the mixed retry policy for client, it will take effect for all methods.
+// WithMixedRetry sets the mixed retry policy for client.
+//
+// NOTICE: WithMixedRetry is only effective for all unary methods.
+// May provide WithUnaryOptions(WithUnaryMixedRetry(d)) option later which is more recommended.
 func WithMixedRetry(p *retry.MixedPolicy) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if p == nil {
 			return
 		}
 		di.Push(fmt.Sprintf("WithMixedRetry(%+v)", p))
-		if o.RetryMethodPolicies == nil {
-			o.RetryMethodPolicies = make(map[string]retry.Policy)
+		if o.UnaryOptions.RetryMethodPolicies == nil {
+			o.UnaryOptions.RetryMethodPolicies = make(map[string]retry.Policy)
 		}
 		// no need to check if BackupPolicy or FailurePolicy are been setup, just let mixed retry replace it
-		o.RetryMethodPolicies[retry.Wildcard] = retry.BuildMixedPolicy(p)
+		o.UnaryOptions.RetryMethodPolicies[retry.Wildcard] = retry.BuildMixedPolicy(p)
 	}}
 }
 
@@ -375,20 +399,23 @@ func WithMixedRetry(p *retry.MixedPolicy) Option {
 // this config will use the policy that is configured by WithFailureRetry or WithBackupRequest .
 // FailureRetry and BackupRequest can be set for different method at same time.
 // Notice: method name is case-sensitive, it should be same with the definition in IDL.
+//
+// NOTICE: WithRetryMethodPolicies is only effective for all unary methods.
+// May provide WithUnaryOptions(WithUnaryRetryMethodPolicies(d)) option later which is more recommended.
 func WithRetryMethodPolicies(mp map[string]retry.Policy) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if mp == nil {
 			return
 		}
 		di.Push(fmt.Sprintf("WithRetryMethodPolicies(%+v)", mp))
-		if o.RetryMethodPolicies == nil {
-			o.RetryMethodPolicies = make(map[string]retry.Policy)
+		if o.UnaryOptions.RetryMethodPolicies == nil {
+			o.UnaryOptions.RetryMethodPolicies = make(map[string]retry.Policy)
 		}
-		wildcardCfg := o.RetryMethodPolicies[retry.Wildcard]
-		o.RetryMethodPolicies = mp
+		wildcardCfg := o.UnaryOptions.RetryMethodPolicies[retry.Wildcard]
+		o.UnaryOptions.RetryMethodPolicies = mp
 		if wildcardCfg.Enable && !mp[retry.Wildcard].Enable {
 			// if there is enabled wildcard config before, keep it
-			o.RetryMethodPolicies[retry.Wildcard] = wildcardCfg
+			o.UnaryOptions.RetryMethodPolicies[retry.Wildcard] = wildcardCfg
 		}
 	}}
 }
@@ -397,13 +424,16 @@ func WithRetryMethodPolicies(mp map[string]retry.Policy) Option {
 // When you enable FailureRetry and want to retry with the specified error or response, you can configure this Option.
 // ShouldResultRetry is defined inside retry.FailurePolicy, so WithFailureRetry also can set ShouldResultRetry.
 // But if your retry policy is enabled by remote config, WithSpecifiedResultRetry is useful.
+//
+// NOTICE: WithSpecifiedResultRetry is only effective for all unary methods.
+// May provide WithUnaryOptions(WithUnarySpecifiedResultRetry(d)) option later which is more recommended.
 func WithSpecifiedResultRetry(rr *retry.ShouldResultRetry) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if rr == nil || !rr.IsValid() {
 			panic(fmt.Errorf("WithSpecifiedResultRetry: invalid '%+v'", rr))
 		}
 		di.Push(fmt.Sprintf("WithSpecifiedResultRetry(%+v)", rr))
-		o.RetryWithResult = rr
+		o.UnaryOptions.RetryWithResult = rr
 	}}
 }
 
@@ -416,13 +446,16 @@ func WithSpecifiedResultRetry(rr *retry.ShouldResultRetry) Option {
 //		`client.WithFallback(fallback.ErrorFallback(yourErrFBFunc).EnableReportAsFallback())`
 //	demo2. fallback for rpctime and circuit breaker
 //		`client.WithFallback(fallback.TimeoutAndCBFallback(yourErrFBFunc))`
+//
+// NOTICE: WithFallback is only effective for all unary methods.
+// May provide WithUnaryOptions(WithUnaryFallback(d)) option later which is more recommended.
 func WithFallback(fb *fallback.Policy) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if !fallback.IsPolicyValid(fb) {
 			panic(fmt.Errorf("WithFallback: invalid '%+v'", fb))
 		}
 		di.Push(fmt.Sprintf("WithFallback(%+v)", fb))
-		o.Fallback = fb
+		o.UnaryOptions.Fallback = fb
 	}}
 }
 
