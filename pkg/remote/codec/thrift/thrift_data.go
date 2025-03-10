@@ -63,16 +63,12 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 	if typecodec.Apache {
 		return apacheMarshalData(data)
 	}
-	if c.CodecType != Basic {
-		// try fallback to frugal or fastcodec
-		// case: typecodec.Frugal=false but typecodec.FastCodec=true
-		if typecodec.FastCodec {
-			return fastMarshalData(data)
-		}
-		// case: typecodec.FastCodec=false but typecodec.Frugal=true
-		if typecodec.Frugal {
-			return frugalMarshalData(data)
-		}
+	// try fallback to fastcodec or frugal even though CodecType=Basic
+	if typecodec.FastCodec {
+		return fastMarshalData(data)
+	}
+	if typecodec.Frugal {
+		return frugalMarshalData(data)
 	}
 	return nil, errEncodeMismatchMsgType
 }
@@ -118,16 +114,12 @@ func (c thriftCodec) unmarshalThriftData(trans bufiox.Reader, data interface{}, 
 	if typecodec.Apache {
 		return apacheUnmarshal(trans, data)
 	}
-	if dataLenOK && c.CodecType != Basic {
-		// try fallback to frugal or fastcodec
-		// case: typecodec.Frugal=false but typecodec.FastCodec=true
-		if typecodec.FastCodec {
-			return fastUnmarshal(trans, data, dataLen)
-		}
-		// case: typecodec.FastCodec=false but typecodec.Frugal=true
-		if typecodec.Frugal {
-			return frugalUnmarshal(trans, data, dataLen)
-		}
+	// try fallback to fastcodec or frugal even though CodecType=Basic or EnableSkipDecoder not set
+	if typecodec.FastCodec {
+		return fastUnmarshal(trans, data, dataLen)
+	}
+	if typecodec.Frugal {
+		return frugalUnmarshal(trans, data, dataLen)
 	}
 	return errDecodeMismatchMsgType
 }
