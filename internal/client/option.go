@@ -202,29 +202,26 @@ type Options struct {
 	CtxBackupHandler backup.BackupHandler
 
 	Streaming stream.StreamingConfig // deprecated, use StreamOptions instead
+
+	// TailOptions is used to store options that are executed after all options are applied.
+	// just ignore it unless you clearly know what you are doing.
+	TailOptions []Option
 }
 
 // Apply applies all options.
 func (o *Options) Apply(opts []Option) {
-	reorderOpts := make([]Option, 0, len(opts))
-	finalOpts := make([]Option, 0, len(opts))
 	for _, op := range opts {
-		if op.finalOption {
-			finalOpts = append(finalOpts, op)
-		} else {
-			reorderOpts = append(reorderOpts, op)
-		}
-	}
-	reorderOpts = append(reorderOpts, finalOpts...)
-	for _, op := range reorderOpts {
 		op.F(o, &o.DebugInfo)
 	}
+	for _, op := range o.TailOptions {
+		op.F(o, &o.DebugInfo)
+	}
+	o.TailOptions = nil
 }
 
 // Option is the only way to config client.
 type Option struct {
-	F           func(o *Options, di *utils.Slice)
-	finalOption bool // just ignore it unless you clearly know what you are doing.
+	F func(o *Options, di *utils.Slice)
 }
 
 // NewOptions creates a new option.
