@@ -33,8 +33,8 @@ import (
 )
 
 // NOTICE: These options are used to inject relevant option configurations into the streaming
-// clients that are not based on streamx. After the streamx feature is enabled, the
-// relevant APIs can be reused with the client package. Therefore, they will be marked as deprecated.
+// clients that are not based on streamx. After the streamx feature is enabled, you can reuse the apis
+// in the client package. Therefore, all apis here will be marked as deprecated.
 // For enabling the streamx feature, please refer to https://www.cloudwego.io/docs/kitex/tutorials/basic-feature/streamx/.
 
 // Deprecated: Use client.WithSuite instead, this requires enabling the streamx feature.
