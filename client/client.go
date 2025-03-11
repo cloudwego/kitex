@@ -344,8 +344,9 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) 
 }
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
-func (kc *kClient) initRPCInfo(ctx context.Context, method string, retryTimes int, firstRI rpcinfo.RPCInfo) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
-	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo, retryTimes, firstRI)
+func (kc *kClient) initRPCInfo(ctx context.Context, method string, retryTimes int, firstRI rpcinfo.RPCInfo,
+	streamCall bool) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo, retryTimes, firstRI, streamCall)
 }
 
 func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo, opt *client.Options) (context.Context, *callopt.CallOptions) {
@@ -367,7 +368,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	validateForCall(ctx, kc.inited, kc.closed)
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions
-	ctx, ri, callOpts = kc.initRPCInfo(ctx, method, 0, nil)
+	ctx, ri, callOpts = kc.initRPCInfo(ctx, method, 0, nil, false)
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	var reportErr error
@@ -429,7 +430,7 @@ func (kc *kClient) rpcCallWithRetry(ri rpcinfo.RPCInfo, method string, request, 
 		currCallTimes := int(atomic.AddInt32(&callTimes, 1))
 		cRI := ri
 		if currCallTimes > 1 {
-			ctx, cRI, _ = kc.initRPCInfo(ctx, method, currCallTimes-1, ri)
+			ctx, cRI, _ = kc.initRPCInfo(ctx, method, currCallTimes-1, ri, false)
 			ctx = metainfo.WithPersistentValue(ctx, retry.TransitKey, strconv.Itoa(currCallTimes-1))
 			if prevRI.Load() == nil {
 				prevRI.Store(ri)
@@ -742,7 +743,8 @@ func getFallbackPolicy(cliOptFB *fallback.Policy, callOpts *callopt.CallOptions)
 	return nil, false
 }
 
-func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInfo *serviceinfo.ServiceInfo, retryTimes int, firstRI rpcinfo.RPCInfo) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInfo *serviceinfo.ServiceInfo,
+	retryTimes int, firstRI rpcinfo.RPCInfo, streamCall bool) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
 	cfg := rpcinfo.AsMutableRPCConfig(opt.Configs).Clone()
 	rmt := remoteinfo.NewRemoteInfo(opt.Svr, method)
 	var callOpts *callopt.CallOptions
@@ -776,15 +778,13 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 	)
 
 	if mi != nil {
-		sm := mi.StreamingMode()
-		ri.Invocation().(rpcinfo.InvocationSetter).SetStreamingMode(sm)
-		if sm == serviceinfo.StreamingClient || sm == serviceinfo.StreamingServer || sm == serviceinfo.StreamingBidirectional {
-			cfg.SetInteractionMode(rpcinfo.Streaming)
-		}
+		ri.Invocation().(rpcinfo.InvocationSetter).SetStreamingMode(mi.StreamingMode())
+	}
+	if streamCall {
+		cfg.SetInteractionMode(rpcinfo.Streaming)
 	}
 	// add grpc transport protocol for better forward compatibility
-	if ri.Config().TransportProtocol()&(transport.GRPC|transport.GRPCStreaming) == transport.GRPCStreaming &&
-		ri.Config().InteractionMode() == rpcinfo.Streaming {
+	if ri.Config().TransportProtocol()&(transport.GRPC|transport.GRPCStreaming) == transport.GRPCStreaming && streamCall {
 		cfg.SetTransportProtocol(transport.GRPC)
 	}
 	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
