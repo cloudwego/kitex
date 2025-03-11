@@ -268,6 +268,10 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 	}
 
 	for ast := range trees {
+
+		// Reset libs to empty. When executing next AST, the dependencies left by previous AST should not be retained.
+		p.libs = nil
+
 		// fd.WriteString(p.utils.GetFilename(ast) + "\n")
 		// scope, err := golang.BuildScope(p.utils, ast)
 		scope, _, err := golang.BuildRefScope(p.utils, ast)
