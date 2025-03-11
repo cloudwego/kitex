@@ -444,7 +444,7 @@ func TestWithMuxConnection(t *testing.T) {
 	opts := client.NewOptions([]client.Option{WithMuxConnection(connNum)})
 	test.Assert(t, opts.RemoteOpt.ConnPool != nil)
 	test.Assert(t, opts.RemoteOpt.CliHandlerFactory != nil)
-	test.Assert(t, opts.Configs.TransportProtocol() == transport.TTHeader, opts.Configs.TransportProtocol())
+	test.Assert(t, opts.Configs.TransportProtocol() == transport.TTHeaderFramed, opts.Configs.TransportProtocol())
 }
 
 func TestWithTimeoutProvider(t *testing.T) {

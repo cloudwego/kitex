@@ -171,7 +171,8 @@ func (r *rpcConfig) TransportProtocol() transport.Protocol {
 func (r *rpcConfig) SetTransportProtocol(tp transport.Protocol) error {
 	// PurePayload would override all the bits set before
 	// since in previous implementation, r.transport |= transport.PurePayload would not take effect
-	if tp == transport.PurePayload {
+	// For HTTP or gRPC, we overwrite the old value directly because with the default protocol changed to framed, using overlay is meaningless, you'll get GRPCFramed and HTTPFramed, which look confusing.
+	if tp == transport.PurePayload || tp == transport.HTTP || tp == transport.GRPC {
 		r.transportProtocol = tp
 	} else {
 		r.transportProtocol |= tp
@@ -222,7 +223,8 @@ func (r *rpcConfig) initialize() {
 	r.connectTimeout = defaultConnectTimeout
 	r.readWriteTimeout = defaultReadWriteTimeout
 	r.ioBufferSize = defaultBufferSize
-	r.transportProtocol = 0
+	// Since Kitex v0.13.0, the default transport protocol has been changed to framed from buffered.
+	r.transportProtocol = transport.Framed
 	r.interactionMode = defaultInteractionMode
 }
 

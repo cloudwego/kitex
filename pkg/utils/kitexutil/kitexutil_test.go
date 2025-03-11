@@ -40,7 +40,7 @@ var (
 	testFromAddr       = utils.NewNetAddr("test", "127.0.0.1:12345")
 	testFromMethod     = "from_method"
 	testMethod         = "testMethod"
-	testTp             = transport.TTHeader
+	testTp             = transport.TTHeaderFramed
 )
 
 func TestMain(m *testing.M) {
