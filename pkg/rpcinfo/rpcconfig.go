@@ -171,8 +171,7 @@ func (r *rpcConfig) TransportProtocol() transport.Protocol {
 func (r *rpcConfig) SetTransportProtocol(tp transport.Protocol) error {
 	// PurePayload would override all the bits set before
 	// since in previous implementation, r.transport |= transport.PurePayload would not take effect
-	// For HTTP or gRPC, we overwrite the old value directly because with the default protocol changed to framed, using overlay is meaningless, you'll get GRPCFramed and HTTPFramed, which look confusing.
-	if tp == transport.PurePayload || tp == transport.HTTP || tp == transport.GRPC {
+	if tp == transport.PurePayload {
 		r.transportProtocol = tp
 	} else {
 		r.transportProtocol |= tp
