@@ -264,38 +264,33 @@ func (p *ThriftContentProvider) newDynamicGoDsc(svc *descriptor.ServiceDescripto
 	}
 }
 
-func parseIncludes(tree *parser.Thrift, parsed map[string]*parser.Thrift, sources map[string]string, isAbsIncludePath bool) (err error) {
+func parseIncludes(tree *parser.Thrift, parsed map[string]*parser.Thrift, sources map[string]string) (err error) {
 	for _, i := range tree.Includes {
-		ps := make([]string, 0, 2)
-		if isAbsIncludePath {
-			abs := absPath(tree.Filename, i.Path)
-			if abs != i.Path {
-				ps = append(ps, abs)
-			}
-		}
-		ps = append(ps, i.Path)
-		for _, p := range ps {
-			ref, ok := parsed[p] // avoid infinite recursion
-			if ok {
+		paths := []string{absPath(tree.Filename, i.Path), i.Path}
+
+		for _, p := range paths {
+			// avoid infinite recursion
+			if ref, ok := parsed[p]; ok {
 				i.Reference = ref
-				continue
+				break
 			}
 
-			if src, ok := sources[p]; !ok {
-				if !isAbsIncludePath {
-					return fmt.Errorf("miss include path: %s for file: %s", p, tree.Filename)
+			if src, ok := sources[p]; ok {
+				ref, err := parser.ParseString(p, src)
+				if err != nil {
+					return err
 				}
-				continue
-			} else {
-				if ref, err = parser.ParseString(p, src); err != nil {
-					return
+				parsed[p] = ref
+				i.Reference = ref
+				if err = parseIncludes(ref, parsed, sources); err != nil {
+					return err
 				}
+				break
 			}
-			parsed[p] = ref
-			i.Reference = ref
-			if err = parseIncludes(ref, parsed, sources, isAbsIncludePath); err != nil {
-				return
-			}
+		}
+
+		if i.Reference == nil {
+			return fmt.Errorf("miss include path: %s for file: %s", i.Path, tree.Filename)
 		}
 	}
 	return nil
@@ -322,7 +317,7 @@ func ParseContent(path, content string, includes map[string]string, isAbsInclude
 	}
 	parsed := make(map[string]*parser.Thrift)
 	parsed[path] = tree
-	if err := parseIncludes(tree, parsed, includes, isAbsIncludePath); err != nil {
+	if err := parseIncludes(tree, parsed, includes); err != nil {
 		return nil, err
 	}
 	if cir := parser.CircleDetect(tree); cir != "" {
