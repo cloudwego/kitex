@@ -61,7 +61,7 @@ func NewClient(destService string, opts ...client.Option) (Client, error) {
     {{template "@client.go-NewClient-option" .}}
 	{{if .HasStreaming}}
 	{{- if eq $.Codec "thrift"}}{{/* thrift streaming only enable grpc for streaming methods by default */}}
-	options = append(options, client.WithTransportProtocol(transport.GRPCStreaming))
+	options = append(options, client.WithTransportProtocol(transport.TTHeaderStreaming))
 	{{- else}}
 	options = append(options, client.WithTransportProtocol(transport.GRPC))
 	{{- end}}

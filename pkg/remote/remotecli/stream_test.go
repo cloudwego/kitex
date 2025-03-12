@@ -29,6 +29,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func TestNewStream(t *testing.T) {
@@ -37,6 +38,7 @@ func TestNewStream(t *testing.T) {
 
 	addr := utils.NewNetAddr("tcp", "to")
 	ri := newMockRPCInfo(addr)
+	rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(transport.GRPC)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
 	hdlr := &mocks.MockCliTransHandler{}

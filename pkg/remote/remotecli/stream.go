@@ -19,6 +19,7 @@ package remotecli
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
@@ -37,6 +38,20 @@ func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTra
 		}
 	}
 
+	if ri.Config().TransportProtocol()&transport.GRPC == transport.GRPC {
+		// default is grpc streaming
+		connPool := opt.GRPCStreamingConnPool
+		if connPool == nil {
+			connPool = opt.ConnPool
+		}
+		cm := NewConnWrapper(connPool)
+		rawConn, err := cm.GetConn(ctx, opt.Dialer, ri)
+		if err != nil {
+			return nil, nil, err
+		}
+		return nphttp2.NewClientStream(ctx, opt.SvcInfo, rawConn, handler), &StreamConnManager{cm}, nil
+	}
+
 	// ttheader streaming
 	if ri.Config().TransportProtocol()&transport.TTHeaderStreaming == transport.TTHeaderStreaming {
 		// wrap internal client provider
@@ -46,17 +61,7 @@ func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTra
 		}
 		return cs, nil, nil
 	}
-	// default is grpc streaming
-	connPool := opt.GRPCStreamingConnPool
-	if connPool == nil {
-		connPool = opt.ConnPool
-	}
-	cm := NewConnWrapper(connPool)
-	rawConn, err := cm.GetConn(ctx, opt.Dialer, ri)
-	if err != nil {
-		return nil, nil, err
-	}
-	return nphttp2.NewClientStream(ctx, opt.SvcInfo, rawConn, handler), &StreamConnManager{cm}, nil
+	return nil, nil, fmt.Errorf("no matching transport protocol for stream call, tp=%s", ri.Config().TransportProtocol().String())
 }
 
 // NewStreamConnManager returns a new StreamConnManager

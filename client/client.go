@@ -344,8 +344,9 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) 
 }
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
-func (kc *kClient) initRPCInfo(ctx context.Context, method string, retryTimes int, firstRI rpcinfo.RPCInfo,
-	streamCall bool) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+func (kc *kClient) initRPCInfo(ctx context.Context, method string, retryTimes int,
+	firstRI rpcinfo.RPCInfo, streamCall bool,
+) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
 	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo, retryTimes, firstRI, streamCall)
 }
 
@@ -744,7 +745,8 @@ func getFallbackPolicy(cliOptFB *fallback.Policy, callOpts *callopt.CallOptions)
 }
 
 func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInfo *serviceinfo.ServiceInfo,
-	retryTimes int, firstRI rpcinfo.RPCInfo, streamCall bool) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+	retryTimes int, firstRI rpcinfo.RPCInfo, streamCall bool,
+) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
 	cfg := rpcinfo.AsMutableRPCConfig(opt.Configs).Clone()
 	rmt := remoteinfo.NewRemoteInfo(opt.Svr, method)
 	var callOpts *callopt.CallOptions
