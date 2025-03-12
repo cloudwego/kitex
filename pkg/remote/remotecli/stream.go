@@ -38,8 +38,10 @@ func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTra
 		}
 	}
 
-	if ri.Config().TransportProtocol()&transport.GRPC == transport.GRPC {
-		// default is grpc streaming
+	tp := ri.Config().TransportProtocol()
+
+	if tp&transport.GRPC == transport.GRPC {
+		// grpc streaming
 		connPool := opt.GRPCStreamingConnPool
 		if connPool == nil {
 			connPool = opt.ConnPool
@@ -53,7 +55,7 @@ func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTra
 	}
 
 	// ttheader streaming
-	if ri.Config().TransportProtocol()&transport.TTHeaderStreaming == transport.TTHeaderStreaming {
+	if tp&transport.TTHeaderStreaming == transport.TTHeaderStreaming {
 		// wrap internal client provider
 		cs, err := opt.TTHeaderStreamingProvider.NewStream(ctx, ri)
 		if err != nil {
@@ -61,7 +63,7 @@ func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTra
 		}
 		return cs, nil, nil
 	}
-	return nil, nil, fmt.Errorf("no matching transport protocol for stream call, tp=%s", ri.Config().TransportProtocol().String())
+	return nil, nil, fmt.Errorf("no matching transport protocol for stream call, tp=%s", tp.String())
 }
 
 // NewStreamConnManager returns a new StreamConnManager
