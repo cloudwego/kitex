@@ -37,6 +37,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/transport"
 )
 
 var (
@@ -64,6 +65,7 @@ func TestStream(t *testing.T) {
 		opt:     client.NewOptions(newOpts(ctrl)),
 		svcInfo: svcInfo,
 	}
+	rpcinfo.AsMutableRPCConfig(kc.opt.Configs).SetTransportProtocol(transport.GRPCStreaming)
 
 	_ = kc.init()
 
@@ -91,6 +93,7 @@ func TestStreaming(t *testing.T) {
 		rpcinfo.NewRPCConfig(),
 		rpcinfo.NewRPCStats(),
 	)
+	rpcinfo.AsMutableRPCConfig(mockRPCInfo.Config()).SetTransportProtocol(transport.GRPC)
 	ctx = rpcinfo.NewCtxWithRPCInfo(context.Background(), mockRPCInfo)
 
 	cliInfo := new(remote.ClientOption)

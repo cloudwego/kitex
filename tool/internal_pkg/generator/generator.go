@@ -642,18 +642,28 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 }
 
 func needCallOpt(pkg *PackageInfo) bool {
-	// callopt is referenced only by non-streaming methods
 	needCallOpt := false
-	switch pkg.Codec {
-	case "thrift":
+	if pkg.StreamX {
 		for _, m := range pkg.ServiceInfo.AllMethods() {
 			if !(m.ClientStreaming || m.ServerStreaming) {
 				needCallOpt = true
 				break
 			}
 		}
-	case "protobuf":
-		needCallOpt = true
+		return needCallOpt
+	} else {
+		// callopt is referenced only by non-streaming methods
+		switch pkg.Codec {
+		case "thrift":
+			for _, m := range pkg.ServiceInfo.AllMethods() {
+				if !m.IsStreaming {
+					needCallOpt = true
+					break
+				}
+			}
+		case "protobuf":
+			needCallOpt = true
+		}
+		return needCallOpt
 	}
-	return needCallOpt
 }
