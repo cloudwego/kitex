@@ -159,6 +159,7 @@ var _ DescriptorProvider = (*ThriftContentProvider)(nil)
 const defaultMainIDLPath = "main.thrift"
 
 // NewThriftContentProvider builder
+// both absolute path search and relative path search are supported.
 func NewThriftContentProvider(main string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
@@ -181,6 +182,7 @@ func NewThriftContentProvider(main string, includes map[string]string, opts ...T
 }
 
 // NewThriftContentProviderWithDynamicGo builder
+// both absolute path search and relative path search are supported
 func NewThriftContentProviderWithDynamicGo(main string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
@@ -338,7 +340,9 @@ type ThriftContentWithAbsIncludePathProvider struct {
 
 var _ DescriptorProvider = (*ThriftContentWithAbsIncludePathProvider)(nil)
 
-// NewThriftContentWithAbsIncludePathProvider create abs include path DescriptorProvider
+// NewThriftContentWithAbsIncludePathProvider create path DescriptorProvider
+// both absolute path search and relative path search are supported.
+// the only difference from NewThriftContentProvider is the first argument type.
 func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentWithAbsIncludePathProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
@@ -365,7 +369,9 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 	return p, nil
 }
 
-// NewThriftContentWithAbsIncludePathProviderWithDynamicGo create abs include path DescriptorProvider with dynamicgo
+// NewThriftContentWithAbsIncludePathProviderWithDynamicGo create DescriptorProvider with dynamicgo
+// both absolute path search and relative path search are supported.
+// the only difference from NewThriftContentProviderWithDynamicGo is the first argument type.
 func NewThriftContentWithAbsIncludePathProviderWithDynamicGo(mainIDLPath string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentWithAbsIncludePathProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
