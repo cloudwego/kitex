@@ -57,8 +57,6 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 	var ri rpcinfo.RPCInfo
 	ctx, ri, _ = kc.initRPCInfo(ctx, method, 0, nil, true)
 
-	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	cs, err := kc.sEps(ctx)
 	if err != nil {
@@ -91,8 +89,6 @@ func (kc *kClient) StreamX(ctx context.Context, method string) (streaming.Client
 	}
 	var ri rpcinfo.RPCInfo
 	ctx, ri, _ = kc.initRPCInfo(ctx, method, 0, nil, true)
-
-	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	cs, err := kc.sEps(ctx)
