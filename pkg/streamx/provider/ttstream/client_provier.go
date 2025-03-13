@@ -18,7 +18,6 @@ package ttstream
 
 import (
 	"context"
-	"runtime"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
@@ -99,6 +98,5 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 	}
 
 	cs := newClientStream(s)
-	runtime.SetFinalizer(cs, clientStreamFinalizer)
 	return cs, err
 }
