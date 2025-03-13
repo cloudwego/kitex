@@ -24,15 +24,32 @@ type Protocol int
 const (
 	PurePayload Protocol = 0
 
-	TTHeader          Protocol = 1 << iota // unary methods only
-	Framed                                 // unary methods only
-	HTTP                                   // unary methods only
-	GRPC                                   // both support unary and streaming methods
-	HESSIAN2                               // unary methods only
-	TTHeaderStreaming                      // streaming methods only
-	GRPCStreaming                          // streaming methods only
+	// TTHeader unary methods only
+	TTHeader Protocol = 1 << iota
 
-	TTHeaderFramed = TTHeader | Framed // unary methods only
+	// Framed unary methods only
+	Framed
+
+	// HTTP unary methods only
+	HTTP
+
+	// GRPC indicates all methods (including unary and streaming) using grpc protocol.
+	GRPC
+
+	// HESSIAN2 unary methods only
+	HESSIAN2
+
+	// TTHeaderStreaming indicates all streaming methods using ttheader streaming protocol,
+	// and it doesn't affect the protocol of all unary methods.
+	TTHeaderStreaming
+
+	// GRPCStreaming indicates all streaming methods using grpc protocol,
+	// and it doesn't affect the protocol of all unary methods.
+	// NOTE: only used in global config of the client side.
+	GRPCStreaming
+
+	// TTHeaderFramed unary methods only
+	TTHeaderFramed = TTHeader | Framed
 )
 
 // Unknown indicates the protocol is unknown.

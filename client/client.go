@@ -744,6 +744,29 @@ func getFallbackPolicy(cliOptFB *fallback.Policy, callOpts *callopt.CallOptions)
 	return nil, false
 }
 
+// purifyProtocol purifies the transport protocol for one rpc request according to whether it's stream call or not.
+// It simplifies the latter judgement logic to avoid processing multiple mixed protocols.
+func purifyProtocol(cfg rpcinfo.MutableRPCConfig, tp transport.Protocol, streamCall bool) {
+	cfg.SetTransportProtocol(transport.PurePayload) // reset transport protocol to pure payload
+	if streamCall {
+		if tp&(transport.GRPC|transport.GRPCStreaming) != 0 {
+			// reset to grpc transport protocol for better forward compatibility
+			tp = transport.GRPC
+		} else if tp&transport.TTHeaderStreaming != 0 {
+			// also add TTHeaderFramed to be compatible with protocol judgement logic,
+			// cuz to some extent, TTHeaderStreaming is also part of the ttheader protocol.
+			tp = transport.TTHeaderStreaming | transport.TTHeaderFramed
+		}
+	} else {
+		if tp&transport.GRPC != 0 {
+			tp = transport.GRPC
+		} else if tp&(transport.TTHeaderStreaming|transport.GRPCStreaming) != 0 {
+			tp = tp &^ (transport.TTHeaderStreaming | transport.GRPCStreaming) // remove streaming protocol
+		}
+	}
+	cfg.SetTransportProtocol(tp)
+}
+
 func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInfo *serviceinfo.ServiceInfo,
 	retryTimes int, firstRI rpcinfo.RPCInfo, streamCall bool,
 ) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
@@ -785,10 +808,9 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 	if streamCall {
 		cfg.SetInteractionMode(rpcinfo.Streaming)
 	}
-	// add grpc transport protocol for better forward compatibility
-	if ri.Config().TransportProtocol()&(transport.GRPC|transport.GRPCStreaming) == transport.GRPCStreaming && streamCall {
-		cfg.SetTransportProtocol(transport.GRPC)
-	}
+
+	purifyProtocol(cfg, ri.Config().TransportProtocol(), streamCall)
+
 	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
 		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))
 	}
