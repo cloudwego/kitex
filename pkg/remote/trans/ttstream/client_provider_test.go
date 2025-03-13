@@ -14,17 +14,21 @@
  * limitations under the License.
  */
 
-package client
+package ttstream
 
 import (
-	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream"
-	"github.com/cloudwego/kitex/pkg/utils"
+	"context"
+	"sync/atomic"
+	"testing"
+
+	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
 )
 
-type TTHeaderStreamingOption struct {
-	F func(o *TTHeaderStreamingOptions, di *utils.Slice)
-}
-
-type TTHeaderStreamingOptions struct {
-	TransportOptions []ttstream.ClientProviderOption
+func Test_registerStreamCancelCallback(t *testing.T) {
+	ctx, cancel := ktx.WithCancel(context.Background())
+	s := &stream{peerEOF: 1}
+	registerStreamCancelCallback(ctx, s)
+	cancel()
+	test.Assert(t, atomic.LoadInt32(&s.selfEOF) == 1)
 }

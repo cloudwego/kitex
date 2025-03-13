@@ -76,9 +76,3 @@ func (s *clientStream) CloseSend(ctx context.Context) error {
 func (s *clientStream) Context() context.Context {
 	return s.ctx
 }
-
-func clientStreamFinalizer(s *clientStream) {
-	// it's safe to call CloseSend twice
-	// we do CloseSend here to ensure stream can be closed normally
-	_ = s.CloseSend(context.Background())
-}

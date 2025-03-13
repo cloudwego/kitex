@@ -41,11 +41,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -129,7 +129,7 @@ type TTHeaderStreamingOption struct {
 }
 
 type TTHeaderStreamingOptions struct {
-	ProviderOptions []ttstream.ServerProviderOption
+	TransportOptions []ttstream.ServerProviderOption
 }
 
 // Option is the only way to config a server.
@@ -222,7 +222,7 @@ func NewOptions(opts []Option) *Options {
 	}
 	ApplyOptions(opts, o)
 	// todo: must be removed in the future
-	ttstreamProvider.(ttstream.ServerProviderOptionApplier).ApplyServerProviderOption(o.TTHeaderStreamingOptions.ProviderOptions...)
+	ttstreamProvider.(ttstream.ServerProviderOptionApplier).ApplyServerProviderOption(o.TTHeaderStreamingOptions.TransportOptions...)
 
 	rpcinfo.AsMutableRPCConfig(o.Configs).LockConfig(o.LockBits)
 	if o.StatsLevel == nil {
