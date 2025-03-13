@@ -1110,7 +1110,7 @@ func Test_initTransportProtocol(t *testing.T) {
 
 		initTransportProtocol(svcInfo, rpcConfig)
 		test.Assert(t, rpcConfig.PayloadCodec() == serviceinfo.Protobuf, rpcConfig.PayloadCodec())
-		test.Assert(t, rpcConfig.TransportProtocol() == transport.GRPC, rpcConfig.TransportProtocol())
+		test.Assert(t, rpcConfig.TransportProtocol()&transport.GRPC == transport.GRPC, rpcConfig.TransportProtocol())
 	})
 
 	t.Run("grpc_thrift", func(t *testing.T) {
@@ -1122,7 +1122,7 @@ func Test_initTransportProtocol(t *testing.T) {
 
 		initTransportProtocol(svcInfo, rpcConfig)
 		test.Assert(t, rpcConfig.PayloadCodec() == serviceinfo.Thrift, rpcConfig.PayloadCodec())
-		test.Assert(t, rpcConfig.TransportProtocol() == transport.GRPC, rpcConfig.TransportProtocol())
+		test.Assert(t, rpcConfig.TransportProtocol()&transport.GRPC == transport.GRPC, rpcConfig.TransportProtocol())
 	})
 }
 

@@ -222,7 +222,8 @@ func (r *rpcConfig) initialize() {
 	r.connectTimeout = defaultConnectTimeout
 	r.readWriteTimeout = defaultReadWriteTimeout
 	r.ioBufferSize = defaultBufferSize
-	r.transportProtocol = 0
+	// Since Kitex v0.13.0, the default transport protocol has been changed to framed from buffered.
+	r.transportProtocol = transport.Framed
 	r.interactionMode = defaultInteractionMode
 }
 

@@ -134,7 +134,7 @@ func TestAsMutableRPCConfig(t *testing.T) {
 	test.Assert(t, c1.ConnectTimeout() == time.Hour*2)
 	test.Assert(t, c1.ReadWriteTimeout() == time.Hour*3)
 	test.Assert(t, c1.IOBufferSize() == 9999)
-	test.Assert(t, c1.TransportProtocol() == transport.HTTP)
+	test.Assert(t, c1.TransportProtocol()&transport.HTTP == transport.HTTP)
 	test.Assert(t, c1.InteractionMode() == rpcinfo.PingPong)
 
 	mc.LockConfig(rpcinfo.BitRPCTimeout)

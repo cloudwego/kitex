@@ -139,6 +139,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"gen_setter",
 		"validate_set=false",
 		"gen_deep_equal=false",
+		// kitex will no longer generate apache codec, cuz it's deprecated in kitex scenario.
+		"no_default_serdes=true",
 		"compatible_names",
 		"frugal_tag",
 		"thrift_streaming",

@@ -226,7 +226,7 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	test.Assert(t, ri.Invocation().ServiceName() == "mock service")
 	test.Assert(t, ri.Invocation().MethodName() == "mock method")
 
-	test.Assert(t, ri.Config().TransportProtocol() == transport.TTHeader)
+	test.Assert(t, ri.Config().TransportProtocol() == transport.TTHeaderFramed)
 	test.Assert(t, ri.Config().ConnectTimeout() == 10*time.Second)
 	test.Assert(t, ri.Config().RPCTimeout() == 20*time.Second)
 	test.Assert(t, ri.Config().InteractionMode() == rpcinfo.Streaming)
@@ -263,7 +263,7 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	test.Assert(t, ri.Invocation().ServiceName() == "")
 	test.Assert(t, ri.Invocation().MethodName() == "")
 
-	test.Assert(t, ri.Config().TransportProtocol() == 0)
+	test.Assert(t, ri.Config().TransportProtocol() == transport.Framed)
 	test.Assert(t, ri.Config().ConnectTimeout() == 50*time.Millisecond)
 	test.Assert(t, ri.Config().RPCTimeout() == 0)
 	test.Assert(t, ri.Config().InteractionMode() == rpcinfo.PingPong)
