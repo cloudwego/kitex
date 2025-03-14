@@ -16,8 +16,8 @@ github.com/cloudwego/base64x v0.1.5 h1:XPciSp1xaq2VCSt6lF0phncD4koWyULpl5bUxbfCy
 github.com/cloudwego/base64x v0.1.5/go.mod h1:0zlkT4Wn5C6NdauXdJRhSKRlJvmclQ1hhJgA0rcu/8w=
 github.com/cloudwego/configmanager v0.2.2 h1:sVrJB8gWYTlPV2OS3wcgJSO9F2/9Zbkmcm1Z7jempOU=
 github.com/cloudwego/configmanager v0.2.2/go.mod h1:ppiyU+5TPLonE8qMVi/pFQk2eL3Q4P7d4hbiNJn6jwI=
-github.com/cloudwego/dynamicgo v0.6.1 h1:hATTf0n7y4uiKXubYXIfhJp898PR02CJWP/0Wu6lAXM=
-github.com/cloudwego/dynamicgo v0.6.1/go.mod h1:ZfuIc4tsk8gdsmsoL+3M/q3916xTj+KAVJaXQHSaWiE=
+github.com/cloudwego/dynamicgo v0.6.2 h1:jpb0R27Kh1cNUFsQsOCTchyt9oNG0UvwDvTecEnV+xg=
+github.com/cloudwego/dynamicgo v0.6.2/go.mod h1:ZfuIc4tsk8gdsmsoL+3M/q3916xTj+KAVJaXQHSaWiE=
 github.com/cloudwego/fastpb v0.0.5 h1:vYnBPsfbAtU5TVz5+f9UTlmSCixG9F9vRwaqE0mZPZU=
 github.com/cloudwego/fastpb v0.0.5/go.mod h1:Bho7aAKBUtT9RPD2cNVkTdx4yQumfSv3If7wYnm1izk=
 github.com/cloudwego/frugal v0.2.3 h1:t1hhhAi8lXcx7Ncs4PR1pSZ90vlDU1cy5K2btDMFpoA=
