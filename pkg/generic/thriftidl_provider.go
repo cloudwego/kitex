@@ -272,20 +272,21 @@ func parseIncludes(tree *parser.Thrift, parsed map[string]*parser.Thrift, source
 
 		for _, p := range paths {
 			// avoid infinite recursion
-			if ref, ok := parsed[p]; ok {
+			ref, ok := parsed[p]
+			if ok {
 				i.Reference = ref
 				break
 			}
 
 			if src, ok := sources[p]; ok {
-				ref, err := parser.ParseString(p, src)
+				ref, err = parser.ParseString(p, src)
 				if err != nil {
-					return err
+					return
 				}
 				parsed[p] = ref
 				i.Reference = ref
 				if err = parseIncludes(ref, parsed, sources); err != nil {
-					return err
+					return
 				}
 				break
 			}
