@@ -1326,7 +1326,7 @@ func (t *http2Client) Dump() interface{} {
 		sd := streamDump{
 			ID:                  v.id,
 			Method:              v.method,
-			State:               v.state,
+			State:               v.getState(),
 			WriteQuota:          atomic.LoadInt32(&v.wq.quota),
 			ValidHeaderReceived: v.getHeaderValid(),
 		}
