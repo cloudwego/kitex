@@ -398,11 +398,13 @@ func (s *Stream) tryGetHeader() (metadata.MD, bool) {
 func (s *Stream) getHeaderValid() bool {
 	if atomic.LoadUint32(&s.headerChanClosed) == 1 {
 		// only read headerValid after headerChan is closed
-		select {
-		case <-s.headerChan:
-			return s.headerValid
-		default:
-			return false
+		if s.headerChan != nil {
+			select {
+			case <-s.headerChan:
+				return s.headerValid
+			default:
+				return false
+			}
 		}
 	}
 	return false

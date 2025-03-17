@@ -2252,3 +2252,15 @@ func Test_closeStreamTask(t *testing.T) {
 	ct.Close(errSelfCloseForTest)
 	server.stop()
 }
+
+func TestStreamGetHeaderValid(t *testing.T) {
+	s := &Stream{
+		headerChan:  make(chan struct{}),
+		headerValid: true,
+	}
+	test.Assert(t, !s.getHeaderValid())
+	s.headerChanClosed = 1
+	test.Assert(t, !s.getHeaderValid())
+	close(s.headerChan)
+	test.Assert(t, s.getHeaderValid() == s.headerValid)
+}
