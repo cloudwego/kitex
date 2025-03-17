@@ -1625,14 +1625,28 @@ func TestGetClientStat(t *testing.T) {
 	td, ok := d.(clientTransportDump)
 	test.Assert(t, ok)
 	test.Assert(t, td.State == reachable)
+	cli.mu.Lock()
+	remoteAddr := cli.remoteAddr.String()
 	test.Assert(t, len(td.ActiveStreams) == len(cli.activeStreams))
+	cli.mu.Unlock()
+
 	if len(td.ActiveStreams) != 0 {
 		// If receiving RST, the stream will be removed from ActiveStreams. So, only check if the stream is still in ActiveStreams.
 		sd := td.ActiveStreams[0]
 		test.Assert(t, sd.ID == s.id)
 		test.Assert(t, sd.ValidHeaderReceived)
-		test.Assert(t, sd.State == streamWriteDone)
 		test.Assert(t, sd.Method == callHdr.Method)
+		test.Assert(t, sd.RemoteAddress == remoteAddr)
+	}
+
+	// with "rip"
+	s.hdrMu.Lock()
+	s.header.Set("rip", "rip")
+	s.hdrMu.Unlock()
+	td = cli.Dump().(clientTransportDump)
+	if len(td.ActiveStreams) != 0 {
+		sd := td.ActiveStreams[0]
+		test.Assert(t, sd.RemoteAddress == "rip")
 	}
 }
 

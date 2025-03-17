@@ -35,8 +35,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/remote/transmeta"
-
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
@@ -1332,9 +1330,10 @@ func (t *http2Client) Dump() interface{} {
 			WriteQuota:          atomic.LoadInt32(&v.wq.quota),
 			ValidHeaderReceived: v.getHeaderValid(),
 		}
-		// get info from header
+		sd.RemoteAddress = t.remoteAddr.String()
 		if md, ok := v.tryGetHeader(); ok {
-			if rip := md.Get(transmeta.HTTPRemoteIP); len(rip) > 0 && len(rip[0]) > 0 {
+			// use the value of "rip" in the header if exist
+			if rip := md.Get("rip"); len(rip) > 0 && len(rip[0]) > 0 {
 				sd.RemoteAddress = rip[0]
 			}
 		}
