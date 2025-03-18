@@ -1584,6 +1584,72 @@ func TestInvalidHeaderField(t *testing.T) {
 	server.stop()
 }
 
+func TestGetClientStat(t *testing.T) {
+	svr, cli := setUp(t, 0, math.MaxUint32, normal)
+	defer svr.stop()
+
+	callHdr := &CallHdr{Host: "localhost", Method: "foo"}
+	s, err := cli.NewStream(context.Background(), callHdr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// no header
+	md, ok := s.tryGetHeader()
+	test.Assert(t, md == nil)
+	test.Assert(t, !ok)
+	test.Assert(t, !s.getHeaderValid())
+
+	// write header
+	outgoingHeader := make([]byte, 5)
+	outgoingHeader[0] = byte(0)
+	binary.BigEndian.PutUint32(outgoingHeader[1:], uint32(len(expectedRequest)))
+	err = cli.Write(s, []byte{}, expectedRequest, &Options{Last: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// wait header
+	s.waitOnHeader()
+
+	// try to get header
+	md, ok = s.tryGetHeader()
+	test.Assert(t, md != nil)
+	test.Assert(t, ok)
+	test.Assert(t, s.getHeaderValid())
+	// send quota
+	w := cli.getOutFlowWindow()
+	test.Assert(t, uint32(w) == cli.loopy.sendQuota)
+
+	// Dump
+	d := cli.Dump()
+	td, ok := d.(clientTransportDump)
+	test.Assert(t, ok)
+	test.Assert(t, td.State == reachable)
+	cli.mu.Lock()
+	remoteAddr := cli.remoteAddr.String()
+	test.Assert(t, len(td.ActiveStreams) == len(cli.activeStreams))
+	cli.mu.Unlock()
+
+	if len(td.ActiveStreams) != 0 {
+		// If receiving RST, the stream will be removed from ActiveStreams. So, only check if the stream is still in ActiveStreams.
+		sd := td.ActiveStreams[0]
+		test.Assert(t, sd.ID == s.id)
+		test.Assert(t, sd.ValidHeaderReceived)
+		test.Assert(t, sd.Method == callHdr.Method)
+		test.Assert(t, sd.RemoteAddress == remoteAddr)
+	}
+
+	// with "rip"
+	s.hdrMu.Lock()
+	s.header.Set("rip", "rip")
+	s.hdrMu.Unlock()
+	td = cli.Dump().(clientTransportDump)
+	if len(td.ActiveStreams) != 0 {
+		sd := td.ActiveStreams[0]
+		test.Assert(t, sd.RemoteAddress == "rip")
+	}
+}
+
 func TestHeaderChanClosedAfterReceivingAnInvalidHeader(t *testing.T) {
 	server, ct := setUp(t, 0, math.MaxUint32, invalidHeaderField)
 	defer server.stop()
@@ -2185,4 +2251,16 @@ func Test_closeStreamTask(t *testing.T) {
 
 	ct.Close(errSelfCloseForTest)
 	server.stop()
+}
+
+func TestStreamGetHeaderValid(t *testing.T) {
+	s := &Stream{
+		headerChan:  make(chan struct{}),
+		headerValid: true,
+	}
+	test.Assert(t, !s.getHeaderValid())
+	s.headerChanClosed = 1
+	test.Assert(t, !s.getHeaderValid())
+	close(s.headerChan)
+	test.Assert(t, s.getHeaderValid() == s.headerValid)
 }
