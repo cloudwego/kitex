@@ -10,7 +10,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.24"
           cache: false
       - name: Scenario Tests
         run: |
@@ -33,7 +33,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.24"
       - name: Benchmark
         # we only use this CI to verify bench code works
         # setting benchtime=100ms is saving our time...
@@ -42,7 +42,7 @@ jobs:
   unit-test-x64:
     strategy:
       matrix:
-        go: [ "1.18", "1.19", "1.20", "1.21", "1.22", "1.23" ]
+        go: [ "1.19", "1.20", "1.21", "1.22", "1.23", "1.24" ]
     runs-on: [ Linux, X64 ]
     steps:
       - uses: actions/checkout@v4
@@ -57,7 +57,7 @@ jobs:
   unit-test-arm:
     strategy:
       matrix:
-        go: [ "1.18", "1.19", "1.20", "1.21", "1.22", "1.23" ]
+        go: [ "1.19", "1.20", "1.21", "1.22", "1.23", "1.24" ]
     runs-on: [ ARM64 ] # It's OK under Linux or macOS
     steps:
       - uses: actions/checkout@v4
@@ -76,7 +76,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.24"
       - name: Prepare
         run: |  
           go install github.com/cloudwego/thriftgo@main
@@ -105,7 +105,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.24"
           cache: false # don't use cache for self-hosted runners
       - name: Windows compatibility test
         run: go test -run=^$ ./...
@@ -118,7 +118,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.24"
           cache: false # don't use cache for self-hosted runners
       - name: Run coverage
         run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
