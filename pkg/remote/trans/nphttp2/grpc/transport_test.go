@@ -806,7 +806,7 @@ func TestLargeMessageWithDelayRead(t *testing.T) {
 		t.Fatalf("%v.NewStream(_, _) = _, %v, want _, <nil>", ct, err)
 		return
 	}
-	// Wait for server's handerler to be initialized
+	// Wait for server's handler to be initialized
 	select {
 	case <-ready:
 	case <-ctx.Done():
@@ -951,7 +951,7 @@ func TestLargeMessageSuspension(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open stream: %v", err)
 	}
-	// Launch a goroutine simillar to the stream monitoring goroutine in
+	// Launch a goroutine similar to the stream monitoring goroutine in
 	// stream.go to keep track of context timeout and call CloseStream.
 	go func() {
 		<-ctx.Done()
@@ -1273,7 +1273,7 @@ func TestServerWithMisbehavedClient(t *testing.T) {
 	// Create a client that can override server stream quota.
 	mconn, err := netpoll.NewDialer().DialTimeout("tcp", server.lis.Addr().String(), time.Second)
 	if err != nil {
-		t.Fatalf("Clent failed to dial:%v", err)
+		t.Fatalf("Client failed to dial:%v", err)
 	}
 	defer mconn.Close()
 	if err := mconn.(netpoll.Connection).SetIdleTimeout(10 * time.Second); err != nil {
@@ -1950,7 +1950,7 @@ func TestReadGivesSameErrorAfterAnyErrorOccurs(t *testing.T) {
 //	// Create a client directly to not couple what you can send to API of http2_client.go.
 //	mconn, err := netpoll.NewDialer().DialTimeout("tcp", server.lis.Addr().String(), time.Second)
 //	if err != nil {
-//		t.Fatalf("Clent failed to dial:%v", err)
+//		t.Fatalf("Client failed to dial:%v", err)
 //	}
 //	defer mconn.Close()
 //

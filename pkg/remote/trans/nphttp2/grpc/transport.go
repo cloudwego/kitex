@@ -418,7 +418,7 @@ func (s *Stream) TrailersOnly() bool {
 	return s.noHeaders
 }
 
-// Trailer returns the cached trailer metedata. Note that if it is not called
+// Trailer returns the cached trailer metadata. Note that if it is not called
 // after the entire stream is done, it could return an empty MD. Client
 // side only.
 // It can be safely read only after stream has ended that is either read

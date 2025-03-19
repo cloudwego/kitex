@@ -474,7 +474,7 @@ func TestWithProfilerMessageTagging(t *testing.T) {
 	test.Assert(t, newCtx.Value("ctx2").(int) == 2)
 }
 
-func TestRefuseTrafficWithoutServiceNamOption(t *testing.T) {
+func TestRefuseTrafficWithoutServiceNameOption(t *testing.T) {
 	svr, _ := NewTestServer(WithRefuseTrafficWithoutServiceName())
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)

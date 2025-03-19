@@ -62,7 +62,7 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
 	ri.Invocation().(rpcinfo.InvocationSetter).SetServiceName(msg.ServiceInfo().ServiceName)
 
-	// pure paylod, no effect
+	// pure payload, no effect
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Thrift))
 	ctx, err := ClientTTHeaderHandler.WriteMeta(ctx, msg)
 	kvs := msg.TransInfo().TransIntInfo()
