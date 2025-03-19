@@ -291,7 +291,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 		fake := c.copyTreeWithRef(ast, ref)
 		fake.Name2Category = nil
 		if err := semantic.ResolveSymbols(fake); err != nil {
-			return fmt.Errorf("resolve fakse ast '%s': %w", ast.Filename, err)
+			return fmt.Errorf("resolve fake ast '%s': %w", ast.Filename, err)
 		}
 		used := true
 		fake.ForEachInclude(func(v *parser.Include) bool {
