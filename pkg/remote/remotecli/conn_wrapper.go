@@ -58,6 +58,10 @@ func NewConnWrapper(connPool remote.ConnPool) *ConnWrapper {
 func (cm *ConnWrapper) GetConn(ctx context.Context, d remote.Dialer, ri rpcinfo.RPCInfo) (net.Conn, error) {
 	configs := ri.Config()
 	timeout := configs.ConnectTimeout()
+	// force short conn for oneway requests
+	if ri.Config().InteractionMode() == rpcinfo.Oneway {
+		cm.connPool = nil
+	}
 	if cm.connPool != nil {
 		conn, err := cm.getConnWithPool(ctx, cm.connPool, d, timeout, ri)
 		if err != nil {
@@ -84,8 +88,7 @@ func (cm *ConnWrapper) ReleaseConn(err error, ri rpcinfo.RPCInfo) {
 	}
 	if cm.connPool != nil {
 		if err == nil {
-			_, ok := ri.To().Tag(rpcinfo.ConnResetTag)
-			if ok || ri.Config().InteractionMode() == rpcinfo.Oneway {
+			if _, ok := ri.To().Tag(rpcinfo.ConnResetTag); ok {
 				cm.connPool.Discard(cm.conn)
 			} else {
 				cm.connPool.Put(cm.conn)
