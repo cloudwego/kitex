@@ -250,3 +250,52 @@ func TestStreamID(t *testing.T) {
 	id = genStreamID()
 	test.Assert(t, id == math.MinInt32)
 }
+
+func Test_clientStreamReceiveTrailer(t *testing.T) {
+	cfd, sfd := netpoll.GetSysFdPairs()
+	cconn, err := netpoll.NewFDConnection(cfd)
+	test.Assert(t, err == nil, err)
+	sconn, err := netpoll.NewFDConnection(sfd)
+	test.Assert(t, err == nil, err)
+
+	intHeader := make(IntHeader)
+	intHeader[0] = "test"
+	strHeader := make(streaming.Header)
+	strHeader["key"] = "val"
+	ctrans := newTransport(clientTransport, cconn, nil)
+	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", intHeader, strHeader)
+	test.Assert(t, err == nil, err)
+	strans := newTransport(serverTransport, sconn, nil)
+	rawServerStream, err := strans.ReadStream(context.Background())
+	test.Assert(t, err == nil, err)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	// client
+	go func() {
+		defer wg.Done()
+		var csErr error
+		cs := newClientStream(rawClientStream)
+		csRes := new(testResponse)
+		csErr = cs.RecvMsg(context.Background(), csRes)
+		test.Assert(t, csErr != nil, csErr)
+
+		csReq := new(testRequest)
+		csReq.B = "hello"
+		csErr = cs.SendMsg(context.Background(), csReq)
+		test.Assert(t, csErr != nil, csErr)
+	}()
+
+	// server
+	var ssErr error
+	ss := newServerStream(rawServerStream)
+	ssErr = ss.SendHeader(strHeader)
+	test.Assert(t, ssErr == nil, ssErr)
+	ssErr = ss.CloseSend(nil)
+	test.Assert(t, ssErr == nil, ssErr)
+
+	ssRes := new(testResponse)
+	ssErr = ss.RecvMsg(context.Background(), ssRes)
+	test.Assert(t, ssErr != nil, ssErr)
+	wg.Wait()
+}

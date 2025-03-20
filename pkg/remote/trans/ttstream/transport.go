@@ -30,8 +30,8 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/container"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 )
 
 const (
@@ -132,7 +132,7 @@ func (t *transport) Close(exception error) (err error) {
 	t.streams.Range(func(key, value any) bool {
 		s := value.(*stream)
 		_ = s.closeSend(exception)
-		_ = s.closeRecv(exception)
+		_ = s.closeRecv(exception, t.kind)
 		return true
 	})
 	// then close stream and frame pipes
@@ -205,7 +205,7 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 				err = s.onReadDataFrame(fr)
 			case trailerFrameType:
 				// process trailer frame: close the stream read direction
-				err = s.onReadTrailerFrame(fr)
+				err = s.onReadTrailerFrame(fr, t.kind)
 			}
 		}
 	}

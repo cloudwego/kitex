@@ -22,7 +22,7 @@ import (
 	"io"
 
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/container"
 )
 
 // streamReader is an abstraction layer for stream level IO operations

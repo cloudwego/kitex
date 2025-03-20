@@ -29,9 +29,9 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/streamx/provider"
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -40,10 +40,10 @@ type (
 	serverStreamCancelCtxKey struct{}
 )
 
-var _ streamx.ServerProvider = (*serverProvider)(nil)
+var _ provider.ServerProvider = (*serverProvider)(nil)
 
 // NewServerProvider return a server provider
-func NewServerProvider(opts ...ServerProviderOption) streamx.ServerProvider {
+func NewServerProvider(opts ...ServerProviderOption) provider.ServerProvider {
 	sp := new(serverProvider)
 	for _, opt := range opts {
 		opt(sp)
