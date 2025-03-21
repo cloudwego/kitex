@@ -158,8 +158,7 @@ var _ DescriptorProvider = (*ThriftContentProvider)(nil)
 
 const defaultMainIDLPath = "main.thrift"
 
-// NewThriftContentProvider builder
-// both absolute path search and relative path search are supported
+// NewThriftContentProvider creates a DescriptorProvider supporting both relative and absolute path searches.
 func NewThriftContentProvider(main string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
@@ -181,8 +180,7 @@ func NewThriftContentProvider(main string, includes map[string]string, opts ...T
 	return p, nil
 }
 
-// NewThriftContentProviderWithDynamicGo builder
-// both absolute path search and relative path search are supported
+// NewThriftContentProviderWithDynamicGo creates a DescriptorProvider supporting both relative and absolute path searches.
 func NewThriftContentProviderWithDynamicGo(main string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
@@ -341,10 +339,8 @@ type ThriftContentWithAbsIncludePathProvider struct {
 
 var _ DescriptorProvider = (*ThriftContentWithAbsIncludePathProvider)(nil)
 
-// NewThriftContentWithAbsIncludePathProvider create path DescriptorProvider
-// both absolute path search and relative path search are supported.
-// the only difference from NewThriftContentProvider is the first argument type.
-// Deprecated: Use NewThriftContentProvider instead.
+// NewThriftContentWithAbsIncludePathProvider creates a DescriptorProvider
+// Deprecated: Use NewThriftContentProvider instead. Only differs in the first argument type.
 func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentWithAbsIncludePathProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
@@ -371,10 +367,8 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 	return p, nil
 }
 
-// NewThriftContentWithAbsIncludePathProviderWithDynamicGo create DescriptorProvider with dynamicgo
-// both absolute path search and relative path search are supported.
-// the only difference from NewThriftContentProviderWithDynamicGo is the first argument type.
-// Deprecated: Use NewThriftContentProviderWithDynamicGo instead.
+// NewThriftContentWithAbsIncludePathProviderWithDynamicGo creates a DescriptorProvider with dynamicgo
+// Deprecated: Use NewThriftContentProviderWithDynamicGo instead. Only differs in the first argument type.
 func NewThriftContentWithAbsIncludePathProviderWithDynamicGo(mainIDLPath string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentWithAbsIncludePathProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
