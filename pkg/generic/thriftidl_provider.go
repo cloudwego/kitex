@@ -159,7 +159,8 @@ var _ DescriptorProvider = (*ThriftContentProvider)(nil)
 const defaultMainIDLPath = "main.thrift"
 
 // NewThriftContentProvider creates a DescriptorProvider supporting both relative and absolute path searches.
-func NewThriftContentProvider(main string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
+// Note: the first argument is the file content of the main IDL
+func NewThriftContentProvider(mainIDLContent string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
 	parseMode := getParseMode(tOpts)
@@ -171,7 +172,7 @@ func NewThriftContentProvider(main string, includes map[string]string, opts ...T
 		goTagOpt:    tOpts.goTag,
 		serviceName: tOpts.serviceName,
 	}
-	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, main, includes, false, parseMode, tOpts.goTag, tOpts.serviceName)
+	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, mainIDLContent, includes, false, parseMode, tOpts.goTag, tOpts.serviceName)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +182,8 @@ func NewThriftContentProvider(main string, includes map[string]string, opts ...T
 }
 
 // NewThriftContentProviderWithDynamicGo creates a DescriptorProvider supporting both relative and absolute path searches.
-func NewThriftContentProviderWithDynamicGo(main string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
+// Note: the first argument is the file content of the main IDL
+func NewThriftContentProviderWithDynamicGo(mainIDLContent string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
 	parseMode := getParseMode(tOpts)
@@ -194,12 +196,12 @@ func NewThriftContentProviderWithDynamicGo(main string, includes map[string]stri
 		serviceName: tOpts.serviceName,
 	}
 
-	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, main, includes, false, parseMode, tOpts.goTag, tOpts.serviceName)
+	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, mainIDLContent, includes, false, parseMode, tOpts.goTag, tOpts.serviceName)
 	if err != nil {
 		return nil, err
 	}
 
-	p.newDynamicGoDsc(svc, defaultMainIDLPath, main, includes, parseMode, tOpts.goTag, tOpts.serviceName)
+	p.newDynamicGoDsc(svc, defaultMainIDLPath, mainIDLContent, includes, parseMode, tOpts.goTag, tOpts.serviceName)
 
 	p.svcs <- svc
 	return p, nil
@@ -339,8 +341,10 @@ type ThriftContentWithAbsIncludePathProvider struct {
 
 var _ DescriptorProvider = (*ThriftContentWithAbsIncludePathProvider)(nil)
 
-// NewThriftContentWithAbsIncludePathProvider creates a DescriptorProvider
-// Deprecated: Use NewThriftContentProvider instead. Only differs in the first argument type.
+// Deprecated: Use NewThriftContentProvider instead.
+//
+// This function behaves the same as `NewThriftContentProvider`,
+// except that the first argument is the path to the main IDL file rather than its file content.
 func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentWithAbsIncludePathProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
@@ -367,8 +371,10 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 	return p, nil
 }
 
-// NewThriftContentWithAbsIncludePathProviderWithDynamicGo creates a DescriptorProvider with dynamicgo
-// Deprecated: Use NewThriftContentProviderWithDynamicGo instead. Only differs in the first argument type.
+// Deprecated: Use NewThriftContentProviderWithDynamicGo instead.
+//
+// This function behaves the same as `NewThriftContentProviderWithDynamicGo`,
+// except that the first argument is the path to the main IDL file rather than its file content.
 func NewThriftContentWithAbsIncludePathProviderWithDynamicGo(mainIDLPath string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentWithAbsIncludePathProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
