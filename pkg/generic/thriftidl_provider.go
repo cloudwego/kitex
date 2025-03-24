@@ -158,7 +158,10 @@ var _ DescriptorProvider = (*ThriftContentProvider)(nil)
 
 const defaultMainIDLPath = "main.thrift"
 
-// NewThriftContentProvider creates a DescriptorProvider supporting both relative and absolute path searches.
+// Deprecated: Use NewThriftContentWithAbsIncludePathProvider instead.
+//
+// NewThriftContentProvider creates a DescriptorProvider supporting only relative path search
+// while NewThriftContentWithAbsIncludePathProvider supports both relative and absolute path searches
 // Note: the first argument is the file content of the main IDL
 func NewThriftContentProvider(mainIDLContent string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
@@ -181,7 +184,10 @@ func NewThriftContentProvider(mainIDLContent string, includes map[string]string,
 	return p, nil
 }
 
-// NewThriftContentProviderWithDynamicGo creates a DescriptorProvider supporting both relative and absolute path searches.
+// Deprecated: Use NewThriftContentWithAbsIncludePathProviderWithDynamicGo instead.
+//
+// NewThriftContentProviderWithDynamicGo creates a DescriptorProvider supporting only relative path search
+// while NewThriftContentWithAbsIncludePathProviderWithDynamicGo supports both relative and absolute path searches
 // Note: the first argument is the file content of the main IDL
 func NewThriftContentProviderWithDynamicGo(mainIDLContent string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
@@ -341,10 +347,8 @@ type ThriftContentWithAbsIncludePathProvider struct {
 
 var _ DescriptorProvider = (*ThriftContentWithAbsIncludePathProvider)(nil)
 
-// Deprecated: Use NewThriftContentProvider instead.
-//
-// This function behaves the same as `NewThriftContentProvider`,
-// except that the first argument is the path to the main IDL file rather than its file content.
+// NewThriftContentWithAbsIncludePathProvider creates a DescriptorProvider supporting both relative and absolute path searches
+// NOTE: the first argument is the path to the main IDL file rather than its file content.
 func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentWithAbsIncludePathProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
@@ -371,10 +375,8 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 	return p, nil
 }
 
-// Deprecated: Use NewThriftContentProviderWithDynamicGo instead.
-//
-// This function behaves the same as `NewThriftContentProviderWithDynamicGo`,
-// except that the first argument is the path to the main IDL file rather than its file content.
+// NewThriftContentWithAbsIncludePathProviderWithDynamicGo creates a DescriptorProvider supporting both relative and absolute path searches
+// NOTE: the first argument is the path to the main IDL file rather than its file content.
 func NewThriftContentWithAbsIncludePathProviderWithDynamicGo(mainIDLPath string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentWithAbsIncludePathProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
