@@ -84,8 +84,10 @@ func (t *svrTransHandler) ProtocolMatch(ctx context.Context, conn net.Conn) (err
 
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	var err error
+	klog.CtxInfof(ctx, "KITEX: TTStream OnActive started")
 	ctx, err = t.provider.OnActive(ctx, conn)
 	if err != nil {
+		klog.CtxErrorf(ctx, "KITEX: TTStream OnActive failed, err= %v", err)
 		return nil, err
 	}
 	return ctx, nil
@@ -107,21 +109,29 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	}()
 	// connection level goroutine
 	for {
+		klog.CtxInfof(ctx, "KITEX: TTStream OnStream start")
 		nctx, ss, nerr := t.provider.OnStream(ctx, conn)
 		if nerr != nil {
 			if errors.Is(nerr, io.EOF) {
+				klog.CtxInfof(ctx, "KITEX: TTStream OnStream recv EOF")
 				return nil
 			}
 			klog.CtxErrorf(ctx, "KITEX: OnStream failed: err=%v", nerr)
 			return nerr
 		}
+		klog.CtxInfof(ctx, "KITEX: TTStream OnStream success")
 		wg.Add(1)
 		// stream level goroutine
 		gofunc.GoFunc(nctx, func() {
 			defer wg.Done()
+			klog.CtxInfof(nctx, "KITEX: TTStream OnStream start")
 			err := t.OnStream(nctx, conn, ss)
-			if err != nil && !errors.Is(err, io.EOF) {
-				klog.CtxErrorf(nctx, "KITEX: stream ReadStream failed: err=%v", err)
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					klog.CtxErrorf(nctx, "KITEX: stream ReadStream failed: err=%v", err)
+				} else {
+					klog.CtxInfof(nctx, "KITEX: stream ReadStream recv EOF")
+				}
 			}
 		})
 	}
@@ -189,7 +199,9 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 			serr = bizErr
 		}
 	}
+	klog.CtxInfof(ctx, "KITEX: TTStream inkHdlFunc finished, serr=%v", serr)
 	ctx, err = t.provider.OnStreamFinish(ctx, ss, serr)
+	klog.CtxInfof(ctx, "KITEX: TTStream OnStreamFinish, err=%v", err)
 	if err == nil && serr != nil {
 		err = serr
 	}
