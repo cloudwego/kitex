@@ -272,9 +272,12 @@ func (p *ThriftContentProvider) newDynamicGoDsc(svc *descriptor.ServiceDescripto
 	}
 }
 
-func parseIncludes(tree *parser.Thrift, parsed map[string]*parser.Thrift, sources map[string]string) (err error) {
+func parseIncludes(tree *parser.Thrift, parsed map[string]*parser.Thrift, sources map[string]string, isAbsIncludePath bool) (err error) {
 	for _, i := range tree.Includes {
-		paths := []string{absPath(tree.Filename, i.Path), i.Path}
+		paths := []string{i.Path}
+		if isAbsIncludePath {
+			paths = append([]string{absPath(tree.Filename, i.Path)}, paths...)
+		}
 
 		for _, p := range paths {
 			// avoid infinite recursion
@@ -291,7 +294,7 @@ func parseIncludes(tree *parser.Thrift, parsed map[string]*parser.Thrift, source
 				}
 				parsed[p] = ref
 				i.Reference = ref
-				if err = parseIncludes(ref, parsed, sources); err != nil {
+				if err = parseIncludes(ref, parsed, sources, isAbsIncludePath); err != nil {
 					return
 				}
 				break
@@ -326,7 +329,7 @@ func ParseContent(path, content string, includes map[string]string, isAbsInclude
 	}
 	parsed := make(map[string]*parser.Thrift)
 	parsed[path] = tree
-	if err := parseIncludes(tree, parsed, includes); err != nil {
+	if err := parseIncludes(tree, parsed, includes, isAbsIncludePath); err != nil {
 		return nil, err
 	}
 	if cir := parser.CircleDetect(tree); cir != "" {
