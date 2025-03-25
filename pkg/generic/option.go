@@ -18,6 +18,7 @@ package generic
 
 import (
 	"github.com/cloudwego/dynamicgo/conv"
+
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
@@ -38,7 +39,7 @@ var (
 		WriteDefaultField:  true,
 		EnableValueMapping: true,
 		String2Int64:       true,
-		MergeBaseFunc:      thrift.MergeRequestBase,
+		MergeBaseFunc:      thrift.MergeBase,
 	}
 )
 

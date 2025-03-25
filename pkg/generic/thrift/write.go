@@ -655,6 +655,24 @@ func writeStringJSONMap(ctx context.Context, val interface{}, out *thrift.Buffer
 	return nil
 }
 
+// writeRequestBase mainly take frkBase and only merge the frkBase.Extra with the jsonBase.Extra
+// NOTICE: this logc must be aligend with mergeRequestBase
+func writeRequestBase(ctx context.Context, val interface{}, out *thrift.BufferWriter, field *descriptor.FieldDescriptor, opt *writerOption) error {
+	final := mergeBaseAny(val, opt.requestBase)
+	if err := out.WriteFieldBegin(thrift.TType(field.Type.Type), int16(field.ID)); err != nil {
+		return err
+	}
+	sz := final.BLength()
+	buf := make([]byte, sz)
+	final.FastWrite(buf)
+	for _, b := range buf {
+		if err := out.WriteByte(int8(b)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // writeStruct iter with Descriptor, can check the field's required and others
 func writeStruct(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	var fg fieldGetter
