@@ -17,11 +17,7 @@
 package thrift
 
 import (
-	"context"
-
-	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
-	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
 // Base ...
@@ -44,9 +40,9 @@ func NewBaseResp() *BaseResp {
 	return base.NewBaseResp()
 }
 
-// mergeRequestBase mainly take frkBase and only merge the frkBase.Extra with the jsonBase.Extra
-// NOTICE: this logic must be aligned with writeRequestBase
-func MergeRequestBase(jsonBase Base, frkBase Base) Base {
+// MergeBase mainly take frkBase and only merge the frkBase.Extra with the jsonBase.Extra
+// NOTICE: this logic must be aligned with mergeBaseAny
+func MergeBase(jsonBase, frkBase Base) Base {
 	if jsonBase.Extra != nil {
 		extra := jsonBase.Extra
 		for k, v := range frkBase.Extra {
@@ -57,35 +53,35 @@ func MergeRequestBase(jsonBase Base, frkBase Base) Base {
 	return frkBase
 }
 
-// writeRequestBase mainly take frkBase and only merge the frkBase.Extra with the jsonBase.Extra
-// NOTICE: this logc must be aligend with mergeRequestBase
-func writeRequestBase(ctx context.Context, val interface{}, out *thrift.BufferWriter, field *descriptor.FieldDescriptor, opt *writerOption) error {
-	if st, ok := val.(map[string]interface{}); ok {
+// mergeBaseAny mainly take frkBase and only merge the frkBase.Extra with the jsonBase.Extra
+// NOTICE: this logic must be aligned with MergeBase
+func mergeBaseAny(jsonBase any, frkBase *Base) *Base {
+	if st, ok := jsonBase.(map[string]any); ok {
 		// copy from user's Extra
 		if ext, ok := st["Extra"]; ok {
 			switch v := ext.(type) {
-			case map[string]interface{}:
+			case map[string]any:
 				// from http json
 				for key, value := range v {
-					if _, ok := opt.requestBase.Extra[key]; !ok {
+					if _, ok := frkBase.Extra[key]; !ok {
 						if vStr, ok := value.(string); ok {
-							if opt.requestBase.Extra == nil {
-								opt.requestBase.Extra = map[string]string{}
+							if frkBase.Extra == nil {
+								frkBase.Extra = map[string]string{}
 							}
-							opt.requestBase.Extra[key] = vStr
+							frkBase.Extra[key] = vStr
 						}
 					}
 				}
-			case map[interface{}]interface{}:
+			case map[any]any:
 				// from struct map
 				for key, value := range v {
 					if kStr, ok := key.(string); ok {
-						if _, ok := opt.requestBase.Extra[kStr]; !ok {
+						if _, ok := frkBase.Extra[kStr]; !ok {
 							if vStr, ok := value.(string); ok {
-								if opt.requestBase.Extra == nil {
-									opt.requestBase.Extra = map[string]string{}
+								if frkBase.Extra == nil {
+									frkBase.Extra = map[string]string{}
 								}
-								opt.requestBase.Extra[kStr] = vStr
+								frkBase.Extra[kStr] = vStr
 							}
 						}
 					}
@@ -93,16 +89,5 @@ func writeRequestBase(ctx context.Context, val interface{}, out *thrift.BufferWr
 			}
 		}
 	}
-	if err := out.WriteFieldBegin(thrift.TType(field.Type.Type), int16(field.ID)); err != nil {
-		return err
-	}
-	sz := opt.requestBase.BLength()
-	buf := make([]byte, sz)
-	opt.requestBase.FastWrite(buf)
-	for _, b := range buf {
-		if err := out.WriteByte(int8(b)); err != nil {
-			return err
-		}
-	}
-	return nil
+	return frkBase
 }
