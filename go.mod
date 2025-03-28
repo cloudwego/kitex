@@ -3,7 +3,7 @@ module github.com/cloudwego/kitex
 go 1.19
 
 require (
-	github.com/bytedance/gopkg v0.1.2-0.20250327072943-56322a7411cd
+	github.com/bytedance/gopkg v0.1.1
 	github.com/bytedance/sonic v1.13.2
 	github.com/cloudwego/configmanager v0.2.3
 	github.com/cloudwego/dynamicgo v0.6.2
