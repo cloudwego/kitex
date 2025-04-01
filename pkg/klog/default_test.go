@@ -52,7 +52,7 @@ func normalOutput(t *testing.T, testLevel Level, want string, args ...interface{
 	case LevelFatal:
 		t.Fatal("fatal method cannot be tested")
 	default:
-		t.Errorf("unknow level: %d", testLevel)
+		t.Errorf("unknown level: %d", testLevel)
 	}
 }
 
@@ -87,7 +87,7 @@ func ctxOutput(t *testing.T, testLevel Level, want, format string, args ...inter
 	case LevelFatal:
 		t.Fatal("fatal method cannot be tested")
 	default:
-		t.Errorf("unknow level: %d", testLevel)
+		t.Errorf("unknown level: %d", testLevel)
 	}
 }
 
@@ -118,7 +118,7 @@ func formatOutput(t *testing.T, testLevel Level, want, format string, args ...in
 	case LevelFatal:
 		t.Fatal("fatal method cannot be tested")
 	default:
-		t.Errorf("unknow level: %d", testLevel)
+		t.Errorf("unknown level: %d", testLevel)
 	}
 }
 
