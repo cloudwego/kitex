@@ -34,6 +34,7 @@ import (
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/client/callopt"
+	"github.com/cloudwego/kitex/client/callopt/streamcall"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
 	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
@@ -200,7 +201,7 @@ func TestWithRetryOption(t *testing.T) {
 	mockRetryContainer := retry.NewRetryContainer()
 	cli := newMockClient(t, ctrl, WithRetryContainer(mockRetryContainer))
 
-	test.Assert(t, cli.(*kcFinalizerClient).opt.RetryContainer == mockRetryContainer)
+	test.Assert(t, cli.(*kcFinalizerClient).opt.UnaryOptions.RetryContainer == mockRetryContainer)
 }
 
 func BenchmarkCall(b *testing.B) {
@@ -1110,7 +1111,7 @@ func Test_initTransportProtocol(t *testing.T) {
 
 		initTransportProtocol(svcInfo, rpcConfig)
 		test.Assert(t, rpcConfig.PayloadCodec() == serviceinfo.Protobuf, rpcConfig.PayloadCodec())
-		test.Assert(t, rpcConfig.TransportProtocol() == transport.GRPC, rpcConfig.TransportProtocol())
+		test.Assert(t, rpcConfig.TransportProtocol()&transport.GRPC == transport.GRPC, rpcConfig.TransportProtocol())
 	})
 
 	t.Run("grpc_thrift", func(t *testing.T) {
@@ -1122,7 +1123,7 @@ func Test_initTransportProtocol(t *testing.T) {
 
 		initTransportProtocol(svcInfo, rpcConfig)
 		test.Assert(t, rpcConfig.PayloadCodec() == serviceinfo.Thrift, rpcConfig.PayloadCodec())
-		test.Assert(t, rpcConfig.TransportProtocol() == transport.GRPC, rpcConfig.TransportProtocol())
+		test.Assert(t, rpcConfig.TransportProtocol()&transport.GRPC == transport.GRPC, rpcConfig.TransportProtocol())
 	})
 }
 
@@ -1131,7 +1132,7 @@ type mockTracerForInitMW struct {
 	rpcinfo.StreamEventReporter
 }
 
-func Test_kClient_initStreamMiddlewares(t *testing.T) {
+func Test_kClient_initMiddlewares(t *testing.T) {
 	ctl := &rpcinfo.TraceController{}
 	ctl.Append(mockTracerForInitMW{})
 	c := &kClient{
@@ -1140,8 +1141,147 @@ func Test_kClient_initStreamMiddlewares(t *testing.T) {
 			Streaming: internal_stream.StreamingConfig{},
 		},
 	}
-	c.initStreamMiddlewares(context.Background())
+	c.initMiddlewares(context.Background())
 
-	test.Assert(t, len(c.opt.Streaming.RecvMiddlewares) > 0, "init middlewares failed")
-	test.Assert(t, len(c.opt.Streaming.SendMiddlewares) > 0, "init middlewares failed")
+	test.Assert(t, len(c.opt.Streaming.RecvMiddlewares) == 0, "init middlewares failed")
+	test.Assert(t, len(c.opt.Streaming.SendMiddlewares) == 0, "init middlewares failed")
+}
+
+func TestRewriteProtocol(t *testing.T) {
+	tcases := []struct {
+		tp         transport.Protocol
+		streamCall bool
+		want       transport.Protocol
+	}{
+		{
+			tp:   transport.PurePayload,
+			want: transport.PurePayload,
+		},
+		{
+			tp:   transport.TTHeaderFramed,
+			want: transport.TTHeaderFramed,
+		},
+		{
+			tp:   transport.TTHeader,
+			want: transport.TTHeader,
+		},
+		{
+			tp:   transport.TTHeader | transport.GRPC,
+			want: transport.GRPC,
+		},
+		{
+			tp:   transport.TTHeader | transport.GRPCStreaming,
+			want: transport.TTHeader,
+		},
+		{
+			tp:   transport.TTHeaderFramed | transport.TTHeaderStreaming,
+			want: transport.TTHeaderFramed,
+		},
+		{
+			tp:   transport.TTHeaderFramed | transport.GRPCStreaming | transport.TTHeaderStreaming,
+			want: transport.TTHeaderFramed,
+		},
+		{
+			tp:   transport.TTHeaderFramed | transport.GRPC | transport.TTHeaderStreaming | transport.GRPCStreaming,
+			want: transport.GRPC,
+		},
+		{
+			tp:   transport.TTHeaderFramed | transport.HTTP | transport.HESSIAN2 | transport.TTHeaderStreaming,
+			want: transport.TTHeaderFramed | transport.HTTP | transport.HESSIAN2,
+		},
+		{
+			tp:   transport.TTHeaderFramed | transport.HTTP | transport.HESSIAN2 | transport.TTHeaderStreaming | transport.GRPCStreaming,
+			want: transport.TTHeaderFramed | transport.HTTP | transport.HESSIAN2,
+		},
+		{
+			tp:   transport.TTHeaderFramed | transport.HTTP | transport.HESSIAN2 | transport.GRPC,
+			want: transport.GRPC,
+		},
+		{
+			tp:         transport.TTHeaderFramed | transport.HTTP | transport.HESSIAN2 | transport.GRPC | transport.GRPCStreaming,
+			streamCall: true,
+			want:       transport.GRPC,
+		},
+		{
+			tp:         transport.TTHeaderFramed | transport.GRPCStreaming,
+			streamCall: true,
+			want:       transport.GRPC,
+		},
+		{
+			tp:         transport.TTHeaderFramed | transport.GRPC | transport.GRPCStreaming,
+			streamCall: true,
+			want:       transport.GRPC,
+		},
+		{
+			tp:         transport.TTHeaderFramed | transport.GRPC | transport.GRPCStreaming | transport.TTHeaderStreaming,
+			streamCall: true,
+			want:       transport.GRPC,
+		},
+		{
+			tp:         transport.TTHeaderFramed | transport.GRPC | transport.GRPCStreaming | transport.TTHeaderStreaming | transport.HTTP | transport.HESSIAN2,
+			streamCall: true,
+			want:       transport.GRPC,
+		},
+		{
+			tp:         transport.TTHeaderFramed | transport.TTHeaderStreaming | transport.HTTP | transport.HESSIAN2,
+			streamCall: true,
+			want:       transport.TTHeaderStreaming | transport.TTHeaderFramed,
+		},
+		{
+			tp:         transport.TTHeaderFramed,
+			streamCall: true,
+			want:       transport.TTHeaderFramed,
+		},
+		{
+			tp:         transport.TTHeaderFramed | transport.GRPC,
+			streamCall: true,
+			want:       transport.GRPC,
+		},
+		{
+			tp:         transport.TTHeader,
+			streamCall: true,
+			want:       transport.TTHeader,
+		},
+		{
+			tp:         transport.Framed,
+			streamCall: true,
+			want:       transport.Framed,
+		},
+		{
+			tp:         transport.PurePayload,
+			streamCall: true,
+			want:       transport.PurePayload,
+		},
+	}
+	for _, tc := range tcases {
+		cfg := rpcinfo.NewRPCConfig()
+		mcfg := rpcinfo.AsMutableRPCConfig(cfg)
+		mcfg.SetTransportProtocol(tc.tp)
+		purifyProtocol(mcfg, tc.tp, tc.streamCall)
+		test.Assert(t, cfg.TransportProtocol() == tc.want)
+	}
+}
+
+func Test_initRPCInfoWithStreamClientCallOption(t *testing.T) {
+	mtd := mocks.MockMethod
+	svcInfo := mocks.ServiceInfo()
+	callOptTimeout := 1 * time.Second
+	testService := "testService"
+
+	// config call option
+	cliIntf, err := NewClient(svcInfo, WithTransportProtocol(transport.TTHeaderStreaming), WithDestService(testService))
+	test.Assert(t, err == nil, err)
+	cli := cliIntf.(*kcFinalizerClient)
+	ctx := NewCtxWithCallOptions(context.Background(), streamcall.GetCallOptions([]streamcall.Option{streamcall.WithRecvTimeout(callOptTimeout)}))
+	_, ri, _ := cli.initRPCInfo(ctx, mtd, 0, nil, true)
+	test.Assert(t, ri.Config().StreamRecvTimeout() == callOptTimeout)
+
+	// call option has higher priority
+	cliTimeout := 2 * time.Second
+	cliIntf, err = NewClient(svcInfo, WithTransportProtocol(transport.TTHeaderStreaming), WithStreamOptions(WithStreamRecvTimeout(cliTimeout)), WithDestService(testService))
+	test.Assert(t, err == nil, err)
+	cli = cliIntf.(*kcFinalizerClient)
+	ctx = NewCtxWithCallOptions(context.Background(), streamcall.GetCallOptions([]streamcall.Option{streamcall.WithRecvTimeout(callOptTimeout)}))
+	_, ri, _ = cli.initRPCInfo(ctx, mtd, 0, nil, true)
+	test.Assert(t, ri.Config().StreamRecvTimeout() == callOptTimeout)
 }

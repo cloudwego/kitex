@@ -379,6 +379,37 @@ func (s *Stream) Header() (metadata.MD, error) {
 	return s.header.Copy(), nil
 }
 
+// tryGetHeader attempts to get the header in a non-blocking way.
+// Returns (nil, false) if the header is not available.
+// Notice: only use on client side.
+func (s *Stream) tryGetHeader() (metadata.MD, bool) {
+	if s.headerChan == nil {
+		return nil, false
+	}
+	select {
+	case <-s.headerChan:
+		return s.header.Copy(), true
+	default:
+		return nil, false
+	}
+}
+
+// getHeaderValid returns whether a valid header has been received
+func (s *Stream) getHeaderValid() bool {
+	if atomic.LoadUint32(&s.headerChanClosed) == 1 {
+		// only read headerValid after headerChan is closed
+		if s.headerChan != nil {
+			select {
+			case <-s.headerChan:
+				return s.headerValid
+			default:
+				return false
+			}
+		}
+	}
+	return false
+}
+
 // TrailersOnly blocks until a header or trailers-only frame is received and
 // then returns true if the stream was trailers-only.  If the stream ends
 // before headers are received, returns true, nil.  Client-side only.
@@ -387,7 +418,7 @@ func (s *Stream) TrailersOnly() bool {
 	return s.noHeaders
 }
 
-// Trailer returns the cached trailer metedata. Note that if it is not called
+// Trailer returns the cached trailer metadata. Note that if it is not called
 // after the entire stream is done, it could return an empty MD. Client
 // side only.
 // It can be safely read only after stream has ended that is either read

@@ -47,6 +47,7 @@ type CallOptions struct {
 	RetryPolicy    retry.Policy
 	Fallback       *fallback.Policy
 	CompressorName string
+	StreamOptions  client.StreamOptions
 }
 
 func newOptions() interface{} {

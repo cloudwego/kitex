@@ -21,6 +21,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // StreamEventHandler is used to handle stream events
@@ -32,16 +33,9 @@ type StreamingConfig struct {
 
 	SendMiddlewareBuilders []endpoint.SendMiddlewareBuilder
 	SendMiddlewares        []endpoint.SendMiddleware
-
-	EventHandler StreamEventHandler
 }
 
 func (c *StreamingConfig) InitMiddlewares(ctx context.Context) {
-	if c.EventHandler != nil {
-		c.RecvMiddlewares = append(c.RecvMiddlewares, c.streamRecvTraceMW(ctx))
-		c.SendMiddlewares = append(c.SendMiddlewares, c.streamSendTraceMW(ctx))
-	}
-
 	if len(c.RecvMiddlewareBuilders) > 0 {
 		recvMiddlewares := make([]endpoint.RecvMiddleware, 0, len(c.RecvMiddlewareBuilders))
 		for _, mwb := range c.RecvMiddlewareBuilders {
@@ -59,10 +53,14 @@ func (c *StreamingConfig) InitMiddlewares(ctx context.Context) {
 	}
 }
 
-func (c *StreamingConfig) BuildRecvInvokeChain(ep endpoint.RecvEndpoint) endpoint.RecvEndpoint {
-	return endpoint.RecvChain(c.RecvMiddlewares...)(ep)
+func (c *StreamingConfig) BuildRecvInvokeChain() endpoint.RecvEndpoint {
+	return endpoint.RecvChain(c.RecvMiddlewares...)(func(stream streaming.Stream, resp interface{}) (err error) {
+		return stream.RecvMsg(resp)
+	})
 }
 
-func (c *StreamingConfig) BuildSendInvokeChain(ep endpoint.SendEndpoint) endpoint.SendEndpoint {
-	return endpoint.SendChain(c.SendMiddlewares...)(ep)
+func (c *StreamingConfig) BuildSendInvokeChain() endpoint.SendEndpoint {
+	return endpoint.SendChain(c.SendMiddlewares...)(func(stream streaming.Stream, req interface{}) (err error) {
+		return stream.SendMsg(req)
+	})
 }

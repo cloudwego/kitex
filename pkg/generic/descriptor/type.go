@@ -44,7 +44,7 @@ const (
 	LIST   Type = 15
 	UTF8   Type = 16
 	UTF16  Type = 17
-	// BINARY Type = 18   wrong and unusued
+	// BINARY Type = 18   wrong and unused
 	JSON Type = 19
 )
 

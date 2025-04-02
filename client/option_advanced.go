@@ -162,7 +162,7 @@ func WithRetryContainer(rc *retry.Container) Option {
 		if rc == nil {
 			panic("invalid retry container: nil")
 		}
-		o.RetryContainer = rc
+		o.UnaryOptions.RetryContainer = rc
 	}}
 }
 

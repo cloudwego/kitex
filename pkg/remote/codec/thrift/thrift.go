@@ -154,15 +154,12 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 		return apacheMarshal(out, ctx, methodName, msgType, seqID, data)
 	}
 
-	// if user only wants to use Basic we never try fallback to frugal or fastcodec
-	if c.CodecType != Basic {
-		// try FrugalWrite < - > FastWrite fallback
-		if typecodec.FastCodec {
-			return fastMarshal(out, methodName, msgType, seqID, data.(thrift.FastCodec))
-		}
-		if typecodec.Frugal {
-			return frugalMarshal(out, methodName, msgType, seqID, data)
-		}
+	// try fallback to fastcodec or frugal even though CodecType=Basic
+	if typecodec.FastCodec {
+		return fastMarshal(out, methodName, msgType, seqID, data.(thrift.FastCodec))
+	}
+	if typecodec.Frugal {
+		return frugalMarshal(out, methodName, msgType, seqID, data)
 	}
 	return errEncodeMismatchMsgType
 }

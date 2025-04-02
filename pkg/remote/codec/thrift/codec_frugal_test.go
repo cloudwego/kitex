@@ -179,9 +179,9 @@ func TestMarshalThriftDataFrugal(t *testing.T) {
 		test.Assert(t, reflect.DeepEqual(buf, mockReqThrift), buf)
 	}
 
-	// Basic can be used for disabling frugal
+	// CodecType=Basic and failback to frugal
 	_, err := MarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), mockReqFrugal)
-	test.Assert(t, err != nil, err)
+	test.Assert(t, err == nil, err)
 }
 
 func TestUnmarshalThriftDataFrugal(t *testing.T) {
@@ -203,9 +203,9 @@ func TestUnmarshalThriftDataFrugal(t *testing.T) {
 
 	}
 
-	// Basic can be used for disabling frugal
+	// CodecType=Basic and failback to frugal
 	err := UnmarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), "mock", mockReqThrift, req)
-	test.Assert(t, err != nil, err)
+	test.Assert(t, err == nil, err)
 }
 
 func TestThriftCodec_unmarshalThriftDataFrugal(t *testing.T) {

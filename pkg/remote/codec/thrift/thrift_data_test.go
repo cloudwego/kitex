@@ -53,10 +53,8 @@ func TestMarshalThriftData(t *testing.T) {
 	})
 	t.Run("BasicCodec", func(t *testing.T) {
 		_, err := MarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), mockReq)
-		test.Assert(t, err != nil, err)
-		// test.Assert(t, reflect.DeepEqual(buf, mockReqThrift), buf)
+		test.Assert(t, err == nil, err)
 	})
-	// FrugalCodec: in thrift_frugal_amd64_test.go: TestMarshalThriftDataFrugal
 }
 
 func checkDecodeResult(t *testing.T, err error, req *mocks.MockReq) {
@@ -81,9 +79,8 @@ func TestUnmarshalThriftData(t *testing.T) {
 	t.Run("BasicCodec", func(t *testing.T) {
 		req := &mocks.MockReq{}
 		err := UnmarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), "mock", mockReqThrift, req)
-		test.Assert(t, err != nil, err)
+		test.Assert(t, err == nil, err)
 	})
-	// FrugalCodec: in thrift_frugal_amd64_test.go: TestUnmarshalThriftDataFrugal
 }
 
 func TestThriftCodec_unmarshalThriftData(t *testing.T) {

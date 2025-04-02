@@ -49,6 +49,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/xds"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -143,9 +144,17 @@ func TestRetryOption(t *testing.T) {
 }
 
 func TestTransportProtocolOption(t *testing.T) {
-	var options []client.Option
-	options = append(options, WithTransportProtocol(transport.GRPC))
-	client.NewOptions(options)
+	opts := []client.Option{WithTransportProtocol(transport.GRPC)}
+	options := client.NewOptions(opts)
+	test.Assert(t, options.RemoteOpt.ConnPool != nil)
+	test.Assert(t, options.RemoteOpt.CliHandlerFactory != nil)
+	opts = []client.Option{WithTransportProtocol(transport.GRPCStreaming)}
+	options = client.NewOptions(opts)
+	test.Assert(t, options.RemoteOpt.GRPCStreamingConnPool != nil)
+	test.Assert(t, options.RemoteOpt.GRPCStreamingCliHandlerFactory != nil)
+	opts = []client.Option{WithTransportProtocol(transport.TTHeaderStreaming)}
+	options = client.NewOptions(opts)
+	test.Assert(t, options.RemoteOpt.TTHeaderStreamingProvider != nil)
 }
 
 func TestWithHostPorts(t *testing.T) {
@@ -443,7 +452,7 @@ func TestWithMuxConnection(t *testing.T) {
 	opts := client.NewOptions([]client.Option{WithMuxConnection(connNum)})
 	test.Assert(t, opts.RemoteOpt.ConnPool != nil)
 	test.Assert(t, opts.RemoteOpt.CliHandlerFactory != nil)
-	test.Assert(t, opts.Configs.TransportProtocol() == transport.TTHeader, opts.Configs.TransportProtocol())
+	test.Assert(t, opts.Configs.TransportProtocol() == transport.TTHeaderFramed, opts.Configs.TransportProtocol())
 }
 
 func TestWithTimeoutProvider(t *testing.T) {
@@ -586,7 +595,7 @@ func TestWithConnPool(t *testing.T) {
 func TestWithRetryContainer(t *testing.T) {
 	mockRetryContainer := &retry.Container{}
 	opts := client.NewOptions([]client.Option{WithRetryContainer(mockRetryContainer)})
-	test.Assert(t, opts.RetryContainer == mockRetryContainer)
+	test.Assert(t, opts.UnaryOptions.RetryContainer == mockRetryContainer)
 }
 
 func TestWithGeneric(t *testing.T) {
@@ -671,7 +680,7 @@ func TestWithSuite(t *testing.T) {
 	opts := client.NewOptions(options)
 	test.Assert(t, opts.Cli == mockEndpointBasicInfo)
 	test.Assert(t, reflect.DeepEqual(opts.DebugService, mockDiagnosisService))
-	test.Assert(t, opts.RetryContainer == mockRetryContainer)
+	test.Assert(t, opts.UnaryOptions.RetryContainer == mockRetryContainer)
 }
 
 func TestWithLongConnectionOption(t *testing.T) {
@@ -738,6 +747,21 @@ func TestWithGRPCTLSConfig(t *testing.T) {
 	cfg := &tls.Config{}
 	opts := client.NewOptions([]client.Option{WithGRPCTLSConfig(cfg)})
 	test.Assert(t, opts.GRPCConnectOpts != nil)
+}
+
+func TestTailOption(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	opt := Option{F: func(o *client.Options, di *utils.Slice) {
+		if o.RemoteOpt.ConnPool == nil {
+			panic("invalid Dialer: nil")
+		}
+		o.RemoteOpt.Dialer = newDialer(ctrl)
+	}}
+	opt = TailOption(opt)
+	opts := client.NewOptions([]client.Option{opt, WithConnPool(mock_remote.NewMockLongConnPool(ctrl))})
+	test.Assert(t, opts.RemoteOpt.Dialer != nil)
 }
 
 func checkOneOptionDebugInfo(t *testing.T, opt Option, expectStr string) error {

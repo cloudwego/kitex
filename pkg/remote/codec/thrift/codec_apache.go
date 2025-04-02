@@ -149,7 +149,7 @@ func (p *netpollSkipDecoder) skipnSlow(n int) error {
 
 	// trigger underlying conn to read more
 	if l := p.r.Len(); l > sz {
-		// read as much as possible, luckly, we will have a full buffer
+		// read as much as possible, luckily, we will have a full buffer
 		// then we no need to call p.Peek many times
 		sz = l
 	}

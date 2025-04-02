@@ -291,23 +291,22 @@ func TestSkipDecoder(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			desc:     "Disable SkipDecoder, fallback to Apache Thrift Codec for Buffer Protocol",
+			desc:     "SkipDecoder=false|PurePayload",
 			codec:    NewThriftCodec(),
 			protocol: transport.PurePayload,
-			wantErr:  true,
 		},
 		{
-			desc:     "Disable SkipDecoder, using FastCodec for TTHeader Protocol",
+			desc:     "SkipDecoder=false|TTHeader",
 			codec:    NewThriftCodec(),
 			protocol: transport.TTHeader,
 		},
 		{
-			desc:     "Enable SkipDecoder, using FastCodec for Buffer Protocol",
+			desc:     "SkipDecoder=true|PurePayload",
 			codec:    NewThriftCodecWithConfig(FastRead | FastWrite | EnableSkipDecoder),
 			protocol: transport.PurePayload,
 		},
 		{
-			desc:     "Enable SkipDecoder, using FastCodec for TTHeader Protocol",
+			desc:     "SkipDecoder=true|TTHeader",
 			codec:    NewThriftCodecWithConfig(FastRead | FastWrite | EnableSkipDecoder),
 			protocol: transport.TTHeader,
 		},

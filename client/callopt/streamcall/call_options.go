@@ -17,6 +17,7 @@
 package streamcall
 
 import (
+	"strings"
 	"time"
 
 	"github.com/cloudwego/kitex/client/callopt"
@@ -44,4 +45,16 @@ func WithConnectTimeout(d time.Duration) Option {
 // WithTag sets the tags for service discovery for an RPC call.
 func WithTag(key, val string) Option {
 	return ConvertOptionFrom(callopt.WithTag(key, val))
+}
+
+// WithRecvTimeout add recv timeout for stream.Recv function.
+// NOTICE: ONLY effective for ttheader streaming protocol for now.
+func WithRecvTimeout(d time.Duration) Option {
+	return Option{f: func(o *callopt.CallOptions, di *strings.Builder) {
+		di.WriteString("WithRecvTimeout(")
+		di.WriteString(d.String())
+		di.WriteString(")")
+
+		o.StreamOptions.RecvTimeout = d
+	}}
 }

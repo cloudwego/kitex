@@ -30,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/endpoint/sep"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/limit"
@@ -40,9 +41,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -50,6 +53,83 @@ import (
 func init() {
 	remote.PutPayloadCode(serviceinfo.Thrift, thrift.NewThriftCodec())
 	remote.PutPayloadCode(serviceinfo.Protobuf, protobuf.NewProtobufCodec())
+}
+
+type UnaryOption struct {
+	F func(o *UnaryOptions, di *utils.Slice)
+}
+
+type UnaryOptions struct {
+	UnaryMiddlewares        []endpoint.UnaryMiddleware
+	UnaryMiddlewareBuilders []endpoint.UnaryMiddlewareBuilder
+}
+
+func (o *UnaryOptions) InitMiddlewares(ctx context.Context) {
+	if len(o.UnaryMiddlewareBuilders) > 0 {
+		unaryMiddlewares := make([]endpoint.UnaryMiddleware, 0, len(o.UnaryMiddlewareBuilders))
+		for _, mwb := range o.UnaryMiddlewareBuilders {
+			unaryMiddlewares = append(unaryMiddlewares, mwb(ctx))
+		}
+		o.UnaryMiddlewares = append(o.UnaryMiddlewares, unaryMiddlewares...)
+	}
+}
+
+type StreamOption struct {
+	F func(o *StreamOptions, di *utils.Slice)
+}
+
+type StreamOptions struct {
+	EventHandler                 streaming.EventHandler
+	StreamMiddlewares            []sep.StreamMiddleware
+	StreamMiddlewareBuilders     []sep.StreamMiddlewareBuilder
+	StreamRecvMiddlewares        []sep.StreamRecvMiddleware
+	StreamRecvMiddlewareBuilders []sep.StreamRecvMiddlewareBuilder
+	StreamSendMiddlewares        []sep.StreamSendMiddleware
+	StreamSendMiddlewareBuilders []sep.StreamSendMiddlewareBuilder
+}
+
+func (o *StreamOptions) InitMiddlewares(ctx context.Context) {
+	if len(o.StreamMiddlewareBuilders) > 0 {
+		streamMiddlewares := make([]sep.StreamMiddleware, 0, len(o.StreamMiddlewareBuilders))
+		for _, mwb := range o.StreamMiddlewareBuilders {
+			streamMiddlewares = append(streamMiddlewares, mwb(ctx))
+		}
+		o.StreamMiddlewares = append(o.StreamMiddlewares, streamMiddlewares...)
+	}
+	if len(o.StreamRecvMiddlewareBuilders) > 0 {
+		streamRecvMiddlewares := make([]sep.StreamRecvMiddleware, 0, len(o.StreamRecvMiddlewareBuilders))
+		for _, mwb := range o.StreamRecvMiddlewareBuilders {
+			streamRecvMiddlewares = append(streamRecvMiddlewares, mwb(ctx))
+		}
+		o.StreamRecvMiddlewares = append(o.StreamRecvMiddlewares, streamRecvMiddlewares...)
+	}
+	if len(o.StreamSendMiddlewareBuilders) > 0 {
+		streamSendMiddlewares := make([]sep.StreamSendMiddleware, 0, len(o.StreamSendMiddlewareBuilders))
+		for _, mwb := range o.StreamSendMiddlewareBuilders {
+			streamSendMiddlewares = append(streamSendMiddlewares, mwb(ctx))
+		}
+		o.StreamSendMiddlewares = append(o.StreamSendMiddlewares, streamSendMiddlewares...)
+	}
+}
+
+func (o *StreamOptions) BuildRecvChain() sep.StreamRecvEndpoint {
+	return sep.StreamRecvChain(o.StreamRecvMiddlewares...)(func(ctx context.Context, stream streaming.ServerStream, message interface{}) (err error) {
+		return stream.RecvMsg(ctx, message)
+	})
+}
+
+func (o *StreamOptions) BuildSendChain() sep.StreamSendEndpoint {
+	return sep.StreamSendChain(o.StreamSendMiddlewares...)(func(ctx context.Context, stream streaming.ServerStream, message interface{}) (err error) {
+		return stream.SendMsg(ctx, message)
+	})
+}
+
+type TTHeaderStreamingOption struct {
+	F func(o *TTHeaderStreamingOptions, di *utils.Slice)
+}
+
+type TTHeaderStreamingOptions struct {
+	TransportOptions []ttstream.ServerProviderOption
 }
 
 // Option is the only way to config a server.
@@ -63,6 +143,9 @@ type Options struct {
 	Configs  rpcinfo.RPCConfig
 	LockBits int
 	Once     *configutil.OptionOnce
+
+	UnaryOptions  UnaryOptions
+	StreamOptions StreamOptions
 
 	MetaHandlers []remote.MetaHandler
 
@@ -96,12 +179,13 @@ type Options struct {
 
 	BackupOpt backup.Options
 
-	// Streaming
-	Streaming stream.StreamingConfig // old version streaming API config
-	StreamX   StreamXOptions         // new version streaming API config
+	Streaming stream.StreamingConfig // deprecated, use StreamOptions instead
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool
+
+	// TTHeaderStreaming
+	TTHeaderStreamingOptions TTHeaderStreamingOptions
 }
 
 type Limit struct {
@@ -118,12 +202,13 @@ type Limit struct {
 
 // NewOptions creates a default options.
 func NewOptions(opts []Option) *Options {
+	ropt, ttstreamProvider := newServerRemoteOption()
 	o := &Options{
 		Svr:          &rpcinfo.EndpointBasicInfo{},
 		Configs:      rpcinfo.NewRPCConfig(),
 		Once:         configutil.NewOptionOnce(),
 		MetaHandlers: []remote.MetaHandler{transmeta.MetainfoServerHandler},
-		RemoteOpt:    newServerRemoteOption(),
+		RemoteOpt:    ropt,
 		DebugService: diagnosis.NoopService,
 		ExitSignal:   DefaultSysExitSignal,
 
@@ -136,6 +221,9 @@ func NewOptions(opts []Option) *Options {
 		Registry:  registry.NoopRegistry,
 	}
 	ApplyOptions(opts, o)
+	// todo: must be removed in the future
+	ttstreamProvider.(ttstream.ServerProviderOptionApplier).ApplyServerProviderOption(o.TTHeaderStreamingOptions.TransportOptions...)
+
 	rpcinfo.AsMutableRPCConfig(o.Configs).LockConfig(o.LockBits)
 	if o.StatsLevel == nil {
 		level := stats.LevelDisabled
