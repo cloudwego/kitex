@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/klog"
+
 	"github.com/bytedance/gopkg/lang/dirtmake"
 
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -89,6 +91,9 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 		host = u.Host
 	}
 	isStreaming := ri.Config().InteractionMode() == rpcinfo.Streaming
+	if !isStreaming {
+		klog.Infof("[DEBUG] grpc unary call, toPSM=%s", host)
+	}
 	invocation := ri.Invocation()
 	callHdr := &grpc.CallHdr{
 		Host: host,

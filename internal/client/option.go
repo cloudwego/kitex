@@ -19,7 +19,10 @@ package client
 
 import (
 	"context"
+	"runtime/debug"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/klog"
 
 	"github.com/cloudwego/localsession/backup"
 
@@ -180,6 +183,7 @@ func (o *Options) initRemoteOpt() {
 	if o.Configs.TransportProtocol()&transport.GRPC == transport.GRPC {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
 			// grpc unary short connection
+			klog.Infof("[DEBUG] use short connection, to_psm=%s, poolCfg=%v, stack=%s", o.Svr.ServiceName, o.PoolCfg, string(debug.Stack()))
 			o.GRPCConnectOpts.ShortConn = true
 		}
 		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)

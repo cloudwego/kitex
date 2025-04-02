@@ -25,6 +25,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/utils/kitexutil"
+
 	"golang.org/x/sync/singleflight"
 
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -135,6 +137,8 @@ func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, netwo
 // Get pick or generate a net.Conn and return
 func (p *connPool) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
 	if p.connOpts.ShortConn {
+		toPSM, _ := kitexutil.GetCallee(ctx)
+		klog.Infof("[DEBUG] get short connection, toPSM: %s", toPSM)
 		return p.createShortConn(ctx, network, address, opt)
 	}
 
