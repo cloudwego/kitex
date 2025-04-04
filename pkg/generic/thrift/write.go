@@ -655,46 +655,16 @@ func writeStringJSONMap(ctx context.Context, val interface{}, out *thrift.Buffer
 	return nil
 }
 
+// writeRequestBase mainly take frkBase and only merge the frkBase.Extra with the jsonBase.Extra
+// NOTICE: this logc must be aligend with mergeRequestBase
 func writeRequestBase(ctx context.Context, val interface{}, out *thrift.BufferWriter, field *descriptor.FieldDescriptor, opt *writerOption) error {
-	if st, ok := val.(map[string]interface{}); ok {
-		// copy from user's Extra
-		if ext, ok := st["Extra"]; ok {
-			switch v := ext.(type) {
-			case map[string]interface{}:
-				// from http json
-				for key, value := range v {
-					if _, ok := opt.requestBase.Extra[key]; !ok {
-						if vStr, ok := value.(string); ok {
-							if opt.requestBase.Extra == nil {
-								opt.requestBase.Extra = map[string]string{}
-							}
-							opt.requestBase.Extra[key] = vStr
-						}
-					}
-				}
-			case map[interface{}]interface{}:
-				// from struct map
-				for key, value := range v {
-					if kStr, ok := key.(string); ok {
-						if _, ok := opt.requestBase.Extra[kStr]; !ok {
-							if vStr, ok := value.(string); ok {
-								if opt.requestBase.Extra == nil {
-									opt.requestBase.Extra = map[string]string{}
-								}
-								opt.requestBase.Extra[kStr] = vStr
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+	final := mergeBaseAny(val, opt.requestBase)
 	if err := out.WriteFieldBegin(thrift.TType(field.Type.Type), int16(field.ID)); err != nil {
 		return err
 	}
-	sz := opt.requestBase.BLength()
+	sz := final.BLength()
 	buf := make([]byte, sz)
-	opt.requestBase.FastWrite(buf)
+	final.FastWrite(buf)
 	for _, b := range buf {
 		if err := out.WriteByte(int8(b)); err != nil {
 			return err
