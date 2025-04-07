@@ -115,7 +115,8 @@ type http2Client struct {
 	// variable.
 	kpDormant bool
 	onGoAway  func(GoAwayReason)
-	onClose   func()
+	// Important: when onClose is invoked, the http2Client.mu is held
+	onClose func()
 
 	bufferPool *bufferPool
 }
