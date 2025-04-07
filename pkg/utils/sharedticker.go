@@ -108,11 +108,17 @@ func (t *SharedTicker) Tick(interval time.Duration) {
 }
 
 func (t *SharedTicker) syncExec() {
+	var todoTasks []TickerTask
 	t.Lock()
+	todoTasks = make([]TickerTask, 0, len(t.tasks))
 	for task := range t.tasks {
-		task.Tick()
+		todoTasks = append(todoTasks, task)
 	}
 	t.Unlock()
+
+	for _, task := range todoTasks {
+		task.Tick()
+	}
 }
 
 func (t *SharedTicker) asyncExec() {
