@@ -19,6 +19,7 @@ package prutal
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -67,6 +68,12 @@ service ServiceC {
 }
 	`), 0o644)
 
+	fastpbFile := filepath.Join(dir, "kitex_gen/test/test.pb.fast.go")
+	err := os.MkdirAll(filepath.Dir(fastpbFile), 0o755)
+	test.Assert(t, err == nil, err)
+	err = os.WriteFile(fastpbFile, []byte("package test"), 0o644)
+	test.Assert(t, err == nil, err)
+
 	c := generator.Config{IDL: fn}
 	c.GenerateMain = true
 	c.CombineService = true
@@ -74,10 +81,14 @@ service ServiceC {
 	c.OutputPath = dir
 	c.GenPath = "kitex_gen"
 	p := NewPrutalGen(c)
-	err := p.Process()
+	err = p.Process()
 	test.Assert(t, err == nil, err)
 
 	b, err := os.ReadFile(filepath.Join(dir, "kitex_gen/test/test.pb.go"))
 	test.Assert(t, err == nil, err)
 	t.Log(string(b))
+
+	b, err = os.ReadFile(fastpbFile)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, strings.Contains(string(b), "deprecated"), string(b))
 }
