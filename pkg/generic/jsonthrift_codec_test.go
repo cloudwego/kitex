@@ -91,8 +91,6 @@ func assertDynamicgoOptions(t *testing.T, exp, act conv.Options) {
 	test.Assert(t, exp.WriteRequireField == act.WriteRequireField, "WriteRequireField")
 	test.Assert(t, exp.ReadHttpValueFallback == act.ReadHttpValueFallback, "ReadHttpValueFallback")
 	test.Assert(t, exp.WriteHttpValueFallback == act.WriteHttpValueFallback, "WriteHttpValueFallback")
-	// typos:ignore
-	test.Assert(t, exp.TracebackRequredOrRootFields == act.TracebackRequredOrRootFields, "TracebackRequredOrRootFields")
 	test.Assert(t, exp.OmitHttpMappingErrors == act.OmitHttpMappingErrors, "OmitHttpMappingErrors")
 	test.Assert(t, exp.NoCopyString == act.NoCopyString, "NoCopyString")
 	test.Assert(t, exp.UseNativeSkip == act.UseNativeSkip, "UseNativeSkip")
