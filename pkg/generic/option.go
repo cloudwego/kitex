@@ -33,6 +33,7 @@ var (
 		UseKitexHttpEncoding:   true,
 		WriteHttpValueFallback: true,
 		ReadHttpValueFallback:  true,
+		MergeBaseFunc:          thrift.MergeBase,
 	}
 	DefaultJSONDynamicGoConvOpts = conv.Options{
 		WriteRequireField:  true,

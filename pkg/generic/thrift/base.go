@@ -40,20 +40,22 @@ func NewBaseResp() *BaseResp {
 	return base.NewBaseResp()
 }
 
-// MergeBase mainly take frkBase and only merge the frkBase.Extra with the jsonBase.Extra
+// MergeBase mainly take frameworkBase and only merge the frkBase.Extra with the jsonBase.Extra
+//
 // NOTICE: this logic must be aligned with mergeBaseAny
-func MergeBase(jsonBase, frkBase Base) Base {
+func MergeBase(jsonBase, frameworkBase Base) Base {
 	if jsonBase.Extra != nil {
 		extra := jsonBase.Extra
-		for k, v := range frkBase.Extra {
+		for k, v := range frameworkBase.Extra {
 			extra[k] = v
 		}
-		frkBase.Extra = extra
+		frameworkBase.Extra = extra
 	}
-	return frkBase
+	return frameworkBase
 }
 
 // mergeBaseAny mainly take frkBase and only merge the frkBase.Extra with the jsonBase.Extra
+//
 // NOTICE: this logic must be aligned with MergeBase
 func mergeBaseAny(jsonBase any, frkBase *Base) *Base {
 	if st, ok := jsonBase.(map[string]any); ok {
