@@ -99,6 +99,30 @@ func Test_mergeBaseAny(t *testing.T) {
 			},
 			want: &Base{LogID: "1", Addr: "", Extra: map[string]string{"a": "1", "b": "2", "c": "1"}},
 		},
+		{
+			name: "any jsonBase is nil",
+			args: args{
+				jsonBase: map[string]any(nil),
+				frkBase:  &Base{LogID: "1", Extra: map[string]string{"a": "1"}},
+			},
+			want: &Base{LogID: "1", Extra: map[string]string{"a": "1"}},
+		},
+		{
+			name: "any frkBase is empty",
+			args: args{
+				jsonBase: map[string]any{"LogID": "2", "Addr": "2", "Extra": map[any]any{"a": "2", "b": "2"}},
+				frkBase:  &Base{},
+			},
+			want: &Base{Extra: map[string]string{"a": "2", "b": "2"}},
+		},
+		{
+			name: "any jsonBase is not empty",
+			args: args{
+				jsonBase: map[string]any{"LogID": "2", "Addr": "2", "Extra": map[any]any{"a": "2", "b": "2"}},
+				frkBase:  &Base{LogID: "1", Extra: map[string]string{"a": "1", "c": "1"}},
+			},
+			want: &Base{LogID: "1", Addr: "", Extra: map[string]string{"a": "1", "b": "2", "c": "1"}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
