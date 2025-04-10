@@ -116,7 +116,7 @@ func NewClientStreaming(ctx context.Context, genericCli Client, method string, c
 	if err != nil {
 		return nil, err
 	}
-	return &clientStreamingClient{stream, method, gCli.svcInfo.MethodInfo(method)}, nil
+	return &clientStreamingClient{stream, method, gCli.svcInfo.Methods[serviceinfo.GenericClientStreamingMethod]}, nil
 }
 
 func (cs *clientStreamingClient) Send(req interface{}) error {
@@ -151,7 +151,7 @@ func NewServerStreaming(ctx context.Context, genericCli Client, method string, r
 	if err != nil {
 		return nil, err
 	}
-	mtInfo := gCli.svcInfo.MethodInfo(method)
+	mtInfo := gCli.svcInfo.Methods[serviceinfo.GenericServerStreamingMethod]
 	ss := &serverStreamingClient{stream, mtInfo}
 	_args := mtInfo.NewArgs().(*generic.Args)
 	_args.Method = method
@@ -188,7 +188,7 @@ func NewBidirectionalStreaming(ctx context.Context, genericCli Client, method st
 	if err != nil {
 		return nil, err
 	}
-	return &bidirectionalStreamingClient{stream, method, gCli.svcInfo.MethodInfo(method)}, nil
+	return &bidirectionalStreamingClient{stream, method, gCli.svcInfo.Methods[serviceinfo.GenericBidirectionalStreamingMethod]}, nil
 }
 
 func (bs *bidirectionalStreamingClient) Send(req interface{}) error {
