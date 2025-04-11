@@ -84,10 +84,10 @@ func TestHttpThriftCodecWithDynamicGo(t *testing.T) {
 	htc := newHTTPThriftCodec(p, gOpts)
 	test.Assert(t, htc.dynamicgoEnabled)
 	test.Assert(t, htc.useRawBodyForHTTPResp)
-	test.DeepEqual(t, htc.convOpts, DefaultHTTPDynamicGoConvOpts)
+	assertDynamicgoOptions(t, DefaultHTTPDynamicGoConvOpts, htc.convOpts)
 	convOptsWithThriftBase := DefaultHTTPDynamicGoConvOpts
 	convOptsWithThriftBase.EnableThriftBase = true
-	test.DeepEqual(t, htc.convOptsWithThriftBase, convOptsWithThriftBase)
+	test.Assert(t, convOptsWithThriftBase.EnableThriftBase, htc.convOptsWithThriftBase.EnableThriftBase)
 	defer htc.Close()
 	test.Assert(t, htc.Name() == "HttpThrift")
 

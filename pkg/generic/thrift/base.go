@@ -16,7 +16,9 @@
 
 package thrift
 
-import "github.com/cloudwego/gopkg/protocol/thrift/base"
+import (
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
+)
 
 // Base ...
 // Deprecated: use github.com/cloudwego/gopkg/protocol/thrift/base
@@ -36,4 +38,58 @@ type BaseResp = base.BaseResp
 // Deprecated: use github.com/cloudwego/gopkg/protocol/thrift/base
 func NewBaseResp() *BaseResp {
 	return base.NewBaseResp()
+}
+
+// MergeBase mainly take frameworkBase and only merge the frkBase.Extra with the jsonBase.Extra
+//
+// NOTICE: this logic must be aligned with mergeBaseAny
+func MergeBase(jsonBase, frameworkBase Base) Base {
+	if jsonBase.Extra != nil {
+		extra := jsonBase.Extra
+		for k, v := range frameworkBase.Extra {
+			extra[k] = v
+		}
+		frameworkBase.Extra = extra
+	}
+	return frameworkBase
+}
+
+// mergeBaseAny mainly take frkBase and only merge the frkBase.Extra with the jsonBase.Extra
+//
+// NOTICE: this logic must be aligned with MergeBase
+func mergeBaseAny(jsonBase any, frkBase *Base) *Base {
+	if st, ok := jsonBase.(map[string]any); ok {
+		// copy from user's Extra
+		if ext, ok := st["Extra"]; ok {
+			switch v := ext.(type) {
+			case map[string]any:
+				// from http json
+				for key, value := range v {
+					if _, ok := frkBase.Extra[key]; !ok {
+						if vStr, ok := value.(string); ok {
+							if frkBase.Extra == nil {
+								frkBase.Extra = map[string]string{}
+							}
+							frkBase.Extra[key] = vStr
+						}
+					}
+				}
+			case map[any]any:
+				// from struct map
+				for key, value := range v {
+					if kStr, ok := key.(string); ok {
+						if _, ok := frkBase.Extra[kStr]; !ok {
+							if vStr, ok := value.(string); ok {
+								if frkBase.Extra == nil {
+									frkBase.Extra = map[string]string{}
+								}
+								frkBase.Extra[kStr] = vStr
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return frkBase
 }
