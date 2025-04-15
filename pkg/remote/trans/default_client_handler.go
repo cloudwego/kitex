@@ -52,6 +52,9 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		rpcinfo.Record(ctx, sendMsg.RPCInfo(), stats.WriteFinish, err)
 	}()
 
+	if t.ext == nil {
+		klog.CtxErrorf(ctx, "KITEX: extension is nil")
+	}
 	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
 	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
