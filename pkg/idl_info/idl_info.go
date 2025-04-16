@@ -1,60 +1,78 @@
+/*
+ * Copyright 2025 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package idl_info
 
+import (
+	"fmt"
+	"os"
+
+	"github.com/cloudwego/kitex/pkg/klog"
+)
+
+// IDLInfo is a whole group of IDLs of a service
 type IDLInfo struct {
 	IDLInfoMeta
 	IDLFileContentMap map[string]string `json:"idl_file_content_map"`
 }
 
+// IDLInfoMeta is the meta info of IDLInfo
 type IDLInfoMeta struct {
-	PSM         string `json:"psm"`
-	MainIDLPath string `json:"mainIDLPath"`
-	GoModule    string `json:"go_module"`
-	CommitID    string `json:"commit_id"`
+	IDLServiceName string `json:"idl_service_name"`
+	IDLType        string `json:"idl_type"`
+	MainIDLPath    string `json:"mainIDLPath"`
+	GoModule       string `json:"go_module"`
+	IDLCommitID    string `json:"idl_commit_id"`
 }
 
-func GetIDLInfoDetails(psm string) (IDLInfo, bool) {
-	// todo: 拿副本？保证 map 不能被修改？
-	groups, ok := globalManager[psm]
+// RegisterThriftIDL should only execute when init, so it's not concurrency safe
+func RegisterThriftIDL(IDLServiceName, goModule, IDLRepoCommitID string, isMainIDL bool, idlContent, idlPath string) error {
+	info, ok := getInfoFromManager(IDLServiceName)
 	if !ok {
-		return IDLInfo{}, false
-	}
-	return *groups, true
-}
-
-func GetIDLInfoList() []IDLInfoMeta {
-	var metas = make([]IDLInfoMeta, 0, len(globalManager))
-	for _, info := range globalManager {
-		metas = append(metas, info.IDLInfoMeta)
-	}
-	return metas
-}
-
-var (
-	globalManager = make(map[string]*IDLInfo)
-)
-
-func RegisterIDL(psm, goModule string, isMainIDL bool, idlContent, idlPath string) {
-	// todo 后面区分下 thrift 和 protobuf
-	// 注册对启动速度的影响，init 不会并发
-	if _, ok := globalManager[psm]; !ok {
-		globalManager[psm] = &IDLInfo{
+		info = &IDLInfo{
 			IDLInfoMeta: IDLInfoMeta{
-				PSM: psm,
+				IDLServiceName: IDLServiceName,
+				IDLType:        "thrift",
+				IDLCommitID:    IDLRepoCommitID,
+				GoModule:       goModule,
 			},
 			IDLFileContentMap: make(map[string]string),
 		}
+		setInfoToManager(IDLServiceName, info)
 	}
-	group := globalManager[psm]
-	group.IDLFileContentMap[idlPath] = idlContent
-	if group.GoModule != "" && group.GoModule != goModule {
-		// 如果多个项目重复注册了一样的 psm，应该及时报错
-		panic("duplicated register for psm xx")
-	} else {
-		group.GoModule = goModule
+
+	if info.GoModule != goModule {
+		// if an IDLServiceName is registered by multiple go mods, panic and stop
+		// if environment 'KITEX_IDL_INFO_DISABLE_CONFLICT_CHECK' is enabled, then skip panic.
+		err := fmt.Errorf("[kitex IDL] '%s' go mod conflict: '%s' -> '%s'", IDLServiceName, info.GoModule, goModule)
+		if os.Getenv("KITEX_IDL_INFO_DISABLE_CONFLICT_CHECK") == "1" {
+			klog.Warnf(err.Error())
+			// skip this IDL's registration
+			return nil
+		} else {
+			return err
+		}
 	}
+	info.IDLFileContentMap[idlPath] = idlContent
 	if isMainIDL {
-		group.MainIDLPath = idlPath
+		if info.MainIDLPath != "" && info.MainIDLPath != idlPath {
+			// todo 如果用户只更新了部分 IDL，调整了新的主 IDL，就有可能出现这样的情况，只做提示
+			klog.Warnf("[kitex IDL] '%s' main idl path is override: '%s' -> '%s'", IDLServiceName, info.MainIDLPath, idlPath)
+		}
+		info.MainIDLPath = idlPath
 	}
-	// todo 注册的时候各种冲突场景路径信息打印等等...更多模块名元信息记录gopath啥的？
-	// todo 看看 protobuf 的全局注册器的实现
+	return nil
 }

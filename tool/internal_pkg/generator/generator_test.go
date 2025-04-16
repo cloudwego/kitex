@@ -45,7 +45,7 @@ func TestConfig_Pack(t *testing.T) {
 		OutputPath            string
 		PackagePrefix         string
 		CombineService        bool
-		CopyIDL               bool
+		RegisterIDL           bool
 		ThriftPlugins         util.StringSlice
 		ProtobufPlugins       util.StringSlice
 		Features              []feature
@@ -67,7 +67,7 @@ func TestConfig_Pack(t *testing.T) {
 		{
 			name:    "some",
 			fields:  fields{Features: []feature{feature(999)}, ThriftPluginTimeLimit: 30 * time.Second},
-			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "Hessian2Options=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "ProtobufPlugins=", "Features=999", "FrugalPretouch=false", "ThriftPluginTimeLimit=30s", "CompilerPath=", "ExtensionFile=", "Record=false", "RecordCmd=", "TemplateDir=", "GenPath=", "DeepCopyAPI=false", "Protocol=", "HandlerReturnKeepResp=false", "NoDependencyCheck=false", "Rapid=false", "LocalThriftgo=false", "FrugalStruct=", "NoRecurse=false", "BuiltinTpl=", "StreamX=false"},
+			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "Hessian2Options=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "RegisterIDL=", "ProtobufPlugins=", "Features=999", "FrugalPretouch=false", "ThriftPluginTimeLimit=30s", "CompilerPath=", "ExtensionFile=", "Record=false", "RecordCmd=", "TemplateDir=", "GenPath=", "DeepCopyAPI=false", "Protocol=", "HandlerReturnKeepResp=false", "NoDependencyCheck=false", "Rapid=false", "LocalThriftgo=false", "FrugalStruct=", "NoRecurse=false", "BuiltinTpl=", "StreamX=false"},
 		},
 	}
 	for _, tt := range tests {
@@ -89,7 +89,7 @@ func TestConfig_Pack(t *testing.T) {
 				OutputPath:            tt.fields.OutputPath,
 				PackagePrefix:         tt.fields.PackagePrefix,
 				CombineService:        tt.fields.CombineService,
-				CopyIDL:               tt.fields.CopyIDL,
+				RegisterIDL:           tt.fields.RegisterIDL,
 				ThriftPlugins:         tt.fields.ThriftPlugins,
 				Features:              tt.fields.Features,
 				FrugalPretouch:        tt.fields.FrugalPretouch,
@@ -122,7 +122,7 @@ func TestConfig_Unpack(t *testing.T) {
 		OutputPath            string
 		PackagePrefix         string
 		CombineService        bool
-		CopyIDL               bool
+		RegisterIDL           string
 		Features              []feature
 		FrugalPretouch        bool
 		TemplateDir           string
@@ -165,7 +165,7 @@ func TestConfig_Unpack(t *testing.T) {
 				OutputPath:            tt.fields.OutputPath,
 				PackagePrefix:         tt.fields.PackagePrefix,
 				CombineService:        tt.fields.CombineService,
-				CopyIDL:               tt.fields.CopyIDL,
+				RegisterIDL:           tt.fields.RegisterIDL,
 				Features:              tt.fields.Features,
 				FrugalPretouch:        tt.fields.FrugalPretouch,
 				TemplateDir:           tt.fields.TemplateDir,

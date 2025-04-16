@@ -120,7 +120,7 @@ type Config struct {
 	OutputPath            string // the output path for main pkg and kitex_gen
 	PackagePrefix         string
 	CombineService        bool // combine services to one service
-	CopyIDL               string
+	RegisterIDL           string
 	ThriftPlugins         util.StringSlice
 	ProtobufPlugins       util.StringSlice
 	Features              []feature

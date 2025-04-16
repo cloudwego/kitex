@@ -140,7 +140,7 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 		noFastAPI:             conv.Config.NoFastAPI,
 		utils:                 conv.Utils,
 		module:                conv.Config.ModuleName,
-		copyIDL:               conv.Config.CopyIDL,
+		registerIDL:           conv.Config.RegisterIDL,
 		version:               conv.Config.Version,
 		record:                conv.Config.Record,
 		recordCmd:             conv.Config.RecordCmd,
