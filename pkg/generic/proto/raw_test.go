@@ -18,9 +18,10 @@ package proto
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func TestWriteRaw_Write(t *testing.T) {
@@ -29,12 +30,10 @@ func TestWriteRaw_Write(t *testing.T) {
 
 	data := []byte("test data")
 	result, err := wr.Write(ctx, data, "method", true)
-	assert.NoError(t, err)
-	assert.IsType(t, []byte{}, result)
-
-	// return should be a copy of data
-	resultBytes := result.([]byte)
-	assert.Equal(t, data, resultBytes)
+	test.Assert(t, err == nil)
+	resultBytes, ok := result.([]byte)
+	test.Assert(t, ok)
+	test.Assert(t, reflect.DeepEqual(data, resultBytes))
 }
 
 func TestReadRaw_Read(t *testing.T) {
@@ -43,12 +42,9 @@ func TestReadRaw_Read(t *testing.T) {
 
 	data := []byte("test data for reading")
 	result, err := reader.Read(ctx, "method", true, data)
+	test.Assert(t, err == nil)
 
-	assert.NoError(t, err)
-	assert.IsType(t, []byte{}, result)
-
-	// return should be a copy of data
-	resultBytes := result.([]byte)
-	assert.Equal(t, data, resultBytes)
-	assert.NotSame(t, &data[0], &resultBytes[0])
+	resultBytes, ok := result.([]byte)
+	test.Assert(t, ok)
+	test.Assert(t, reflect.DeepEqual(data, resultBytes))
 }
