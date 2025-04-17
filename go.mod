@@ -12,13 +12,14 @@ require (
 	github.com/cloudwego/gopkg v0.1.4
 	github.com/cloudwego/localsession v0.1.2
 	github.com/cloudwego/netpoll v0.7.0
-	github.com/cloudwego/prutal v0.1.0
+	github.com/cloudwego/prutal v0.1.1
 	github.com/cloudwego/runtimex v0.1.1
 	github.com/cloudwego/thriftgo v0.4.1
 	github.com/golang/mock v1.6.0
 	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8
 	github.com/jhump/protoreflect v1.8.2
 	github.com/json-iterator/go v1.1.12
+	github.com/stretchr/testify v1.9.0
 	github.com/tidwall/gjson v1.17.3
 	golang.org/x/net v0.24.0
 	golang.org/x/sync v0.8.0
@@ -42,7 +43,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
