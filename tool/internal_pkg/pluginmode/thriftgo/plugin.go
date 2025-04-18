@@ -28,9 +28,6 @@ import (
 // PluginName is the link name when the kitex binary is used as a plugin for thriftgo.
 const PluginName = "thrift-gen-kitex"
 
-// TheUseOptionMessage indicates that the generating of kitex_gen is aborted due to the -use option.
-const TheUseOptionMessage = "kitex_gen is not generated due to the -use option"
-
 // Run is an entry of the plugin mode of kitex for thriftgo.
 // It reads a plugin request from the standard input and writes out a response.
 func Run() int {
@@ -132,7 +129,9 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 	if conv.Config.Use != "" {
 		err := conv.persist(res)
 		if err == nil {
-			err = errors.New(TheUseOptionMessage)
+			// todo 检测这里的效果？修改打印！
+			fmt.Println("kitex_gen is not generated due to the -use option")
+			return res
 		}
 		return conv.failResp(err)
 	}

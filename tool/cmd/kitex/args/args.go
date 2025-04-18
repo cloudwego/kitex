@@ -25,6 +25,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cloudwego/kitex/tool/cmd/kitex/versions"
+
+	"github.com/cloudwego/kitex/tool/cmd/kitex/code"
+
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
@@ -50,7 +54,9 @@ type ExtraFlag struct {
 // Arguments .
 type Arguments struct {
 	generator.Config
-	extends []*ExtraFlag
+	extends           []*ExtraFlag
+	queryVersion      bool
+	dependencyChecker *versions.DependencyChecker
 }
 
 const (
@@ -77,6 +83,8 @@ func (a *Arguments) AddExtraFlag(e *ExtraFlag) {
 
 func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	f.BoolVar(&a.queryVersion, "version", false,
+		"Show the version of kitex")
 	f.BoolVar(&a.NoFastAPI, "no-fast-api", false,
 		"Generate codes without injecting fast method.")
 	f.StringVar(&a.ModuleName, "module", "",
@@ -174,6 +182,15 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 	f := a.buildFlags(version)
 	if err = f.Parse(kitexArgs); err != nil {
 		return err
+	}
+	if a.queryVersion {
+		println(a.Version)
+		return code.ErrExitZeroInterrupted
+	}
+	if !a.NoDependencyCheck {
+		if ok, _ := versions.CheckVersion(); !ok {
+			return code.ErrVersionCheckFailed
+		}
 	}
 	if a.StreamX {
 		a.ThriftOptions = append(a.ThriftOptions, "streamx")

@@ -99,9 +99,9 @@ func defaultParseCheckResult(cr *CheckResult) (prompt string, shouldExit bool) {
 }
 
 var defaultPrompt = `# Kitex Cmd Tool %s is not compatible with %s %s in your go.mod
-# You can upgrade %s to latest version
+# You can upgrade kitex to latest version
 go get %s@latest
-# Or upgrade %s to %s version
+# Or upgrade kitex to %s version
 go get %s@%s
 # Or downgrade Kitex Cmd Tool to %s version
 go install github.com/cloudwego/kitex/tool/cmd/kitex@%s`
