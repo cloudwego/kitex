@@ -16,13 +16,13 @@ package thriftgo
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/cloudwego/kitex"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
 
 	kargs "github.com/cloudwego/kitex/tool/cmd/kitex/args"
 	"github.com/cloudwego/kitex/tool/cmd/kitex/code"
-	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/thriftgo/plugin"
 	"github.com/cloudwego/thriftgo/sdk"
 )
@@ -51,6 +51,9 @@ func (k *KitexThriftgoPlugin) GetThriftgoParameters() []string {
 
 // RunKitexThriftgoGenFromArgs kitex tool to generate thrift as sdk
 func RunKitexThriftgoGenFromArgs(wd string, plugins []plugin.SDKPlugin, argsParsed *kargs.Arguments) (error, code.ToolExitCode) {
+	if !argsParsed.IsThrift() {
+		return fmt.Errorf("only support thrift idl"), code.ToolArgsError
+	}
 	p, err := GetKitexThriftgoPluginFromArgs(wd, argsParsed)
 	if err != nil {
 		if code.IsInterrupted(err) {
@@ -63,10 +66,6 @@ func RunKitexThriftgoGenFromArgs(wd string, plugins []plugin.SDKPlugin, argsPars
 	}
 
 	plugins = append([]plugin.SDKPlugin{p}, plugins...)
-
-	// fixme
-	l := log.DefaultLogger()      // pluginmode/thriftgo/convertor.go will change the logger
-	defer log.SetDefaultLogger(l) // revert it back
 
 	err = sdk.RunThriftgoAsSDK(wd, plugins, p.GetThriftgoParameters()...)
 	if err == nil {

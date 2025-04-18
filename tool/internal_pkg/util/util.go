@@ -158,10 +158,20 @@ func SearchGoMod(cwd string) (moduleName, path string, found bool) {
 	return
 }
 
-func RunGitCommand(gitLink string) (string, string, error) {
+func IsGitURL(s string) bool {
+	prefixes := []string{"git@", "http://", "https://"}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(s, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func RunGitCommand(gitLink string) (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return "", "Failed to get home dir", err
+		return "", fmt.Errorf("failed to get home dir: %s", err.Error())
 	}
 	cachePath := JoinPath(homeDir, ".kitex", "cache")
 
@@ -194,21 +204,25 @@ func RunGitCommand(gitLink string) (string, string, error) {
 	if err != nil && !os.IsExist(err) {
 		err = os.MkdirAll(gitPath, os.ModePerm)
 		if err != nil {
-			return "", "Failed to create cache directory,please check your permission for ~/.kitex/cache", err
+			return "", fmt.Errorf("failed to create cache directory,please check your permission for ~/.kitex/cache: %s", err.Error())
 		}
 		cmdClone := exec.Command("git", "clone", pullLink, ".")
 		cmdClone.Dir = gitPath
 		out, gitErr := cmdClone.CombinedOutput()
 		if gitErr != nil {
-			return "", string(out), gitErr
+			return "", fmt.Errorf("%s: %s", gitErr.Error(), string(out))
 		}
 		if branch != "" {
 			cmdCheckout := exec.Command("git", "checkout", branch)
 			cmdCheckout.Dir = gitPath
 			out, gitErr = cmdCheckout.CombinedOutput()
-			return gitPath, string(out), gitErr
+			if gitErr != nil {
+				return "", fmt.Errorf("%s: %s", gitErr.Error(), string(out))
+			} else {
+				return gitPath, nil
+			}
 		} else {
-			return gitPath, "", nil
+			return gitPath, nil
 		}
 	}
 
@@ -216,10 +230,10 @@ func RunGitCommand(gitLink string) (string, string, error) {
 	cmdPull.Dir = gitPath
 	out, gitErr := cmdPull.CombinedOutput()
 	if gitErr != nil {
-		return "", string(out), gitErr
+		return "", fmt.Errorf("%s: %s", gitErr.Error(), string(out))
 	}
 
-	return gitPath, "", nil
+	return gitPath, nil
 }
 
 // CombineOutputPath read the output and path variables and render them into the final path

@@ -85,7 +85,7 @@ func CheckVersion() (ok bool, err error) {
 	if !currentVersion.greatOrEqual(minDepRepoVersion) {
 		prompt := cr.promptFunc(cr.minDepRepoPath, currentVersionStr, kitex.Version)
 		log.Infof(prompt)
-		return false, fmt.Errorf("kitex cmd tool dependency compatibility check failed")
+		return false, ErrDependencyVersionNotCompatible
 	}
 
 	return true, nil

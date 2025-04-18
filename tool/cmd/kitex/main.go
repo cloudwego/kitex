@@ -42,7 +42,7 @@ func main() {
 	// 2. parse user input to arguments
 	// 3. check dependency version ( details: versions/dependencies_v2.go)
 	// 4. execute code generation by choosing specific tool (thriftgo、prutal、protoc?)
-	err, retCode := generator.RunKitexToolCmd(curpath, os.Args, &args, kitex.Version)
+	err, retCode := generator.RunKitexTool(curpath, os.Args, &args, kitex.Version)
 	if err != nil || !code.Good(retCode) {
 		log.Errorf(err.Error())
 		os.Exit(int(retCode))

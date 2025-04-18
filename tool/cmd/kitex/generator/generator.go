@@ -30,7 +30,7 @@ func RunKitexThriftgoGen(wd string, plugins []plugin.SDKPlugin, kitexOsArgs ...s
 	return t.RunKitexThriftgoGenFromArgs(wd, plugins, &args)
 }
 
-func RunKitexToolCmd(curpath string, osArgs []string, args *kargs.Arguments, toolVersion string) (err error, retCode code.ToolExitCode) {
+func RunKitexTool(curpath string, osArgs []string, args *kargs.Arguments, toolVersion string) (err error, retCode code.ToolExitCode) {
 	// try run as thriftgo/protoc plugin process
 	mode := os.Getenv(kargs.EnvPluginMode)
 	if len(osArgs) <= 1 && mode != "" {

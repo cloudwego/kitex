@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+
 	"github.com/cloudwego/thriftgo/plugin"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
@@ -129,8 +131,7 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 	if conv.Config.Use != "" {
 		err := conv.persist(res)
 		if err == nil {
-			// todo 检测这里的效果？修改打印！
-			fmt.Println("kitex_gen is not generated due to the -use option")
+			log.Info("kitex_gen is not generated due to the -use option")
 			return res
 		}
 		return conv.failResp(err)

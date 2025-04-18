@@ -66,6 +66,8 @@ func (c *converter) init(req *plugin.Request) error {
 }
 
 func (c *converter) initLogs() backend.LogFunc {
+	// todo fix log
+	// todo 单步验证 thriftgo log
 	lf := backend.LogFunc{
 		Info: func(v ...interface{}) {},
 		Warn: func(v ...interface{}) {
@@ -75,13 +77,13 @@ func (c *converter) initLogs() backend.LogFunc {
 			c.Warnings = append(c.Warnings, warns...)
 		},
 	}
-	if c.Config.Verbose {
-		lf.Info = lf.Warn
-	}
+	//if c.Config.Verbose {
+	//	lf.Info = lf.Warn
+	//}
 
-	log.SetDefaultLogger(log.LoggerFunc(func(format string, a ...interface{}) {
-		c.Warnings = append(c.Warnings, fmt.Sprintf(format, a...))
-	}))
+	//log.SetDefaultLogger(log.LoggerFunc(func(format string, a ...interface{}) {
+	//	c.Warnings = append(c.Warnings, fmt.Sprintf(format, a...))
+	//}))
 	return lf
 }
 
