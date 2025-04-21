@@ -40,18 +40,28 @@ var (
 	}
 )
 
+type ctxDoneCallback func(context.Context) error
+
 // Pipe implement a queue that never block on Write but block on Read if there is nothing to read
 type Pipe[Item any] struct {
 	queue   *Queue[Item]
 	state   pipeState
 	trigger chan struct{}
+
+	ctxDoneCallback ctxDoneCallback
 }
 
-func NewPipe[Item any]() *Pipe[Item] {
+func NewPipe[Item any](opts ...PipeOption) *Pipe[Item] {
+	options := PipeOptions{}
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	p := new(Pipe[Item])
 	p.queue = NewQueue[Item]()
 	p.trigger = make(chan struct{}, 1)
 	p.state = pipeStateActive
+	p.ctxDoneCallback = options.ctxDoneCallback
 	return p
 }
 
@@ -82,6 +92,9 @@ READ:
 		if ctx.Done() != nil {
 			select {
 			case <-ctx.Done():
+				if p.ctxDoneCallback != nil {
+					return 0, p.ctxDoneCallback(ctx)
+				}
 				return 0, ctx.Err()
 			case <-p.trigger:
 			}
@@ -121,5 +134,17 @@ func (p *Pipe[Item]) Cancel() {
 	select {
 	case p.trigger <- struct{}{}:
 	default:
+	}
+}
+
+type PipeOptions struct {
+	ctxDoneCallback ctxDoneCallback
+}
+
+type PipeOption func(*PipeOptions)
+
+func WithCtxDoneCallback(cb ctxDoneCallback) PipeOption {
+	return func(options *PipeOptions) {
+		options.ctxDoneCallback = cb
 	}
 }

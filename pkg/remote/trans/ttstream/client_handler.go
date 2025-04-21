@@ -18,10 +18,14 @@ package ttstream
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
+	internal_stream "github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
@@ -38,6 +42,7 @@ func NewCliTransHandlerFactory(opts ...ClientHandlerOption) remote.ClientStreamF
 	for _, opt := range opts {
 		opt(cp)
 	}
+
 	return cp
 }
 
@@ -72,6 +77,20 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	if strHeader == nil {
 		strHeader = map[string]string{}
 	}
+	var transmissionTimeoutEffect bool
+	// retrieve deadline from context as the whole stream timeout
+	if ddl, ok := ctx.Deadline(); ok {
+		tm := time.Until(ddl)
+		intHeader[ttheader.RPCTimeout] = strconv.Itoa(int(tm.Milliseconds()))
+		// When user using a ctx with transmission timeout and handles the ctx with context.WithTimeout or context.WithDeadline,
+		// we should determine whether the deadline injected by the user is valid to optimized error returning.
+		// The logic of context.WithTimeout is that the new deadline will only take effect if new deadline < old deadline,
+		// we just judge it manually here.
+		transDdl, ok := internal_stream.GetTransmissionDeadline(ctx)
+		if ok && !ddl.After(transDdl) {
+			transmissionTimeoutEffect = true
+		}
+	}
 	strHeader[ttheader.HeaderIDLServiceName] = invocation.ServiceName()
 	metainfo.SaveMetaInfoToMap(ctx, strHeader)
 
@@ -81,10 +100,11 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	}
 
 	// create new stream
-	s := newStream(ctx, trans, streamFrame{sid: genStreamID(), method: method})
+	s := newStreamForClientSide(ctx, trans, streamFrame{sid: genStreamID(), method: method})
 	// stream should be configured before WriteStream or there would be a race condition for metaFrameHandler
 	s.setRecvTimeout(rconfig.StreamRecvTimeout())
 	s.setMetaFrameHandler(c.metaHandler)
+	s.setTransmissionTimeoutEffect(transmissionTimeoutEffect)
 
 	if err = trans.WriteStream(ctx, s, intHeader, strHeader); err != nil {
 		return nil, err
@@ -104,4 +124,35 @@ func registerStreamCancelCallback(ctx context.Context, s *stream) {
 		// we do closeSend here to ensure stream can be closed normally
 		s.closeSend(nil)
 	})
+}
+
+func (s *stream) convertContextErr(ctx context.Context) error {
+	cErr := ctx.Err()
+	switch cErr {
+	// biz code invokes cancel()
+	case context.Canceled:
+		return errBizCancel
+	case context.DeadlineExceeded:
+		// triggered by upstream transmission timeout
+		// - gRPC handler
+		// - TTHeader Streaming handler
+		// - thrift handler when server.WithEnableContextTimeout is configured
+		// todo: considering print information of case above
+		tm, ok := internal_stream.GetTransmissionTimeout(ctx)
+		if ok && s.transmissionTimeoutEffect {
+			return errUpstreamTransmissionTimeout.WithCause(fmt.Errorf("timeout: %s", tm))
+		}
+		// biz code injects timeout
+		return errBizTimeout
+	}
+
+	// todo: consider cancelCause API
+	//// biz code make use of cancelCause
+	//if cause(ctx) {
+	//	return errBizCancelWithCause.WithCause(cErr)
+	//}
+	if ex, ok := cErr.(tException); ok {
+		return ex
+	}
+	return errInternalCancel.WithCause(cErr)
 }

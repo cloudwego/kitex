@@ -22,16 +22,21 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
 
+	internal_stream "github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/container"
 	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 const (
@@ -45,6 +50,9 @@ const (
 func isIgnoreError(err error) bool {
 	return errors.Is(err, netpoll.ErrEOF) || errors.Is(err, io.EOF) || errors.Is(err, netpoll.ErrConnClosed)
 }
+
+// ticker is used to manage closeStreamTask.
+var ticker *utils.SharedTicker
 
 // transport is used to read/write frames and disturbed frames to different streams
 type transport struct {
@@ -105,6 +113,7 @@ func newTransport(kind int32, conn netpoll.Connection, pool transPool) *transpor
 		}()
 		err = t.loopWrite()
 	}, gofunc.NewBasicInfo("", addr))
+
 	return t
 }
 
@@ -128,11 +137,13 @@ func (t *transport) Close(exception error) (err error) {
 		return nil
 	}
 	klog.Debugf("transport[%d-%s] is closing", t.kind, t.Addr())
-	// send trailer first
 	t.streams.Range(func(key, value any) bool {
 		s := value.(*stream)
-		_ = s.closeSend(exception)
-		_ = s.closeRecv(exception, t.kind)
+		if t.kind == clientTransport {
+			// for compatibility
+			_ = s.closeSend(exception)
+		}
+		_ = s.close(exception, false, t.kind)
 		return true
 	})
 	// then close stream and frame pipes
@@ -181,7 +192,24 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 	var s *stream
 	if fr.typ == headerFrameType && t.kind == serverTransport {
 		// server recv a header frame, we should create a new stream
-		s = newStream(context.Background(), t, fr.streamFrame)
+		ctx := context.Background()
+		s = newStreamForServerSide(ctx, t, fr.streamFrame)
+		var cancel context.CancelFunc
+		if tmStr, ok := s.meta[ttheader.RPCTimeout]; ok {
+			tmMs, aErr := strconv.Atoi(tmStr)
+			tm := time.Duration(tmMs) * time.Millisecond
+			if aErr == nil {
+				ctx, cancel = context.WithTimeout(ctx, tm)
+				ctx = internal_stream.NewCtxWithTransmissionTimeout(ctx, tm)
+			} else {
+				klog.CtxErrorf(ctx, "KITEX: RPCTimeout IntInfo parse failed, err: %v", aErr)
+			}
+		} else {
+			ctx, cancel = context.WithCancel(ctx)
+		}
+		ctx, cFunc := newCtxWithCancelCause(ctx, cancel)
+		s.setContext(ctx)
+		s.setCancelFunc(cFunc)
 		t.storeStream(s)
 		err = t.spipe.Write(context.Background(), s)
 	} else {
@@ -189,6 +217,7 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		var ok bool
 		s, ok = t.loadStream(fr.sid)
 		if !ok {
+			// todo: think about remove this error log since this is a very common
 			klog.Errorf("transport[%d] read a unknown stream: frame[%s]", t.kind, fr.String())
 			// ignore unknown stream error
 			err = nil
@@ -206,6 +235,9 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 			case trailerFrameType:
 				// process trailer frame: close the stream read direction
 				err = s.onReadTrailerFrame(fr, t.kind)
+			case rstFrameType:
+				// process reset frame: close the entire stream
+				err = s.onReadRstFrame(fr, t.kind)
 			}
 		}
 	}

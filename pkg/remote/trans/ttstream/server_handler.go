@@ -176,6 +176,7 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 
 	ink := ri.Invocation().(rpcinfo.InvocationSetter)
 	sinfo := t.opt.SvcSearcher.SearchService(st.Service(), st.Method(), false)
+	// todo: return specific error
 	if sinfo == nil {
 		err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", st.Service()))
 		return
@@ -203,13 +204,16 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 	}
 	// register metainfo into ctx
 	ctx = metainfo.SetMetaInfoFromMap(ctx, st.header)
-	ss := newServerStream(st)
 
 	// cancel ctx when OnStreamFinish
+	// todo: remove ktx package and related ktx logic
 	ctx, cancelFunc := ktx.WithCancel(ctx)
 	ctx = context.WithValue(ctx, serverStreamCancelCtxKey{}, cancelFunc)
 
 	ctx = t.startTracer(ctx, ri)
+	st.setContext(ctx)
+	ss := newServerStream(st)
+
 	defer func() {
 		panicErr := recover()
 		if panicErr != nil {
@@ -293,7 +297,7 @@ func (t *svrTransHandler) OnStreamFinish(ctx context.Context, ss streaming.Serve
 		}
 	}
 	// server stream CloseSend will send the trailer with payload
-	if err = sst.CloseSend(exception); err != nil {
+	if err = sst.Close(exception); err != nil {
 		return nil, err
 	}
 

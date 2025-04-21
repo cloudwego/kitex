@@ -19,6 +19,7 @@ package ttstream
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
@@ -36,11 +37,14 @@ type clientStream struct {
 
 func (s *clientStream) Header() (streaming.Header, error) {
 	sig := <-s.headerSig
+	// todo: return close stream err of clientStream itself
 	switch sig {
+	// todo: refine this logic
 	case streamSigNone:
 		return make(streaming.Header), nil
 	case streamSigActive:
 		return s.header, nil
+	// todo: define other exceptions
 	case streamSigInactive:
 		return nil, ErrClosedStream
 	case streamSigCancel:
@@ -51,6 +55,7 @@ func (s *clientStream) Header() (streaming.Header, error) {
 
 func (s *clientStream) Trailer() (streaming.Trailer, error) {
 	sig := <-s.trailerSig
+	// todo: return error of lifecycle
 	switch sig {
 	case streamSigNone:
 		return make(streaming.Trailer), nil
@@ -65,7 +70,20 @@ func (s *clientStream) Trailer() (streaming.Trailer, error) {
 }
 
 func (s *clientStream) RecvMsg(ctx context.Context, req any) error {
-	return s.stream.RecvMsg(ctx, req)
+	// using ctx of stream itself to avoid life cycle mismatch
+	return s.stream.RecvMsg(s.ctx, req, clientTransport)
+}
+
+func (s *clientStream) SendMsg(ctx context.Context, res any) error {
+	if state := atomic.LoadInt32(&s.state); state != streamStateActive {
+		if ex := s.clientStreamException.Load(); ex == nil {
+			// todo: predefine error here
+			return errIllegalOperation.WithCause(errors.New("stream is closed send"))
+		} else {
+			return ex.(error)
+		}
+	}
+	return s.stream.SendMsg(ctx, res)
 }
 
 // CloseSend by clientStream only send trailer frame and will not close the stream

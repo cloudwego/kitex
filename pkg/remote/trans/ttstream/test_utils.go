@@ -42,7 +42,7 @@ func newTestStreamPipe(sinfo *serviceinfo.ServiceInfo, method string) (*clientSt
 	strHeader := make(streaming.Header)
 	ctrans := newTransport(clientTransport, cconn, nil)
 	ctx := context.Background()
-	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: method})
+	rawClientStream := newStreamForClientSide(ctx, ctrans, streamFrame{sid: genStreamID(), method: method})
 	if err = ctrans.WriteStream(ctx, rawClientStream, intHeader, strHeader); err != nil {
 		return nil, nil, err
 	}

@@ -56,3 +56,6 @@ base2.go
 # Go workspace file
 go.work
 go.work.sum
+
+# Mac OS Desktop Services Store
+.DS_Store
