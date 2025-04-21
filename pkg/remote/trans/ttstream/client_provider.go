@@ -21,12 +21,14 @@ import (
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
+	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 var _ remote.ClientStreamFactory = (*clientProvider)(nil)
@@ -35,16 +37,30 @@ var _ remote.ClientStreamFactory = (*clientProvider)(nil)
 func NewClientProvider(opts ...ClientProviderOption) remote.ClientStreamFactory {
 	cp := new(clientProvider)
 	cp.transPool = newMuxConnTransPool(DefaultMuxConnConfig)
+	cp.cancelStreamTaskConfig = defaultCancelStreamTaskConfig
 	for _, opt := range opts {
 		opt(cp)
 	}
+
+	cfg := cp.cancelStreamTaskConfig
+	if !cfg.Disable {
+		if cfg.Sync {
+			ticker = utils.NewSyncSharedTicker(cfg.TriggerInterval)
+		} else {
+			ticker = utils.NewSharedTicker(cfg.TriggerInterval)
+		}
+	}
+	cp.transPool.SetInitFunc(func(kind int32, conn netpoll.Connection, pool transPool) *transport {
+		return newTransport(kind, conn, pool, !cfg.Disable)
+	})
 	return cp
 }
 
 type clientProvider struct {
-	transPool     transPool
-	metaHandler   MetaFrameHandler
-	headerHandler HeaderFrameWriteHandler
+	transPool              transPool
+	metaHandler            MetaFrameHandler
+	headerHandler          HeaderFrameWriteHandler
+	cancelStreamTaskConfig CancelStreamTaskConfig
 }
 
 // NewStream return a client stream

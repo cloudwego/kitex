@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 CloudWeGo Authors
+ * Copyright 2025 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,28 @@
 
 package ttstream
 
-import (
-	"github.com/cloudwego/netpoll"
-)
+import "time"
 
-var dialer = netpoll.NewDialer()
-
-type transPool interface {
-	Get(network, addr string) (trans *transport, err error)
-	Put(trans *transport)
-	SetInitFunc(f initFunc)
+var defaultCancelStreamTaskConfig = CancelStreamTaskConfig{
+	Disable:         false,
+	TriggerInterval: 5 * time.Second,
+	Sync:            true,
 }
 
-type initFunc func(kind int32, conn netpoll.Connection, pool transPool) *transport
+type CancelStreamTaskConfig struct {
+	Disable         bool
+	TriggerInterval time.Duration
+	Sync            bool
+}
+
+func (t *transport) Tick() {
+	t.streams.Range(func(key, value any) bool {
+		s := value.(*stream)
+		select {
+		case <-s.ctx.Done():
+			_ = s.close(contextException(s.ctx.Err()), true, t.kind)
+		default:
+		}
+		return true
+	})
+}

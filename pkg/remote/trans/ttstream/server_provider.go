@@ -69,7 +69,7 @@ func (s *serverProvider) Available(ctx context.Context, conn net.Conn) bool {
 // OnActive will be called when a connection accepted
 func (s *serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	nconn := conn.(netpoll.Connection)
-	trans := newTransport(serverTransport, nconn, nil)
+	trans := newTransport(serverTransport, nconn, nil, false)
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
 		// server only close transport when peer connection closed
 		_ = trans.Close(nil)
@@ -149,8 +149,8 @@ func (s *serverProvider) OnStreamFinish(ctx context.Context, ss streaming.Server
 			exception = thrift.NewApplicationException(remote.InternalError, terr.Error())
 		}
 	}
-	// server stream CloseSend will send the trailer with payload
-	if err = sst.CloseSend(exception); err != nil {
+	// server stream Close will send the trailer with payload
+	if err = sst.Close(exception); err != nil {
 		return nil, err
 	}
 

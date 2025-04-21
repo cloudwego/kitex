@@ -17,6 +17,7 @@
 package ttstream
 
 import (
+	"context"
 	"errors"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -34,6 +35,8 @@ var (
 	errIllegalFrame         = newExceptionType("illegal frame", kerrors.ErrStreamingProtocol, 12004)
 	errIllegalOperation     = newExceptionType("illegal operation", kerrors.ErrStreamingProtocol, 12005)
 	errTransport            = newExceptionType("transport is closing", kerrors.ErrStreamingProtocol, 12006)
+
+	errBizCancel = newExceptionType("biz cancel", nil, 12007)
 )
 
 type exceptionType struct {
@@ -75,4 +78,18 @@ func (e *exceptionType) TypeId() int32 {
 // Code is used for uniform code retrieving by Kitex in the future
 func (e *exceptionType) Code() int32 {
 	return e.TypeId()
+}
+
+// todo: refine this function
+func contextException(err error) *exceptionType {
+	switch err {
+	case context.Canceled:
+		// todo: predefined exception
+		return errBizCancel
+	}
+	ex, ok := err.(*exceptionType)
+	if ok {
+		return ex
+	}
+	return newExceptionType("default context exception", nil, 12009)
 }

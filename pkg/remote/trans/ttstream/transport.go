@@ -32,6 +32,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/container"
 	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 const (
@@ -46,6 +47,11 @@ func isIgnoreError(err error) bool {
 	return errors.Is(err, netpoll.ErrEOF) || errors.Is(err, io.EOF) || errors.Is(err, netpoll.ErrConnClosed)
 }
 
+var (
+	// ticker is used to manage closeStreamTask.
+	ticker *utils.SharedTicker
+)
+
 // transport is used to read/write frames and disturbed frames to different streams
 type transport struct {
 	kind int32
@@ -58,20 +64,23 @@ type transport struct {
 	fpipe         *container.Pipe[*Frame]  // out-coming frame pipe
 	closedFlag    int32
 	closedTrigger chan struct{}
+
+	enableCancelStreamTask bool
 }
 
-func newTransport(kind int32, conn netpoll.Connection, pool transPool) *transport {
+func newTransport(kind int32, conn netpoll.Connection, pool transPool, enableCancelStreamTask bool) *transport {
 	// TODO: let it configurable
 	_ = conn.SetReadTimeout(0)
 	t := &transport{
-		kind:          kind,
-		conn:          conn,
-		pool:          pool,
-		streams:       sync.Map{},
-		spipe:         container.NewPipe[*stream](),
-		scache:        make([]*stream, 0, streamCacheSize),
-		fpipe:         container.NewPipe[*Frame](),
-		closedTrigger: make(chan struct{}, 2),
+		kind:                   kind,
+		conn:                   conn,
+		pool:                   pool,
+		streams:                sync.Map{},
+		spipe:                  container.NewPipe[*stream](),
+		scache:                 make([]*stream, 0, streamCacheSize),
+		fpipe:                  container.NewPipe[*Frame](),
+		closedTrigger:          make(chan struct{}, 2),
+		enableCancelStreamTask: enableCancelStreamTask,
 	}
 	addr := ""
 	if t.Addr() != nil {
@@ -105,6 +114,10 @@ func newTransport(kind int32, conn netpoll.Connection, pool transPool) *transpor
 		}()
 		err = t.loopWrite()
 	}, gofunc.NewBasicInfo("", addr))
+
+	if t.enableCancelStreamTask {
+		ticker.Add(t)
+	}
 	return t
 }
 
@@ -128,16 +141,21 @@ func (t *transport) Close(exception error) (err error) {
 		return nil
 	}
 	klog.Debugf("transport[%d-%s] is closing", t.kind, t.Addr())
-	// send trailer first
 	t.streams.Range(func(key, value any) bool {
 		s := value.(*stream)
-		_ = s.closeSend(exception)
-		_ = s.closeRecv(exception, t.kind)
+		if t.kind == clientTransport {
+			// for compatibility
+			_ = s.closeSend(exception)
+		}
+		_ = s.close(exception, false, t.kind)
 		return true
 	})
 	// then close stream and frame pipes
 	t.spipe.Close()
 	t.fpipe.Close()
+	if t.enableCancelStreamTask {
+		ticker.Delete(t)
+	}
 	return err
 }
 
@@ -206,6 +224,9 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 			case trailerFrameType:
 				// process trailer frame: close the stream read direction
 				err = s.onReadTrailerFrame(fr, t.kind)
+			case rstFrameType:
+				// process reset frame: close the entire stream
+				err = s.onReadRstFrame(fr, t.kind)
 			}
 		}
 	}

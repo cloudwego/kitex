@@ -53,3 +53,10 @@ func WithClientMuxConnPool(config MuxConnConfig) ClientProviderOption {
 		cp.transPool = newMuxConnTransPool(config)
 	}
 }
+
+// WithClientCancelStreamTask using background task to clean up streams cancelled by users
+func WithClientCancelStreamTask(config CancelStreamTaskConfig) ClientProviderOption {
+	return func(cp *clientProvider) {
+		cp.cancelStreamTaskConfig = config
+	}
+}

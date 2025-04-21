@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
@@ -38,6 +39,8 @@ var (
 	_ streaming.ClientStream          = (*clientStream)(nil)
 	_ streaming.ServerStream          = (*serverStream)(nil)
 	_ streaming.CloseCallbackRegister = (*stream)(nil)
+
+	defaultRstException = thrift.NewApplicationException(remote.InternalError, "stream reset without payload")
 )
 
 func newStream(ctx context.Context, writer streamWriter, smeta streamFrame) *stream {
@@ -70,6 +73,13 @@ const (
 	streamSigCancel   int32 = -2
 )
 
+const (
+	streamStateActive          int32 = 0
+	streamStateHalfCloseLocal  int32 = 1
+	streamStateHalfCloseRemote int32 = 2
+	streamStateInactive        int32 = 3
+)
+
 // stream is used to process frames and expose user APIs
 type stream struct {
 	streamFrame
@@ -83,9 +93,8 @@ type stream struct {
 	headerSig  chan int32
 	trailerSig chan int32
 
-	selfEOF int32
-	peerEOF int32
-	eofFlag int32
+	state                 int32
+	clientStreamException atomic.Value // type must be of *exceptionType
 
 	recvTimeout      time.Duration
 	metaFrameHandler MetaFrameHandler
@@ -112,8 +121,14 @@ func (s *stream) TransportProtocol() ktransport.Protocol {
 // contain information related to this RPC, the context specified when creating the stream is used
 // here, and the context passed in by the user is ignored.
 func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
-	if atomic.LoadInt32(&s.selfEOF) != 0 {
-		return errIllegalOperation.WithCause(errors.New("stream is closed send"))
+	if state := atomic.LoadInt32(&s.state); state == streamStateHalfCloseLocal || state == streamStateInactive {
+		if ex := s.clientStreamException.Load(); ex == nil {
+			// 这个错误设计是有问题的，不能这么玩
+			// 而且这里可以预定义，不需要每次都生成
+			return errIllegalOperation.WithCause(errors.New("stream is closed send"))
+		} else {
+			return ex.(error)
+		}
 	}
 	// encode payload
 	payload, err := EncodePayload(s.ctx, msg)
@@ -137,6 +152,7 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 		ctx, cancel = context.WithTimeout(ctx, s.recvTimeout)
 		defer cancel()
 	}
+	// 在这个环境检测 ctx 是否被 cancel
 	payload, err := s.reader.output(ctx)
 	if err != nil {
 		return err
@@ -162,29 +178,18 @@ func (s *stream) RegisterCloseCallback(cb func(error)) {
 // closeSend should be called when following cases happen:
 // client:
 // - user call CloseSend
-// - client recv a trailer
-// - transport layer exception
-// server:
-// - server handler return
+// - client recv a trailer for compatibility
 // - transport layer exception
 func (s *stream) closeSend(exception error) error {
-	if !atomic.CompareAndSwapInt32(&s.selfEOF, 0, 1) {
+	if !atomic.CompareAndSwapInt32(&s.state, streamStateActive, streamStateHalfCloseLocal) {
 		return nil
 	}
-	err := s.sendTrailer(exception)
-	s.tryRunCloseCallback(exception)
-	return err
+	return s.sendTrailer(exception)
 }
 
-// closeRecv should be called when following cases happen:
-// client:
-// - transport layer exception
-// - client stream is GCed
-// server:
-// - transport layer exception
-// - server handler return
-func (s *stream) closeRecv(exception error, kind int32) error {
-	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
+func (s *stream) close(exception error, rst bool, kind int32) error {
+	if atomic.SwapInt32(&s.state, streamStateInactive) == streamStateInactive {
+		// stream has been closed
 		return nil
 	}
 	select {
@@ -196,18 +201,20 @@ func (s *stream) closeRecv(exception error, kind int32) error {
 	default:
 	}
 	s.reader.close(exception)
-	s.tryRunCloseCallback(exception)
-	if kind == clientTransport {
-		// for client stream, if trailer frame is received, finish the lifecycle
-		s.closeSend(nil)
+	// 是否需要区分 kind？是需要判断的，因为 server stream 不需要这个东西
+	if kind == clientTransport && exception != nil {
+		s.clientStreamException.Store(exception)
 	}
+	if rst {
+		s.sendRstFrame(exception)
+	}
+	s.runCloseCallback(exception)
 	return nil
 }
 
 func (s *stream) cancel() error {
-	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
-		return nil
-	}
+	// todo: simplify this logic
+	// since cancel would close this stream directly
 	select {
 	case s.headerSig <- streamSigCancel:
 	default:
@@ -231,10 +238,7 @@ func (s *stream) setMetaFrameHandler(metaHandler MetaFrameHandler) {
 	s.metaFrameHandler = metaHandler
 }
 
-func (s *stream) tryRunCloseCallback(exception error) {
-	if atomic.AddInt32(&s.eofFlag, 1) != 2 {
-		return
-	}
+func (s *stream) runCloseCallback(exception error) {
 	if len(s.closeCallback) > 0 {
 		for _, cb := range s.closeCallback {
 			cb(exception)
@@ -251,6 +255,7 @@ func (s *stream) writeFrame(ftype int32, header streaming.Header, trailer stream
 // writeHeader copy kvs into s.wheader
 func (s *stream) writeHeader(hd streaming.Header) error {
 	if s.wheader == nil {
+		// todo: 换成 ttstream exception
 		return fmt.Errorf("stream header already sent")
 	}
 	for k, v := range hd {
@@ -264,6 +269,7 @@ func (s *stream) sendHeader() (err error) {
 	wheader := s.wheader
 	s.wheader = nil
 	if wheader == nil {
+		// todo: 换成 ttstream exception
 		return fmt.Errorf("stream header already sent")
 	}
 	err = s.writeFrame(headerFrameType, wheader, nil, nil)
@@ -298,8 +304,23 @@ func (s *stream) sendTrailer(exception error) (err error) {
 			return err
 		}
 	}
-	err = s.writeFrame(trailerFrameType, nil, wtrailer, payload)
-	return err
+	return s.writeFrame(trailerFrameType, nil, wtrailer, payload)
+}
+
+// todo: 处理写入错误，需要感知到连接断开这个现象
+func (s *stream) sendRstFrame(exception error) (err error) {
+	klog.Debugf("stream[%d] send rst frame: err=%v", s.sid, exception)
+
+	var payload []byte
+	if exception != nil {
+		payload, err = EncodeException(context.Background(), s.method, s.sid, exception)
+		if err != nil {
+			klog.Errorf("stream[%d] encode exception in rst frame failed: err=%v", s.sid, exception)
+			// valid rst frame must be sent otherwise the server stream has the risk of leaking
+			payload, _ = EncodeException(context.Background(), s.method, s.sid, defaultRstException)
+		}
+	}
+	return s.writeFrame(rstFrameType, nil, nil, payload)
 }
 
 // === Frame OnRead callback
@@ -364,6 +385,40 @@ func (s *stream) onReadTrailerFrame(fr *Frame, kind int32) (err error) {
 	// if client recv trailer, server handler must be return,
 	// so we don't need to send data anymore
 	// if server recv trailer, we only need to close recv but still can send data
-	err = s.closeRecv(exception, kind)
+	if kind == clientTransport {
+		// for client stream, if trailer frame is received, finish the lifecycle for compatibility
+		s.closeSend(nil)
+		return s.close(exception, false, kind)
+	}
+	err = s.close(exception, false, kind)
+	return err
+}
+
+func (s *stream) onReadRstFrame(fr *Frame, kind int32) (err error) {
+	var rstException error
+	if len(fr.payload) > 0 {
+		// exception is type of (*thrift.ApplicationException)
+		_, _, err = thrift.UnmarshalFastMsg(fr.payload, nil)
+		// todo: use another parent exception
+		rstException = errApplicationException.WithCause(err)
+	} else {
+		klog.Infof("KITEX: stream[%d] recv rst frame without payload", s.sid)
+		rstException = defaultRstException
+	}
+	// todo: compare with gRPC to deal with header/trailer behaviour
+	s.trailer = fr.trailer
+	select {
+	case s.trailerSig <- streamSigActive:
+	default:
+	}
+	select {
+	case s.headerSig <- streamSigNone:
+		// if trailer arrived, we should return unblock stream.Header()
+	default:
+	}
+
+	klog.Debugf("stream[%d] recv trailer: %v, exception: %v", s.sid, s.trailer, rstException)
+	// when receiving rst frame, we should close stream and there is no need to send rst frame
+	err = s.close(rstException, false, kind)
 	return err
 }
