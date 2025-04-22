@@ -17,7 +17,7 @@
 package client
 
 import (
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -26,5 +26,5 @@ type TTHeaderStreamingOption struct {
 }
 
 type TTHeaderStreamingOptions struct {
-	ProviderOptions []ttstream.ClientProviderOption
+	TransportOptions []ttstream.ClientProviderOption
 }

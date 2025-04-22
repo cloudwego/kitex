@@ -57,9 +57,6 @@ func newMuxConnTransList(size int, pool transPool) *muxConnTransList {
 	tl.size = size
 	tl.transports = make([]*transport, size)
 	tl.pool = pool
-	runtime.SetFinalizer(tl, func(tl *muxConnTransList) {
-		tl.Close()
-	})
 	return tl
 }
 
@@ -106,10 +103,6 @@ func (tl *muxConnTransList) Get(network, addr string) (*transport, error) {
 		// peer close
 		_ = trans.Close(errTransport.WithCause(errors.New("connection closed by peer")))
 		return nil
-	})
-	runtime.SetFinalizer(trans, func(trans *transport) {
-		// self close when not hold by user
-		_ = trans.Close(nil)
 	})
 	tl.transports[idx] = trans
 	tl.L.Unlock()

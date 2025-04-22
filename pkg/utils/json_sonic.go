@@ -24,7 +24,7 @@ import (
 	"github.com/bytedance/sonic"
 )
 
-var sonicConifg = sonic.Config{
+var sonicConfig = sonic.Config{
 	EscapeHTML:     true,
 	ValidateString: true,
 }.Froze()
@@ -40,7 +40,7 @@ func Map2JSONStr(mapInfo map[string]string) (str string, err error) {
 	if len(mapInfo) == 0 {
 		return "{}", nil
 	}
-	return sonicConifg.MarshalToString(mapInfo)
+	return sonicConfig.MarshalToString(mapInfo)
 }
 
 // JSONStr2Map transform json str to map[string]string, perf is better than use json lib directly
@@ -51,7 +51,7 @@ func JSONStr2Map(jsonStr string) (mapInfo map[string]string, err error) {
 			klog.Warnf("KITEX: panic when JSONStr2Map, msg=%v, stack=%s", r, string(debug.Stack()))
 		}
 	}()
-	err = sonicConifg.UnmarshalFromString(jsonStr, &mapInfo)
+	err = sonicConfig.UnmarshalFromString(jsonStr, &mapInfo)
 	if len(mapInfo) == 0 {
 		mapInfo = nil
 	}

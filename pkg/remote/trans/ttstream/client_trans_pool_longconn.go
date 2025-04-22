@@ -19,7 +19,7 @@ package ttstream
 import (
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/container"
 )
 
 var DefaultLongConnConfig = LongConnConfig{

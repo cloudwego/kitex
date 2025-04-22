@@ -229,7 +229,7 @@ func TestRecv(t *testing.T) {
 	test.Assert(t, err == readErr, err)
 }
 
-// TestRecvOneWay test recv onw way msg
+// TestRecvOneWay test recv own way msg
 func TestRecvOneWay(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

@@ -158,8 +158,12 @@ var _ DescriptorProvider = (*ThriftContentProvider)(nil)
 
 const defaultMainIDLPath = "main.thrift"
 
-// NewThriftContentProvider builder
-func NewThriftContentProvider(main string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
+// Deprecated: Use NewThriftContentWithAbsIncludePathProvider instead.
+//
+// NewThriftContentProvider creates a DescriptorProvider supporting only relative path search
+// while NewThriftContentWithAbsIncludePathProvider supports both relative and absolute path searches
+// Note: the first argument is the file content of the main IDL
+func NewThriftContentProvider(mainIDLContent string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
 	parseMode := getParseMode(tOpts)
@@ -171,7 +175,7 @@ func NewThriftContentProvider(main string, includes map[string]string, opts ...T
 		goTagOpt:    tOpts.goTag,
 		serviceName: tOpts.serviceName,
 	}
-	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, main, includes, false, parseMode, tOpts.goTag, tOpts.serviceName)
+	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, mainIDLContent, includes, false, parseMode, tOpts.goTag, tOpts.serviceName)
 	if err != nil {
 		return nil, err
 	}
@@ -180,8 +184,12 @@ func NewThriftContentProvider(main string, includes map[string]string, opts ...T
 	return p, nil
 }
 
-// NewThriftContentProviderWithDynamicGo builder
-func NewThriftContentProviderWithDynamicGo(main string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
+// Deprecated: Use NewThriftContentWithAbsIncludePathProviderWithDynamicGo instead.
+//
+// NewThriftContentProviderWithDynamicGo creates a DescriptorProvider supporting only relative path search
+// while NewThriftContentWithAbsIncludePathProviderWithDynamicGo supports both relative and absolute path searches
+// Note: the first argument is the file content of the main IDL
+func NewThriftContentProviderWithDynamicGo(mainIDLContent string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
 	parseMode := getParseMode(tOpts)
@@ -194,12 +202,12 @@ func NewThriftContentProviderWithDynamicGo(main string, includes map[string]stri
 		serviceName: tOpts.serviceName,
 	}
 
-	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, main, includes, false, parseMode, tOpts.goTag, tOpts.serviceName)
+	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, mainIDLContent, includes, false, parseMode, tOpts.goTag, tOpts.serviceName)
 	if err != nil {
 		return nil, err
 	}
 
-	p.newDynamicGoDsc(svc, defaultMainIDLPath, main, includes, parseMode, tOpts.goTag, tOpts.serviceName)
+	p.newDynamicGoDsc(svc, defaultMainIDLPath, mainIDLContent, includes, parseMode, tOpts.goTag, tOpts.serviceName)
 
 	p.svcs <- svc
 	return p, nil
@@ -266,26 +274,35 @@ func (p *ThriftContentProvider) newDynamicGoDsc(svc *descriptor.ServiceDescripto
 
 func parseIncludes(tree *parser.Thrift, parsed map[string]*parser.Thrift, sources map[string]string, isAbsIncludePath bool) (err error) {
 	for _, i := range tree.Includes {
-		p := i.Path
+		paths := []string{i.Path}
 		if isAbsIncludePath {
-			p = absPath(tree.Filename, i.Path)
+			paths = append([]string{absPath(tree.Filename, i.Path)}, paths...)
 		}
-		ref, ok := parsed[p] // avoid infinite recursion
-		if ok {
-			i.Reference = ref
-			continue
-		}
-		if src, ok := sources[p]; !ok {
-			return fmt.Errorf("miss include path: %s for file: %s", p, tree.Filename)
-		} else {
-			if ref, err = parser.ParseString(p, src); err != nil {
-				return
+
+		for _, p := range paths {
+			// avoid infinite recursion
+			ref, ok := parsed[p]
+			if ok {
+				i.Reference = ref
+				break
+			}
+
+			if src, ok := sources[p]; ok {
+				ref, err = parser.ParseString(p, src)
+				if err != nil {
+					return
+				}
+				parsed[p] = ref
+				i.Reference = ref
+				if err = parseIncludes(ref, parsed, sources, isAbsIncludePath); err != nil {
+					return
+				}
+				break
 			}
 		}
-		parsed[p] = ref
-		i.Reference = ref
-		if err = parseIncludes(ref, parsed, sources, isAbsIncludePath); err != nil {
-			return
+
+		if i.Reference == nil {
+			return fmt.Errorf("miss include path: %s for file: %s", i.Path, tree.Filename)
 		}
 	}
 	return nil
@@ -333,7 +350,8 @@ type ThriftContentWithAbsIncludePathProvider struct {
 
 var _ DescriptorProvider = (*ThriftContentWithAbsIncludePathProvider)(nil)
 
-// NewThriftContentWithAbsIncludePathProvider create abs include path DescriptorProvider
+// NewThriftContentWithAbsIncludePathProvider creates a DescriptorProvider supporting both relative and absolute path searches
+// NOTE: the first argument is the path to the main IDL file rather than its file content.
 func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentWithAbsIncludePathProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
@@ -360,7 +378,8 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 	return p, nil
 }
 
-// NewThriftContentWithAbsIncludePathProviderWithDynamicGo create abs include path DescriptorProvider with dynamicgo
+// NewThriftContentWithAbsIncludePathProviderWithDynamicGo creates a DescriptorProvider supporting both relative and absolute path searches
+// NOTE: the first argument is the path to the main IDL file rather than its file content.
 func NewThriftContentWithAbsIncludePathProviderWithDynamicGo(mainIDLPath string, includes map[string]string, opts ...ThriftIDLProviderOption) (*ThriftContentWithAbsIncludePathProvider, error) {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)

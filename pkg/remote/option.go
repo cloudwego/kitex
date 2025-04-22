@@ -23,10 +23,10 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/profiler"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
+	"github.com/cloudwego/kitex/pkg/remote/trans/streamx/provider"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 // Option is used to pack the inbound and outbound handlers.
@@ -142,5 +142,5 @@ type ClientOption struct {
 	GRPCStreamingCliHandlerFactory ClientTransHandlerFactory
 	GRPCStreamingConnPool          ConnPool
 	// for ttheader streaming, only used for streaming call
-	TTHeaderStreamingProvider streamx.ClientProvider
+	TTHeaderStreamingProvider provider.ClientProvider
 }

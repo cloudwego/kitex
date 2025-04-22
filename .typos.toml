@@ -1,0 +1,12 @@
+# Typo check: https://github.com/crate-ci/typos
+
+[files]
+extend-exclude = ["go.mod", "go.sum"]
+
+[default.extend-words]
+typ = "typ"   # type
+Descritor = "Descritor" # reflect pkg typo, exported func, let it go
+
+[default.extend-identifiers]
+GoAways = "GoAways" # GoAway frame plural noun
+henc = "henc" # hpack encoder

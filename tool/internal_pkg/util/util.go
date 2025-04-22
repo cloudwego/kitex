@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -160,11 +159,11 @@ func SearchGoMod(cwd string) (moduleName, path string, found bool) {
 }
 
 func RunGitCommand(gitLink string) (string, string, error) {
-	u, err := user.Current()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", "Failed to get home dir", err
 	}
-	cachePath := JoinPath(u.HomeDir, ".kitex", "cache")
+	cachePath := JoinPath(homeDir, ".kitex", "cache")
 
 	branch := ""
 	if strings.Contains(gitLink, ".git@") {

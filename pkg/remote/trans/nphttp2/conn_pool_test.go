@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bytedance/sonic"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
@@ -49,6 +51,15 @@ func TestConnPool(t *testing.T) {
 	opt.ConnectTimeout = time.Microsecond
 	_, err = connPool.Get(ctx, "tcp", mockAddr0, opt)
 	test.Assert(t, err != nil, err)
+
+	// test Dump()
+	dump := connPool.Dump()
+	test.Assert(t, dump != nil)
+	m := dump.(map[string]interface{})
+	test.Assert(t, m[mockAddr0] != nil)
+	test.Assert(t, m[mockAddr1] != nil)
+	_, err = sonic.Marshal(dump)
+	test.Assert(t, err == nil, err)
 
 	// test Clean()
 	connPool.Clean("tcp", mockAddr0)

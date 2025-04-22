@@ -75,7 +75,7 @@ func TestMaxConnectionIdle(t *testing.T) {
 	}
 }
 
-// TestMaxConenctionIdleBusyClient tests that a server will not send GoAway to
+// TestMaxConnectionIdleBusyClient tests that a server will not send GoAway to
 // a busy client.
 func TestMaxConnectionIdleBusyClient(t *testing.T) {
 	serverConfig := &ServerConfig{

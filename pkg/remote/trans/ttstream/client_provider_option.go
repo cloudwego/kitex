@@ -33,13 +33,6 @@ func WithClientHeaderFrameHandler(handler HeaderFrameWriteHandler) ClientProvide
 	}
 }
 
-// WithClientDisableCancelingTransmit disable canceling transmit from upstream
-func WithClientDisableCancelingTransmit() ClientProviderOption {
-	return func(cp *clientProvider) {
-		cp.disableCancelingTransmit = true
-	}
-}
-
 // WithClientLongConnPool using long connection pool for client
 func WithClientLongConnPool(config LongConnConfig) ClientProviderOption {
 	return func(cp *clientProvider) {

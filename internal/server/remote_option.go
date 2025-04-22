@@ -28,11 +28,12 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	streamxstrans "github.com/cloudwego/kitex/pkg/remote/trans/streamx"
-	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
+	"github.com/cloudwego/kitex/pkg/remote/trans/streamx/provider"
+
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream"
 )
 
-func newServerRemoteOption() (*remote.ServerOption, streamx.ServerProvider) {
+func newServerRemoteOption() (*remote.ServerOption, provider.ServerProvider) {
 	ttstreamServerProvider := ttstream.NewServerProvider()
 	return &remote.ServerOption{
 		TransServerFactory: netpoll.NewTransServerFactory(),

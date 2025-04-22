@@ -29,9 +29,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/streamx/provider"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -52,11 +52,11 @@ Other interface is used by trans pipeline
 */
 
 type svrTransHandlerFactory struct {
-	provider streamx.ServerProvider
+	provider provider.ServerProvider
 }
 
 // NewSvrTransHandlerFactory ...
-func NewSvrTransHandlerFactory(provider streamx.ServerProvider) remote.ServerTransHandlerFactory {
+func NewSvrTransHandlerFactory(provider provider.ServerProvider) remote.ServerTransHandlerFactory {
 	return &svrTransHandlerFactory{provider: provider}
 }
 
@@ -74,7 +74,7 @@ var (
 
 type svrTransHandler struct {
 	opt        *remote.ServerOption
-	provider   streamx.ServerProvider
+	provider   provider.ServerProvider
 	inkHdlFunc endpoint.Endpoint
 }
 

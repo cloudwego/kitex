@@ -186,7 +186,7 @@ func (s *stream) closeSend(exception error) error {
 // server:
 // - transport layer exception
 // - server handler return
-func (s *stream) closeRecv(exception error) error {
+func (s *stream) closeRecv(exception error, kind int32) error {
 	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
 		return nil
 	}
@@ -200,6 +200,10 @@ func (s *stream) closeRecv(exception error) error {
 	}
 	s.reader.close(exception)
 	s.tryRunCloseCallback(exception)
+	if kind == clientTransport {
+		// for client stream, if trailer frame is received, finish the lifecycle
+		s.closeSend(nil)
+	}
 	return nil
 }
 
@@ -331,7 +335,7 @@ func (s *stream) onReadDataFrame(fr *Frame) (err error) {
 
 // onReadTrailerFrame by client: unblock recv function and return EOF if no unread frame
 // onReadTrailerFrame by server: unblock recv function and return EOF if no unread frame
-func (s *stream) onReadTrailerFrame(fr *Frame) (err error) {
+func (s *stream) onReadTrailerFrame(fr *Frame, kind int32) (err error) {
 	var exception error
 	// when server-side returns non-biz error, it will be wrapped as ApplicationException stored in trailer frame payload
 	if len(fr.payload) > 0 {
@@ -363,6 +367,6 @@ func (s *stream) onReadTrailerFrame(fr *Frame) (err error) {
 	// if client recv trailer, server handler must be return,
 	// so we don't need to send data anymore
 	// if server recv trailer, we only need to close recv but still can send data
-	err = s.closeRecv(exception)
+	err = s.closeRecv(exception, kind)
 	return err
 }

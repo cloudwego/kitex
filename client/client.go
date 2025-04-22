@@ -829,9 +829,14 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 
-	if callOpts != nil && callOpts.CompressorName != "" {
-		// set send grpc compressor at client to tell how to server decode
-		remote.SetSendCompressor(ri, callOpts.CompressorName)
+	if callOpts != nil {
+		if callOpts.CompressorName != "" {
+			// set send grpc compressor at client to tell how to server decode
+			remote.SetSendCompressor(ri, callOpts.CompressorName)
+		}
+		if callOpts.StreamOptions.RecvTimeout != 0 {
+			cfg.SetStreamRecvTimeout(callOpts.StreamOptions.RecvTimeout)
+		}
 	}
 
 	return ctx, ri, callOpts
