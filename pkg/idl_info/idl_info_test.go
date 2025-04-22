@@ -41,7 +41,7 @@ func TestRegisterThriftIDL(t *testing.T) {
 	info1, ok := getInfoFromManager("idl_service_1")
 	test.Assert(t, ok)
 	test.Assert(t, info1.IDLServiceName == "idl_service_1")
-	test.Assert(t, info1.IDLCommitID == "12345678")
+	test.Assert(t, info1.MainIDLCommitID == "12345678")
 	test.Assert(t, info1.MainIDLPath == "./1/a.thrift")
 	test.Assert(t, info1.GoModule == "mod1")
 	test.Assert(t, len(info1.IDLFileContentMap) == 3)
@@ -52,7 +52,7 @@ func TestRegisterThriftIDL(t *testing.T) {
 	info2, ok := getInfoFromManager("idl_service_2")
 	test.Assert(t, ok)
 	test.Assert(t, info2.IDLServiceName == "idl_service_2")
-	test.Assert(t, info2.IDLCommitID == "23456789")
+	test.Assert(t, info2.MainIDLCommitID == "23456789")
 	test.Assert(t, info2.MainIDLPath == "./2/d.thrift")
 	test.Assert(t, info2.GoModule == "mod2")
 	test.Assert(t, len(info2.IDLFileContentMap) == 3)
@@ -66,10 +66,14 @@ func TestRegisterThriftIDL(t *testing.T) {
 	test.Assert(t, RegisterThriftIDL("idl_service_3", "mod1", "12345678", true, "aaa", "./1/a.thrift") == nil)
 	// test conflict
 	test.Assert(t, RegisterThriftIDL("idl_service_3", "mod2", "23456789", true, "ddd", "./2/d.thrift") != nil)
+	// test empty idl service name
+	test.Assert(t, RegisterThriftIDL("", "mod5", "23456789", false, "fff", "./2/f.thrift") != nil)
 	// set environment to skip conflict
-	test.Assert(t, os.Setenv("KITEX_IDL_INFO_DISABLE_CONFLICT_CHECK", "1") == nil)
+	test.Assert(t, os.Setenv(IgnoreCheckEnvironment, "1") == nil)
 	// register conflict again with 'skip environment'
 	test.Assert(t, RegisterThriftIDL("idl_service_3", "mod2", "23456789", true, "ddd", "./2/d.thrift") == nil)
+	// register empty name again with 'skip environment'
+	test.Assert(t, RegisterThriftIDL("", "mod5", "23456789", false, "fff", "./2/f.thrift") == nil)
 	// there should be only one idl registered in idl_service_3
 	metas = getAllIDLInfoMetas()
 	test.Assert(t, len(metas) == 3)
@@ -77,7 +81,7 @@ func TestRegisterThriftIDL(t *testing.T) {
 	info3, ok := getInfoFromManager("idl_service_3")
 	test.Assert(t, ok)
 	test.Assert(t, info3.IDLServiceName == "idl_service_3")
-	test.Assert(t, info3.IDLCommitID == "12345678")
+	test.Assert(t, info3.MainIDLCommitID == "12345678")
 	test.Assert(t, info3.MainIDLPath == "./1/a.thrift")
 	test.Assert(t, info3.GoModule == "mod1")
 	test.Assert(t, len(info3.IDLFileContentMap) == 1)
@@ -98,7 +102,7 @@ func TestIDLInfoAPIs(t *testing.T) {
 	info1, ok := GetIDLInfoDetails("idl_service_1")
 	test.Assert(t, ok)
 	test.Assert(t, info1.IDLServiceName == "idl_service_1")
-	test.Assert(t, info1.IDLCommitID == "12345678")
+	test.Assert(t, info1.MainIDLCommitID == "12345678")
 	test.Assert(t, info1.MainIDLPath == "./1/a.thrift")
 	test.Assert(t, info1.GoModule == "mod1")
 	test.Assert(t, len(info1.IDLFileContentMap) == 3)
@@ -109,7 +113,7 @@ func TestIDLInfoAPIs(t *testing.T) {
 	info2, ok := GetIDLInfoDetails("idl_service_2")
 	test.Assert(t, ok)
 	test.Assert(t, info2.IDLServiceName == "idl_service_2")
-	test.Assert(t, info2.IDLCommitID == "23456789")
+	test.Assert(t, info2.MainIDLCommitID == "23456789")
 	test.Assert(t, info2.MainIDLPath == "./2/d.thrift")
 	test.Assert(t, info2.GoModule == "mod2")
 	test.Assert(t, len(info2.IDLFileContentMap) == 3)

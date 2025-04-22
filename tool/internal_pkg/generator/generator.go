@@ -120,7 +120,7 @@ type Config struct {
 	IDL                   string // the IDL file passed on the command line
 	OutputPath            string // the output path for main pkg and kitex_gen
 	PackagePrefix         string // package prefix ends with `GenPath`, like: github.com/cloudwego/blabla/kitex_gen
-	CombineService        bool // combine services to one service
+	CombineService        bool   // combine services to one service
 	RegisterIDL           string
 	ThriftPlugins         util.StringSlice
 	ProtobufPlugins       util.StringSlice

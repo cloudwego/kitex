@@ -16,7 +16,6 @@ package thriftgo
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -30,6 +29,7 @@ import (
 	"github.com/cloudwego/thriftgo/generator/golang/templates/slim"
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/plugin"
+	"gopkg.in/yaml.v3"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
@@ -272,7 +272,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 	metaFilePath := filepath.Join(req.OutputPath, IdlInfoMetaFile)
 	meta, doIDLRegistration, err := p.decideIDLRegistration(req.OutputPath, mainAST.Filename)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("[kitex IDL] %s", err.Error())
 	}
 	if doIDLRegistration {
 		yamlData, err := yaml.Marshal(&meta)
@@ -284,9 +284,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			Name:    &metaFilePath,
 		})
 	}
-
-	var suffixMap = map[string]int{}
-
+	suffixMap := make(map[string]int, len(trees))
 	for ast := range trees {
 
 		// Reset libs to empty. When executing next AST, the dependencies left by previous AST should not be retained.

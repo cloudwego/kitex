@@ -24,12 +24,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cloudwego/kitex"
-	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/plugin"
 	"github.com/cloudwego/thriftgo/tool/trimmer/dump"
 	"gopkg.in/yaml.v3"
+
+	"github.com/cloudwego/kitex"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 const IdlInfoMetaFile = "idl_info_meta.yaml"
@@ -42,7 +43,8 @@ type idlMeta struct {
 }
 
 // decideIDLRegistration determines whether the IDL needs to be registered. If so, it returns the meta for registration.
-func (p *patcher) decideIDLRegistration(metaFilePath, mainIDLFile string) (meta *idlMeta, doIDLRegistration bool, err error) {
+func (p *patcher) decideIDLRegistration(outputPath, mainIDLFile string) (meta *idlMeta, doIDLRegistration bool, err error) {
+	metaFilePath := filepath.Join(outputPath, IdlInfoMetaFile)
 	IDLServiceName := p.registerIDL
 	// when registerIDL is empty, check if there's meta file under kitex_gen.
 	// If it exists, automatically parse the IDLServiceName and register it.
@@ -58,16 +60,15 @@ func (p *patcher) decideIDLRegistration(metaFilePath, mainIDLFile string) (meta 
 		if err = yaml.Unmarshal(mdata, &meta); err != nil {
 			return nil, false, err
 		}
+		if meta.IDLServiceName == "" {
+			return nil, false, fmt.Errorf("idl service name is empty in '%s', you can delete it or complete it", metaFilePath)
+		}
 		IDLServiceName = meta.IDLServiceName
+		fmt.Printf("[INFO] [kitex IDL] auto register [%s]\n", IDLServiceName)
+	} else {
+		// todo: fixme later with log.Infof when kitex tool refactor pr is merged.
+		fmt.Printf("[INFO] [kitex IDL] register [%s]\n", IDLServiceName)
 	}
-
-	if IDLServiceName == "" {
-		return nil, false, nil
-	}
-
-	// todo: fixme later with log.Infof when kitex tool refactor pr is merged.
-	fmt.Printf("[INFO] [kitex idl info] register [%s]\n", p.registerIDL)
-
 	// get commitID of IDL git repo, so users can distinguish the versions of the IDL.
 	// if IDL repo is not git repo or fail to get commit, just warning and continue, because commitID is not important, just help user to know the IDL version.
 	mainIDLCommitID, err := getGitCommitHashWithCache(mainIDLFile)
@@ -76,7 +77,7 @@ func (p *patcher) decideIDLRegistration(metaFilePath, mainIDLFile string) (meta 
 		mainIDLCommitID = ""
 	}
 	return &idlMeta{
-		IDLServiceName:  p.registerIDL,
+		IDLServiceName:  IDLServiceName,
 		GoModule:        p.module,
 		MainIDLCommitID: mainIDLCommitID,
 		MainIDLFile:     mainIDLFile,

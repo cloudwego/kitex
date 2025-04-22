@@ -45,7 +45,7 @@ func TestConfig_Pack(t *testing.T) {
 		OutputPath            string
 		PackagePrefix         string
 		CombineService        bool
-		RegisterIDL           bool
+		RegisterIDL           string
 		ThriftPlugins         util.StringSlice
 		ProtobufPlugins       util.StringSlice
 		Features              []feature

@@ -38,6 +38,7 @@ func GetIDLInfoDetails(IDLServiceName string) (*IDLInfo, bool) {
 	return &IDLInfo{
 		IDLInfoMeta:       info.IDLInfoMeta,
 		IDLFileContentMap: copyStringMap(info.IDLFileContentMap),
+		IDLFileVersionMap: copyStringMap(info.IDLFileVersionMap),
 	}, true
 }
 

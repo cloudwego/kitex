@@ -79,7 +79,7 @@ func TestSearchGitRoot(t *testing.T) {
 	test.Assert(t, ok)
 	test.Assert(t, root == subGitRepoPath)
 
-	root, ok, err = searchGitRoot(filepath.Join(subGitRepoPath, "efg.thrift"))
+	_, ok, err = searchGitRoot(filepath.Join(subGitRepoPath, "efg.thrift"))
 	test.Assert(t, err != nil)
 	test.Assert(t, !ok)
 }

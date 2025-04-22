@@ -27,29 +27,46 @@ import (
 type IDLInfo struct {
 	IDLInfoMeta
 	IDLFileContentMap map[string]string `json:"idl_file_content_map"`
+	IDLFileVersionMap map[string]string `json:"idl_file_version_map"`
 }
 
 // IDLInfoMeta is the meta info of IDLInfo
 type IDLInfoMeta struct {
-	IDLServiceName string `json:"idl_service_name"`
-	IDLType        string `json:"idl_type"`
-	MainIDLPath    string `json:"mainIDLPath"`
-	GoModule       string `json:"go_module"`
-	IDLCommitID    string `json:"idl_commit_id"`
+	IDLServiceName  string `json:"idl_service_name"`
+	IDLType         string `json:"idl_type"`
+	GoModule        string `json:"go_module"`
+	MainIDLPath     string `json:"mainIDLPath"`
+	MainIDLCommitID string `json:"main_idl_commit_id"`
+}
+
+const IgnoreCheckEnvironment = "KITEX_IDL_IGNORE_REGISTER_CHECK"
+
+func IgnoreRegisterCheck() bool {
+	return os.Getenv(IgnoreCheckEnvironment) == "1"
 }
 
 // RegisterThriftIDL should only execute when init, so it's not concurrency safe
-func RegisterThriftIDL(IDLServiceName, goModule, IDLRepoCommitID string, isMainIDL bool, idlContent, idlPath string) error {
+func RegisterThriftIDL(IDLServiceName, goModule, IDLRepoCommitID string, isMainIDL bool, idlContent, idlPath string) (err error) {
+	defer func() {
+		if err != nil && IgnoreRegisterCheck() {
+			klog.Warnf(err.Error())
+			err = nil
+		}
+	}()
+
+	if IDLServiceName == "" {
+		return fmt.Errorf("[kitex IDL] IDL service name is nil")
+	}
 	info, ok := getInfoFromManager(IDLServiceName)
 	if !ok {
 		info = &IDLInfo{
 			IDLInfoMeta: IDLInfoMeta{
 				IDLServiceName: IDLServiceName,
 				IDLType:        "thrift",
-				IDLCommitID:    IDLRepoCommitID,
 				GoModule:       goModule,
 			},
 			IDLFileContentMap: make(map[string]string),
+			IDLFileVersionMap: make(map[string]string),
 		}
 		setInfoToManager(IDLServiceName, info)
 	}
@@ -57,22 +74,17 @@ func RegisterThriftIDL(IDLServiceName, goModule, IDLRepoCommitID string, isMainI
 	if info.GoModule != goModule {
 		// if an IDLServiceName is registered by multiple go mods, panic and stop
 		// if environment 'KITEX_IDL_INFO_DISABLE_CONFLICT_CHECK' is enabled, then skip panic.
-		err := fmt.Errorf("[kitex IDL] '%s' go mod conflict: '%s' -> '%s'", IDLServiceName, info.GoModule, goModule)
-		if os.Getenv("KITEX_IDL_INFO_DISABLE_CONFLICT_CHECK") == "1" {
-			klog.Warnf(err.Error())
-			// skip this IDL's registration
-			return nil
-		} else {
-			return err
-		}
+		return fmt.Errorf("[kitex IDL] '%s' go mod conflict: '%s' -> '%s'", IDLServiceName, info.GoModule, goModule)
 	}
 	info.IDLFileContentMap[idlPath] = idlContent
+	info.IDLFileVersionMap[idlPath] = IDLRepoCommitID
 	if isMainIDL {
 		if info.MainIDLPath != "" && info.MainIDLPath != idlPath {
 			// todo 如果用户只更新了部分 IDL，调整了新的主 IDL，就有可能出现这样的情况，只做提示
 			klog.Warnf("[kitex IDL] '%s' main idl path is override: '%s' -> '%s'", IDLServiceName, info.MainIDLPath, idlPath)
 		}
 		info.MainIDLPath = idlPath
+		info.MainIDLCommitID = IDLRepoCommitID
 	}
 	return nil
 }
