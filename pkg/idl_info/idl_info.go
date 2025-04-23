@@ -48,6 +48,7 @@ func IgnoreRegisterCheck() bool {
 // RegisterThriftIDL should only execute when init, so it's not concurrency safe
 func RegisterThriftIDL(IDLServiceName, goModule, IDLRepoCommitID string, isMainIDL bool, idlContent, idlPath string) (err error) {
 	defer func() {
+		// if 'IgnoreCheckEnvironment' is enabled, just warn the error and return nil
 		if err != nil && IgnoreRegisterCheck() {
 			klog.Warnf(err.Error())
 			err = nil
@@ -72,8 +73,7 @@ func RegisterThriftIDL(IDLServiceName, goModule, IDLRepoCommitID string, isMainI
 	}
 
 	if info.GoModule != goModule {
-		// if an IDLServiceName is registered by multiple go mods, panic and stop
-		// if environment 'KITEX_IDL_INFO_DISABLE_CONFLICT_CHECK' is enabled, then skip panic.
+		// if an IDLServiceName is registered by multiple go mods, return err
 		return fmt.Errorf("[kitex IDL] '%s' go mod conflict: '%s' -> '%s'", IDLServiceName, info.GoModule, goModule)
 	}
 	info.IDLFileContentMap[idlPath] = idlContent
