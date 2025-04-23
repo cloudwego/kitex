@@ -21,6 +21,8 @@ import (
 	"net"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // ClientTransHandlerFactory to new TransHandler for client
@@ -69,4 +71,10 @@ type InvokeHandleFuncSetter interface {
 // GracefulShutdown supports closing connections in a graceful manner.
 type GracefulShutdown interface {
 	GracefulShutdown(ctx context.Context) error
+}
+
+// ClientStreamFactory is used to create a stream for client.
+// NOTICE: might be updated without compatibility guarantee in the future.
+type ClientStreamFactory interface {
+	NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (streaming.ClientStream, error)
 }

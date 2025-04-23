@@ -23,16 +23,16 @@ import (
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/remote/trans/streamx/provider"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
-var _ provider.ClientProvider = (*clientProvider)(nil)
+var _ remote.ClientStreamFactory = (*clientProvider)(nil)
 
 // NewClientProvider return a client provider
-func NewClientProvider(opts ...ClientProviderOption) provider.ClientProvider {
+func NewClientProvider(opts ...ClientProviderOption) remote.ClientStreamFactory {
 	cp := new(clientProvider)
 	cp.transPool = newMuxConnTransPool(DefaultMuxConnConfig)
 	for _, opt := range opts {

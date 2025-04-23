@@ -29,7 +29,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/trans/streamx/provider"
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -40,10 +39,8 @@ type (
 	serverStreamCancelCtxKey struct{}
 )
 
-var _ provider.ServerProvider = (*serverProvider)(nil)
-
-// NewServerProvider return a server provider
-func NewServerProvider(opts ...ServerProviderOption) provider.ServerProvider {
+// newServerProvider return a server provider
+func newServerProvider(opts ...ServerProviderOption) *serverProvider {
 	sp := new(serverProvider)
 	for _, opt := range opts {
 		opt(sp)
@@ -54,12 +51,6 @@ func NewServerProvider(opts ...ServerProviderOption) provider.ServerProvider {
 type serverProvider struct {
 	metaHandler   MetaFrameHandler
 	headerHandler HeaderFrameReadHandler
-}
-
-func (s *serverProvider) ApplyServerProviderOption(opts ...ServerProviderOption) {
-	for _, opt := range opts {
-		opt(s)
-	}
 }
 
 // Available sniff the conn if provider can process

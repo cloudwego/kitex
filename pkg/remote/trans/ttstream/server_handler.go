@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 CloudWeGo Authors
+ * Copyright 2025 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package streamx
+package ttstream
 
 import (
 	"context"
@@ -29,16 +29,15 @@ import (
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/trans/streamx/provider"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/transport"
+	ktransport "github.com/cloudwego/kitex/transport"
 )
 
 type StreamInfo interface {
 	Service() string
 	Method() string
-	TransportProtocol() transport.Protocol
+	TransportProtocol() ktransport.Protocol
 }
 
 /*  trans_server.go only use the following interface in remote.ServerTransHandler:
@@ -51,19 +50,23 @@ type StreamInfo interface {
 Other interface is used by trans pipeline
 */
 
-type svrTransHandlerFactory struct {
-	provider provider.ServerProvider
-}
+type svrTransHandlerFactory struct{}
 
 // NewSvrTransHandlerFactory ...
-func NewSvrTransHandlerFactory(provider provider.ServerProvider) remote.ServerTransHandlerFactory {
-	return &svrTransHandlerFactory{provider: provider}
+func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
+	return &svrTransHandlerFactory{}
 }
 
 func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
+	ttOpts := make([]ServerProviderOption, 0, len(opt.TTHeaderStreamingOptions.TransportOptions))
+	for _, o := range opt.TTHeaderStreamingOptions.TransportOptions {
+		if opt, ok := o.(ServerProviderOption); ok {
+			ttOpts = append(ttOpts, opt)
+		}
+	}
 	return &svrTransHandler{
 		opt:      opt,
-		provider: f.provider,
+		provider: newServerProvider(ttOpts...),
 	}, nil
 }
 
@@ -74,7 +77,7 @@ var (
 
 type svrTransHandler struct {
 	opt        *remote.ServerOption
-	provider   provider.ServerProvider
+	provider   *serverProvider
 	inkHdlFunc endpoint.Endpoint
 }
 
