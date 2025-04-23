@@ -69,7 +69,7 @@ func BinaryThriftGeneric() Generic {
 	return &binaryThriftGeneric{}
 }
 
-// BinaryPbGeneric raw protobuf binary Generic
+// BinaryPbGeneric raw protobuf binary payload Generic
 func BinaryPbGeneric(serviceName string) Generic {
 	return &binaryPbGeneric{
 		codec:       newBinaryPbCodec(),
