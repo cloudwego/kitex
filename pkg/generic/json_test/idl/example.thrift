@@ -56,4 +56,5 @@ service ExampleService extends extend.ExtendService {
     string Ping(1: string msg)
     oneway void Oneway(1: string msg)
     void Void(1: string msg)
+    void VoidWithString(1: string msg)
 }
