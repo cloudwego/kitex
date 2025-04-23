@@ -365,11 +365,7 @@ func testThriftVoidMethod(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, resp == descriptor.Void{})
 
-	svr.Stop()
-
-	time.Sleep(50 * time.Millisecond)
-	svr = initThriftServer(t, addr, new(GenericServiceVoidWithStringImpl), "./idl/example.thrift", nil, nil, false)
-	resp, err = cli.GenericCall(context.Background(), "Void", "hello", callopt.WithRPCTimeout(100*time.Second))
+	resp, err = cli.GenericCall(context.Background(), "VoidWithString", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	test.Assert(t, resp == descriptor.Void{})
 
@@ -405,11 +401,7 @@ func testThriftVoidMethodWithDynamicGo(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, resp == descriptor.Void{})
 
-	svr.Stop()
-
-	time.Sleep(50 * time.Millisecond)
-	svr = initThriftServer(t, addr, new(GenericServiceVoidWithStringImpl), "./idl/example.thrift", nil, nil, true)
-	resp, err = cli.GenericCall(context.Background(), "Void", "hello", callopt.WithRPCTimeout(100*time.Second))
+	resp, err = cli.GenericCall(context.Background(), "VoidWithString", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	test.Assert(t, resp == descriptor.Void{})
 
