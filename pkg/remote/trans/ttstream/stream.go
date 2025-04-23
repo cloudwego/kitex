@@ -144,7 +144,7 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 	if err != nil {
 		return err
 	}
-	err = DecodePayload(context.Background(), payload, data)
+	err = DecodePayload(ctx, payload, data)
 	// payload will not be access after decode
 	mcache.Free(payload)
 
