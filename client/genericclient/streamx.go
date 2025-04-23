@@ -27,11 +27,16 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
+// StreamXClient is a generic client that supports streaming calls and generic call
 type StreamXClient interface {
+	// ClientStreaming creates an implementation of StreamXClientStreamingClient
 	ClientStreaming(ctx context.Context, method string, mecallOptions ...streamcall.Option) (StreamXClientStreamingClient, error)
+	// ServerStreaming creates an implementation of StreamXServerStreamingClient
 	ServerStreaming(ctx context.Context, method string, req interface{}, callOptions ...streamcall.Option) (StreamXServerStreamingClient, error)
+	// BidirectionalStreaming creates an implementation of StreamXBidiStreamingClient
 	BidirectionalStreaming(ctx context.Context, method string, callOptions ...streamcall.Option) (StreamXBidiStreamingClient, error)
-	GenericCall(ctx context.Context, method string, Req interface{}, callOptions ...callopt.Option) (interface{}, error)
+	// GenericCall generic call
+	GenericCall(ctx context.Context, method string, req interface{}, callOptions ...callopt.Option) (interface{}, error)
 }
 
 type streamXClient struct {
@@ -41,10 +46,12 @@ type streamXClient struct {
 	sc      client.Streaming
 }
 
+// NewStreamXClient creates an implementation of StreamXClient
 func NewStreamXClient(destService string, g generic.Generic, opts ...client.Option) (StreamXClient, error) {
 	return NewStreamXClientWithServiceInfo(destService, g, StreamingServiceInfo(g), opts...)
 }
 
+// NewStreamXClientWithServiceInfo creates an implementation of StreamXClient with service info
 func NewStreamXClientWithServiceInfo(destService string, g generic.Generic, serviceInfo *serviceinfo.ServiceInfo, opts ...client.Option) (StreamXClient, error) {
 	var options []client.Option
 	options = append(options, client.WithGeneric(g))
@@ -76,7 +83,7 @@ func (c *streamXClient) ClientStreaming(ctx context.Context, method string, call
 	return newStreamXClientStreamingClient(c.svcInfo.Methods[serviceinfo.GenericClientStreamingMethod], method, st), nil
 }
 
-func (c *streamXClient) ServerStreaming(ctx context.Context, method string, Req interface{}, callOptions ...streamcall.Option) (StreamXServerStreamingClient, error) {
+func (c *streamXClient) ServerStreaming(ctx context.Context, method string, req interface{}, callOptions ...streamcall.Option) (StreamXServerStreamingClient, error) {
 	ctx = client.NewCtxWithCallOptions(ctx, streamcall.GetCallOptions(callOptions))
 	st, err := c.sc.StreamX(ctx, method)
 	if err != nil {
@@ -86,7 +93,7 @@ func (c *streamXClient) ServerStreaming(ctx context.Context, method string, Req 
 
 	args := stream.methodInfo.NewArgs().(*generic.Args)
 	args.Method = stream.method
-	args.Request = Req
+	args.Request = req
 	if err := st.SendMsg(ctx, args); err != nil {
 		return nil, err
 	}
@@ -109,6 +116,7 @@ func (c *streamXClient) GenericCall(ctx context.Context, method string, req inte
 	return c.gc.GenericCall(ctx, method, req, callOptions...)
 }
 
+// StreamXClientStreamingClient define client side generic client streaming APIs
 type StreamXClientStreamingClient interface {
 	Send(ctx context.Context, req interface{}) error
 	CloseAndRecv(ctx context.Context) (interface{}, error)
@@ -147,6 +155,7 @@ func (c *streamXClientStreamingClient) CloseAndRecv(ctx context.Context) (interf
 	return res.GetSuccess(), nil
 }
 
+// StreamXServerStreamingClient define client side generic server streaming APIs
 type StreamXServerStreamingClient interface {
 	Recv(ctx context.Context) (interface{}, error)
 	streaming.ClientStream
@@ -174,6 +183,7 @@ func (c *streamXServerStreamingClient) Recv(ctx context.Context) (interface{}, e
 	return res.GetSuccess(), nil
 }
 
+// StreamXBidiStreamingClient define client side generic bidirectional streaming APIs
 type StreamXBidiStreamingClient interface {
 	Send(ctx context.Context, req interface{}) error
 	Recv(ctx context.Context) (interface{}, error)
