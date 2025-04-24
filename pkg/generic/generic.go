@@ -465,3 +465,12 @@ func (g *httpPbThriftGeneric) MessageReaderWriter() interface{} {
 func (g *httpPbThriftGeneric) GetExtra(key string) string {
 	return g.codec.extra[key]
 }
+
+func HasIDLInfo(g Generic) bool {
+	switch g.(type) {
+	case *binaryThriftGeneric, *binaryPbGeneric:
+		return false
+	default:
+		return true
+	}
+}

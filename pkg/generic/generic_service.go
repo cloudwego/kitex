@@ -29,22 +29,7 @@ type Service interface {
 	GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error)
 }
 
-// ServiceInfoWithGeneric create a generic ServiceInfo
 func ServiceInfoWithGeneric(g Generic) *serviceinfo.ServiceInfo {
-	isCombinedServices := getIsCombinedServices(g)
-	return newServiceInfo(g, isCombinedServices)
-}
-
-func getIsCombinedServices(g Generic) bool {
-	if extra, ok := g.(ExtraProvider); ok {
-		if extra.GetExtra(CombineServiceKey) == "true" {
-			return true
-		}
-	}
-	return false
-}
-
-func newServiceInfo(g Generic, isCombinedServices bool) *serviceinfo.ServiceInfo {
 	handlerType := (*Service)(nil)
 
 	methods, svcName := getMethodInfo(g, g.IDLServiceName())
@@ -57,8 +42,13 @@ func newServiceInfo(g Generic, isCombinedServices bool) *serviceinfo.ServiceInfo
 		Extra:        make(map[string]interface{}),
 	}
 	svcInfo.Extra["generic"] = true
-	if isCombinedServices {
-		svcInfo.Extra["combine_service"] = true
+	if extra, ok := g.(ExtraProvider); ok {
+		if extra.GetExtra(CombineServiceKey) == "true" {
+			svcInfo.Extra[CombineServiceKey] = true
+		}
+		if pkg := extra.GetExtra(packageNameKey); pkg != "" {
+			svcInfo.Extra[packageNameKey] = pkg
+		}
 	}
 	return svcInfo
 }
@@ -73,6 +63,51 @@ func getMethodInfo(g Generic, serviceName string) (methods map[string]serviceinf
 	} else {
 		svcName = serviceName
 		methods = map[string]serviceinfo.MethodInfo{
+			serviceinfo.GenericClientStreamingMethod: serviceinfo.NewMethodInfo(
+				nil,
+				func() interface{} {
+					args := &Args{}
+					args.SetCodec(g.MessageReaderWriter())
+					return args
+				},
+				func() interface{} {
+					result := &Result{}
+					result.SetCodec(g.MessageReaderWriter())
+					return result
+				},
+				false,
+				serviceinfo.WithStreamingMode(serviceinfo.StreamingClient),
+			),
+			serviceinfo.GenericServerStreamingMethod: serviceinfo.NewMethodInfo(
+				nil,
+				func() interface{} {
+					args := &Args{}
+					args.SetCodec(g.MessageReaderWriter())
+					return args
+				},
+				func() interface{} {
+					result := &Result{}
+					result.SetCodec(g.MessageReaderWriter())
+					return result
+				},
+				false,
+				serviceinfo.WithStreamingMode(serviceinfo.StreamingServer),
+			),
+			serviceinfo.GenericBidirectionalStreamingMethod: serviceinfo.NewMethodInfo(
+				nil,
+				func() interface{} {
+					args := &Args{}
+					args.SetCodec(g.MessageReaderWriter())
+					return args
+				},
+				func() interface{} {
+					result := &Result{}
+					result.SetCodec(g.MessageReaderWriter())
+					return result
+				},
+				false,
+				serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
+			),
 			serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(
 				callHandler,
 				func() interface{} {
