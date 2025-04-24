@@ -36,9 +36,17 @@ import (
 
 var extraTemplates []string
 
+type PatchFunc func(req *plugin.Request, p *Patcher) ([]*plugin.Generated, error)
+
+var extraPatchFunc PatchFunc
+
 // AppendToTemplate string
 func AppendToTemplate(text string) {
 	extraTemplates = append(extraTemplates, text)
+}
+
+func AppendExtensionPatches(f PatchFunc) {
+	extraPatchFunc = f
 }
 
 const kitexUnusedProtection = `
@@ -49,7 +57,7 @@ var KitexUnusedProtection = struct{}{}
 //lint:ignore U1000 until protectionInsertionPoint is used
 var protectionInsertionPoint = "KitexUnusedProtection"
 
-type patcher struct {
+type Patcher struct {
 	noFastAPI             bool
 	utils                 *golang.CodeUtils
 	module                string
@@ -67,8 +75,16 @@ type patcher struct {
 	libs    map[string]string
 }
 
+func (p *Patcher) GetModule() string {
+	return p.module
+}
+
+func (p *Patcher) GetUtils() *golang.CodeUtils {
+	return p.utils
+}
+
 // UseFrugalForStruct judge if we need to replace fastCodec to frugal implementation. It's related to the argument '-frugal-struct'.
-func (p *patcher) UseFrugalForStruct(st *golang.StructLike) bool {
+func (p *Patcher) UseFrugalForStruct(st *golang.StructLike) bool {
 	// '@all' matches all structs
 	// '@auto' matches those with annotation (go.codec="frugal")
 	// otherwise, check if the given name matches the struct's name
@@ -88,7 +104,7 @@ func (p *patcher) UseFrugalForStruct(st *golang.StructLike) bool {
 	return false
 }
 
-func (p *patcher) UseLib(path, alias string) string {
+func (p *Patcher) UseLib(path, alias string) string {
 	if p.libs == nil {
 		p.libs = make(map[string]string)
 	}
@@ -96,7 +112,7 @@ func (p *patcher) UseLib(path, alias string) string {
 	return ""
 }
 
-func (p *patcher) buildTemplates() (err error) {
+func (p *Patcher) buildTemplates() (err error) {
 	m := p.utils.BuildFuncMap()
 	m["PrintImports"] = util.PrintlImports
 	m["UseLib"] = p.UseLib
@@ -246,7 +262,7 @@ func (p *patcher) buildTemplates() (err error) {
 
 const ImportInsertPoint = "// imports insert-point"
 
-func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err error) {
+func (p *Patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err error) {
 	if err := p.buildTemplates(); err != nil {
 		return nil, err
 	}
@@ -384,10 +400,19 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		}
 
 	}
+
+	if extraPatchFunc != nil {
+		extPatches, err := extraPatchFunc(req, p)
+		if err != nil {
+			return nil, err
+		}
+		patches = append(patches, extPatches...)
+	}
+
 	return
 }
 
-func (p *patcher) patchHessian(path string, scope *golang.Scope, pkgName, base string) (patch *plugin.Generated, err error) {
+func (p *Patcher) patchHessian(path string, scope *golang.Scope, pkgName, base string) (patch *plugin.Generated, err error) {
 	buf := strings.Builder{}
 	resigterIDLName := fmt.Sprintf("hessian2-register-%s", base)
 	register := util.JoinPath(path, resigterIDLName)
@@ -420,7 +445,7 @@ func getBashPath() string {
 	return "kitex-all.sh"
 }
 
-func (p *patcher) extractLocalLibs(imports []util.Import) []util.Import {
+func (p *Patcher) extractLocalLibs(imports []util.Import) []util.Import {
 	ret := make([]util.Import, 0)
 	prefix := p.module + "/"
 	kitexPkgPath := generator.ImportPathTo("pkg")
@@ -481,7 +506,7 @@ func doRecord(recordCmd []string) string {
 	return content
 }
 
-func (p *patcher) reorderStructFields(fields []*golang.Field) ([]*golang.Field, error) {
+func (p *Patcher) reorderStructFields(fields []*golang.Field) ([]*golang.Field, error) {
 	fixedLengthFields := make(map[*golang.Field]bool, len(fields))
 	for _, field := range fields {
 		fixedLengthFields[field] = golang.IsFixedLengthType(field.Type)
@@ -502,11 +527,11 @@ func (p *patcher) reorderStructFields(fields []*golang.Field) ([]*golang.Field, 
 	return sortedFields, nil
 }
 
-func (p *patcher) isBinaryOrStringType(t *parser.Type) bool {
+func (p *Patcher) isBinaryOrStringType(t *parser.Type) bool {
 	return t.Category.IsBinary() || t.Category.IsString()
 }
 
-func (p *patcher) IsHessian2() bool {
+func (p *Patcher) IsHessian2() bool {
 	return strings.EqualFold(p.protocol, "hessian2")
 }
 
