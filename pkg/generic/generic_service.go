@@ -29,6 +29,7 @@ type Service interface {
 	GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error)
 }
 
+// ServiceInfoWithGeneric create a generic ServiceInfo
 func ServiceInfoWithGeneric(g Generic) *serviceinfo.ServiceInfo {
 	handlerType := (*Service)(nil)
 
