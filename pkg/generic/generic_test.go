@@ -26,6 +26,7 @@ import (
 	dproto "github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -366,4 +367,30 @@ func TestIsCombinedServices(t *testing.T) {
 	test.Assert(t, extra.GetExtra(CombineServiceKey) == "true")
 
 	// TODO: test pb after supporting parse mode
+}
+
+func TestBinaryPbGeneric(t *testing.T) {
+	svcName := "TestService"
+	packageName := "test.package"
+	g := BinaryPbGeneric(svcName, packageName)
+	defer g.Close()
+
+	test.Assert(t, g.Framed() == false)
+	test.Assert(t, g.PayloadCodec() == nil)
+	test.Assert(t, g.PayloadCodecType() == serviceinfo.Protobuf)
+	test.Assert(t, g.MessageReaderWriter() != nil)
+	test.Assert(t, g.IDLServiceName() == svcName)
+
+	extra, ok := g.(ExtraProvider)
+	test.Assert(t, ok)
+	test.Assert(t, extra.GetExtra(packageNameKey) == packageName)
+
+	method, err := g.GetMethod(nil, "Test")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Test")
+	test.Assert(t, method.Oneway == false)
+
+	rw := g.MessageReaderWriter()
+	_, ok = rw.(*proto.RawReaderWriter)
+	test.Assert(t, ok)
 }
