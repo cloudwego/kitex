@@ -46,6 +46,8 @@ func WithParseMode(parseMode thrift.ParseMode) ThriftIDLProviderOption {
 	}}
 }
 
+// WithGoTagDisabled sets the go tag disabled **GOLABALLY**.
+// NOTICE: it will take effect globally for each Provider, and never change back.
 func WithGoTagDisabled(disable bool) ThriftIDLProviderOption {
 	return ThriftIDLProviderOption{F: func(opt *thriftIDLProviderOptions) {
 		opt.goTag = &goTagOption{
