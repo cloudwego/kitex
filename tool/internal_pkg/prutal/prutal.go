@@ -278,7 +278,9 @@ func genStructsAndKitexInterfaces(f *prutalgen.Proto, c *generator.Config, dir s
 	// interfaces used by kitex
 	genKitexServiceInterface(f, w, c.StreamX)
 
-	fn := strings.TrimSuffix(path.Base(f.ProtoFile), ".proto") + ".pb.go"
+	baseFilename := filepath.Base(f.ProtoFile)
+	fn := strings.TrimSuffix(baseFilename, ".proto") + ".pb.go"
+
 	out := filepath.Join(dir, fn)
 	f.Infof("generating %s", out)
 	writeFile(out, w.Bytes())
