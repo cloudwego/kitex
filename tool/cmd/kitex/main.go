@@ -135,7 +135,6 @@ func main() {
 			}
 		}
 		log.Warn(err)
-
 		os.Exit(1)
 	}
 NormalExit:
