@@ -130,7 +130,7 @@ func (ts *transServer) Shutdown() (err error) {
 
 // ConnCount implements the remote.TransServer interface.
 func (ts *transServer) ConnCount() utils.AtomicInt {
-	return ts.connCount
+	return utils.AtomicInt(ts.connCount.Value())
 }
 
 func (ts *transServer) onError(ctx context.Context, err error, conn net.Conn) {
