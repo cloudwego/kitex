@@ -109,6 +109,9 @@ func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error)
 		_ = kc.Close()
 		return nil, err
 	}
+	if kc.opt.Svr != nil {
+		klog.Infof("serviceName: %s, stack: %s", kc.opt.Svr.ServiceName, debug.Stack())
+	}
 	// like os.File, if kc is garbage-collected, but Close is not called, call Close.
 	runtime.SetFinalizer(kc, func(c *kcFinalizerClient) {
 		_ = c.Close()
