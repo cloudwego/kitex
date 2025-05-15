@@ -19,14 +19,13 @@ package generic
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 func TestNewBinaryPbCodec(t *testing.T) {
 	codec := newBinaryPbCodec()
-	assert.NotNil(t, codec)
+	test.Assert(t, codec != nil)
 }
 
 func TestBinaryPbCodecGetMessageReaderWriter(t *testing.T) {
@@ -34,18 +33,18 @@ func TestBinaryPbCodecGetMessageReaderWriter(t *testing.T) {
 
 	rw := codec.getMessageReaderWriter()
 	_, ok := rw.(*proto.RawReaderWriter)
-	assert.True(t, ok, "should return *proto.RawReaderWriter")
+	test.Assert(t, ok, "should return *proto.RawReaderWriter")
 }
 
 func TestBinaryPbCodecName(t *testing.T) {
 	codec := newBinaryPbCodec()
-	assert.Equal(t, "BinaryPb", codec.Name())
+	test.Assert(t, codec.Name() == "BinaryPb")
 }
 
 func TestBinaryPbCodecReaderWriter(t *testing.T) {
 	codec := newBinaryPbCodec()
 	rw := codec.getMessageReaderWriter().(*proto.RawReaderWriter)
 
-	assert.NotNil(t, rw.RawReader)
-	assert.NotNil(t, rw.RawWriter)
+	test.Assert(t, rw.RawReader != nil)
+	test.Assert(t, rw.RawWriter != nil)
 }
