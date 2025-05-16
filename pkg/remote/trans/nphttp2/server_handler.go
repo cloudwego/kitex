@@ -31,6 +31,7 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -174,6 +175,8 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 			_ = tr.WriteStatus(s, status.New(codes.Internal, errDesc))
 			return
 		}
+		// Pass through method name using ctx, the method name will be used as from method in the client.
+		rCtx = context.WithValue(rCtx, consts.CtxKeyMethod, ri.To().Method())
 	}
 
 	var serviceName string
