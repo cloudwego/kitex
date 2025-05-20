@@ -711,7 +711,7 @@ func TestContextFallback(t *testing.T) {
 	test.Assert(t, err == nil)
 }
 
-// createErrorMiddleware 创建一个用于注入错误的流式中间件
+// createErrorMiddleware creates a streaming middleware that injects an error
 func createErrorMiddleware(injectErr error) cep.StreamMiddleware {
 	return func(next cep.StreamEndpoint) cep.StreamEndpoint {
 		return func(ctx context.Context) (streaming.ClientStream, error) {
@@ -720,12 +720,12 @@ func createErrorMiddleware(injectErr error) cep.StreamMiddleware {
 	}
 }
 
-// TestStreamDoFinish 测试Stream方法中的DoFinish是否被正确调用
+// TestStreamDoFinish tests if DoFinish is correctly called in Stream method
 func TestStreamDoFinish(t *testing.T) {
-	// 创建测试错误
+	// Create test error
 	testErr := errors.New("test stream error")
 
-	// 创建mock的Tracer
+	// Create mock Tracer
 	finishCalled := false
 	tracer := &mockTracer{
 		finish: func(ctx context.Context) {
@@ -734,7 +734,7 @@ func TestStreamDoFinish(t *testing.T) {
 		},
 	}
 
-	// 创建客户端
+	// Create client
 	cli, err := NewClient(mocks.ServiceInfo(),
 		WithTracer(tracer),
 		WithTransportProtocol(transport.TTHeaderStreaming),
@@ -747,31 +747,31 @@ func TestStreamDoFinish(t *testing.T) {
 		t.Fatalf("NewClient failed: %v", err)
 	}
 
-	// 获取Streaming接口
+	// Get Streaming interface
 	streamingCli := cli.(Streaming)
 
-	// 调用Stream方法
+	// Call Stream method
 	result := &streaming.Result{}
 	err = streamingCli.Stream(context.Background(), "mockStreaming", nil, result)
 
-	// 检查测试错误是否被正确返回
+	// Check if test error is correctly returned
 	if err != testErr {
 		t.Errorf("Expected error %v, got %v", testErr, err)
 	}
 
-	// 检查DoFinish是否被调用
+	// Check if DoFinish is called
 	if !finishCalled {
 		t.Error("DoFinish was not called")
 	}
 	fmt.Printf("Final finishCalled status: %v\n", finishCalled)
 }
 
-// TestStreamXDoFinish 测试StreamX方法中的DoFinish是否被正确调用
+// TestStreamXDoFinish tests if DoFinish is correctly called in StreamX method
 func TestStreamXDoFinish(t *testing.T) {
-	// 创建测试错误
+	// Create test error
 	testErr := errors.New("test streamX error")
 
-	// 创建mock的Tracer
+	// Create mock Tracer
 	finishCalled := false
 	tracer := &mockTracer{
 		finish: func(ctx context.Context) {
@@ -782,7 +782,7 @@ func TestStreamXDoFinish(t *testing.T) {
 	ctl := &rpcinfo.TraceController{}
 	ctl.Append(tracer)
 
-	// 创建客户端
+	// Create client
 	cli, err := NewClient(mocks.ServiceInfo(),
 		WithTracer(tracer),
 		WithTransportProtocol(transport.TTHeaderStreaming),
@@ -795,18 +795,18 @@ func TestStreamXDoFinish(t *testing.T) {
 		t.Fatalf("NewClient failed: %v", err)
 	}
 
-	// 获取Streaming接口
+	// Get Streaming interface
 	streamingCli := cli.(Streaming)
 
-	// 调用StreamX方法
+	// Call StreamX method
 	_, err = streamingCli.StreamX(context.Background(), "mockStreaming")
 
-	// 检查测试错误是否被正确返回
+	// Check if test error is correctly returned
 	if err != testErr {
 		t.Errorf("Expected error %v, got %v", testErr, err)
 	}
 
-	// 检查DoFinish是否被调用
+	// Check if DoFinish is called
 	if !finishCalled {
 		t.Error("DoFinish was not called")
 	}
