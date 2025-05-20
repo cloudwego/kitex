@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 
@@ -29,6 +30,7 @@ import (
 	mocksnet "github.com/cloudwego/kitex/internal/mocks/net"
 	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/endpoint/cep"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
@@ -707,4 +709,106 @@ func TestContextFallback(t *testing.T) {
 	test.Assert(t, err == nil)
 	err = st.SendMsg(context.Background(), nil)
 	test.Assert(t, err == nil)
+}
+
+// createErrorMiddleware 创建一个用于注入错误的流式中间件
+func createErrorMiddleware(injectErr error) cep.StreamMiddleware {
+	return func(next cep.StreamEndpoint) cep.StreamEndpoint {
+		return func(ctx context.Context) (streaming.ClientStream, error) {
+			return nil, injectErr
+		}
+	}
+}
+
+// TestStreamDoFinish 测试Stream方法中的DoFinish是否被正确调用
+func TestStreamDoFinish(t *testing.T) {
+	// 创建测试错误
+	testErr := errors.New("test stream error")
+
+	// 创建mock的Tracer
+	finishCalled := false
+	tracer := &mockTracer{
+		finish: func(ctx context.Context) {
+			finishCalled = true
+			fmt.Printf("finishCalled set to true\n")
+		},
+	}
+
+	// 创建客户端
+	cli, err := NewClient(mocks.ServiceInfo(),
+		WithTracer(tracer),
+		WithTransportProtocol(transport.TTHeaderStreaming),
+		WithDestService("MockService"),
+		WithStreamOptions(
+			WithStreamMiddleware(createErrorMiddleware(testErr)),
+		),
+	)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+
+	// 获取Streaming接口
+	streamingCli := cli.(Streaming)
+
+	// 调用Stream方法
+	result := &streaming.Result{}
+	err = streamingCli.Stream(context.Background(), "mockStreaming", nil, result)
+
+	// 检查测试错误是否被正确返回
+	if err != testErr {
+		t.Errorf("Expected error %v, got %v", testErr, err)
+	}
+
+	// 检查DoFinish是否被调用
+	if !finishCalled {
+		t.Error("DoFinish was not called")
+	}
+	fmt.Printf("Final finishCalled status: %v\n", finishCalled)
+}
+
+// TestStreamXDoFinish 测试StreamX方法中的DoFinish是否被正确调用
+func TestStreamXDoFinish(t *testing.T) {
+	// 创建测试错误
+	testErr := errors.New("test streamX error")
+
+	// 创建mock的Tracer
+	finishCalled := false
+	tracer := &mockTracer{
+		finish: func(ctx context.Context) {
+			finishCalled = true
+			fmt.Printf("finishCalled set to true\n")
+		},
+	}
+	ctl := &rpcinfo.TraceController{}
+	ctl.Append(tracer)
+
+	// 创建客户端
+	cli, err := NewClient(mocks.ServiceInfo(),
+		WithTracer(tracer),
+		WithTransportProtocol(transport.TTHeaderStreaming),
+		WithDestService("MockService"),
+		WithStreamOptions(
+			WithStreamMiddleware(createErrorMiddleware(testErr)),
+		),
+	)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+
+	// 获取Streaming接口
+	streamingCli := cli.(Streaming)
+
+	// 调用StreamX方法
+	_, err = streamingCli.StreamX(context.Background(), "mockStreaming")
+
+	// 检查测试错误是否被正确返回
+	if err != testErr {
+		t.Errorf("Expected error %v, got %v", testErr, err)
+	}
+
+	// 检查DoFinish是否被调用
+	if !finishCalled {
+		t.Error("DoFinish was not called")
+	}
+	fmt.Printf("Final finishCalled status: %v\n", finishCalled)
 }
