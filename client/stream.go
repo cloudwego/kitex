@@ -58,8 +58,21 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 	ctx, ri, _ = kc.initRPCInfo(ctx, method, 0, nil, true)
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
+	var reportErr error
+	var err error
+	defer func() {
+		if panicInfo := recover(); panicInfo != nil {
+			err = rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, false)
+			reportErr = err
+		}
+		if reportErr != nil {
+			kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)
+		}
+	}()
+
 	cs, err := kc.sEps(ctx)
 	if err != nil {
+		reportErr = err
 		return err
 	}
 	result := response.(*streaming.Result)
@@ -67,12 +80,16 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 	if getter, ok := cs.(streaming.GRPCStreamGetter); ok {
 		grpcStream := getter.GetGRPCStream()
 		if grpcStream == nil {
-			return fmt.Errorf("ClientStream.GetGRPCStream() returns nil: %T", cs)
+			err = fmt.Errorf("ClientStream.GetGRPCStream() returns nil: %T", cs)
+			reportErr = err
+			return err
 		}
 		result.Stream = grpcStream
 		return nil
 	} else {
-		return fmt.Errorf("ClientStream does not implement streaming.GRPCStreamGetter interface: %T", cs)
+		err = fmt.Errorf("ClientStream does not implement streaming.GRPCStreamGetter interface: %T", cs)
+		reportErr = err
+		return err
 	}
 }
 
@@ -91,7 +108,23 @@ func (kc *kClient) StreamX(ctx context.Context, method string) (streaming.Client
 	ctx, ri, _ = kc.initRPCInfo(ctx, method, 0, nil, true)
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
-	cs, err := kc.sEps(ctx)
+	var reportErr error
+	var err error
+	var cs streaming.ClientStream
+	defer func() {
+		if panicInfo := recover(); panicInfo != nil {
+			err = rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, false)
+			reportErr = err
+		}
+		if reportErr != nil {
+			kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)
+		}
+	}()
+
+	cs, err = kc.sEps(ctx)
+	if err != nil {
+		reportErr = err
+	}
 	return cs, err
 }
 
