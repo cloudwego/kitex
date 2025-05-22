@@ -90,13 +90,13 @@ func BinaryPbGeneric(serviceName string) Generic {
 //	SetBinaryWithByteSlice(g, true)
 func MapThriftGeneric(p DescriptorProvider) (Generic, error) {
 	return &mapThriftGeneric{
-		codec: newMapThriftCodec(p),
+		codec: newMapThriftCodec(p, false),
 	}, nil
 }
 
 func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 	return &mapThriftGeneric{
-		codec: newMapThriftCodecForJSON(p),
+		codec: newMapThriftCodec(p, true),
 	}, nil
 }
 
