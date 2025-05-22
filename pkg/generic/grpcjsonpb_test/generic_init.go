@@ -117,7 +117,6 @@ func (s *StreamingTestImpl) BidirectionalStreamingTest(stream mock.Mock_Bidirect
 			}
 			wg.Done()
 		}()
-		defer stream.Close()
 		for {
 			msg, recvErr := stream.Recv()
 			if recvErr == io.EOF {
