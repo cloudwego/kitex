@@ -99,6 +99,9 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.UnaryMiddleware {
 				//    ErrRPCTimeout: it is same with outer timeout, here only care about non-timeout err.
 				//    ErrRPCFinish: it happens in retry scene, previous call returns first.
 				var errMsg string
+				if errors.Is(err, kerrors.ErrRemoteOrNetwork) {
+					klog.CtxErrorf(ctx, "KITEX: ErrRemoteOrNetwork.WithCause")
+				}
 				if ri.To().Address() != nil {
 					errMsg = fmt.Sprintf("KITEX: to_service=%s method=%s addr=%s error=%s",
 						ri.To().ServiceName(), ri.To().Method(), ri.To().Address(), err.Error())
