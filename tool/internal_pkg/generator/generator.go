@@ -50,6 +50,7 @@ const (
 
 	// built in tpls
 	MultipleServicesTpl = "multiple_services"
+	UpdateTpl           = "update"
 
 	streamxTTHeaderRef = "ttstream"
 )
@@ -305,6 +306,15 @@ func (c *Config) ApplyExtension() error {
 func (c *Config) IsUsingMultipleServicesTpl() bool {
 	for _, part := range c.BuiltinTpl {
 		if part == MultipleServicesTpl {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Config) IsUpdateTpl() bool {
+	for _, part := range c.BuiltinTpl {
+		if part == UpdateTpl {
 			return true
 		}
 	}

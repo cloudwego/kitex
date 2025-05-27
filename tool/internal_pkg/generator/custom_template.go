@@ -65,6 +65,8 @@ type Template struct {
 	LoopMethod bool `yaml:"loop_method,omitempty"`
 	// If both set this field and combine-service, kitex will generate service by cycle.
 	LoopService bool `yaml:"loop_service,omitempty"`
+	// If set this field, kitex will not generate this file when -update flag is set.
+	SingleUse bool `yaml:"single_use,omitempty"`
 }
 
 type customGenerator struct {
@@ -236,7 +238,7 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 
 			for i := range cs {
 				pkg.ServiceInfo = cs[i]
-				f, err := renderFile(pkg, g.OutputPath, tpl)
+				f, err := renderFile(pkg, g.OutputPath, tpl, g.IsUpdateTpl())
 				if err != nil {
 					return nil, err
 				}
@@ -244,7 +246,7 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 			}
 			pkg.ServiceInfo, pkg.CombineServices = svrInfo, cs
 		} else {
-			f, err := renderFile(pkg, g.OutputPath, tpl)
+			f, err := renderFile(pkg, g.OutputPath, tpl, g.IsUpdateTpl())
 			if err != nil {
 				return nil, err
 			}
@@ -254,7 +256,10 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 	return fs, nil
 }
 
-func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File, err error) {
+func renderFile(pkg *PackageInfo, outputPath string, tpl *Template, isUpdate bool) (fs []*File, err error) {
+	if isUpdate && tpl.SingleUse {
+		return nil, nil
+	}
 	cg := NewCustomGenerator(pkg, outputPath)
 	// special handling Methods field
 	if tpl.LoopMethod {
