@@ -743,9 +743,7 @@ func TestStreamDoFinish(t *testing.T) {
 			WithStreamMiddleware(createErrorMiddleware(testErr)),
 		),
 	)
-	if err != nil {
-		t.Fatalf("NewClient failed: %v", err)
-	}
+	test.Assert(t, err == nil, err)
 
 	// Get Streaming interface
 	streamingCli := cli.(Streaming)
@@ -755,14 +753,10 @@ func TestStreamDoFinish(t *testing.T) {
 	err = streamingCli.Stream(context.Background(), "mockStreaming", nil, result)
 
 	// Check if test error is correctly returned
-	if err != testErr {
-		t.Errorf("Expected error %v, got %v", testErr, err)
-	}
+	test.Assert(t, err == testErr, err)
 
 	// Check if DoFinish is called
-	if !finishCalled {
-		t.Error("DoFinish was not called")
-	}
+	test.Assert(t, finishCalled, "DoFinish was not called")
 	fmt.Printf("Final finishCalled status: %v\n", finishCalled)
 }
 
@@ -791,24 +785,16 @@ func TestStreamXDoFinish(t *testing.T) {
 			WithStreamMiddleware(createErrorMiddleware(testErr)),
 		),
 	)
-	if err != nil {
-		t.Fatalf("NewClient failed: %v", err)
-	}
+	test.Assert(t, err == nil, err)
 
 	// Get Streaming interface
 	streamingCli := cli.(Streaming)
 
 	// Call StreamX method
 	_, err = streamingCli.StreamX(context.Background(), "mockStreaming")
-
-	// Check if test error is correctly returned
-	if err != testErr {
-		t.Errorf("Expected error %v, got %v", testErr, err)
-	}
+	test.Assert(t, err == testErr, err)
 
 	// Check if DoFinish is called
-	if !finishCalled {
-		t.Error("DoFinish was not called")
-	}
+	test.Assert(t, finishCalled, "DoFinish was not called")
 	fmt.Printf("Final finishCalled status: %v\n", finishCalled)
 }
