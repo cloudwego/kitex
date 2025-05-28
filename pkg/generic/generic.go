@@ -69,11 +69,10 @@ func BinaryThriftGeneric() Generic {
 	return &binaryThriftGeneric{}
 }
 
-// BinaryPbGeneric raw protobuf binary Generic
-func BinaryPbGeneric(serviceName string) Generic {
+// BinaryPbGeneric raw protobuf binary payload Generic
+func BinaryPbGeneric(svcName, packageName string) Generic {
 	return &binaryPbGeneric{
-		codec:       newBinaryPbCodec(),
-		serviceName: serviceName,
+		codec: newBinaryPbCodec(svcName, packageName),
 	}
 }
 
@@ -254,8 +253,7 @@ func (g *binaryThriftGeneric) MessageReaderWriter() interface{} {
 }
 
 type binaryPbGeneric struct {
-	serviceName string
-	codec       *binaryPbCodec
+	codec *binaryPbCodec
 }
 
 func (g *binaryPbGeneric) Framed() bool {
@@ -279,11 +277,15 @@ func (g *binaryPbGeneric) Close() error {
 }
 
 func (g *binaryPbGeneric) IDLServiceName() string {
-	return g.serviceName
+	return g.codec.svcName
 }
 
 func (g *binaryPbGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
+}
+
+func (g *binaryPbGeneric) GetExtra(key string) string {
+	return g.codec.extra[key]
 }
 
 type mapThriftGeneric struct {
@@ -464,4 +466,13 @@ func (g *httpPbThriftGeneric) MessageReaderWriter() interface{} {
 
 func (g *httpPbThriftGeneric) GetExtra(key string) string {
 	return g.codec.extra[key]
+}
+
+func HasIDLInfo(g Generic) bool {
+	switch g.(type) {
+	case *binaryThriftGeneric, *binaryPbGeneric:
+		return false
+	default:
+		return true
+	}
 }

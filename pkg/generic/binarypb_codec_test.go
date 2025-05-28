@@ -24,25 +24,27 @@ import (
 )
 
 func TestNewBinaryPbCodec(t *testing.T) {
-	codec := newBinaryPbCodec()
+	codec := newBinaryPbCodec("service", "package")
 	test.Assert(t, codec != nil)
 }
 
 func TestBinaryPbCodecGetMessageReaderWriter(t *testing.T) {
-	codec := newBinaryPbCodec()
+	codec := newBinaryPbCodec("service", "package")
 
 	rw := codec.getMessageReaderWriter()
 	_, ok := rw.(*proto.RawReaderWriter)
 	test.Assert(t, ok, "should return *proto.RawReaderWriter")
 }
 
-func TestBinaryPbCodecName(t *testing.T) {
-	codec := newBinaryPbCodec()
+func TestBinaryPbFields(t *testing.T) {
+	codec := newBinaryPbCodec("service", "package")
 	test.Assert(t, codec.Name() == "BinaryPb")
+	test.Assert(t, codec.svcName == "service")
+	test.Assert(t, codec.extra[packageNameKey] == "package")
 }
 
 func TestBinaryPbCodecReaderWriter(t *testing.T) {
-	codec := newBinaryPbCodec()
+	codec := newBinaryPbCodec("service", "package")
 	rw := codec.getMessageReaderWriter().(*proto.RawReaderWriter)
 
 	test.Assert(t, rw.RawReader != nil)
