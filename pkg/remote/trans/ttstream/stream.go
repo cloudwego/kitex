@@ -99,6 +99,7 @@ type stream struct {
 	recvTimeout      time.Duration
 	metaFrameHandler MetaFrameHandler
 	closeCallback    []func(error)
+	cancelFunc       context.CancelFunc // only valid in server stream
 }
 
 func (s *stream) Service() string {
@@ -123,8 +124,7 @@ func (s *stream) TransportProtocol() ktransport.Protocol {
 func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
 	if state := atomic.LoadInt32(&s.state); state == streamStateHalfCloseLocal || state == streamStateInactive {
 		if ex := s.clientStreamException.Load(); ex == nil {
-			// 这个错误设计是有问题的，不能这么玩
-			// 而且这里可以预定义，不需要每次都生成
+			// todo: predefine error here
 			return errIllegalOperation.WithCause(errors.New("stream is closed send"))
 		} else {
 			return ex.(error)
@@ -152,9 +152,11 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 		ctx, cancel = context.WithTimeout(ctx, s.recvTimeout)
 		defer cancel()
 	}
-	// 在这个环境检测 ctx 是否被 cancel
+	// todo: format the error returned by output
+	// like gRPC ContextError
 	payload, err := s.reader.output(ctx)
 	if err != nil {
+		s.close(err, true, clientTransport)
 		return err
 	}
 	err = DecodePayload(ctx, payload, data)
@@ -192,6 +194,10 @@ func (s *stream) close(exception error, rst bool, kind int32) error {
 		// stream has been closed
 		return nil
 	}
+	// todo: think about the cancel logic location
+	if s.cancelFunc != nil {
+		s.cancelFunc()
+	}
 	select {
 	case s.headerSig <- streamSigInactive:
 	default:
@@ -201,7 +207,6 @@ func (s *stream) close(exception error, rst bool, kind int32) error {
 	default:
 	}
 	s.reader.close(exception)
-	// 是否需要区分 kind？是需要判断的，因为 server stream 不需要这个东西
 	if kind == clientTransport && exception != nil {
 		s.clientStreamException.Store(exception)
 	}
@@ -307,7 +312,6 @@ func (s *stream) sendTrailer(exception error) (err error) {
 	return s.writeFrame(trailerFrameType, nil, wtrailer, payload)
 }
 
-// todo: 处理写入错误，需要感知到连接断开这个现象
 func (s *stream) sendRstFrame(exception error) (err error) {
 	klog.Debugf("stream[%d] send rst frame: err=%v", s.sid, exception)
 

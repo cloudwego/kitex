@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/thrift"
@@ -28,6 +29,7 @@ import (
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/streaming"
@@ -113,6 +115,18 @@ func (s *serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.C
 	// cancel ctx when OnStreamFinish
 	ctx, cancelFunc := ktx.WithCancel(ctx)
 	ctx = context.WithValue(ctx, serverStreamCancelCtxKey{}, cancelFunc)
+	// process whole stream timeout
+	var cancel context.CancelFunc
+	if tmStr, ok := st.meta[ttheader.RPCTimeout]; ok {
+		tm, err := strconv.Atoi(tmStr)
+		if err == nil {
+			ctx, cancel = context.WithTimeout(ctx, time.Duration(tm)*time.Millisecond)
+			st.cancelFunc = cancel
+		} else {
+			klog.CtxErrorf(ctx, "ttstream decode RPCTimeout failed, err: %v", err)
+		}
+	}
+
 	return ctx, ss, nil
 }
 

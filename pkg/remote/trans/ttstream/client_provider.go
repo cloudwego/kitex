@@ -18,6 +18,8 @@ package ttstream
 
 import (
 	"context"
+	"strconv"
+	"time"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
@@ -88,6 +90,12 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 	if strHeader == nil {
 		strHeader = map[string]string{}
 	}
+	// retrieve deadline fron context as the whole stream timeout
+	if ddl, ok := ctx.Deadline(); ok {
+		tm := time.Until(ddl)
+		intHeader[ttheader.RPCTimeout] = strconv.Itoa(int(tm.Milliseconds()))
+	}
+
 	strHeader[ttheader.HeaderIDLServiceName] = invocation.ServiceName()
 	metainfo.SaveMetaInfoToMap(ctx, strHeader)
 
