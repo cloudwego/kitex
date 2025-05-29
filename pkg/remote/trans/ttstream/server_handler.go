@@ -27,6 +27,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -131,7 +132,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 			defer wg.Done()
 			err := t.OnStream(nctx, conn, ss)
 			if err != nil && !errors.Is(err, io.EOF) {
-				klog.CtxErrorf(nctx, "KITEX: stream ReadStream failed: err=%v", err)
+				t.OnError(nctx, err, conn)
 			}
 		})
 	}
@@ -175,9 +176,9 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 		panicErr := recover()
 		if panicErr != nil {
 			if conn != nil {
-				klog.CtxErrorf(ctx, "KITEX: streamx panic happened, close conn, remoteAddress=%s, error=%s\nstack=%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
+				klog.CtxErrorf(ctx, "KITEX: ttstream panic happened, close conn, remoteAddress=%s, error=%s\nstack=%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
 			} else {
-				klog.CtxErrorf(ctx, "KITEX: streamx panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
+				klog.CtxErrorf(ctx, "KITEX: ttstream panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
 			}
 		}
 		t.finishTracer(ctx, ri, err, panicErr)
@@ -186,16 +187,18 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 	args := &streaming.Args{
 		ServerStream: ss,
 	}
-	serr := t.inkHdlFunc(ctx, args, nil)
-	if serr == nil {
-		if bizErr := ri.Invocation().BizStatusErr(); bizErr != nil {
-			serr = bizErr
-		}
+	if err = t.inkHdlFunc(ctx, args, nil); err != nil {
+		// treat err thrown by invoking handler as the final err, ignore the err returned by OnStreamFinish
+		t.provider.OnStreamFinish(ctx, ss, err)
+		return
 	}
-	ctx, err = t.provider.OnStreamFinish(ctx, ss, serr)
-	if err == nil && serr != nil {
-		err = serr
+	if bizErr := ri.Invocation().BizStatusErr(); bizErr != nil {
+		// when biz err thrown, treat the err returned by OnStreamFinish as the final err
+		ctx, err = t.provider.OnStreamFinish(ctx, ss, bizErr)
+		return
 	}
+	// there is no invoking handler err or biz err, treat the err returned by OnStreamFinish as the final err
+	ctx, err = t.provider.OnStreamFinish(ctx, ss, nil)
 	return err
 }
 
@@ -211,6 +214,12 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 }
 
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
+	var de *kerrors.DetailedError
+	if ok := errors.As(err, &de); ok && de.Stack() != "" {
+		klog.CtxErrorf(ctx, "KITEX: processing ttstream request error, remoteAddr=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), de.Stack())
+	} else {
+		klog.CtxErrorf(ctx, "KITEX: processing ttstream request error, remoteAddr=%s, error=%s", conn.RemoteAddr(), err.Error())
+	}
 }
 
 func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
