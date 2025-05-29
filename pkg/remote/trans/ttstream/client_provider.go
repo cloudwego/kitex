@@ -90,7 +90,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 	if strHeader == nil {
 		strHeader = map[string]string{}
 	}
-	// retrieve deadline fron context as the whole stream timeout
+	// retrieve deadline from context as the whole stream timeout
 	if ddl, ok := ctx.Deadline(); ok {
 		tm := time.Until(ddl)
 		intHeader[ttheader.RPCTimeout] = strconv.Itoa(int(tm.Milliseconds()))

@@ -55,6 +55,7 @@ func TestCancelStreamTaskConfig(t *testing.T) {
 	ticker = nil
 }
 
+// todo: optimized unit time-consuming
 func TestCancelStreamTask(t *testing.T) {
 	cfd, sfd := netpoll.GetSysFdPairs()
 	cconn, err := netpoll.NewFDConnection(cfd)
@@ -88,7 +89,7 @@ func TestCancelStreamTask(t *testing.T) {
 			req := new(testRequest)
 			req.A = 123
 			if sErr := cs.SendMsg(cCtx, req); sErr != nil {
-				//test.Assert(t, sErr == defaultCancelStreamTaskConfig.CancelException, sErr)
+				// test.Assert(t, sErr == defaultCancelStreamTaskConfig.CancelException, sErr)
 				wg.Done()
 				break
 			}
@@ -97,7 +98,7 @@ func TestCancelStreamTask(t *testing.T) {
 
 	for {
 		if rErr := ss.RecvMsg(sCtx, new(testResponse)); rErr != nil {
-			//test.Assert(t, errors.Is(rErr, newExceptionType(context.Canceled.Error(), nil, 12008)), rErr)
+			// test.Assert(t, errors.Is(rErr, newExceptionType(context.Canceled.Error(), nil, 12008)), rErr)
 			wg.Done()
 			break
 		}
@@ -112,7 +113,7 @@ func TestCancelStreamTask(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	cs = newClientStream(rawClientStream)
-	ss = newServerStream(rawClientStream)
+	ss = newServerStream(rawServerStream)
 
 	wg.Add(2)
 	go func() {
@@ -144,7 +145,7 @@ func TestCancelStreamTask(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	cs = newClientStream(rawClientStream)
-	ss = newServerStream(rawClientStream)
+	ss = newServerStream(rawServerStream)
 
 	wg.Add(2)
 	go func() {

@@ -47,10 +47,8 @@ func isIgnoreError(err error) bool {
 	return errors.Is(err, netpoll.ErrEOF) || errors.Is(err, io.EOF) || errors.Is(err, netpoll.ErrConnClosed)
 }
 
-var (
-	// ticker is used to manage closeStreamTask.
-	ticker *utils.SharedTicker
-)
+// ticker is used to manage closeStreamTask.
+var ticker *utils.SharedTicker
 
 // transport is used to read/write frames and disturbed frames to different streams
 type transport struct {
@@ -207,6 +205,7 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		var ok bool
 		s, ok = t.loadStream(fr.sid)
 		if !ok {
+			// todo: think about remove this error log since this is a very common
 			klog.Errorf("transport[%d] read a unknown stream: frame[%s]", t.kind, fr.String())
 			// ignore unknown stream error
 			err = nil
