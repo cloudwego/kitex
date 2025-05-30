@@ -104,7 +104,7 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr *Frame) (err erro
 	param.IntInfo[ttheader.ToMethod] = fr.method
 
 	switch fr.typ {
-	case headerFrameType:
+	case headerFrameType, metaFrameType:
 		param.StrInfo = fr.header
 	case trailerFrameType:
 		param.StrInfo = fr.trailer
@@ -149,6 +149,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	switch dp.IntInfo[ttheader.FrameType] {
 	case ttheader.FrameTypeMeta:
 		ftype = metaFrameType
+		fheader = dp.StrInfo
 	case ttheader.FrameTypeHeader:
 		ftype = headerFrameType
 		fheader = dp.StrInfo

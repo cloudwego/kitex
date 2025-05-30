@@ -30,8 +30,11 @@ import (
 	"time"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -66,7 +69,9 @@ func TestTransportBasic(t *testing.T) {
 	strHeader := make(streaming.Header)
 	strHeader["key"] = "val"
 	ctrans := newTransport(clientTransport, cconn, nil)
-	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", intHeader, strHeader)
+	ctx := context.Background()
+	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	err = ctrans.WriteStream(ctx, rawClientStream, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
 	strans := newTransport(serverTransport, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
@@ -134,7 +139,9 @@ func TestTransportServerStreaming(t *testing.T) {
 	intHeader := make(IntHeader)
 	strHeader := make(streaming.Header)
 	ctrans := newTransport(clientTransport, cconn, nil)
-	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", intHeader, strHeader)
+	ctx := context.Background()
+	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	err = ctrans.WriteStream(ctx, rawClientStream, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
 	strans := newTransport(serverTransport, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
@@ -198,7 +205,9 @@ func TestTransportException(t *testing.T) {
 
 	// server send data
 	ctrans := newTransport(clientTransport, cconn, nil)
-	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", make(IntHeader), make(streaming.Header))
+	ctx := context.Background()
+	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	err = ctrans.WriteStream(ctx, rawClientStream, make(IntHeader), make(streaming.Header))
 	test.Assert(t, err == nil, err)
 	strans := newTransport(serverTransport, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
@@ -228,7 +237,9 @@ func TestTransportException(t *testing.T) {
 	time.Sleep(time.Millisecond * 50)
 
 	// server send illegal frame
-	rawClientStream, err = ctrans.WriteStream(context.Background(), "Bidi", make(IntHeader), make(streaming.Header))
+	ctx = context.Background()
+	rawClientStream = newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	err = ctrans.WriteStream(ctx, rawClientStream, make(IntHeader), make(streaming.Header))
 	test.Assert(t, err == nil, err)
 	rawServerStream, err = strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
@@ -263,7 +274,9 @@ func Test_clientStreamReceiveTrailer(t *testing.T) {
 	strHeader := make(streaming.Header)
 	strHeader["key"] = "val"
 	ctrans := newTransport(clientTransport, cconn, nil)
-	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", intHeader, strHeader)
+	ctx := context.Background()
+	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	err = ctrans.WriteStream(ctx, rawClientStream, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
 	strans := newTransport(serverTransport, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
@@ -298,4 +311,84 @@ func Test_clientStreamReceiveTrailer(t *testing.T) {
 	ssErr = ss.RecvMsg(context.Background(), ssRes)
 	test.Assert(t, ssErr != nil, ssErr)
 	wg.Wait()
+}
+
+type mockMetaFrameHandler struct {
+	onMetaFrame func(ctx context.Context, intHeader IntHeader, header streaming.Header, payload []byte) error
+}
+
+func (hdl *mockMetaFrameHandler) OnMetaFrame(ctx context.Context, intHeader IntHeader, header streaming.Header, payload []byte) error {
+	return hdl.onMetaFrame(ctx, intHeader, header, payload)
+}
+
+func Test_clientStreamReceiveMetaFrame(t *testing.T) {
+	cfd, sfd := netpoll.GetSysFdPairs()
+	cconn, err := netpoll.NewFDConnection(cfd)
+	test.Assert(t, err == nil, err)
+	sconn, err := netpoll.NewFDConnection(sfd)
+	test.Assert(t, err == nil, err)
+	ctrans := newTransport(clientTransport, cconn, nil)
+
+	testMethod := "Bidi"
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
+		nil, remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)}, testMethod), nil, nil, nil,
+	))
+	finishCh := make(chan struct{})
+	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: testMethod})
+	rawClientStream.setMetaFrameHandler(&mockMetaFrameHandler{
+		onMetaFrame: func(ctx context.Context, intHeader IntHeader, header streaming.Header, payload []byte) error {
+			ri := rpcinfo.GetRPCInfo(ctx)
+			test.Assert(t, ri != nil)
+			rmt := remoteinfo.AsRemoteInfo(ri.To())
+			if rip := header[ttheader.HeaderTransRemoteAddr]; rip != "" {
+				rmt.ForceSetTag(ttheader.HeaderTransRemoteAddr, rip)
+			}
+			if tc := header[ttheader.HeaderTransToCluster]; tc != "" {
+				rmt.ForceSetTag(ttheader.HeaderTransToCluster, tc)
+			}
+			if ti := header[ttheader.HeaderTransToIDC]; ti != "" {
+				rmt.ForceSetTag(ttheader.HeaderTransToIDC, ti)
+			}
+			close(finishCh)
+			return nil
+		},
+	})
+	err = ctrans.WriteStream(ctx, rawClientStream, make(IntHeader), make(streaming.Header))
+	test.Assert(t, err == nil, err)
+
+	wBuf := newWriterBuffer(sconn.Writer())
+	err = EncodeFrame(context.Background(), wBuf, &Frame{
+		streamFrame: streamFrame{
+			// this sid should be the same as rawClientStream
+			sid:    rawClientStream.sid,
+			method: testMethod,
+			header: map[string]string{
+				ttheader.HeaderTransRemoteAddr: "127.0.0.1",
+				ttheader.HeaderTransToCluster:  "cluster",
+				ttheader.HeaderTransToIDC:      "idc",
+			},
+		},
+		typ:     metaFrameType,
+		payload: nil,
+	})
+	test.Assert(t, err == nil, err)
+	err = wBuf.Flush()
+	test.Assert(t, err == nil, err)
+
+	<-finishCh
+	// wait for MetaFrame parsed
+	time.Sleep(5 * time.Millisecond)
+
+	ri := rpcinfo.GetRPCInfo(ctx)
+	rip, ok := ri.To().Tag(ttheader.HeaderTransRemoteAddr)
+	test.Assert(t, ok)
+	test.Assert(t, rip == "127.0.0.1")
+
+	tc, ok := ri.To().Tag(ttheader.HeaderTransToCluster)
+	test.Assert(t, ok)
+	test.Assert(t, tc == "cluster")
+
+	ti, ok := ri.To().Tag(ttheader.HeaderTransToIDC)
+	test.Assert(t, ok)
+	test.Assert(t, ti == "idc")
 }
