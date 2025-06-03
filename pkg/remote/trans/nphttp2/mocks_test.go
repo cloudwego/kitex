@@ -372,6 +372,7 @@ func newMockRPCInfo() rpcinfo.RPCInfo {
 	s := rpcinfo.NewEndpointInfo("", method, nil, endpointTags)
 	ink := rpcinfo.NewInvocation("", method)
 	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetPayloadCodec(serviceinfo.Protobuf)
 	ri := rpcinfo.NewRPCInfo(c, s, ink, cfg, rpcinfo.NewRPCStats())
 	return ri
 }
