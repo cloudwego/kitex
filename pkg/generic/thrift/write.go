@@ -266,6 +266,17 @@ func wrapStructWriter(ctx context.Context, val interface{}, out *thrift.BufferWr
 	return nil
 }
 
+func structWriter(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+	writer, err := nextWriter(val, t, opt)
+	if err != nil {
+		return fmt.Errorf("nextWriter of field[%s] error %w", t.Name, err)
+	}
+	if err := writer(ctx, val, out, t, opt); err != nil {
+		return fmt.Errorf("writer of field[%s] error %w", t.Name, err)
+	}
+	return nil
+}
+
 // TODO(marina.sakai): Optimize generic json writer
 func wrapJSONWriter(ctx context.Context, val *gjson.Result, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	for name, field := range t.Struct.FieldsByName {

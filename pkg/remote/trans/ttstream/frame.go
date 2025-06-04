@@ -29,7 +29,9 @@ import (
 	gopkgthrift "github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
+	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
@@ -48,6 +50,11 @@ var frameTypeToString = map[int32]string{
 }
 
 var framePool sync.Pool
+
+var (
+	errNoRPCInfo      = errors.New("no rpcinfo in context")
+	errInvalidMessage = errors.New("ttheaderstreaming invalid message")
+)
 
 // Frame define a TTHeader Streaming Frame
 type Frame struct {
@@ -177,16 +184,43 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 }
 
 func EncodePayload(ctx context.Context, msg any) ([]byte, error) {
-	payload := gopkgthrift.FastMarshal(msg.(gopkgthrift.FastCodec))
-	return payload, nil
-}
-
-func EncodeGenericPayload(ctx context.Context, msg any) ([]byte, error) {
-	return nil, nil
+	switch t := msg.(type) {
+	case gopkgthrift.FastCodec:
+		return gopkgthrift.FastMarshal(t), nil
+	case *generic.Args:
+		ri := rpcinfo.GetRPCInfo(ctx)
+		if ri == nil {
+			return nil, errNoRPCInfo
+		}
+		methodName := ri.Invocation().MethodName()
+		var buf []byte
+		w := bufiox.NewBytesWriter(&buf)
+		err := t.Write(ctx, methodName, w)
+		if err != nil {
+			return nil, err
+		}
+		w.Flush()
+		return buf, nil
+	default:
+		return nil, errInvalidMessage
+	}
 }
 
 func DecodePayload(ctx context.Context, payload []byte, msg any) error {
-	return gopkgthrift.FastUnmarshal(payload, msg.(gopkgthrift.FastCodec))
+	switch t := msg.(type) {
+	case gopkgthrift.FastCodec:
+		return gopkgthrift.FastUnmarshal(payload, msg.(gopkgthrift.FastCodec))
+	case *generic.Result:
+		ri := rpcinfo.GetRPCInfo(ctx)
+		if ri == nil {
+			return errNoRPCInfo
+		}
+		methodName := ri.Invocation().MethodName()
+		r := bufiox.NewBytesReader(payload)
+		return t.Read(ctx, methodName, len(payload), r)
+	default:
+		return errInvalidMessage
+	}
 }
 
 func EncodeException(ctx context.Context, method string, seq int32, ex error) ([]byte, error) {
