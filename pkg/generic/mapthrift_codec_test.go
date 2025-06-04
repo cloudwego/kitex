@@ -17,7 +17,10 @@
 package generic
 
 import (
+	"context"
 	"testing"
+
+	"github.com/cloudwego/gopkg/bufiox"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
@@ -27,7 +30,7 @@ import (
 func TestMapThriftCodec(t *testing.T) {
 	p, err := NewThriftFileProvider("./map_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	mtc := newMapThriftCodec(p)
+	mtc := newMapThriftCodec(p, false)
 	defer mtc.Close()
 	test.Assert(t, mtc.Name() == "MapThrift")
 
@@ -39,16 +42,30 @@ func TestMapThriftCodec(t *testing.T) {
 	test.Assert(t, mtc.extra[CombineServiceKey] == "false")
 
 	rw := mtc.getMessageReaderWriter()
-	_, ok := rw.(thrift.MessageWriter)
-	test.Assert(t, ok)
-	_, ok = rw.(thrift.MessageReader)
-	test.Assert(t, ok)
+
+	var buf []byte
+	out := bufiox.NewBytesWriter(&buf)
+
+	err = rw.(*thrift.StructReaderWriter).Write(context.Background(), out, map[string]interface{}{
+		"strMap": map[string]interface{}{"hello": "world"},
+	}, "Test", true, nil)
+	test.Assert(t, err == nil)
+
+	err = out.Flush()
+	test.Assert(t, err == nil)
+
+	in := bufiox.NewBytesReader(buf)
+
+	res, err := rw.(*thrift.StructReaderWriter).Read(context.Background(), "Test", false, len(buf), in)
+	test.Assert(t, err == nil)
+
+	test.Assert(t, res.(map[string]interface{})["strMap"].(map[interface{}]interface{})["hello"].(string) == "world")
 }
 
 func TestMapThriftCodecSelfRef(t *testing.T) {
 	p, err := NewThriftFileProvider("./map_test/idl/self_ref.thrift")
 	test.Assert(t, err == nil)
-	mtc := newMapThriftCodec(p)
+	mtc := newMapThriftCodec(p, false)
 	defer mtc.Close()
 	test.Assert(t, mtc.Name() == "MapThrift")
 
@@ -66,7 +83,7 @@ func TestMapThriftCodecSelfRef(t *testing.T) {
 func TestMapThriftCodecForJSON(t *testing.T) {
 	p, err := NewThriftFileProvider("./map_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	mtc := newMapThriftCodecForJSON(p)
+	mtc := newMapThriftCodec(p, true)
 	defer mtc.Close()
 	test.Assert(t, mtc.Name() == "MapThrift")
 
@@ -77,6 +94,22 @@ func TestMapThriftCodecForJSON(t *testing.T) {
 	test.Assert(t, mtc.svcName == "Mock")
 
 	rw := mtc.getMessageReaderWriter()
-	_, ok := rw.(*thrift.StructReaderWriter)
-	test.Assert(t, ok)
+
+	var buf []byte
+	out := bufiox.NewBytesWriter(&buf)
+
+	err = rw.(*thrift.StructReaderWriter).Write(context.Background(), out, map[string]interface{}{
+		"strMap": map[string]interface{}{"hello": "world"},
+	}, "Test", true, nil)
+	test.Assert(t, err == nil)
+
+	err = out.Flush()
+	test.Assert(t, err == nil)
+
+	in := bufiox.NewBytesReader(buf)
+
+	res, err := rw.(*thrift.StructReaderWriter).Read(context.Background(), "Test", false, len(buf), in)
+	test.Assert(t, err == nil)
+
+	test.Assert(t, res.(map[string]interface{})["strMap"].(map[string]interface{})["hello"].(string) == "world")
 }
