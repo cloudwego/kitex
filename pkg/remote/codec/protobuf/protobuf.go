@@ -112,6 +112,7 @@ func (c protobufCodec) Marshal(ctx context.Context, message remote.Message, out 
 
 	// 2. encode pb struct
 	// fast write
+	// Deprecated: fastpb is no longer used
 	if msg, ok := data.(fastpb.Writer); ok {
 		msgsize := msg.Size()
 		actualMsgBuf, err := out.Malloc(msgsize)
@@ -180,6 +181,7 @@ func (c protobufCodec) Unmarshal(ctx context.Context, message remote.Message, in
 	data := message.Data()
 
 	// fast read
+	// Deprecated: fastpb is no longer used
 	if msg, ok := data.(fastpb.Reader); ok {
 		if len(actualMsgBuf) == 0 {
 			// if all fields of a struct is default value, actualMsgLen will be zero and actualMsgBuf will be nil

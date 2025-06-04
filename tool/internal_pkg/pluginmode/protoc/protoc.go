@@ -113,6 +113,9 @@ func GenKitex(req *pluginpb.CodeGeneratorRequest, opts protogen.Options) (*plugi
 	}
 	pp.process(gen)
 	gen.SupportedFeatures = gengo.SupportedFeatures
+
+	// FastPB is deprecated, so truncate all fastpb files
+	util.TruncateAllFastPBFiles(filepath.Join(pp.OutputPath, pp.GenPath))
 	// construct plugin response
 	resp := gen.Response()
 	return resp, nil
