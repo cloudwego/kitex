@@ -28,6 +28,7 @@ import (
 
 var (
 	_ internalRemote.SetState = &cliConn{}
+	_ internalRemote.IsGonet  = &cliConn{}
 	_ bufioxReadWriter        = &cliConn{}
 	_ bufioxReadWriter        = &svrConn{}
 )
@@ -45,6 +46,10 @@ type cliConn struct {
 	w        bufiox.Writer
 	inactive atomic.Bool // set inactive in connpool's detection logic.
 	closed   atomic.Bool // ensures Close is only executed once
+}
+
+func (c *cliConn) IsGonet() bool {
+	return true
 }
 
 func newCliConn(conn net.Conn) *cliConn {

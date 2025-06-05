@@ -21,7 +21,6 @@ import (
 	"net"
 	"time"
 
-	internalRemote "github.com/cloudwego/kitex/internal/remote"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
@@ -29,8 +28,6 @@ import (
 func NewDialer() remote.Dialer {
 	return &dialer{}
 }
-
-var _ internalRemote.IsGonet = &dialer{}
 
 type dialer struct {
 	net.Dialer
@@ -44,8 +41,4 @@ func (d *dialer) DialTimeout(network, address string, timeout time.Duration) (ne
 		return nil, err
 	}
 	return newCliConn(conn), nil
-}
-
-func (d *dialer) IsGonet() bool {
-	return true
 }
