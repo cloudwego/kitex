@@ -25,11 +25,14 @@ import (
 	"runtime/debug"
 	"sync"
 
+	"github.com/bytedance/gopkg/cloud/metainfo"
+
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	ktransport "github.com/cloudwego/kitex/transport"
@@ -118,7 +121,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	}()
 	// connection level goroutine
 	for {
-		nctx, ss, nerr := t.provider.OnStream(ctx, conn)
+		nctx, st, nerr := t.provider.OnStream(ctx, conn)
 		if nerr != nil {
 			if errors.Is(nerr, io.EOF) {
 				return nil
@@ -130,7 +133,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		// stream level goroutine
 		gofunc.GoFunc(nctx, func() {
 			defer wg.Done()
-			err := t.OnStream(nctx, conn, ss)
+			err := t.OnStream(nctx, conn, st)
 			if err != nil && !errors.Is(err, io.EOF) {
 				t.OnError(nctx, err, conn)
 			}
@@ -142,7 +145,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 // - create  server stream
 // - process server stream
 // - close   server stream
-func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss streaming.ServerStream) (err error) {
+func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *stream) (err error) {
 	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	defer func() {
@@ -153,23 +156,37 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 	}()
 
 	ink := ri.Invocation().(rpcinfo.InvocationSetter)
-	if si, ok := ss.(StreamInfo); ok {
-		sinfo := t.opt.SvcSearcher.SearchService(si.Service(), si.Method(), false)
-		if sinfo == nil {
-			return remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", si.Service()))
-		}
-		minfo := sinfo.MethodInfo(si.Method())
-		if minfo == nil {
-			return remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", si.Method()))
-		}
-		ink.SetServiceName(sinfo.ServiceName)
-		ink.SetMethodName(si.Method())
-		ink.SetStreamingMode(minfo.StreamingMode())
-		if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
-			_ = mutableTo.SetMethod(si.Method())
-		}
-		rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(si.TransportProtocol())
+	sinfo := t.opt.SvcSearcher.SearchService(st.Service(), st.Method(), false)
+	if sinfo == nil {
+		return remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", st.Service()))
 	}
+	minfo := sinfo.MethodInfo(st.Method())
+	if minfo == nil {
+		return remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", st.Method()))
+	}
+	ink.SetServiceName(sinfo.ServiceName)
+	ink.SetMethodName(st.Method())
+	ink.SetStreamingMode(minfo.StreamingMode())
+	if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
+		_ = mutableTo.SetMethod(st.Method())
+	}
+	rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(st.TransportProtocol())
+
+	// headerHandler return a new stream level ctx
+	// it contains rpcinfo modified by HeaderHandler
+	if t.provider.headerHandler != nil {
+		ctx, err = t.provider.headerHandler.OnReadStream(ctx, st.meta, st.header)
+		if err != nil {
+			return err
+		}
+	}
+	// register metainfo into ctx
+	ctx = metainfo.SetMetaInfoFromMap(ctx, st.header)
+	ss := newServerStream(st)
+
+	// cancel ctx when OnStreamFinish
+	ctx, cancelFunc := ktx.WithCancel(ctx)
+	ctx = context.WithValue(ctx, serverStreamCancelCtxKey{}, cancelFunc)
 
 	ctx = t.startTracer(ctx, ri)
 	defer func() {
