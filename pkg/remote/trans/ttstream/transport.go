@@ -287,23 +287,19 @@ func genStreamID() int32 {
 // it's typically used by client side
 // newStream is concurrency safe
 func (t *transport) WriteStream(
-	ctx context.Context, method string, intHeader IntHeader, strHeader streaming.Header,
-) (*stream, error) {
+	ctx context.Context, s *stream, intHeader IntHeader, strHeader streaming.Header,
+) error {
 	if t.kind != clientTransport {
-		return nil, fmt.Errorf("transport already be used as other kind")
+		return fmt.Errorf("transport already be used as other kind")
 	}
 
-	sid := genStreamID()
-	// new stream first
-	s := newStream(ctx, t, streamFrame{sid: sid, method: method})
 	t.storeStream(s)
 	// send create stream request for server
-	fr := newFrame(streamFrame{sid: sid, method: method, header: strHeader, meta: intHeader}, headerFrameType, nil)
-	err := t.WriteFrame(fr)
-	if err != nil {
-		return nil, err
+	fr := newFrame(streamFrame{sid: s.sid, method: s.method, header: strHeader, meta: intHeader}, headerFrameType, nil)
+	if err := t.WriteFrame(fr); err != nil {
+		return err
 	}
-	return s, nil
+	return nil
 }
 
 // ReadStream wait for a new incoming stream on current connection

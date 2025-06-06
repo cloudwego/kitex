@@ -80,12 +80,15 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 		return nil, err
 	}
 
-	s, err := trans.WriteStream(ctx, method, intHeader, strHeader)
-	if err != nil {
-		return nil, err
-	}
+	// create new stream
+	s := newStream(ctx, trans, streamFrame{sid: genStreamID(), method: method})
+	// stream should be configured before WriteStream or there would be a race condition for metaFrameHandler
 	s.setRecvTimeout(rconfig.StreamRecvTimeout())
 	s.setMetaFrameHandler(c.metaHandler)
+
+	if err = trans.WriteStream(ctx, s, intHeader, strHeader); err != nil {
+		return nil, err
+	}
 
 	// if ctx from server side, we should cancel the stream when server handler already returned
 	registerStreamCancelCallback(ctx, s)
