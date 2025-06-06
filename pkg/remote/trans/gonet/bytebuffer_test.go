@@ -17,14 +17,30 @@
 package gonet
 
 import (
-	"bufio"
 	"bytes"
 	"strings"
 	"testing"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
+
+var _ bufioxReadWriter = &mockBufioxReadWriter{}
+
+type mockBufioxReadWriter struct {
+	r bufiox.Reader
+	w bufiox.Writer
+}
+
+func (m *mockBufioxReadWriter) Reader() bufiox.Reader {
+	return m.r
+}
+
+func (m *mockBufioxReadWriter) Writer() bufiox.Writer {
+	return m.w
+}
 
 var (
 	msg    = "hello world"
@@ -34,10 +50,10 @@ var (
 // TestBufferReadWrite test bytebuf write and read success.
 func TestBufferReadWrite(t *testing.T) {
 	var (
-		reader = bufio.NewReader(strings.NewReader(strings.Repeat(msg, 5)))
-		writer = bufio.NewWriter(bytes.NewBufferString(strings.Repeat(msg, 5)))
-		ioRW   = bufio.NewReadWriter(reader, writer)
-		bufRW  = NewBufferReadWriter(ioRW)
+		reader   = bufiox.NewDefaultReader(strings.NewReader(strings.Repeat(msg, 5)))
+		writer   = bufiox.NewDefaultWriter(bytes.NewBufferString(strings.Repeat(msg, 5)))
+		bufioxRW = &mockBufioxReadWriter{r: reader, w: writer}
+		bufRW    = NewBufferReadWriter(bufioxRW)
 	)
 
 	testRead(t, bufRW)
@@ -46,111 +62,95 @@ func TestBufferReadWrite(t *testing.T) {
 
 // TestBufferWrite test write success.
 func TestBufferWrite(t *testing.T) {
-	wi := bytes.NewBufferString(strings.Repeat(msg, 5))
-	nbp := &bufferReadWriter{}
+	wi := bufiox.NewDefaultWriter(bytes.NewBufferString(strings.Repeat(msg, 5)))
 
 	buf := NewBufferWriter(wi)
 	testWrite(t, buf)
-	testReadFailed(t, buf)
-
-	err := nbp.WriteDirect([]byte(msg), 11)
-	// check err not nil
-	test.Assert(t, err != nil, err)
 }
 
 // TestBufferRead test read success.
 func TestBufferRead(t *testing.T) {
 	ri := strings.NewReader(strings.Repeat(msg, 5))
 
-	buf := NewBufferReader(ri)
-	testWriteFailed(t, buf)
+	buf := NewBufferReader(bufiox.NewDefaultReader(ri))
 	testRead(t, buf)
 }
 
 func testRead(t *testing.T, buf remote.ByteBuffer) {
 	var (
-		p   []byte
-		s   string
-		err error
+		p       []byte
+		s       string
+		err     error
+		readLen int
 	)
 
+	// Skip
 	p, err = buf.Peek(msgLen)
 	if err != nil {
-		t.Logf("Peek failed, err=%s", err.Error())
-		t.FailNow()
+		t.Fatalf("Peek failed, err=%s", err.Error())
 	}
 	test.Assert(t, string(p) == msg)
+	if n := buf.ReadLen(); n != readLen {
+		t.Fatalf("ReadLen expect %d, but got %d", readLen, n)
+	}
 
+	// Skip
+	readLen += 1 + msgLen
 	err = buf.Skip(1 + msgLen)
 	if err != nil {
-		t.Logf("Skip failed, err=%s", err.Error())
-		t.FailNow()
+		t.Fatalf("Skip failed, err=%s", err.Error())
+	}
+	if n := buf.ReadLen(); n != readLen {
+		t.Fatalf("ReadLen expect %d, but got %d", readLen, n)
 	}
 
+	// Next
+	readLen += msgLen - 1
 	p, err = buf.Next(msgLen - 1)
 	if err != nil {
-		t.Logf("Next failed, err=%s", err.Error())
-		t.FailNow()
+		t.Fatalf("Next failed, err=%s", err.Error())
 	}
 	test.Assert(t, string(p) == msg[1:])
-
-	if n := buf.ReadableLen(); n != 3*msgLen {
-		t.Logf("ReadableLen expect %d, but got %d", 3*msgLen, n)
-		t.FailNow()
-	}
-	if n := buf.ReadLen(); n != msgLen-1 {
-		t.Logf("ReadLen expect %d, but got %d", msgLen-1, n)
-		t.FailNow()
+	if n := buf.ReadLen(); n != readLen {
+		t.Fatalf("ReadLen expect %d, but got %d", readLen, n)
 	}
 
+	// ReadString
+	readLen += msgLen
 	s, err = buf.ReadString(msgLen)
 	if err != nil {
-		t.Logf("ReadString failed, err=%s", err.Error())
-		t.FailNow()
+		t.Fatalf("ReadString failed, err=%s", err.Error())
 	}
 	test.Assert(t, s == msg)
-
-	p = make([]byte, msgLen)
-	_, err = buf.ReadBinary(p)
-	if err != nil {
-		t.Logf("ReadBinary failed, err=%s", err.Error())
-		t.FailNow()
+	if n := buf.ReadLen(); n != readLen {
+		t.Fatalf("ReadLen expect %d, but got %d", readLen, n)
 	}
+
+	// ReadBinary
+	p = make([]byte, msgLen)
+	nn, err := buf.ReadBinary(p)
+	readLen += nn
+	if err != nil {
+		t.Fatalf("ReadBinary failed, err=%s", err.Error())
+	}
+	test.Assert(t, nn == len(p))
 	test.Assert(t, string(p) == msg)
-}
+	if n := buf.ReadLen(); n != readLen {
+		t.Fatalf("ReadLen expect %d, but got %d", readLen, n)
+	}
 
-func testReadFailed(t *testing.T, buf remote.ByteBuffer) {
-	p := make([]byte, len(msg))
-	var n int
-
-	_, err := buf.Peek(len(msg))
-	test.Assert(t, err != nil)
-
-	err = buf.Skip(1)
-	test.Assert(t, err != nil)
-
-	_, err = buf.Next(msgLen - 1)
-	test.Assert(t, err != nil)
-
-	n = buf.ReadableLen()
-	test.Assert(t, n == -1)
-
-	n = buf.ReadLen()
-	test.Assert(t, n == 0)
-
-	_, err = buf.ReadString(len(msg))
-	test.Assert(t, err != nil)
-
-	b := make([]byte, len(msg))
-	_, err = buf.ReadBinary(b)
-	test.Assert(t, err != nil)
-
-	n, err = buf.Read(p)
-	test.Assert(t, err != nil)
-	test.Assert(t, n == -1, n)
-
-	_, err = buf.Read(nil)
-	test.Assert(t, err != nil)
+	// Read
+	p = make([]byte, msgLen)
+	nn, err = buf.Read(p)
+	readLen += nn
+	if err != nil {
+		t.Fatalf("ReadBinary failed, err=%s", err.Error())
+	}
+	test.Assert(t, nn == len(p))
+	test.Assert(t, string(p) == msg)
+	if n := buf.ReadLen(); n != readLen {
+		t.Fatalf("ReadLen expect %d, but got %d", readLen, n)
+	}
 }
 
 func testWrite(t *testing.T, buf remote.ByteBuffer) {
@@ -184,28 +184,4 @@ func testWrite(t *testing.T, buf remote.ByteBuffer) {
 		t.Logf("Flush failed, err=%s", err.Error())
 		t.FailNow()
 	}
-}
-
-func testWriteFailed(t *testing.T, buf remote.ByteBuffer) {
-	_, err := buf.Malloc(len(msg))
-	test.Assert(t, err != nil)
-
-	l := buf.WrittenLen()
-	test.Assert(t, l == -1)
-
-	_, err = buf.WriteString(msg)
-	test.Assert(t, err != nil)
-
-	_, err = buf.WriteBinary([]byte(msg))
-	test.Assert(t, err != nil)
-
-	err = buf.Flush()
-	test.Assert(t, err != nil)
-
-	n, err := buf.Write([]byte(msg))
-	test.Assert(t, err != nil)
-	test.Assert(t, n == -1, n)
-
-	_, err = buf.Write(nil)
-	test.Assert(t, err != nil)
 }
