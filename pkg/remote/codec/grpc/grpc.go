@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/fastpb"
+
 	"github.com/cloudwego/gopkg/bufiox"
 	"google.golang.org/protobuf/proto"
 
@@ -122,6 +123,7 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 		}
 	case serviceinfo.Protobuf:
 		switch t := message.Data().(type) {
+		// Deprecated: fastpb is no longer used
 		case fastpb.Writer:
 			size := t.Size()
 			if !isCompressed {
@@ -217,6 +219,7 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 			return thrift.UnmarshalThriftData(ctx, c.ThriftCodec, "", d, message.Data())
 		}
 	case serviceinfo.Protobuf:
+		// Deprecated: fastpb is no longer used
 		if t, ok := data.(fastpb.Reader); ok {
 			if len(d) == 0 {
 				// if all fields of a struct is default value, data will be nil
