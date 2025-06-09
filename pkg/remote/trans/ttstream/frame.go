@@ -40,6 +40,7 @@ const (
 	headerFrameType  int32 = 2
 	dataFrameType    int32 = 3
 	trailerFrameType int32 = 4
+	rstFrameType     int32 = 5
 )
 
 var frameTypeToString = map[int32]string{
@@ -47,6 +48,7 @@ var frameTypeToString = map[int32]string{
 	headerFrameType:  ttheader.FrameTypeHeader,
 	dataFrameType:    ttheader.FrameTypeData,
 	trailerFrameType: ttheader.FrameTypeTrailer,
+	rstFrameType:     ttheader.FrameTypeRst,
 }
 
 var framePool sync.Pool
@@ -158,6 +160,8 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	case ttheader.FrameTypeTrailer:
 		ftype = trailerFrameType
 		ftrailer = dp.StrInfo
+	case ttheader.FrameTypeRst:
+		ftype = rstFrameType
 	default:
 		return nil, errIllegalFrame.WithCause(fmt.Errorf("unexpected frame type: %v", dp.IntInfo[ttheader.FrameType]))
 	}

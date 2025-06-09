@@ -25,7 +25,9 @@ func newShortConnTransPool() transPool {
 	return &shortConnTransPool{}
 }
 
-type shortConnTransPool struct{}
+type shortConnTransPool struct {
+	f initFunc
+}
 
 func (p *shortConnTransPool) Get(network, addr string) (*transport, error) {
 	// create new connection
@@ -34,10 +36,14 @@ func (p *shortConnTransPool) Get(network, addr string) (*transport, error) {
 		return nil, err
 	}
 	// create new transport
-	trans := newTransport(clientTransport, conn, p)
+	trans := p.f(clientTransport, conn, p)
 	return trans, nil
 }
 
 func (p *shortConnTransPool) Put(trans *transport) {
 	_ = trans.Close(errTransport.WithCause(errors.New("short connection closed")))
+}
+
+func (p *shortConnTransPool) SetInitFunc(f initFunc) {
+	p.f = f
 }

@@ -62,12 +62,13 @@ func (s *serverStream) SendMsg(ctx context.Context, res any) error {
 	return s.stream.SendMsg(ctx, res)
 }
 
-// CloseSend by serverStream will be called after server handler returned
-// after CloseSend stream cannot be access again
-func (s *serverStream) CloseSend(exception error) error {
+// todo: refine this logic
+// Close by serverStream will be called after server handler returned
+// after Close stream cannot be access again
+func (s *serverStream) Close(exception error) error {
 	err := s.closeSend(exception)
 	if err != nil {
 		return err
 	}
-	return s.closeRecv(nil, serverTransport)
+	return s.close(nil, false, serverTransport)
 }

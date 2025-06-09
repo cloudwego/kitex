@@ -43,6 +43,7 @@ func newLongConnTransPool(config LongConnConfig) transPool {
 type longConnTransPool struct {
 	transPool *container.ObjectPool
 	config    LongConnConfig
+	f         initFunc
 }
 
 func (c *longConnTransPool) Get(network, addr string) (trans *transport, err error) {
@@ -62,7 +63,7 @@ func (c *longConnTransPool) Get(network, addr string) (trans *transport, err err
 	if err != nil {
 		return nil, err
 	}
-	trans = newTransport(clientTransport, conn, c)
+	trans = c.f(clientTransport, conn, c)
 	// create new transport
 	return trans, nil
 }
@@ -70,4 +71,8 @@ func (c *longConnTransPool) Get(network, addr string) (trans *transport, err err
 func (c *longConnTransPool) Put(trans *transport) {
 	addr := trans.conn.RemoteAddr().String()
 	c.transPool.Push(addr, trans)
+}
+
+func (c *longConnTransPool) SetInitFunc(f initFunc) {
+	c.f = f
 }

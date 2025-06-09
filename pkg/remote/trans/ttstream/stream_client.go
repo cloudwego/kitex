@@ -36,11 +36,14 @@ type clientStream struct {
 
 func (s *clientStream) Header() (streaming.Header, error) {
 	sig := <-s.headerSig
+	// todo: return close stream err of clientStream itself
 	switch sig {
+	// todo: refine this logic
 	case streamSigNone:
 		return make(streaming.Header), nil
 	case streamSigActive:
 		return s.header, nil
+	// todo: define other exceptions
 	case streamSigInactive:
 		return nil, ErrClosedStream
 	case streamSigCancel:
@@ -51,6 +54,7 @@ func (s *clientStream) Header() (streaming.Header, error) {
 
 func (s *clientStream) Trailer() (streaming.Trailer, error) {
 	sig := <-s.trailerSig
+	// todo: 这里的 error 应该返回 stream 本身的错误
 	switch sig {
 	case streamSigNone:
 		return make(streaming.Trailer), nil

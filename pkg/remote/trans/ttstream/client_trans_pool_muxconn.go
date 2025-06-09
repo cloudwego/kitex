@@ -47,9 +47,10 @@ type muxConnTransList struct {
 	cursor     uint32
 	transports []*transport
 	pool       transPool
+	f          initFunc
 }
 
-func newMuxConnTransList(size int, pool transPool) *muxConnTransList {
+func newMuxConnTransList(size int, pool transPool, f initFunc) *muxConnTransList {
 	tl := new(muxConnTransList)
 	if size <= 0 {
 		size = runtime.GOMAXPROCS(0)
@@ -57,6 +58,7 @@ func newMuxConnTransList(size int, pool transPool) *muxConnTransList {
 	tl.size = size
 	tl.transports = make([]*transport, size)
 	tl.pool = pool
+	tl.f = f
 	return tl
 }
 
@@ -98,7 +100,7 @@ func (tl *muxConnTransList) Get(network, addr string) (*transport, error) {
 	if err != nil {
 		return nil, err
 	}
-	trans = newTransport(clientTransport, conn, tl.pool)
+	trans = tl.f(clientTransport, conn, tl.pool)
 	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
 		// peer close
 		_ = trans.Close(errTransport.WithCause(errors.New("connection closed by peer")))
@@ -121,13 +123,14 @@ type muxConnTransPool struct {
 	pool        sync.Map // addr:*muxConnTransList
 	activity    sync.Map // addr:lastActive
 	cleanerOnce int32
+	f           initFunc
 }
 
 func (p *muxConnTransPool) Get(network, addr string) (trans *transport, err error) {
 	v, ok := p.pool.Load(addr)
 	if !ok {
 		// multi concurrent Get should get the same TransList object
-		v, _ = p.pool.LoadOrStore(addr, newMuxConnTransList(p.config.PoolSize, p))
+		v, _ = p.pool.LoadOrStore(addr, newMuxConnTransList(p.config.PoolSize, p, p.f))
 	}
 	return v.(*muxConnTransList).Get(network, addr)
 }
@@ -167,4 +170,8 @@ func (p *muxConnTransPool) Put(trans *transport) {
 			time.Sleep(idleTimeout)
 		}
 	}, gofunc.NewBasicInfo("", trans.Addr().String()))
+}
+
+func (p *muxConnTransPool) SetInitFunc(f initFunc) {
+	p.f = f
 }
