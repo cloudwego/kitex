@@ -31,6 +31,9 @@ import (
 	"unicode"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // StringSlice implements the flag.Value interface on string slices
@@ -386,4 +389,28 @@ func TruncateFastPBFile(fn string) (success bool) {
 	}
 	err = os.WriteFile(fn, b, 0o644)
 	return err == nil
+}
+
+var (
+	snakeRE1 = regexp.MustCompile(`([^_])([A-Z][a-z]+)`)
+	snakeRE2 = regexp.MustCompile(`([a-z0-9])([A-Z])`)
+)
+
+func Snakify(id string) string {
+	id = snakeRE1.ReplaceAllString(id, `${1}_${2}`)
+	id = snakeRE2.ReplaceAllString(id, `${1}_${2}`)
+	return strings.ToLower(id)
+}
+
+func LowerCamelCase(id string) string {
+	id = Snakify(id)
+	words := strings.Split(id, "_")
+	c := cases.Title(language.English)
+
+	for i, w := range words {
+		if i > 0 && len(w) > 0 {
+			words[i] = c.String(w)
+		}
+	}
+	return strings.Join(words, "")
 }

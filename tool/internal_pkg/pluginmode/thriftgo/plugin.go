@@ -148,6 +148,7 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 		protocol:              conv.Config.Protocol,
 		handlerReturnKeepResp: conv.Config.HandlerReturnKeepResp,
 		frugalStruct:          conv.Config.FrugalStruct,
+		httpTags:              conv.Config.HTTPTags,
 	}
 	// for cmd without setting -module
 	if p.module == "" {
