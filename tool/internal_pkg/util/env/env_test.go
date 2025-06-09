@@ -37,3 +37,19 @@ func TestUseProtoc(t *testing.T) {
 	use = UseProtoc()
 	test.Assert(t, use == false, use)
 }
+
+func TestUsePrutalMarshal(t *testing.T) {
+	use := UsePrutalMarshal() // default: true
+	test.Assert(t, use == true, use)
+
+	t.Setenv("KITEX_TOOL_USE_PROTOC", "0")
+	use = UsePrutalMarshal()
+	test.Assert(t, use == true, use)
+
+	t.Setenv("KITEX_TOOL_USE_PROTOC", "1")
+	use = UsePrutalMarshal()
+	test.Assert(t, use == false, use)
+	t.Setenv("KITEX_TOOL_USE_PRUTAL_MARSHAL", "1")
+	use = UsePrutalMarshal()
+	test.Assert(t, use == true, use)
+}

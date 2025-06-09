@@ -605,11 +605,11 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 				pkg.AddImports("fmt")
 			}
 			if m.GenArgResultStruct {
-				if env.UseProtoc() {
-					pkg.AddImports("proto")
-				} else {
+				if env.UsePrutalMarshal() {
 					// reuse "proto" so that no need to change code templates ...
 					pkg.AddImport("proto", "github.com/cloudwego/prutal")
+				} else {
+					pkg.AddImports("proto")
 				}
 			} else {
 				// for method Arg and Result
