@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -92,17 +93,26 @@ var prefaceReadAtMost = func() int {
 
 func (t *svrTransHandler) ProtocolMatch(ctx context.Context, conn net.Conn) error {
 	// Check the validity of client preface.
-	// FIXME: should not rely on netpoll.Reader
+	var peekReader interface {
+		Peek(n int) (buf []byte, err error)
+	}
+	if withReader, ok := conn.(interface{ Reader() bufiox.Reader }); ok {
+		if br := withReader.Reader(); br != nil {
+			peekReader = br
+		}
+	}
 	if withReader, ok := conn.(interface{ Reader() netpoll.Reader }); ok {
-		if npReader := withReader.Reader(); npReader != nil {
-			// read at most avoid block
-			preface, err := npReader.Peek(prefaceReadAtMost)
-			if err != nil {
-				return err
-			}
-			if len(preface) >= prefaceReadAtMost && bytes.Equal(preface[:prefaceReadAtMost], grpcTransport.ClientPreface[:prefaceReadAtMost]) {
-				return nil
-			}
+		if br := withReader.Reader(); br != nil {
+			peekReader = br
+		}
+	}
+	if peekReader != nil {
+		preface, err := peekReader.Peek(prefaceReadAtMost)
+		if err != nil {
+			return err
+		}
+		if len(preface) >= prefaceReadAtMost && bytes.Equal(preface[:prefaceReadAtMost], grpcTransport.ClientPreface[:prefaceReadAtMost]) {
+			return nil
 		}
 	}
 	return errors.New("error protocol not match")

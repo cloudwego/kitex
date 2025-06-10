@@ -1286,7 +1286,7 @@ func TestServerWithMisbehavedClient(t *testing.T) {
 	// success chan indicates that reader received a RSTStream from server.
 	success := make(chan struct{})
 	var mu sync.Mutex
-	framer := grpcframe.NewFramer(mconn, mconn.(netpoll.Connection).Reader())
+	framer := grpcframe.NewFramer(mconn, &netpollBufioxReader{Reader: mconn.(netpoll.Connection).Reader()})
 	if err := framer.WriteSettings(); err != nil {
 		t.Fatalf("Error while writing settings: %v", err)
 	}

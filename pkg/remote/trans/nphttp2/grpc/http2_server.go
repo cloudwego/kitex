@@ -469,7 +469,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 		default:
 			klog.CtxErrorf(t.ctx, "transport: http2Server.HandleStreams found unhandled frame type %v.", frame)
 		}
-		t.framer.reader.Release()
+		t.framer.reader.Release(nil)
 	}
 }
 

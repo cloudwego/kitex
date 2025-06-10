@@ -1204,7 +1204,7 @@ func (t *http2Client) reader() {
 		default:
 			klog.Warnf("transport: http2Client.reader got unhandled frame type %v.", frame)
 		}
-		t.framer.reader.Release()
+		t.framer.reader.Release(nil)
 	}
 }
 

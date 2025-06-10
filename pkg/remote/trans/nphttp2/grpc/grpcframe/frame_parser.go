@@ -16,7 +16,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/cloudwego/netpoll"
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 )
@@ -76,7 +77,7 @@ func (f *DataFrame) Data() []byte {
 	return f.data
 }
 
-func parseDataFrame(fc *frameCache, fh http2.FrameHeader, payload netpoll.Reader) (http2.Frame, error) {
+func parseDataFrame(fc *frameCache, fh http2.FrameHeader, payload bufiox.Reader) (http2.Frame, error) {
 	if fh.StreamID == 0 {
 		// DATA frames MUST be associated with a stream. If a
 		// DATA frame is received whose stream identifier
@@ -91,12 +92,12 @@ func parseDataFrame(fc *frameCache, fh http2.FrameHeader, payload netpoll.Reader
 	var padSize byte
 	payloadLen := int(fh.Length)
 	if fh.Flags.Has(http2.FlagDataPadded) {
-		var err error
-		padSize, err = payload.ReadByte()
-		payloadLen--
+		p, err := payload.Next(1)
 		if err != nil {
 			return nil, err
 		}
+		padSize = p[0]
+		payloadLen--
 	}
 	if int(padSize) > payloadLen {
 		// If the length of the padding is greater than the

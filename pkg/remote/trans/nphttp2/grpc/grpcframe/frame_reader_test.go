@@ -21,15 +21,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/cloudwego/gopkg/protocol/thrift"
-	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
 
 type mockNetpollReader struct {
-	netpoll.Reader
+	bufiox.Reader
 	buf []byte
 }
 
@@ -65,7 +66,7 @@ func Test_Framer_readAndCheckFrameHeader(t *testing.T) {
 	fr.SetMaxReadFrameSize(http2MaxFrameLen)
 	testcases := []struct {
 		desc                   string
-		reader                 netpoll.Reader
+		reader                 bufiox.Reader
 		checkFrameHeaderAndErr func(*testing.T, http2.FrameHeader, error)
 	}{
 		{
