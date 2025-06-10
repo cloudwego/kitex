@@ -31,6 +31,7 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -174,6 +175,11 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 			_ = tr.WriteStatus(s, status.New(codes.Internal, errDesc))
 			return
 		}
+		// this method name will be used as from method if a new RPC call is invoked in this handler.
+		// ping-pong relies on transMetaHandler.OnMessage to inject but streaming does not trigger.
+		//
+		//nolint:staticcheck // SA1029: consts.CtxKeyMethod has been used and we just follow it
+		rCtx = context.WithValue(rCtx, consts.CtxKeyMethod, methodName)
 	}
 
 	var serviceName string
