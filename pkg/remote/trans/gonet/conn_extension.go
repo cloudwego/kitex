@@ -53,12 +53,12 @@ func (e *gonetConnExtension) SetReadTimeout(ctx context.Context, conn net.Conn, 
 
 // NewWriteByteBuffer implements the trans.Extension interface.
 func (e *gonetConnExtension) NewWriteByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-	return NewBufferWriter(conn.(bufioxReadWriter).Writer())
+	return newBufferWriter(conn.(bufioxReadWriter).Writer())
 }
 
 // NewReadByteBuffer implements the trans.Extension interface.
 func (e *gonetConnExtension) NewReadByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-	return NewBufferReader(conn.(bufioxReadWriter).Reader())
+	return newBufferReader(conn.(bufioxReadWriter).Reader())
 }
 
 // ReleaseBuffer implements the trans.Extension interface.

@@ -17,30 +17,30 @@
 package gonet
 
 import (
+	"errors"
 	"net"
 	"sync/atomic"
-	"syscall"
 
 	"github.com/cloudwego/gopkg/bufiox"
 )
 
 var (
-	_ bufioxReadWriter = &cliConn{}
-	_ bufioxReadWriter = &svrConn{}
+	_             bufioxReadWriter = &cliConn{}
+	_             bufioxReadWriter = &svrConn{}
+	errConnClosed error            = errors.New("connection has been closed")
 )
 
 type bufioxReadWriter interface {
-	Reader() bufiox.Reader
-	Writer() bufiox.Writer
+	Reader() *bufiox.DefaultReader
+	Writer() *bufiox.DefaultWriter
 }
 
 // cliConn implements the net.Conn interface.
-// IsActive function which is used to check the connection state when getting from connpool.
 // FIXME: add proactive state check of long connection
 type cliConn struct {
 	net.Conn
-	r      bufiox.Reader
-	w      bufiox.Writer
+	r      *bufiox.DefaultReader
+	w      *bufiox.DefaultWriter
 	closed atomic.Bool // ensures Close is only executed once
 }
 
@@ -52,12 +52,16 @@ func newCliConn(conn net.Conn) *cliConn {
 	}
 }
 
-func (c *cliConn) Reader() bufiox.Reader {
+func (c *cliConn) Reader() *bufiox.DefaultReader {
 	return c.r
 }
 
-func (c *cliConn) Writer() bufiox.Writer {
+func (c *cliConn) Writer() *bufiox.DefaultWriter {
 	return c.w
+}
+
+func (c *cliConn) Read(b []byte) (int, error) {
+	return c.r.Read(b)
 }
 
 func (c *cliConn) Close() error {
@@ -65,18 +69,14 @@ func (c *cliConn) Close() error {
 		c.r.Release(nil)
 		return c.Conn.Close()
 	}
-	return nil
-}
-
-func (c *cliConn) SyscallConn() (syscall.RawConn, error) {
-	return c.Conn.(syscall.Conn).SyscallConn()
+	return errConnClosed
 }
 
 // svrConn implements the net.Conn interface.
 type svrConn struct {
 	net.Conn
-	r      bufiox.Reader
-	w      bufiox.Writer
+	r      *bufiox.DefaultReader
+	w      *bufiox.DefaultWriter
 	closed atomic.Bool
 }
 
@@ -89,7 +89,7 @@ func newSvrConn(conn net.Conn) *svrConn {
 }
 
 func (bc *svrConn) Read(b []byte) (int, error) {
-	return bc.r.ReadBinary(b)
+	return bc.r.Read(b)
 }
 
 func (bc *svrConn) Close() error {
@@ -97,13 +97,13 @@ func (bc *svrConn) Close() error {
 		bc.r.Release(nil)
 		return bc.Conn.Close()
 	}
-	return nil
+	return errConnClosed
 }
 
-func (bc *svrConn) Reader() bufiox.Reader {
+func (bc *svrConn) Reader() *bufiox.DefaultReader {
 	return bc.r
 }
 
-func (bc *svrConn) Writer() bufiox.Writer {
+func (bc *svrConn) Writer() *bufiox.DefaultWriter {
 	return bc.w
 }

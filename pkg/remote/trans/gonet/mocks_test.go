@@ -59,8 +59,8 @@ var (
 // MockNetConn implements net.Conn.
 type MockNetConn struct {
 	mocks.Conn
-	r                  bufiox.Reader
-	w                  bufiox.Writer
+	r                  *bufiox.DefaultReader
+	w                  *bufiox.DefaultWriter
 	IsActiveFunc       func() (r bool)
 	SetIdleTimeoutFunc func(timeout time.Duration) (e error)
 	SetOnRequestFunc   func(on netpoll.OnRequest) (e error)
@@ -84,12 +84,12 @@ func (m *MockNetConn) IsActive() (r bool) {
 }
 
 // Reader implements the netpoll.Connection interface.
-func (m *MockNetConn) Reader() (r bufiox.Reader) {
+func (m *MockNetConn) Reader() (r *bufiox.DefaultReader) {
 	return m.r
 }
 
 // Writer implements the netpoll.Connection interface.
-func (m *MockNetConn) Writer() (r bufiox.Writer) {
+func (m *MockNetConn) Writer() (r *bufiox.DefaultWriter) {
 	return m.w
 }
 

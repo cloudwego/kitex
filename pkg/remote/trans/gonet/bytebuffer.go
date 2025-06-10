@@ -20,6 +20,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/unsafex"
 
@@ -31,29 +32,29 @@ var rwPool = sync.Pool{New: func() any { return &bufferReadWriter{} }}
 var _ remote.ByteBuffer = &bufferReadWriter{}
 
 type bufferReadWriter struct {
-	reader bufiox.Reader
-	writer bufiox.Writer
+	reader *bufiox.DefaultReader
+	writer *bufiox.DefaultWriter
 	status int
 }
 
-// NewBufferReader creates a new remote.ByteBuffer using the given bufiox.Reader.
-func NewBufferReader(reader bufiox.Reader) remote.ByteBuffer {
+// newBufferReader creates a new remote.ByteBuffer using the given bufiox.DefaultReader.
+func newBufferReader(reader *bufiox.DefaultReader) remote.ByteBuffer {
 	rw := rwPool.Get().(*bufferReadWriter)
 	rw.reader = reader
 	rw.status = remote.BitReadable
 	return rw
 }
 
-// NewBufferWriter creates a new remote.ByteBuffer using the given bufiox.Writer.
-func NewBufferWriter(writer bufiox.Writer) remote.ByteBuffer {
+// newBufferWriter creates a new remote.ByteBuffer using the given bufiox.DefaultWriter.
+func newBufferWriter(writer *bufiox.DefaultWriter) remote.ByteBuffer {
 	rw := rwPool.Get().(*bufferReadWriter)
 	rw.writer = writer
 	rw.status = remote.BitWritable
 	return rw
 }
 
-// NewBufferReadWriter creates a new remote.ByteBuffer using the given bufioxReadWriter.
-func NewBufferReadWriter(irw bufioxReadWriter) remote.ByteBuffer {
+// newBufferReadWriter creates a new remote.ByteBuffer using the given bufioxReadWriter.
+func newBufferReadWriter(irw bufioxReadWriter) remote.ByteBuffer {
 	rw := rwPool.Get().(*bufferReadWriter)
 	rw.writer = irw.Writer()
 	rw.reader = irw.Reader()
@@ -101,31 +102,26 @@ func (rw *bufferReadWriter) ReadString(n int) (s string, err error) {
 	if !rw.readable() {
 		return "", errors.New("unreadable buffer, cannot support ReadString")
 	}
-	var buf []byte
-	if buf, err = rw.reader.Next(n); err != nil {
+	buf := mcache.Malloc(n)
+	_, err = rw.reader.ReadBinary(buf)
+	if err != nil {
 		return "", err
 	}
-	return string(buf), nil
+	return unsafex.BinaryToString(buf), nil
 }
 
 func (rw *bufferReadWriter) ReadBinary(p []byte) (n int, err error) {
 	if !rw.readable() {
 		return 0, errors.New("unreadable buffer, cannot support ReadBinary")
 	}
-	n = len(p)
-	var buf []byte
-	if buf, err = rw.reader.Next(n); err != nil {
-		return 0, err
-	}
-	copy(p, buf)
-	return
+	return rw.reader.ReadBinary(p)
 }
 
 func (rw *bufferReadWriter) Read(p []byte) (n int, err error) {
 	if !rw.readable() {
 		return -1, errors.New("unreadable buffer, cannot support Read")
 	}
-	return rw.reader.(*bufiox.DefaultReader).Read(p)
+	return rw.reader.Read(p)
 }
 
 func (rw *bufferReadWriter) ReadLen() (n int) {

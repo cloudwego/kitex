@@ -30,15 +30,15 @@ import (
 var _ bufioxReadWriter = &mockBufioxReadWriter{}
 
 type mockBufioxReadWriter struct {
-	r bufiox.Reader
-	w bufiox.Writer
+	r *bufiox.DefaultReader
+	w *bufiox.DefaultWriter
 }
 
-func (m *mockBufioxReadWriter) Reader() bufiox.Reader {
+func (m *mockBufioxReadWriter) Reader() *bufiox.DefaultReader {
 	return m.r
 }
 
-func (m *mockBufioxReadWriter) Writer() bufiox.Writer {
+func (m *mockBufioxReadWriter) Writer() *bufiox.DefaultWriter {
 	return m.w
 }
 
@@ -53,7 +53,7 @@ func TestBufferReadWrite(t *testing.T) {
 		reader   = bufiox.NewDefaultReader(strings.NewReader(strings.Repeat(msg, 5)))
 		writer   = bufiox.NewDefaultWriter(bytes.NewBufferString(strings.Repeat(msg, 5)))
 		bufioxRW = &mockBufioxReadWriter{r: reader, w: writer}
-		bufRW    = NewBufferReadWriter(bufioxRW)
+		bufRW    = newBufferReadWriter(bufioxRW)
 	)
 
 	testRead(t, bufRW)
@@ -64,7 +64,7 @@ func TestBufferReadWrite(t *testing.T) {
 func TestBufferWrite(t *testing.T) {
 	wi := bufiox.NewDefaultWriter(bytes.NewBufferString(strings.Repeat(msg, 5)))
 
-	buf := NewBufferWriter(wi)
+	buf := newBufferWriter(wi)
 	testWrite(t, buf)
 }
 
@@ -72,7 +72,7 @@ func TestBufferWrite(t *testing.T) {
 func TestBufferRead(t *testing.T) {
 	ri := strings.NewReader(strings.Repeat(msg, 5))
 
-	buf := NewBufferReader(bufiox.NewDefaultReader(ri))
+	buf := newBufferReader(bufiox.NewDefaultReader(ri))
 	testRead(t, buf)
 }
 
