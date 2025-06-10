@@ -91,6 +91,8 @@ func (rw *bufferReadWriter) Skip(n int) (err error) {
 	return rw.reader.Skip(n)
 }
 
+// Deprecated: Go net buffer does not implement this.
+// All current usage of ReadableLen in Kitex are tied to netpoll connection.
 func (rw *bufferReadWriter) ReadableLen() (n int) {
 	panic("implement me")
 }
