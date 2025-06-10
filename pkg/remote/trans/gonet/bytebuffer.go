@@ -20,7 +20,8 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/bytedance/gopkg/lang/mcache"
+	"github.com/bytedance/gopkg/lang/dirtmake"
+
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/unsafex"
 
@@ -102,7 +103,7 @@ func (rw *bufferReadWriter) ReadString(n int) (s string, err error) {
 	if !rw.readable() {
 		return "", errors.New("unreadable buffer, cannot support ReadString")
 	}
-	buf := mcache.Malloc(n)
+	buf := dirtmake.Bytes(n, n)
 	_, err = rw.reader.ReadBinary(buf)
 	if err != nil {
 		return "", err
