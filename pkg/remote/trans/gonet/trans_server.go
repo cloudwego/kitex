@@ -114,13 +114,13 @@ func (ts *transServer) serveConn(ctx context.Context, conn net.Conn) (err error)
 	}
 	for {
 		// block to wait for next request
-		bc.SetReadDeadline(time.Time{})
+		ts.refreshIdleDeadline(bc)
 		_, err = bc.r.Peek(1)
 		if err != nil {
 			return err
 		}
 		// set the read deadline if ReadTimeout configured
-		ts.refreshDeadline(rpcinfo.GetRPCInfo(ctx), bc)
+		ts.refreshReadDeadline(rpcinfo.GetRPCInfo(ctx), bc)
 		// FIXME: for gRPC transHandler, OnRead should execute only once.
 		err = ts.transHdlr.OnRead(ctx, bc)
 		if err != nil {
@@ -172,10 +172,23 @@ func (ts *transServer) onError(ctx context.Context, err error, conn net.Conn) {
 	ts.transHdlr.OnError(ctx, err, conn)
 }
 
-func (ts *transServer) refreshDeadline(ri rpcinfo.RPCInfo, conn net.Conn) {
+func (ts *transServer) refreshIdleDeadline(conn net.Conn) {
+	// set the default setting to 2 minutes to make sure it's greater
+	// than the client idle timeout.
+	idleTimeout := 2 * time.Minute
+	if ts.opt.MaxConnectionIdleTime > idleTimeout {
+		// use MaxConnectionIdleTime if larger than the old default timeout
+		idleTimeout = ts.opt.MaxConnectionIdleTime
+	}
+	conn.SetReadDeadline(time.Now().Add(idleTimeout))
+}
+
+func (ts *transServer) refreshReadDeadline(ri rpcinfo.RPCInfo, conn net.Conn) {
 	readTimeout := ri.Config().ReadWriteTimeout()
 	if readTimeout > 0 {
 		_ = conn.SetReadDeadline(time.Now().Add(readTimeout))
+	} else {
+		_ = conn.SetReadDeadline(time.Time{})
 	}
 }
 
