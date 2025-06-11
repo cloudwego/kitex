@@ -20,6 +20,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	internalRemote "github.com/cloudwego/kitex/internal/remote"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 )
@@ -47,5 +49,26 @@ func TestSvrConn(t *testing.T) {
 	sc.Close()
 	test.Assert(t, atomic.LoadUint32(&sc.closed) == 1)
 	sc.Close()
+	test.Assert(t, closeNum == 1)
+}
+
+func TestCliConn(t *testing.T) {
+	closeNum := 0
+	c := newCliConn(mocks.Conn{CloseFunc: func() (e error) {
+		closeNum++
+		return nil
+	}})
+	test.Assert(t, c.IsActive())
+	c.SetConnState(true)
+	test.Assert(t, !c.IsActive())
+
+	// check
+	err := internalRemote.ConnectionStateCheck(c)
+	test.Assert(t, err != nil) // mocks.Conn does not implement syscall.Conn
+
+	// close
+	c.Close()
+	test.Assert(t, atomic.LoadUint32(&c.closed) == 1)
+	c.Close()
 	test.Assert(t, closeNum == 1)
 }

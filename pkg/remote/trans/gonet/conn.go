@@ -18,16 +18,19 @@ package gonet
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"sync/atomic"
+	"syscall"
 
 	"github.com/cloudwego/gopkg/bufiox"
 )
 
 var (
 	_             bufioxReadWriter = &cliConn{}
+	_             syscall.Conn     = &cliConn{}
 	_             bufioxReadWriter = &svrConn{}
-	errConnClosed error            = errors.New("connection has been closed")
+	errConnClosed                  = errors.New("connection has been closed")
 )
 
 type bufioxReadWriter interface {
@@ -36,12 +39,12 @@ type bufioxReadWriter interface {
 }
 
 // cliConn implements the net.Conn interface.
-// FIXME: add proactive state check of long connection
 type cliConn struct {
 	net.Conn
-	r      *bufiox.DefaultReader
-	w      *bufiox.DefaultWriter
-	closed uint32 // 1: closed
+	r        *bufiox.DefaultReader
+	w        *bufiox.DefaultWriter
+	closed   uint32 // 1: closed
+	inactive uint32 // 1: inactive, set by proactive check logic in connection pool
 }
 
 func newCliConn(conn net.Conn) *cliConn {
@@ -62,6 +65,27 @@ func (c *cliConn) Writer() *bufiox.DefaultWriter {
 
 func (c *cliConn) Read(b []byte) (int, error) {
 	return c.r.Read(b)
+}
+
+// IsActive is used to check if the connection is active.
+func (c *cliConn) IsActive() bool {
+	return atomic.LoadUint32(&c.inactive) == 0
+}
+
+func (c *cliConn) SetConnState(inactive bool) {
+	if inactive {
+		atomic.StoreUint32(&c.inactive, 1)
+	} else {
+		atomic.StoreUint32(&c.inactive, 0)
+	}
+}
+
+func (c *cliConn) SyscallConn() (syscall.RawConn, error) {
+	sc, ok := c.Conn.(syscall.Conn)
+	if !ok {
+		return nil, fmt.Errorf("conn is not a syscall.Conn, got %T", c.Conn)
+	}
+	return sc.SyscallConn()
 }
 
 func (c *cliConn) Close() error {

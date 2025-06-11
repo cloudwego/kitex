@@ -22,19 +22,20 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"reflect"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/connpool"
-
 	"github.com/golang/mock/gomock"
 
 	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
+	internalRemote "github.com/cloudwego/kitex/internal/remote"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/connpool"
 	dialer "github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -55,7 +56,7 @@ func TestPoolReuse(t *testing.T) {
 		maxIdleTimeout = time.Millisecond
 	)
 
-	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	p := newPool(connpool.IdleConfig{MinIdlePerAddress: minIdle, MaxIdlePerAddress: maxIdle, MaxIdleTimeout: maxIdleTimeout}, ProactiveCheckConfig{})
 	count := make(map[*longConn]bool)
 
 	conn := newLongConnForTest(ctrl, mockAddr0)
@@ -82,7 +83,7 @@ func TestPoolGetInactiveConn(t *testing.T) {
 		maxIdleTimeout = time.Millisecond
 	)
 
-	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	p := newPool(connpool.IdleConfig{MinIdlePerAddress: minIdle, MaxIdlePerAddress: maxIdle, MaxIdleTimeout: maxIdleTimeout}, ProactiveCheckConfig{})
 
 	// inactive conn
 	var closed bool
@@ -119,7 +120,7 @@ func TestPoolGetWithInactiveConn(t *testing.T) {
 		inactiveNum    = 5
 	)
 
-	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	p := newPool(connpool.IdleConfig{MinIdlePerAddress: minIdle, MaxIdlePerAddress: maxIdle, MaxIdleTimeout: maxIdleTimeout}, ProactiveCheckConfig{})
 	// put active conn
 	activeConn := newLongConnForTest(ctrl, mockAddr0)
 	recycled := p.Put(activeConn)
@@ -165,7 +166,7 @@ func TestPoolMaxIdle(t *testing.T) {
 		maxIdleTimeout = time.Millisecond
 	)
 
-	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	p := newPool(connpool.IdleConfig{MinIdlePerAddress: minIdle, MaxIdlePerAddress: maxIdle, MaxIdleTimeout: maxIdleTimeout}, ProactiveCheckConfig{})
 	for i := 0; i < maxIdle+1; i++ {
 		recycled := p.Put(newLongConnForTest(ctrl, mockAddr0))
 		if i < maxIdle {
@@ -187,7 +188,7 @@ func TestPoolMinIdle(t *testing.T) {
 		maxIdleTimeout = time.Millisecond
 	)
 
-	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	p := newPool(connpool.IdleConfig{MinIdlePerAddress: minIdle, MaxIdlePerAddress: maxIdle, MaxIdleTimeout: maxIdleTimeout}, ProactiveCheckConfig{})
 	for i := 0; i < maxIdle+1; i++ {
 		p.Put(newLongConnForTest(ctrl, mockAddr0))
 	}
@@ -208,7 +209,7 @@ func TestPoolClose(t *testing.T) {
 		maxIdleTimeout = time.Millisecond
 	)
 
-	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	p := newPool(connpool.IdleConfig{MinIdlePerAddress: minIdle, MaxIdlePerAddress: maxIdle, MaxIdleTimeout: maxIdleTimeout}, ProactiveCheckConfig{})
 	for i := 0; i < maxIdle+1; i++ {
 		p.Put(newLongConnForTest(ctrl, mockAddr0))
 	}
@@ -229,7 +230,7 @@ func TestPoolDump(t *testing.T) {
 		maxIdleTimeout = time.Millisecond
 	)
 
-	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	p := newPool(connpool.IdleConfig{MinIdlePerAddress: minIdle, MaxIdlePerAddress: maxIdle, MaxIdleTimeout: maxIdleTimeout}, ProactiveCheckConfig{})
 	for i := 0; i < maxIdle+1; i++ {
 		p.Put(newLongConnForTest(ctrl, mockAddr0))
 	}
@@ -912,6 +913,42 @@ func TestLongConnPoolDump(t *testing.T) {
 
 	length := len(val.(PoolDump).ConnsDeadline)
 	test.Assert(t, length == 1)
+}
+
+func TestLongConnPoolProactiveCheck(t *testing.T) {
+	idleCfg := connpool.IdleConfig{MaxIdleTimeout: DefaultProactiveConnCheckInterval * 2}
+	proactiveCheckConfig := ProactiveCheckConfig{
+		Enable:    true,
+		Interval:  DefaultProactiveConnCheckInterval,
+		CheckFunc: internalRemote.ConnectionStateCheck,
+	}
+	lp := NewLongPoolWithConfig(LongPoolConfig{
+		ServiceName:          mockDestService,
+		IdleConfig:           idleCfg,
+		ProactiveCheckConfig: proactiveCheckConfig,
+	})
+	test.Assert(t, lp.sharedTicker.Interval == DefaultProactiveConnCheckInterval)
+	lp.Close()
+	p := newPool(idleCfg, proactiveCheckConfig)
+	test.Assert(t, p.ProactiveCheckConfig.Enable)
+	test.Assert(t, p.ProactiveCheckConfig.Interval == DefaultProactiveConnCheckInterval)
+	test.Assert(t, p.ProactiveCheckConfig.CheckFunc != nil)
+	test.Assert(t, reflect.ValueOf(p.ProactiveCheckConfig.CheckFunc).Pointer() == reflect.ValueOf(internalRemote.ConnectionStateCheck).Pointer())
+	// check conn state
+	err := p.ProactiveCheckConfig.CheckFunc()
+	test.Assert(t, err == nil)
+
+	// adjust interval
+	idleCfg.MaxIdleTimeout = DefaultProactiveConnCheckInterval / 2
+	lp = NewLongPoolWithConfig(LongPoolConfig{
+		ServiceName:          mockDestService,
+		IdleConfig:           idleCfg,
+		ProactiveCheckConfig: proactiveCheckConfig,
+	})
+	test.Assert(t, lp.sharedTicker.Interval == idleCfg.MaxIdleTimeout)
+	lp.Close()
+	p = newPool(idleCfg, proactiveCheckConfig)
+	test.Assert(t, p.ProactiveCheckConfig.Interval == idleCfg.MaxIdleTimeout)
 }
 
 func BenchmarkLongPoolGetOne(b *testing.B) {
