@@ -4,13 +4,16 @@ on: [ push, pull_request ]
 
 jobs:
   unit-scenario-test:
+    strategy:
+      matrix:
+        go: [ "1.18", "1.24" ]
     runs-on: [ Linux, X64 ]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: ${{ matrix.go }}
           cache: false
       - name: Scenario Tests
         run: |
