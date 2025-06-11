@@ -58,7 +58,7 @@ type transServer struct {
 	ln        net.Listener
 	lncfg     net.ListenConfig
 	connCount utils.AtomicInt
-	shutdown  atomic.Bool
+	shutdown  uint32 // 1: shutdown
 	sync.Mutex
 }
 
@@ -83,7 +83,7 @@ func (ts *transServer) BootstrapServer(ln net.Listener) error {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			if ts.shutdown.Load() {
+			if atomic.LoadUint32(&ts.shutdown) == 1 {
 				// shutdown
 				return nil
 			}
@@ -131,7 +131,7 @@ func (ts *transServer) serveConn(ctx context.Context, conn net.Conn) (err error)
 
 // Shutdown implements the remote.TransServer interface.
 func (ts *transServer) Shutdown() (err error) {
-	ts.shutdown.Store(true)
+	atomic.StoreUint32(&ts.shutdown, 1)
 
 	ts.Lock()
 	defer ts.Unlock()

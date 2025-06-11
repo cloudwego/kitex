@@ -17,6 +17,7 @@
 package gonet
 
 import (
+	"sync/atomic"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -44,7 +45,7 @@ func TestSvrConn(t *testing.T) {
 
 	// close
 	sc.Close()
-	test.Assert(t, sc.closed.Load())
+	test.Assert(t, atomic.LoadUint32(&sc.closed) == 1)
 	sc.Close()
 	test.Assert(t, closeNum == 1)
 }

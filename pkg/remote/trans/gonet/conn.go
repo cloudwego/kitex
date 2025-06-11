@@ -41,7 +41,7 @@ type cliConn struct {
 	net.Conn
 	r      *bufiox.DefaultReader
 	w      *bufiox.DefaultWriter
-	closed atomic.Bool // ensures Close is only executed once
+	closed uint32 // 1: closed
 }
 
 func newCliConn(conn net.Conn) *cliConn {
@@ -65,7 +65,7 @@ func (c *cliConn) Read(b []byte) (int, error) {
 }
 
 func (c *cliConn) Close() error {
-	if c.closed.CompareAndSwap(false, true) {
+	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
 		c.r.Release(nil)
 		return c.Conn.Close()
 	}
@@ -77,7 +77,7 @@ type svrConn struct {
 	net.Conn
 	r      *bufiox.DefaultReader
 	w      *bufiox.DefaultWriter
-	closed atomic.Bool
+	closed uint32 // 1: closed
 }
 
 func newSvrConn(conn net.Conn) *svrConn {
@@ -93,7 +93,7 @@ func (bc *svrConn) Read(b []byte) (int, error) {
 }
 
 func (bc *svrConn) Close() error {
-	if bc.closed.CompareAndSwap(false, true) {
+	if atomic.CompareAndSwapUint32(&bc.closed, 0, 1) {
 		bc.r.Release(nil)
 		return bc.Conn.Close()
 	}
