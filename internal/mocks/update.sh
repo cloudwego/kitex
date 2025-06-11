@@ -23,6 +23,7 @@ files=(
 ../../pkg/proxy/proxy.go proxy/proxy.go proxy
 ../../pkg/utils/sharedticker.go utils/sharedticker.go utils
 ../../../netpoll/connection.go netpoll/connection.go netpoll
+../../../gopkg/bufiox/bufreader.go bufiox/bufreader.go bufiox
 $GOROOT/src/net/net.go net/net.go net
 )
 

@@ -20,6 +20,8 @@ import (
 	bytes2 "bytes"
 	"net"
 	"time"
+
+	"github.com/cloudwego/gopkg/bufiox"
 )
 
 var _ net.Conn = &Conn{}
@@ -110,4 +112,13 @@ func NewIOConn() *Conn {
 			return bytes.Write(b)
 		},
 	}
+}
+
+type MockConnWithBufioxReader struct {
+	net.Conn
+	BufioxReader bufiox.Reader
+}
+
+func (c *MockConnWithBufioxReader) Reader() bufiox.Reader {
+	return c.BufioxReader
 }
