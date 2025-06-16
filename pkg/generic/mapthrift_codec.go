@@ -43,10 +43,11 @@ type mapThriftCodec struct {
 	readerWriter            atomic.Value // *thrift.StructReaderWriter
 }
 
-func newMapThriftCodec(p DescriptorProvider) *mapThriftCodec {
+func newMapThriftCodec(p DescriptorProvider, forJSON bool) *mapThriftCodec {
 	svc := <-p.Provide()
 	c := &mapThriftCodec{
 		provider:            p,
+		forJSON:             forJSON,
 		binaryWithBase64:    false,
 		binaryWithByteSlice: false,
 		svcName:             svc.Name,
@@ -56,12 +57,6 @@ func newMapThriftCodec(p DescriptorProvider) *mapThriftCodec {
 	c.svcDsc.Store(svc)
 	c.configureMessageReaderWriter(svc)
 	go c.update()
-	return c
-}
-
-func newMapThriftCodecForJSON(p DescriptorProvider) *mapThriftCodec {
-	c := newMapThriftCodec(p)
-	c.forJSON = true
 	return c
 }
 

@@ -136,7 +136,7 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 		}
 		return conv.failResp(err)
 	}
-	p := &patcher{
+	p := &Patcher{
 		noFastAPI:             conv.Config.NoFastAPI,
 		utils:                 conv.Utils,
 		module:                conv.Config.ModuleName,

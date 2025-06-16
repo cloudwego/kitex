@@ -208,19 +208,18 @@ type GenericServiceVoidImpl struct{}
 
 // GenericCall ...
 func (g *GenericServiceVoidImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
-	msg := request.(string)
-	fmt.Printf("Recv: %v\n", msg)
-	return descriptor.Void{}, nil
-}
-
-// GenericServiceVoidWithStringImpl ...
-type GenericServiceVoidWithStringImpl struct{}
-
-// GenericCall ...
-func (g *GenericServiceVoidWithStringImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
-	msg := request.(string)
-	fmt.Printf("Recv: %v\n", msg)
-	return "Void", nil
+	switch method {
+	case "Void":
+		msg := request.(string)
+		fmt.Printf("Void Called, Recv: %v\n", msg)
+		return descriptor.Void{}, nil
+	case "VoidWithString":
+		msg := request.(string)
+		fmt.Printf("VoidVoidWithString Called, Recv: %v\n", msg)
+		return "Void", nil
+	default:
+		panic("Unknown method")
+	}
 }
 
 // GenericServiceBinaryEchoImpl ...

@@ -31,6 +31,7 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -174,6 +175,11 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 			_ = tr.WriteStatus(s, status.New(codes.Internal, errDesc))
 			return
 		}
+		// this method name will be used as from method if a new RPC call is invoked in this handler.
+		// ping-pong relies on transMetaHandler.OnMessage to inject but streaming does not trigger.
+		//
+		//nolint:staticcheck // SA1029: consts.CtxKeyMethod has been used and we just follow it
+		rCtx = context.WithValue(rCtx, consts.CtxKeyMethod, methodName)
 	}
 
 	var serviceName string
@@ -188,7 +194,9 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 	ink.SetServiceName(serviceName)
 
 	// set grpc transport flag before execute metahandler
-	rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(transport.GRPC)
+	cfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	cfg.SetTransportProtocol(transport.GRPC)
+	cfg.SetPayloadCodec(getPayloadCodecFromContentType(s.ContentSubtype()))
 	var err error
 	for _, shdlr := range t.opt.StreamingMetaHandlers {
 		rCtx, err = shdlr.OnReadStream(rCtx)
@@ -296,6 +304,15 @@ func invokeStreamUnaryHandler(ctx context.Context, st streaming.ServerStream, mi
 		return nil
 	}
 	return st.SendMsg(ctx, realResp)
+}
+
+func getPayloadCodecFromContentType(ct string) serviceinfo.PayloadCodec {
+	switch ct {
+	case contentSubTypeThrift:
+		return serviceinfo.Thrift
+	default:
+		return serviceinfo.Protobuf
+	}
 }
 
 // msg 是解码后的实例，如 Arg 或 Result, 触发上层处理，用于异步 和 服务端处理

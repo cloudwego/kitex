@@ -37,7 +37,6 @@ import (
 var (
 	_ streaming.ClientStream          = (*clientStream)(nil)
 	_ streaming.ServerStream          = (*serverStream)(nil)
-	_ StreamMeta                      = (*stream)(nil)
 	_ streaming.CloseCallbackRegister = (*stream)(nil)
 )
 
@@ -46,7 +45,6 @@ func newStream(ctx context.Context, writer streamWriter, smeta streamFrame) *str
 	s.ctx = ctx
 	s.rpcInfo = rpcinfo.GetRPCInfo(ctx)
 	s.streamFrame = smeta
-	s.StreamMeta = newStreamMeta()
 	s.reader = newStreamReader()
 	s.writer = writer
 	s.wheader = make(streaming.Header)
@@ -75,7 +73,6 @@ const (
 // stream is used to process frames and expose user APIs
 type stream struct {
 	streamFrame
-	StreamMeta
 	ctx      context.Context
 	rpcInfo  rpcinfo.RPCInfo
 	reader   *streamReader
@@ -144,7 +141,7 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 	if err != nil {
 		return err
 	}
-	err = DecodePayload(context.Background(), payload, data)
+	err = DecodePayload(ctx, payload, data)
 	// payload will not be access after decode
 	mcache.Free(payload)
 
@@ -311,7 +308,7 @@ func (s *stream) onReadMetaFrame(fr *Frame) (err error) {
 	if s.metaFrameHandler == nil {
 		return nil
 	}
-	return s.metaFrameHandler.OnMetaFrame(s.StreamMeta, fr.meta, fr.header, fr.payload)
+	return s.metaFrameHandler.OnMetaFrame(s.ctx, fr.meta, fr.header, fr.payload)
 }
 
 func (s *stream) onReadHeaderFrame(fr *Frame) (err error) {

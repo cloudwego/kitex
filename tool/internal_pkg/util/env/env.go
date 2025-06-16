@@ -27,7 +27,19 @@ import (
 func UseProtoc() bool {
 	v := os.Getenv("KITEX_TOOL_USE_PROTOC")
 	if v == "" {
-		return false // disable protoc by default
+		return false // false by default
+	}
+	ok, _ := strconv.ParseBool(v)
+	return ok
+}
+
+func UsePrutalMarshal() bool {
+	if !UseProtoc() {
+		return true // if not using protoc, can only use prutal
+	}
+	v := os.Getenv("KITEX_TOOL_USE_PRUTAL_MARSHAL")
+	if v == "" {
+		return false // false by default
 	}
 	ok, _ := strconv.ParseBool(v)
 	return ok

@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"sync"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/callopt"
@@ -49,7 +50,7 @@ type BidirectionalStreaming interface {
 }
 
 func NewStreamingClient(destService string, g generic.Generic, opts ...client.Option) (Client, error) {
-	return NewStreamingClientWithServiceInfo(destService, g, StreamingServiceInfo(g), opts...)
+	return NewStreamingClientWithServiceInfo(destService, g, generic.ServiceInfoWithGeneric(g), opts...)
 }
 
 func NewStreamingClientWithServiceInfo(destService string, g generic.Generic, svcInfo *serviceinfo.ServiceInfo, opts ...client.Option) (Client, error) {
@@ -62,22 +63,32 @@ func NewStreamingClientWithServiceInfo(destService string, g generic.Generic, sv
 	if err != nil {
 		return nil, err
 	}
+	var mp *sync.Map
+	if !generic.HasIDLInfo(g) {
+		mp = &sync.Map{}
+	}
 	cli := &genericServiceClient{
 		svcInfo: svcInfo,
 		kClient: kc,
+		sClient: kc.(client.Streaming),
 		g:       g,
+		modeMap: mp,
 	}
 	runtime.SetFinalizer(cli, (*genericServiceClient).Close)
 
 	svcInfo.GenericMethod = func(name string) serviceinfo.MethodInfo {
-		n, err := g.GetMethod(nil, name)
-		var key string
-		if err != nil {
-			// TODO: support fallback solution for binary
-			key = serviceinfo.GenericMethod
-		} else {
-			key = getGenericStreamingMethodInfoKey(n.StreamingMode)
+		key := serviceinfo.GenericMethod
+		if !generic.HasIDLInfo(g) {
+			if mode, ok := mp.Load(name); ok {
+				key = getGenericStreamingMethodInfoKey(mode.(serviceinfo.StreamingMode))
+			}
+			return svcInfo.Methods[key]
 		}
+		n, err := g.GetMethod(nil, name)
+		if err != nil {
+			return svcInfo.Methods[key]
+		}
+		key = getGenericStreamingMethodInfoKey(n.StreamingMode)
 		m := svcInfo.Methods[key]
 		return &methodInfo{
 			MethodInfo: m,
@@ -101,7 +112,7 @@ func getGenericStreamingMethodInfoKey(streamingMode serviceinfo.StreamingMode) s
 	}
 }
 
-type clientStreamingClient struct {
+type deprecatedClientStreamingClient struct {
 	streaming.Stream
 	method     string
 	methodInfo serviceinfo.MethodInfo
@@ -112,21 +123,24 @@ func NewClientStreaming(ctx context.Context, genericCli Client, method string, c
 	if !ok {
 		return nil, errors.New("invalid generic client")
 	}
+	if gCli.modeMap != nil {
+		gCli.modeMap.LoadOrStore(method, serviceinfo.StreamingClient)
+	}
 	stream, err := getStream(ctx, genericCli, method, callOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return &clientStreamingClient{stream, method, gCli.svcInfo.MethodInfo(method)}, nil
+	return &deprecatedClientStreamingClient{stream, method, gCli.svcInfo.MethodInfo(method)}, nil
 }
 
-func (cs *clientStreamingClient) Send(req interface{}) error {
+func (cs *deprecatedClientStreamingClient) Send(req interface{}) error {
 	_args := cs.methodInfo.NewArgs().(*generic.Args)
 	_args.Method = cs.method
 	_args.Request = req
 	return cs.Stream.SendMsg(_args)
 }
 
-func (cs *clientStreamingClient) CloseAndRecv() (resp interface{}, err error) {
+func (cs *deprecatedClientStreamingClient) CloseAndRecv() (resp interface{}, err error) {
 	if err := cs.Stream.Close(); err != nil {
 		return nil, err
 	}
@@ -137,7 +151,7 @@ func (cs *clientStreamingClient) CloseAndRecv() (resp interface{}, err error) {
 	return _result.GetSuccess(), nil
 }
 
-type serverStreamingClient struct {
+type deprecatedServerStreamingClient struct {
 	streaming.Stream
 	methodInfo serviceinfo.MethodInfo
 }
@@ -147,12 +161,15 @@ func NewServerStreaming(ctx context.Context, genericCli Client, method string, r
 	if !ok {
 		return nil, errors.New("invalid generic client")
 	}
+	if gCli.modeMap != nil {
+		gCli.modeMap.LoadOrStore(method, serviceinfo.StreamingServer)
+	}
 	stream, err := getStream(ctx, genericCli, method, callOpts...)
 	if err != nil {
 		return nil, err
 	}
 	mtInfo := gCli.svcInfo.MethodInfo(method)
-	ss := &serverStreamingClient{stream, mtInfo}
+	ss := &deprecatedServerStreamingClient{stream, mtInfo}
 	_args := mtInfo.NewArgs().(*generic.Args)
 	_args.Method = method
 	_args.Request = req
@@ -165,7 +182,7 @@ func NewServerStreaming(ctx context.Context, genericCli Client, method string, r
 	return ss, nil
 }
 
-func (ss *serverStreamingClient) Recv() (resp interface{}, err error) {
+func (ss *deprecatedServerStreamingClient) Recv() (resp interface{}, err error) {
 	_result := ss.methodInfo.NewResult().(*generic.Result)
 	if err = ss.Stream.RecvMsg(_result); err != nil {
 		return nil, err
@@ -173,7 +190,7 @@ func (ss *serverStreamingClient) Recv() (resp interface{}, err error) {
 	return _result.GetSuccess(), nil
 }
 
-type bidirectionalStreamingClient struct {
+type deprecatedBidirectionalStreamingClient struct {
 	streaming.Stream
 	method     string
 	methodInfo serviceinfo.MethodInfo
@@ -184,21 +201,24 @@ func NewBidirectionalStreaming(ctx context.Context, genericCli Client, method st
 	if !ok {
 		return nil, errors.New("invalid generic client")
 	}
+	if gCli.modeMap != nil {
+		gCli.modeMap.LoadOrStore(method, serviceinfo.StreamingBidirectional)
+	}
 	stream, err := getStream(ctx, genericCli, method, callOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return &bidirectionalStreamingClient{stream, method, gCli.svcInfo.MethodInfo(method)}, nil
+	return &deprecatedBidirectionalStreamingClient{stream, method, gCli.svcInfo.MethodInfo(method)}, nil
 }
 
-func (bs *bidirectionalStreamingClient) Send(req interface{}) error {
+func (bs *deprecatedBidirectionalStreamingClient) Send(req interface{}) error {
 	_args := bs.methodInfo.NewArgs().(*generic.Args)
 	_args.Method = bs.method
 	_args.Request = req
 	return bs.Stream.SendMsg(_args)
 }
 
-func (bs *bidirectionalStreamingClient) Recv() (resp interface{}, err error) {
+func (bs *deprecatedBidirectionalStreamingClient) Recv() (resp interface{}, err error) {
 	_result := bs.methodInfo.NewResult().(*generic.Result)
 	if err = bs.Stream.RecvMsg(_result); err != nil {
 		return nil, err

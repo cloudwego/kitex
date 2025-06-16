@@ -162,27 +162,6 @@ type UnaryTestArgs struct {
 	Req *MockReq
 }
 
-func (p *UnaryTestArgs) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
-	if !p.IsSetReq() {
-		p.Req = new(MockReq)
-	}
-	return p.Req.FastRead(buf, _type, number)
-}
-
-func (p *UnaryTestArgs) FastWrite(buf []byte) (n int) {
-	if !p.IsSetReq() {
-		return 0
-	}
-	return p.Req.FastWrite(buf)
-}
-
-func (p *UnaryTestArgs) Size() (n int) {
-	if !p.IsSetReq() {
-		return 0
-	}
-	return p.Req.Size()
-}
-
 func (p *UnaryTestArgs) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetReq() {
 		return out, nil
@@ -221,27 +200,6 @@ type UnaryTestResult struct {
 }
 
 var UnaryTestResult_Success_DEFAULT *MockResp
-
-func (p *UnaryTestResult) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
-	if !p.IsSetSuccess() {
-		p.Success = new(MockResp)
-	}
-	return p.Success.FastRead(buf, _type, number)
-}
-
-func (p *UnaryTestResult) FastWrite(buf []byte) (n int) {
-	if !p.IsSetSuccess() {
-		return 0
-	}
-	return p.Success.FastWrite(buf)
-}
-
-func (p *UnaryTestResult) Size() (n int) {
-	if !p.IsSetSuccess() {
-		return 0
-	}
-	return p.Success.Size()
-}
 
 func (p *UnaryTestResult) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
@@ -335,27 +293,6 @@ type ClientStreamingTestArgs struct {
 	Req *MockReq
 }
 
-func (p *ClientStreamingTestArgs) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
-	if !p.IsSetReq() {
-		p.Req = new(MockReq)
-	}
-	return p.Req.FastRead(buf, _type, number)
-}
-
-func (p *ClientStreamingTestArgs) FastWrite(buf []byte) (n int) {
-	if !p.IsSetReq() {
-		return 0
-	}
-	return p.Req.FastWrite(buf)
-}
-
-func (p *ClientStreamingTestArgs) Size() (n int) {
-	if !p.IsSetReq() {
-		return 0
-	}
-	return p.Req.Size()
-}
-
 func (p *ClientStreamingTestArgs) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetReq() {
 		return out, nil
@@ -394,27 +331,6 @@ type ClientStreamingTestResult struct {
 }
 
 var ClientStreamingTestResult_Success_DEFAULT *MockResp
-
-func (p *ClientStreamingTestResult) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
-	if !p.IsSetSuccess() {
-		p.Success = new(MockResp)
-	}
-	return p.Success.FastRead(buf, _type, number)
-}
-
-func (p *ClientStreamingTestResult) FastWrite(buf []byte) (n int) {
-	if !p.IsSetSuccess() {
-		return 0
-	}
-	return p.Success.FastWrite(buf)
-}
-
-func (p *ClientStreamingTestResult) Size() (n int) {
-	if !p.IsSetSuccess() {
-		return 0
-	}
-	return p.Success.Size()
-}
 
 func (p *ClientStreamingTestResult) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
@@ -501,27 +417,6 @@ type ServerStreamingTestArgs struct {
 	Req *MockReq
 }
 
-func (p *ServerStreamingTestArgs) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
-	if !p.IsSetReq() {
-		p.Req = new(MockReq)
-	}
-	return p.Req.FastRead(buf, _type, number)
-}
-
-func (p *ServerStreamingTestArgs) FastWrite(buf []byte) (n int) {
-	if !p.IsSetReq() {
-		return 0
-	}
-	return p.Req.FastWrite(buf)
-}
-
-func (p *ServerStreamingTestArgs) Size() (n int) {
-	if !p.IsSetReq() {
-		return 0
-	}
-	return p.Req.Size()
-}
-
 func (p *ServerStreamingTestArgs) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetReq() {
 		return out, nil
@@ -560,27 +455,6 @@ type ServerStreamingTestResult struct {
 }
 
 var ServerStreamingTestResult_Success_DEFAULT *MockResp
-
-func (p *ServerStreamingTestResult) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
-	if !p.IsSetSuccess() {
-		p.Success = new(MockResp)
-	}
-	return p.Success.FastRead(buf, _type, number)
-}
-
-func (p *ServerStreamingTestResult) FastWrite(buf []byte) (n int) {
-	if !p.IsSetSuccess() {
-		return 0
-	}
-	return p.Success.FastWrite(buf)
-}
-
-func (p *ServerStreamingTestResult) Size() (n int) {
-	if !p.IsSetSuccess() {
-		return 0
-	}
-	return p.Success.Size()
-}
 
 func (p *ServerStreamingTestResult) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
@@ -671,27 +545,6 @@ type BidirectionalStreamingTestArgs struct {
 	Req *MockReq
 }
 
-func (p *BidirectionalStreamingTestArgs) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
-	if !p.IsSetReq() {
-		p.Req = new(MockReq)
-	}
-	return p.Req.FastRead(buf, _type, number)
-}
-
-func (p *BidirectionalStreamingTestArgs) FastWrite(buf []byte) (n int) {
-	if !p.IsSetReq() {
-		return 0
-	}
-	return p.Req.FastWrite(buf)
-}
-
-func (p *BidirectionalStreamingTestArgs) Size() (n int) {
-	if !p.IsSetReq() {
-		return 0
-	}
-	return p.Req.Size()
-}
-
 func (p *BidirectionalStreamingTestArgs) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetReq() {
 		return out, nil
@@ -730,27 +583,6 @@ type BidirectionalStreamingTestResult struct {
 }
 
 var BidirectionalStreamingTestResult_Success_DEFAULT *MockResp
-
-func (p *BidirectionalStreamingTestResult) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
-	if !p.IsSetSuccess() {
-		p.Success = new(MockResp)
-	}
-	return p.Success.FastRead(buf, _type, number)
-}
-
-func (p *BidirectionalStreamingTestResult) FastWrite(buf []byte) (n int) {
-	if !p.IsSetSuccess() {
-		return 0
-	}
-	return p.Success.FastWrite(buf)
-}
-
-func (p *BidirectionalStreamingTestResult) Size() (n int) {
-	if !p.IsSetSuccess() {
-		return 0
-	}
-	return p.Success.Size()
-}
 
 func (p *BidirectionalStreamingTestResult) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {

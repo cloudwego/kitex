@@ -16,7 +16,11 @@
 
 package generic
 
-import "github.com/cloudwego/dynamicgo/conv"
+import (
+	"github.com/cloudwego/dynamicgo/conv"
+
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
+)
 
 var (
 	DefaultHTTPDynamicGoConvOpts = conv.Options{
@@ -29,12 +33,14 @@ var (
 		UseKitexHttpEncoding:   true,
 		WriteHttpValueFallback: true,
 		ReadHttpValueFallback:  true,
+		MergeBaseFunc:          thrift.MergeBase,
 	}
 	DefaultJSONDynamicGoConvOpts = conv.Options{
 		WriteRequireField:  true,
 		WriteDefaultField:  true,
 		EnableValueMapping: true,
 		String2Int64:       true,
+		MergeBaseFunc:      thrift.MergeBase,
 	}
 )
 

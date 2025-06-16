@@ -41,7 +41,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
-	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -124,14 +123,6 @@ func (o *StreamOptions) BuildSendChain() sep.StreamSendEndpoint {
 	})
 }
 
-type TTHeaderStreamingOption struct {
-	F func(o *TTHeaderStreamingOptions, di *utils.Slice)
-}
-
-type TTHeaderStreamingOptions struct {
-	TransportOptions []ttstream.ServerProviderOption
-}
-
 // Option is the only way to config a server.
 type Option struct {
 	F func(o *Options, di *utils.Slice)
@@ -183,9 +174,6 @@ type Options struct {
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool
-
-	// TTHeaderStreaming
-	TTHeaderStreamingOptions TTHeaderStreamingOptions
 }
 
 type Limit struct {
@@ -202,7 +190,7 @@ type Limit struct {
 
 // NewOptions creates a default options.
 func NewOptions(opts []Option) *Options {
-	ropt, ttstreamProvider := newServerRemoteOption()
+	ropt := newServerRemoteOption()
 	o := &Options{
 		Svr:          &rpcinfo.EndpointBasicInfo{},
 		Configs:      rpcinfo.NewRPCConfig(),
@@ -221,8 +209,6 @@ func NewOptions(opts []Option) *Options {
 		Registry:  registry.NoopRegistry,
 	}
 	ApplyOptions(opts, o)
-	// todo: must be removed in the future
-	ttstreamProvider.(ttstream.ServerProviderOptionApplier).ApplyServerProviderOption(o.TTHeaderStreamingOptions.TransportOptions...)
 
 	rpcinfo.AsMutableRPCConfig(o.Configs).LockConfig(o.LockBits)
 	if o.StatsLevel == nil {

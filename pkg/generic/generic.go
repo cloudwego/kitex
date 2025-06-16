@@ -69,6 +69,13 @@ func BinaryThriftGeneric() Generic {
 	return &binaryThriftGeneric{}
 }
 
+// BinaryPbGeneric raw protobuf binary payload Generic
+func BinaryPbGeneric(svcName, packageName string) Generic {
+	return &binaryPbGeneric{
+		codec: newBinaryPbCodec(svcName, packageName),
+	}
+}
+
 // MapThriftGeneric map mapping generic
 // Base64 codec for binary field is disabled by default. You can change this option with SetBinaryWithBase64.
 // eg:
@@ -82,13 +89,13 @@ func BinaryThriftGeneric() Generic {
 //	SetBinaryWithByteSlice(g, true)
 func MapThriftGeneric(p DescriptorProvider) (Generic, error) {
 	return &mapThriftGeneric{
-		codec: newMapThriftCodec(p),
+		codec: newMapThriftCodec(p, false),
 	}, nil
 }
 
 func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 	return &mapThriftGeneric{
-		codec: newMapThriftCodecForJSON(p),
+		codec: newMapThriftCodec(p, true),
 	}, nil
 }
 
@@ -243,6 +250,42 @@ func (g *binaryThriftGeneric) IDLServiceName() string {
 
 func (g *binaryThriftGeneric) MessageReaderWriter() interface{} {
 	return nil
+}
+
+type binaryPbGeneric struct {
+	codec *binaryPbCodec
+}
+
+func (g *binaryPbGeneric) Framed() bool {
+	return false
+}
+
+func (g *binaryPbGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
+	return serviceinfo.Protobuf
+}
+
+func (g *binaryPbGeneric) PayloadCodec() remote.PayloadCodec {
+	return nil
+}
+
+func (g *binaryPbGeneric) GetMethod(req interface{}, method string) (*Method, error) {
+	return &Method{Name: method, Oneway: false}, nil
+}
+
+func (g *binaryPbGeneric) Close() error {
+	return nil
+}
+
+func (g *binaryPbGeneric) IDLServiceName() string {
+	return g.codec.svcName
+}
+
+func (g *binaryPbGeneric) MessageReaderWriter() interface{} {
+	return g.codec.getMessageReaderWriter()
+}
+
+func (g *binaryPbGeneric) GetExtra(key string) string {
+	return g.codec.extra[key]
 }
 
 type mapThriftGeneric struct {
@@ -423,4 +466,13 @@ func (g *httpPbThriftGeneric) MessageReaderWriter() interface{} {
 
 func (g *httpPbThriftGeneric) GetExtra(key string) string {
 	return g.codec.extra[key]
+}
+
+func HasIDLInfo(g Generic) bool {
+	switch g.(type) {
+	case *binaryThriftGeneric, *binaryPbGeneric:
+		return false
+	default:
+		return true
+	}
 }

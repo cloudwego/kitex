@@ -54,16 +54,16 @@ func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
 	// with dynamicgo
 	p, err := NewThriftFileProviderWithDynamicGo("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	gOpts := &Options{dynamicgoConvOpts: DefaultJSONDynamicGoConvOpts}
-	jtc := newJsonThriftCodec(p, gOpts)
+	g, err := JSONThriftGeneric(p)
+	test.Assert(t, err == nil)
+	jtc := g.(*jsonThriftGeneric).codec
 	test.Assert(t, jtc.dynamicgoEnabled)
-	test.DeepEqual(t, jtc.convOpts, DefaultJSONDynamicGoConvOpts)
-	convOptsWithThriftBase := DefaultJSONDynamicGoConvOpts
-	convOptsWithThriftBase.EnableThriftBase = true
-	test.DeepEqual(t, jtc.convOptsWithThriftBase, convOptsWithThriftBase)
-	convOptsWithException := DefaultJSONDynamicGoConvOpts
-	convOptsWithException.ConvertException = true
-	test.DeepEqual(t, jtc.convOptsWithException, convOptsWithException)
+	assertDynamicgoOptions(t, DefaultJSONDynamicGoConvOpts, jtc.convOpts)
+	test.Assert(t, jtc.convOptsWithException.ConvertException)
+	assertDynamicgoOptions(t, DefaultJSONDynamicGoConvOpts, jtc.convOptsWithException)
+	test.Assert(t, jtc.convOptsWithThriftBase.EnableThriftBase)
+	test.Assert(t, jtc.convOptsWithThriftBase.MergeBaseFunc != nil)
+	assertDynamicgoOptions(t, DefaultJSONDynamicGoConvOpts, jtc.convOptsWithThriftBase)
 	defer jtc.Close()
 	test.Assert(t, jtc.Name() == "JSONThrift")
 
@@ -76,6 +76,25 @@ func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
 	rw := jtc.getMessageReaderWriter()
 	_, ok := rw.(*thrift.JSONReaderWriter)
 	test.Assert(t, ok)
+}
+
+func assertDynamicgoOptions(t *testing.T, exp, act conv.Options) {
+	test.Assert(t, exp.ByteAsUint8 == act.ByteAsUint8, "ByteAsUint8")
+	test.Assert(t, exp.DisallowUnknownField == act.DisallowUnknownField, "DisallowUnknownField")
+	test.Assert(t, exp.EnableValueMapping == act.EnableValueMapping, "EnableValueMapping")
+	test.Assert(t, exp.EnableHttpMapping == act.EnableHttpMapping, "EnableHttpMapping")
+	test.Assert(t, exp.String2Int64 == act.String2Int64, "String2Int64")
+	test.Assert(t, exp.Int642String == act.Int642String, "Int642String")
+	test.Assert(t, exp.NoBase64Binary == act.NoBase64Binary, "NoBase64Binary")
+	test.Assert(t, exp.WriteOptionalField == act.WriteOptionalField, "WriteOptionalField")
+	test.Assert(t, exp.WriteDefaultField == act.WriteDefaultField, "WriteDefaultField")
+	test.Assert(t, exp.WriteRequireField == act.WriteRequireField, "WriteRequireField")
+	test.Assert(t, exp.ReadHttpValueFallback == act.ReadHttpValueFallback, "ReadHttpValueFallback")
+	test.Assert(t, exp.WriteHttpValueFallback == act.WriteHttpValueFallback, "WriteHttpValueFallback")
+	test.Assert(t, exp.OmitHttpMappingErrors == act.OmitHttpMappingErrors, "OmitHttpMappingErrors")
+	test.Assert(t, exp.NoCopyString == act.NoCopyString, "NoCopyString")
+	test.Assert(t, exp.UseNativeSkip == act.UseNativeSkip, "UseNativeSkip")
+	test.Assert(t, exp.UseKitexHttpEncoding == act.UseKitexHttpEncoding, "UseKitexHttpEncoding")
 }
 
 func TestJsonThriftCodec_SelfRef(t *testing.T) {

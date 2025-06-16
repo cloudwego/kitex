@@ -138,7 +138,7 @@ func (ts *transServer) Shutdown() (err error) {
 
 // ConnCount implements the remote.TransServer interface.
 func (ts *transServer) ConnCount() utils.AtomicInt {
-	return ts.connCount
+	return utils.AtomicInt(ts.connCount.Value())
 }
 
 // TODO: Is it necessary to init RPCInfo when connection is first created?

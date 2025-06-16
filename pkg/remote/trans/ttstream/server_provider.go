@@ -22,15 +22,12 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/trans/streamx/provider"
-	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -40,10 +37,8 @@ type (
 	serverStreamCancelCtxKey struct{}
 )
 
-var _ provider.ServerProvider = (*serverProvider)(nil)
-
-// NewServerProvider return a server provider
-func NewServerProvider(opts ...ServerProviderOption) provider.ServerProvider {
+// newServerProvider return a server provider
+func newServerProvider(opts ...ServerProviderOption) *serverProvider {
 	sp := new(serverProvider)
 	for _, opt := range opts {
 		opt(sp)
@@ -54,12 +49,6 @@ func NewServerProvider(opts ...ServerProviderOption) provider.ServerProvider {
 type serverProvider struct {
 	metaHandler   MetaFrameHandler
 	headerHandler HeaderFrameReadHandler
-}
-
-func (s *serverProvider) ApplyServerProviderOption(opts ...ServerProviderOption) {
-	for _, opt := range opts {
-		opt(s)
-	}
 }
 
 // Available sniff the conn if provider can process
@@ -95,7 +84,7 @@ func (s *serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context
 	return ctx, nil
 }
 
-func (s *serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Context, streaming.ServerStream, error) {
+func (s *serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Context, *stream, error) {
 	trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
 	if trans == nil {
 		return nil, nil, fmt.Errorf("server transport is nil")
@@ -107,22 +96,7 @@ func (s *serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.C
 		return nil, nil, err
 	}
 	st.setMetaFrameHandler(s.metaHandler)
-
-	// headerHandler return a new stream level ctx
-	if s.headerHandler != nil {
-		ctx, err = s.headerHandler.OnReadStream(ctx, st.meta, st.header)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	// register metainfo into ctx
-	ctx = metainfo.SetMetaInfoFromMap(ctx, st.header)
-	ss := newServerStream(st)
-
-	// cancel ctx when OnStreamFinish
-	ctx, cancelFunc := ktx.WithCancel(ctx)
-	ctx = context.WithValue(ctx, serverStreamCancelCtxKey{}, cancelFunc)
-	return ctx, ss, nil
+	return ctx, st, nil
 }
 
 func (s *serverProvider) OnStreamFinish(ctx context.Context, ss streaming.ServerStream, err error) (context.Context, error) {

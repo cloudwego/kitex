@@ -40,6 +40,7 @@ func NewDefaultSvcSearcher() *MockSvcSearcher {
 		mocks.MockExceptionMethod: svcInfo,
 		mocks.MockErrorMethod:     svcInfo,
 		mocks.MockOnewayMethod:    svcInfo,
+		mocks.MockStreamingMethod: svcInfo,
 	}
 	return &MockSvcSearcher{svcMap: s, methodSvcMap: m}
 }

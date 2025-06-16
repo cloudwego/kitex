@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	"github.com/cloudwego/kitex/pkg/consts"
 
 	"github.com/golang/mock/gomock"
 
@@ -113,6 +114,9 @@ func TestServerHandler(t *testing.T) {
 	// test SetInvokeHandleFunc()
 	var calledInvoke int32
 	handler.(remote.InvokeHandleFuncSetter).SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+		fromMethod, ok := ctx.Value(consts.CtxKeyMethod).(string)
+		test.Assert(t, ok)
+		test.Assert(t, fromMethod == "SayHello", fromMethod)
 		atomic.StoreInt32(&calledInvoke, 1)
 		return nil
 	})
