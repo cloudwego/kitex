@@ -44,6 +44,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/http"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/proxy"
+	connpool2 "github.com/cloudwego/kitex/pkg/remote/connpool"
+	"github.com/cloudwego/kitex/pkg/remote/trans/gonet"
+	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -762,6 +765,20 @@ func TestTailOption(t *testing.T) {
 	opt = TailOption(opt)
 	opts := client.NewOptions([]client.Option{opt, WithConnPool(mock_remote.NewMockLongConnPool(ctrl))})
 	test.Assert(t, opts.RemoteOpt.Dialer != nil)
+}
+
+func TestGonetOption(t *testing.T) {
+	// gonet
+	opt := client.NewOptions([]Option{WithDialer(gonet.NewDialer()), WithLongConnection(connpool.IdleConfig{MaxIdlePerAddress: 10})})
+	d := opt.RemoteOpt.ConnPool.(*connpool2.LongPool)
+	pcfg := d.Config()
+	test.Assert(t, pcfg.Enable)
+
+	// netpoll
+	opt = client.NewOptions([]Option{WithDialer(netpoll.NewDialer()), WithLongConnection(connpool.IdleConfig{MaxIdlePerAddress: 10})})
+	d = opt.RemoteOpt.ConnPool.(*connpool2.LongPool)
+	pcfg = d.Config()
+	test.Assert(t, !pcfg.Enable)
 }
 
 func checkOneOptionDebugInfo(t *testing.T, opt Option, expectStr string) error {

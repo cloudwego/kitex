@@ -21,8 +21,11 @@ import (
 	"net"
 	"time"
 
+	internalRemote "github.com/cloudwego/kitex/internal/remote"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
+
+var _ internalRemote.IsGonetDialer = &dialer{}
 
 // NewDialer returns the default go net dialer.
 func NewDialer() remote.Dialer {
@@ -31,6 +34,10 @@ func NewDialer() remote.Dialer {
 
 type dialer struct {
 	net.Dialer
+}
+
+func (d *dialer) IsGonetDialer() bool {
+	return true
 }
 
 func (d *dialer) DialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
