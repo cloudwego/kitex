@@ -12,7 +12,7 @@ require (
 	github.com/cloudwego/gopkg v0.1.5
 	github.com/cloudwego/localsession v0.1.2
 	github.com/cloudwego/netpoll v0.7.1
-	github.com/cloudwego/prutal v0.1.1
+	github.com/cloudwego/prutal v0.1.2
 	github.com/cloudwego/runtimex v0.1.1
 	github.com/cloudwego/thriftgo v0.4.2
 	github.com/golang/mock v1.6.0
