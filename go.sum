@@ -14,8 +14,6 @@ github.com/cloudwego/base64x v0.1.5 h1:XPciSp1xaq2VCSt6lF0phncD4koWyULpl5bUxbfCy
 github.com/cloudwego/base64x v0.1.5/go.mod h1:0zlkT4Wn5C6NdauXdJRhSKRlJvmclQ1hhJgA0rcu/8w=
 github.com/cloudwego/configmanager v0.2.3 h1:P0YTBgqDBnKeI/VARvut/Dc9Rfxt9Bw1Nv7sk0Ru4u8=
 github.com/cloudwego/configmanager v0.2.3/go.mod h1:4GeSKjH6JLvKx4/Hrbh5dse8fDqj1n/Up8HfU4wHJ+w=
-github.com/cloudwego/dynamicgo v0.6.3 h1:hnb6VEraCECfFl8lzfvYQHf2TPLHqBZQzOJGuy1eOsk=
-github.com/cloudwego/dynamicgo v0.6.3/go.mod h1:ZfuIc4tsk8gdsmsoL+3M/q3916xTj+KAVJaXQHSaWiE=
 github.com/cloudwego/dynamicgo v0.6.4 h1:OgZ1Q0u8dlU6N+nxwrt4YOX7pXw3jTluICBWMlc7mFU=
 github.com/cloudwego/dynamicgo v0.6.4/go.mod h1:ZfuIc4tsk8gdsmsoL+3M/q3916xTj+KAVJaXQHSaWiE=
 github.com/cloudwego/fastpb v0.0.5 h1:vYnBPsfbAtU5TVz5+f9UTlmSCixG9F9vRwaqE0mZPZU=
@@ -31,8 +29,8 @@ github.com/cloudwego/localsession v0.1.2 h1:RBmeLDO5sKr4ujd8iBp5LTMmuVKLdu88jjIn
 github.com/cloudwego/localsession v0.1.2/go.mod h1:J4uams2YT/2d4t7OI6A7NF7EcG8OlHJsOX2LdPbqoyc=
 github.com/cloudwego/netpoll v0.7.1 h1://3rtQV/auOCsqHn9XrXwYJhSgAS+5zSBPpYPm5vydY=
 github.com/cloudwego/netpoll v0.7.1/go.mod h1:PI+YrmyS7cIr0+SD4seJz3Eo3ckkXdu2ZVKBLhURLNU=
-github.com/cloudwego/prutal v0.1.1 h1:ie4PBf4sqJewL5ZgZwWVFplx9vypNG03BWj5VGlEFg8=
-github.com/cloudwego/prutal v0.1.1/go.mod h1:PHt8jxqWkVFv7VcXGVy5IJA/6CTbAtagHZGwCfNSMVA=
+github.com/cloudwego/prutal v0.1.2 h1:npQie1NB2WAOmxge6pdN4iYH0O4Yuceg4iNWtOp+Ol8=
+github.com/cloudwego/prutal v0.1.2/go.mod h1:PHt8jxqWkVFv7VcXGVy5IJA/6CTbAtagHZGwCfNSMVA=
 github.com/cloudwego/runtimex v0.1.1 h1:lheZjFOyKpsq8TsGGfmX9/4O7F0TKpWmB8on83k7GE8=
 github.com/cloudwego/runtimex v0.1.1/go.mod h1:23vL/HGV0W8nSCHbe084AgEBdDV4rvXenEUMnUNvUd8=
 github.com/cloudwego/thriftgo v0.4.2 h1:+XioeEgBOVqyKMJqUuqeJbKUtQ0XIkXhlNIqoWSESFw=
