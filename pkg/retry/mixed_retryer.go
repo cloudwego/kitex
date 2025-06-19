@@ -78,7 +78,7 @@ func (r *mixedRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implement the Retryer interface.
-func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
+func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req, resp interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
 	r.RLock()
 	var maxDuration time.Duration
 	if r.policy.StopPolicy.MaxDurationMS > 0 {
@@ -125,15 +125,15 @@ func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpci
 					return
 				}
 				var (
-					e    error
-					cRI  rpcinfo.RPCInfo
-					resp interface{}
+					e     error
+					cRI   rpcinfo.RPCInfo
+					nresp interface{}
 				)
 				defer func() {
 					if panicInfo := recover(); panicInfo != nil {
 						e = panicToErr(ctx, panicInfo, firstRI)
 					}
-					callDone <- &resultWrapper{cRI, resp, e}
+					callDone <- &resultWrapper{cRI, nresp, e}
 				}()
 				ct := atomic.AddInt32(&callTimes, 1)
 				callStart := time.Now()
@@ -141,7 +141,8 @@ func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpci
 					// record stat before call since requests may be slow, making the limiter more accurate
 					recordRetryStat(cbKey, r.cbContainer.cbPanel, ct)
 				}
-				cRI, resp, e = rpcCall(ctx, r)
+				nresp = NewStructPointer(resp)
+				cRI, e = rpcCall(ctx, r, req, nresp)
 				recordCost(ct, callStart, &recordCostDoing, &callCosts, &abort, e)
 				if !r.cbContainer.enablePercentageLimit && r.cbContainer.cbStat {
 					circuitbreak.RecordStat(ctx, req, nil, e, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
@@ -157,10 +158,6 @@ func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpci
 			}
 		case res := <-callDone:
 			// result retry
-			if respOp, ok := ctx.Value(CtxRespOp).(*int32); ok {
-				// must set as OpNo, or the new resp cannot be decoded
-				atomic.StoreInt32(respOp, OpNo)
-			}
 			doneCount++
 			isFinishErr := res.err != nil && errors.Is(res.err, kerrors.ErrRPCFinish)
 			if nonFinishedErrRes == nil || !isFinishErr {
@@ -194,6 +191,7 @@ func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpci
 			}
 			atomic.StoreInt32(&abort, 1)
 			recordRetryInfo(nonFinishedErrRes.ri, atomic.LoadInt32(&callTimes), callCosts.String())
+			ShallowCopyStructPointer(nonFinishedErrRes.resp, resp)
 			return nonFinishedErrRes.ri, false, nonFinishedErrRes.err
 		}
 	}
