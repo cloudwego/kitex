@@ -127,6 +127,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.Var(&a.FrugalStruct, "frugal-struct", "Replace fastCodec code to frugal. Use `-frugal-struct @all` for all, `-frugal-struct @auto` for annotated structs (go.codec=\"frugal\"), or specify multiple structs (e.g., `-frugal-struct A -frugal-struct B`).")
 
 	f.BoolVar(&a.NoRecurse, "no-recurse", false, `Don't generate thrift files recursively, just generate the given file.'`)
+	f.BoolVar(&a.HTTPTags, "http-tags", false, `Recognize api.xx tags in IDL and generate HTTP go tags and router info in kitex_gen.'`)
 
 	if env.UseProtoc() {
 		f.Var(&a.ProtobufOptions, "protobuf", "Specify arguments for the protobuf compiler.")
@@ -150,6 +151,10 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"thrift_streaming",
 		"no_processor",
 	)
+
+	if a.HTTPTags {
+		a.ThriftOptions = append(a.ThriftOptions, "gen_json_tag=false")
+	}
 
 	f.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Version %s

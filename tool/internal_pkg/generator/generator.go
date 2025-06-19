@@ -149,6 +149,7 @@ type Config struct {
 
 	FrugalStruct util.StringSlice
 	NoRecurse    bool
+	HTTPTags     bool
 
 	BuiltinTpl util.StringSlice // specify the built-in template to use
 

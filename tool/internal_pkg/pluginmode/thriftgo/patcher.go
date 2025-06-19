@@ -68,8 +68,8 @@ type Patcher struct {
 	deepCopyAPI           bool
 	protocol              string
 	handlerReturnKeepResp bool
-
-	frugalStruct []string
+	httpTags              bool
+	frugalStruct          []string
 
 	fileTpl *template.Template
 	libs    map[string]string
@@ -397,6 +397,25 @@ func (p *Patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 				Content: content,
 				Name:    &bashPath,
 			})
+		}
+
+		if p.httpTags {
+			feat := p.utils.Features()
+			// append http tags to struct go tag
+			thriftgoGenFilename := util.JoinPath(path, base)
+			for _, st := range ast.Structs {
+				for _, f := range st.Fields {
+					insertPointer := "struct." + st.GetName() + "." + f.GetName() + "." + "tag"
+					patches = append(patches, &plugin.Generated{
+						Content: genHTTPTags(f, genHTTPTagOption{
+							snakeTyleJSONTag:      feat.SnakeTyleJSONTag,
+							lowerCamelCaseJSONTag: feat.LowerCamelCaseJSONTag,
+						}),
+						Name:           &thriftgoGenFilename,
+						InsertionPoint: &insertPointer,
+					})
+				}
+			}
 		}
 
 	}
