@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"runtime/debug"
 	"strconv"
 
@@ -40,9 +41,6 @@ const (
 
 	// CtxReqOp is used to ignore RPC Request concurrent write
 	CtxReqOp ctxKey = "K_REQ_OP"
-
-	// CtxRespOp is used to ignore RPC Response concurrent write/read.
-	CtxRespOp ctxKey = "K_RESP_OP"
 
 	// Wildcard stands for 'any method' when associated with a retryer.
 	Wildcard = "*"
@@ -179,4 +177,29 @@ func IsLocalRetryRequest(ctx context.Context) bool {
 func IsRemoteRetryRequest(ctx context.Context) bool {
 	_, isRetry := metainfo.GetPersistentValue(ctx, TransitKey)
 	return isRetry
+}
+
+// NewStructPointer creates a pointer to a new element with the same type of *v.
+// NOTE: v must be a pointer to a struct, and don't need to copy the element inside.
+// NewStructPointer might panic, callers should recover it.
+func NewStructPointer(v interface{}) interface{} {
+	if v == nil {
+		return nil
+	}
+	rt := reflect.TypeOf(v)
+	if rt.Kind() != reflect.Ptr {
+		panic("retry shallow copy: not a pointer")
+	}
+	return reflect.New(rt.Elem()).Interface()
+}
+
+// ShallowCopyStructPointer copies the element inside src to dst.
+// NOTE: src and dst must be non nil pointers to the same type of struct.
+// It might panic, callers should recover it.
+// It equals to: *dst = *src .
+func ShallowCopyStructPointer(src interface{}, dst interface{}) {
+	if src == nil || dst == nil {
+		return
+	}
+	reflect.ValueOf(dst).Elem().Set(reflect.ValueOf(src).Elem())
 }

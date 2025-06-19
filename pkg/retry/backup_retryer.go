@@ -87,7 +87,7 @@ func (r *backupRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implement the Retryer interface.
-func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
+func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req, resp interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
 	r.RLock()
 	retryTimes := r.policy.StopPolicy.MaxRetryTimes
 	retryDelay := r.retryDelay
@@ -120,14 +120,15 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 					return
 				}
 				var (
-					e   error
-					cRI rpcinfo.RPCInfo
+					e     error
+					cRI   rpcinfo.RPCInfo
+					nresp interface{}
 				)
 				defer func() {
 					if panicInfo := recover(); panicInfo != nil {
 						e = panicToErr(ctx, panicInfo, firstRI)
 					}
-					done <- &resultWrapper{ri: cRI, err: e}
+					done <- &resultWrapper{ri: cRI, resp: nresp, err: e}
 				}()
 				ct := atomic.AddInt32(&callTimes, 1)
 				callStart := time.Now()
@@ -135,7 +136,8 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 					// record stat before call since requests may be slow, making the limiter more accurate
 					recordRetryStat(cbKey, r.cbContainer.cbPanel, ct)
 				}
-				cRI, _, e = rpcCall(ctx, r)
+				nresp = NewStructPointer(resp)
+				cRI, e = rpcCall(ctx, r, req, nresp)
 				recordCost(ct, callStart, &recordCostDoing, &callCosts, &abort, e)
 				if !r.cbContainer.enablePercentageLimit && r.cbContainer.cbStat {
 					circuitbreak.RecordStat(ctx, req, nil, e, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
@@ -159,6 +161,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				}
 				continue
 			}
+			ShallowCopyStructPointer(res.resp, resp)
 			atomic.StoreInt32(&abort, 1)
 			recordRetryInfo(res.ri, atomic.LoadInt32(&callTimes), callCosts.String())
 			return res.ri, false, res.err
