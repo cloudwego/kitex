@@ -25,6 +25,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cloudwego/kitex/tool/cmd/kitex/versions"
+
+	"github.com/cloudwego/kitex/tool/cmd/kitex/code"
+
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
@@ -50,7 +54,8 @@ type ExtraFlag struct {
 // Arguments .
 type Arguments struct {
 	generator.Config
-	extends []*ExtraFlag
+	extends      []*ExtraFlag
+	queryVersion bool
 }
 
 const (
@@ -77,6 +82,8 @@ func (a *Arguments) AddExtraFlag(e *ExtraFlag) {
 
 func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	f.BoolVar(&a.queryVersion, "version", false,
+		"Show the version of kitex")
 	f.BoolVar(&a.NoFastAPI, "no-fast-api", false,
 		"Generate codes without injecting fast method.")
 	f.StringVar(&a.ModuleName, "module", "",
@@ -90,7 +97,6 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Turn on verbose mode.")
 	f.BoolVar(&a.GenerateInvoker, "invoker", false,
 		"Generate invoker side codes when service name is specified.")
-	f.StringVar(&a.IDLType, "type", "unknown", "Specify the type of IDL: 'thrift' or 'protobuf'.")
 	f.Var(&a.Includes, "I", "Add an IDL search path for includes.")
 	f.Var(&a.ThriftOptions, "thrift", "Specify arguments for the thrift go compiler.")
 	f.Var(&a.Hessian2Options, "hessian2", "Specify arguments for the hessian2 codec.")
@@ -175,13 +181,32 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 	if err = f.Parse(kitexArgs); err != nil {
 		return err
 	}
+	if a.queryVersion {
+		println(a.Version)
+		return code.ErrExitZeroInterrupted
+	}
+	if !a.NoDependencyCheck {
+		if ok, _ := versions.CheckVersion(); !ok {
+			return code.ErrVersionCheckFailed
+		}
+	}
 	if a.StreamX {
 		a.ThriftOptions = append(a.ThriftOptions, "streamx")
 	}
 	if a.Record {
-		a.RecordCmd = os.Args
+		a.RecordCmd = append([]string{"kitex"}, kitexArgs...)
 	}
 	log.Verbose = a.Verbose
+
+	for i, inc := range a.Includes {
+		if util.IsGitURL(inc) {
+			localGitPath, gitErr := util.RunGitCommand(inc)
+			if gitErr != nil {
+				return fmt.Errorf("failed to pull IDL from git: %s, errMsg: %s\nYou can execute 'rm -rf ~/.kitex' to clean the git cache and try again", inc, gitErr.Error())
+			}
+			a.Includes[i] = localGitPath
+		}
+	}
 
 	// format -thrift xxx,xxx to -thrift xx -thrift xx
 	thriftOptions := make([]string, len(a.ThriftOptions))
@@ -238,16 +263,11 @@ func (a *Arguments) checkIDL(files []string) error {
 	}
 	a.IDL = files[0]
 
-	switch a.IDLType {
-	case Thrift, Protobuf:
-	case Unknown:
-		if typ, ok := guessIDLType(a.IDL); ok {
-			a.IDLType = typ
-		} else {
-			return fmt.Errorf("can not guess an IDL type from %q (unknown suffix), please specify with the '-type' flag", a.IDL)
-		}
-	default:
-		return fmt.Errorf("unsupported IDL type: %s", a.IDLType)
+	if typ, ok := guessIDLType(a.IDL); ok {
+		a.IDLType = typ
+	} else {
+		return fmt.Errorf("the last parameter shoule be IDL filename (xxx.thrift or xxx.proto), for example: " +
+			"\"kitex -service demo idl.thrift\"")
 	}
 	return nil
 }
@@ -350,19 +370,6 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect current executable: %s", err.Error())
-	}
-
-	for i, inc := range a.Includes {
-		if strings.HasPrefix(inc, "git@") || strings.HasPrefix(inc, "http://") || strings.HasPrefix(inc, "https://") {
-			localGitPath, errMsg, gitErr := util.RunGitCommand(inc)
-			if gitErr != nil {
-				if errMsg == "" {
-					errMsg = gitErr.Error()
-				}
-				return nil, fmt.Errorf("failed to pull IDL from git:%s\nYou can execute 'rm -rf ~/.kitex' to clean the git cache and try again", errMsg)
-			}
-			a.Includes[i] = localGitPath
-		}
 	}
 
 	configkv := a.Config.Pack()

@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 // Verbose decides whether the informatc logs should be output.
@@ -48,24 +50,28 @@ func SetDefaultLogger(l Logger) {
 	defaultLogger = l
 }
 
+var errorPrefix = util.Bold + util.FgRed + "[ERROR] " + util.Reset
+
+var warningPrefix = util.Bold + util.FgYellow + "[WARN] " + util.Reset
+
 // Error ...
 func Error(v ...interface{}) {
-	defaultLogger.Printf("[ERROR] %s", fmt.Sprintln(v...))
+	defaultLogger.Printf("%s%s", errorPrefix, fmt.Sprintln(v...))
 }
 
 // Errorf ...
 func Errorf(format string, v ...interface{}) {
-	defaultLogger.Printf("[ERROR] "+format, v...)
+	defaultLogger.Printf(errorPrefix+format, v...)
 }
 
 // Warn ...
 func Warn(v ...interface{}) {
-	defaultLogger.Printf("[WARN] %s", fmt.Sprintln(v...))
+	defaultLogger.Printf("%s %s", warningPrefix, fmt.Sprintln(v...))
 }
 
 // Warnf ...
 func Warnf(format string, v ...interface{}) {
-	defaultLogger.Printf("[WARN] "+format, v...)
+	defaultLogger.Printf(warningPrefix+format, v...)
 }
 
 // Info ...
