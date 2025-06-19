@@ -397,11 +397,15 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 }
 
 func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
+	t.mu.Lock()
+	if t.li.Len() == 0 {
+		t.mu.Unlock()
+		return nil
+	}
 	klog.Info("KITEX: gRPC GracefulShutdown starts")
 	defer func() {
 		klog.Info("KITEX: gRPC GracefulShutdown ends")
 	}()
-	t.mu.Lock()
 	for elem := t.li.Front(); elem != nil; elem = elem.Next() {
 		svrTrans := elem.Value.(*SvrTrans)
 		svrTrans.tr.Drain()
