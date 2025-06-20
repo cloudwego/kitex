@@ -3,3 +3,11 @@ github_checks:
 
 ignore:
   - "tool/**/*.go"
+
+coverage:
+  status:
+    project:
+      default:
+        # pass if coverage drops by no more than 0.05%
+        # this is possibly caused by unstable coverage.
+        threshold: 0.05%
