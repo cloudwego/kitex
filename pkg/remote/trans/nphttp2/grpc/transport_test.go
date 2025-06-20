@@ -1033,6 +1033,27 @@ func TestMaxStreams(t *testing.T) {
 		t.Fatalf("%s", "Test failed: didn't expect new stream to be created just yet.")
 	default:
 	}
+	blocked := make(chan struct{})
+	go func() {
+		for {
+			ok, _ := ct.controlBuf.execute(func(it interface{}) bool {
+				// The last stream that fails with context deadline exceeded makes waitingStreams +1.
+				// To make sure that the new stream is blocking because of streamQuota, we need to make sure that
+				// streamQuota is 0 and waitingStreams is greater than 1
+				if ct.streamQuota == 0 && ct.waitingStreams > 1 {
+					return true
+				}
+				return false
+			}, nil)
+			if ok {
+				close(blocked)
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+	// wait for creating the new stream is blocking actually
+	<-blocked
 	// Close the first stream created so that the new stream can finally be created.
 	ct.CloseStream(s, nil)
 	<-done
