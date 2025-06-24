@@ -146,7 +146,7 @@ type ClientOption struct {
 	GRPCStreamingConnPool          ConnPool
 
 	// for ttheader streaming, only used for streaming call
-	TTHeaderStreamingProvider ClientStreamFactory
+	TTHeaderStreamingCliHandlerFactory ClientStreamFactory
 }
 
 type TTHeaderStreamingOption struct {
@@ -154,7 +154,7 @@ type TTHeaderStreamingOption struct {
 }
 
 type TTHeaderStreamingOptions struct {
-	// actually is []ttstream.ServerProviderOption,
+	// actually is []ttstream.ServerHandlerOption,
 	// but we can't import ttstream here because of circular dependency,
 	// so we have to use interface{} here.
 	TransportOptions []interface{}

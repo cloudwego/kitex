@@ -154,7 +154,7 @@ func TestTransportProtocolOption(t *testing.T) {
 	test.Assert(t, options.RemoteOpt.GRPCStreamingCliHandlerFactory != nil)
 	opts = []client.Option{WithTransportProtocol(transport.TTHeaderStreaming)}
 	options = client.NewOptions(opts)
-	test.Assert(t, options.RemoteOpt.TTHeaderStreamingProvider != nil)
+	test.Assert(t, options.RemoteOpt.TTHeaderStreamingCliHandlerFactory != nil)
 }
 
 func TestWithHostPorts(t *testing.T) {

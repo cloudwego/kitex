@@ -57,7 +57,7 @@ func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTra
 	// ttheader streaming
 	if tp&transport.TTHeaderStreaming == transport.TTHeaderStreaming {
 		// wrap internal client provider
-		cs, err := opt.TTHeaderStreamingProvider.NewStream(ctx, ri)
+		cs, err := opt.TTHeaderStreamingCliHandlerFactory.NewStream(ctx, ri)
 		if err != nil {
 			return nil, nil, err
 		}
