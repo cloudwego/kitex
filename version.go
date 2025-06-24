@@ -16,8 +16,53 @@
 
 package kitex
 
-// Name and Version info of this framework, used for statistics and debug
-const (
-	Name    = "Kitex"
-	Version = "v0.14.0"
+import (
+	"regexp"
+	"runtime/debug"
 )
+
+const (
+	// Name info of this framework, used for statistics and debug
+	Name = "KiteX"
+
+	packageName    = "github.com/cloudwego/kitex"
+	versionUnknown = "unknown"
+)
+
+var (
+	// Version info of this framework, used for statistics and debug
+	Version string
+
+	versionPattern = regexp.MustCompile(`^v\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)*$`)
+)
+
+func init() {
+	Version = getVersion(packageName)
+}
+
+func getVersion(path string) (version string) {
+	defer func() {
+		if !versionPattern.MatchString(version) {
+			version = versionUnknown
+		}
+	}()
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+	if info.Main.Path == path {
+		version = info.Main.Version
+		return
+	}
+	for _, dep := range info.Deps {
+		if dep.Path == path {
+			if dep.Replace != nil {
+				version = dep.Replace.Version
+			} else {
+				version = dep.Version
+			}
+			return
+		}
+	}
+	return
+}
