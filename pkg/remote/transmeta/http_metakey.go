@@ -16,7 +16,10 @@
 
 package transmeta
 
-// key of http transit info
+// Key of http transit info.
+//
+// Only used by grpc. must be in lower case as per http2 spec
+// See: https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2
 const (
 	HTTPDestService   = "destination-service"
 	HTTPDestAddr      = "destination-addr"
