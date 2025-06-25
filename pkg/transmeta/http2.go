@@ -37,6 +37,11 @@ var (
 	_ remote.StreamingMetaHandler = ClientHTTP2Handler
 )
 
+// same as md.Append without strings.ToLower coz k must always be lower cases
+func metaAppend(m metadata.MD, k, v string) {
+	m[k] = append(m[k], v)
+}
+
 func (*clientHTTP2Handler) OnConnectStream(ctx context.Context) (context.Context, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	if !isGRPC(ri) {
@@ -47,10 +52,10 @@ func (*clientHTTP2Handler) OnConnectStream(ctx context.Context) (context.Context
 	if !ok {
 		md = metadata.MD{}
 	}
-	md.Append(transmeta.HTTPDestService, ri.To().ServiceName())
-	md.Append(transmeta.HTTPDestMethod, ri.To().Method())
-	md.Append(transmeta.HTTPSourceService, ri.From().ServiceName())
-	md.Append(transmeta.HTTPSourceMethod, ri.From().Method())
+	metaAppend(md, transmeta.HTTPDestService, ri.To().ServiceName())
+	metaAppend(md, transmeta.HTTPDestMethod, ri.To().Method())
+	metaAppend(md, transmeta.HTTPSourceService, ri.From().ServiceName())
+	metaAppend(md, transmeta.HTTPSourceMethod, ri.From().Method())
 	return metadata.NewOutgoingContext(ctx, md), nil
 }
 
@@ -86,10 +91,10 @@ func (*serverHTTP2Handler) OnReadStream(ctx context.Context) (context.Context, e
 	}
 	ci := rpcinfo.AsMutableEndpointInfo(ri.From())
 	if ci != nil {
-		if v := md.Get(transmeta.HTTPSourceService); len(v) != 0 {
+		if v := md[transmeta.HTTPSourceService]; len(v) != 0 {
 			ci.SetServiceName(v[0])
 		}
-		if v := md.Get(transmeta.HTTPSourceMethod); len(v) != 0 {
+		if v := md[transmeta.HTTPSourceMethod]; len(v) != 0 {
 			ci.SetMethod(v[0])
 		}
 	}

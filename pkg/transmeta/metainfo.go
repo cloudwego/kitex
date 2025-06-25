@@ -54,7 +54,7 @@ func (mi *metainfoClientHandler) OnConnectStream(ctx context.Context) (context.C
 		}
 		metainfo.ToHTTPHeader(ctx, metainfo.HTTPHeader(md))
 		if streamLogID := logid.GetStreamLogID(ctx); streamLogID != "" {
-			md.Set(transmeta.HTTPStreamLogID, streamLogID)
+			md[transmeta.HTTPStreamLogID] = []string{streamLogID}
 		}
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
@@ -115,7 +115,7 @@ func (mi *metainfoServerHandler) OnReadStream(ctx context.Context) (context.Cont
 }
 
 func addStreamIDToContext(ctx context.Context, md metadata.MD) context.Context {
-	streamLogIDValues := md.Get(transmeta.HTTPStreamLogID)
+	streamLogIDValues := md[transmeta.HTTPStreamLogID]
 	if len(streamLogIDValues) == 0 {
 		// the caller has not set the stream log id, skip
 		return ctx

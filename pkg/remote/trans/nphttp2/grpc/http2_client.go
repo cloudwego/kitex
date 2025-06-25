@@ -1334,7 +1334,7 @@ func (t *http2Client) Dump() interface{} {
 		sd.RemoteAddress = t.remoteAddr.String()
 		if md, ok := v.tryGetHeader(); ok {
 			// use the value of "rip" in the header if exist
-			if rip := md.Get("rip"); len(rip) > 0 && len(rip[0]) > 0 {
+			if rip := md["rip"]; len(rip) > 0 && len(rip[0]) > 0 {
 				sd.RemoteAddress = rip[0]
 			}
 		}
