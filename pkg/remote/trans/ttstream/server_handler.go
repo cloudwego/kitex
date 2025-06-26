@@ -23,9 +23,13 @@ import (
 	"io"
 	"net"
 	"runtime/debug"
+	"strconv"
 	"sync"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/ttheader"
+	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
@@ -35,14 +39,13 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	ktransport "github.com/cloudwego/kitex/transport"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-type StreamInfo interface {
-	Service() string
-	Method() string
-	TransportProtocol() ktransport.Protocol
-}
+type (
+	serverTransCtxKey        struct{}
+	serverStreamCancelCtxKey struct{}
+)
 
 /*  trans_server.go only use the following interface in remote.ServerTransHandler:
 - OnRead
@@ -61,17 +64,16 @@ func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
 	return &svrTransHandlerFactory{}
 }
 
-func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
-	ttOpts := make([]ServerProviderOption, 0, len(opt.TTHeaderStreamingOptions.TransportOptions))
-	for _, o := range opt.TTHeaderStreamingOptions.TransportOptions {
-		if opt, ok := o.(ServerProviderOption); ok {
-			ttOpts = append(ttOpts, opt)
+func (f *svrTransHandlerFactory) NewTransHandler(opts *remote.ServerOption) (remote.ServerTransHandler, error) {
+	sp := &svrTransHandler{
+		opt: opts,
+	}
+	for _, o := range opts.TTHeaderStreamingOptions.TransportOptions {
+		if opt, ok := o.(ServerHandlerOption); ok {
+			opt(sp)
 		}
 	}
-	return &svrTransHandler{
-		opt:      opt,
-		provider: newServerProvider(ttOpts...),
-	}, nil
+	return sp, nil
 }
 
 var (
@@ -80,9 +82,9 @@ var (
 )
 
 type svrTransHandler struct {
-	opt        *remote.ServerOption
-	provider   *serverProvider
-	inkHdlFunc endpoint.Endpoint
+	opt           *remote.ServerOption
+	inkHdlFunc    endpoint.Endpoint
+	headerHandler HeaderFrameReadHandler
 }
 
 func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {
@@ -90,19 +92,33 @@ func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {
 }
 
 func (t *svrTransHandler) ProtocolMatch(ctx context.Context, conn net.Conn) (err error) {
-	if t.provider.Available(ctx, conn) {
-		return nil
+	nconn, ok := conn.(netpoll.Connection)
+	if !ok {
+		return errProtocolNotMatch
 	}
-	return errProtocolNotMatch
+	data, err := nconn.Reader().Peek(8)
+	if err != nil {
+		return errProtocolNotMatch
+	}
+	if !ttheader.IsStreaming(data) {
+		return errProtocolNotMatch
+	}
+	return nil
 }
 
+type onDisConnectSetter interface {
+	SetOnDisconnect(onDisconnect netpoll.OnDisconnect) error
+}
+
+// OnActive will be called when a connection accepted
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
-	var err error
-	ctx, err = t.provider.OnActive(ctx, conn)
-	if err != nil {
-		return nil, err
-	}
-	return ctx, nil
+	nconn := conn.(netpoll.Connection)
+	trans := newTransport(serverTransport, nconn, nil)
+	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
+		// server only close transport when peer connection closed
+		_ = trans.Close(nil)
+	})
+	return context.WithValue(ctx, serverTransCtxKey{}, trans), nil
 }
 
 // OnRead control the connection level lifecycle.
@@ -111,31 +127,34 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	var wg sync.WaitGroup
 	defer func() {
 		wg.Wait()
-		_, nerr := t.provider.OnInactive(ctx, conn)
-		if err == nil && nerr != nil {
-			err = nerr
+		trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
+		if trans != nil {
+			trans.WaitClosed()
 		}
-		if err != nil {
-			klog.CtxErrorf(ctx, "KITEX: stream OnRead return: err=%v", err)
+		if errors.Is(err, io.EOF) {
+			err = nil
 		}
 	}()
 	// connection level goroutine
 	for {
-		nctx, st, nerr := t.provider.OnStream(ctx, conn)
-		if nerr != nil {
-			if errors.Is(nerr, io.EOF) {
-				return nil
-			}
-			klog.CtxErrorf(ctx, "KITEX: OnStream failed: err=%v", nerr)
-			return nerr
+		trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
+		if trans == nil {
+			err = fmt.Errorf("server transport is nil")
+			return
+		}
+		var st *stream
+		// ReadStream will block until a stream coming or conn return error
+		st, err = trans.ReadStream(ctx)
+		if err != nil {
+			return
 		}
 		wg.Add(1)
 		// stream level goroutine
-		gofunc.GoFunc(nctx, func() {
+		gofunc.GoFunc(ctx, func() {
 			defer wg.Done()
-			err := t.OnStream(nctx, conn, st)
+			err := t.OnStream(ctx, conn, st)
 			if err != nil && !errors.Is(err, io.EOF) {
-				t.OnError(nctx, err, conn)
+				t.OnError(ctx, err, conn)
 			}
 		})
 	}
@@ -158,11 +177,13 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 	ink := ri.Invocation().(rpcinfo.InvocationSetter)
 	sinfo := t.opt.SvcSearcher.SearchService(st.Service(), st.Method(), false)
 	if sinfo == nil {
-		return remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", st.Service()))
+		err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", st.Service()))
+		return
 	}
 	minfo := sinfo.MethodInfo(st.Method())
 	if minfo == nil {
-		return remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", st.Method()))
+		err = remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", st.Method()))
+		return
 	}
 	ink.SetServiceName(sinfo.ServiceName)
 	ink.SetMethodName(st.Method())
@@ -174,10 +195,10 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 
 	// headerHandler return a new stream level ctx
 	// it contains rpcinfo modified by HeaderHandler
-	if t.provider.headerHandler != nil {
-		ctx, err = t.provider.headerHandler.OnReadStream(ctx, st.meta, st.header)
+	if t.headerHandler != nil {
+		ctx, err = t.headerHandler.OnReadStream(ctx, st.meta, st.header)
 		if err != nil {
-			return err
+			return
 		}
 	}
 	// register metainfo into ctx
@@ -200,23 +221,22 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 		}
 		t.finishTracer(ctx, ri, err, panicErr)
 	}()
-
 	args := &streaming.Args{
 		ServerStream: ss,
 	}
 	if err = t.inkHdlFunc(ctx, args, nil); err != nil {
 		// treat err thrown by invoking handler as the final err, ignore the err returned by OnStreamFinish
-		t.provider.OnStreamFinish(ctx, ss, err)
+		_, _ = t.OnStreamFinish(ctx, ss, err)
 		return
 	}
 	if bizErr := ri.Invocation().BizStatusErr(); bizErr != nil {
 		// when biz err thrown, treat the err returned by OnStreamFinish as the final err
-		ctx, err = t.provider.OnStreamFinish(ctx, ss, bizErr)
+		ctx, err = t.OnStreamFinish(ctx, ss, bizErr)
 		return
 	}
 	// there is no invoking handler err or biz err, treat the err returned by OnStreamFinish as the final err
-	ctx, err = t.provider.OnStreamFinish(ctx, ss, nil)
-	return err
+	ctx, err = t.OnStreamFinish(ctx, ss, nil)
+	return
 }
 
 func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (nctx context.Context, err error) {
@@ -237,6 +257,52 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 	} else {
 		klog.CtxErrorf(ctx, "KITEX: processing ttstream request error, remoteAddr=%s, error=%s", conn.RemoteAddr(), err.Error())
 	}
+}
+
+func (t *svrTransHandler) OnStreamFinish(ctx context.Context, ss streaming.ServerStream, err error) (context.Context, error) {
+	sst := ss.(*serverStream)
+	var exception error
+	if err != nil {
+		switch terr := err.(type) {
+		case kerrors.BizStatusErrorIface:
+			bizStatus := strconv.Itoa(int(terr.BizStatusCode()))
+			bizMsg := terr.BizMessage()
+			if terr.BizExtra() == nil {
+				err = sst.writeTrailer(streaming.Trailer{
+					"biz-status":  bizStatus,
+					"biz-message": bizMsg,
+				})
+			} else {
+				bizExtra, _ := utils.Map2JSONStr(terr.BizExtra())
+				err = sst.writeTrailer(streaming.Trailer{
+					"biz-status":  bizStatus,
+					"biz-message": bizMsg,
+					"biz-extra":   bizExtra,
+				})
+			}
+			if err != nil {
+				return nil, err
+			}
+			exception = nil
+		case *thrift.ApplicationException:
+			exception = terr
+		case tException:
+			exception = thrift.NewApplicationException(terr.TypeId(), terr.Error())
+		default:
+			exception = thrift.NewApplicationException(remote.InternalError, terr.Error())
+		}
+	}
+	// server stream CloseSend will send the trailer with payload
+	if err = sst.CloseSend(exception); err != nil {
+		return nil, err
+	}
+
+	cancelFunc, _ := ctx.Value(serverStreamCancelCtxKey{}).(context.CancelFunc)
+	if cancelFunc != nil {
+		cancelFunc()
+	}
+
+	return ctx, nil
 }
 
 func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {

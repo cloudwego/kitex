@@ -17,10 +17,11 @@
 package apache
 
 import (
+	"testing"
+
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift/internal/test"
-	"testing"
 )
 
 type mockTStruct struct {
@@ -46,7 +47,6 @@ func TestCheckTStruct(t *testing.T) {
 }
 
 func TestCallThriftReadAndWrite(t *testing.T) {
-
 	var bytes []byte
 
 	s1 := &mockTStruct{content: "test"}
@@ -61,5 +61,4 @@ func TestCallThriftReadAndWrite(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	test.Assert(t, s1.content == s2.content)
-
 }

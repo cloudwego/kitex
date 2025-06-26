@@ -26,5 +26,5 @@ type TTHeaderStreamingOption struct {
 }
 
 type TTHeaderStreamingOptions struct {
-	TransportOptions []ttstream.ClientProviderOption
+	TransportOptions []ttstream.ClientHandlerOption
 }

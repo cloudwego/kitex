@@ -39,9 +39,9 @@ func WithTTHeaderStreamingOptions(opts ...TTHeaderStreamingOption) Option {
 }
 
 // WithTTHeaderStreamingTransportOptions add ttheader streaming transport options for server.
-func WithTTHeaderStreamingTransportOptions(opts ...ttstream.ServerProviderOption) TTHeaderStreamingOption {
+func WithTTHeaderStreamingTransportOptions(opts ...ttstream.ServerHandlerOption) TTHeaderStreamingOption {
 	return TTHeaderStreamingOption{F: func(o *remote.TTHeaderStreamingOptions, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithTTHeaderStreamingProviderOption(%T)", opts))
+		di.Push(fmt.Sprintf("WithTTHeaderStreamingHandlerOption(%T)", opts))
 
 		for _, opt := range opts {
 			o.TransportOptions = append(o.TransportOptions, opt)

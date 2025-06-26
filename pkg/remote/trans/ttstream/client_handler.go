@@ -29,11 +29,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
-var _ remote.ClientStreamFactory = (*clientProvider)(nil)
+var _ remote.ClientStreamFactory = (*clientTransHandler)(nil)
 
-// NewClientProvider return a client provider
-func NewClientProvider(opts ...ClientProviderOption) remote.ClientStreamFactory {
-	cp := new(clientProvider)
+// NewCliTransHandlerFactory return a client trans handler factory.
+func NewCliTransHandlerFactory(opts ...ClientHandlerOption) remote.ClientStreamFactory {
+	cp := new(clientTransHandler)
 	cp.transPool = newMuxConnTransPool(DefaultMuxConnConfig)
 	for _, opt := range opts {
 		opt(cp)
@@ -41,14 +41,14 @@ func NewClientProvider(opts ...ClientProviderOption) remote.ClientStreamFactory 
 	return cp
 }
 
-type clientProvider struct {
+type clientTransHandler struct {
 	transPool     transPool
 	metaHandler   MetaFrameHandler
 	headerHandler HeaderFrameWriteHandler
 }
 
-// NewStream return a client stream
-func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (streaming.ClientStream, error) {
+// NewStream creates a client stream
+func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (streaming.ClientStream, error) {
 	rconfig := ri.Config()
 	invocation := ri.Invocation()
 	method := invocation.MethodName()

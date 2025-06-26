@@ -25,6 +25,7 @@ import (
 	"net"
 	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -114,55 +115,54 @@ func (m *mockHeaderFrameReadHandler) OnReadStream(ctx context.Context, ihd IntHe
 	return ctx, nil
 }
 
-func TestOnStream(t *testing.T) {
-	ripTag := "rip"
-	tracer := &mockTracer{}
-	traceCtl := &rpcinfo.TraceController{}
-	traceCtl.Append(tracer)
-	factory := NewSvrTransHandlerFactory()
-	rawTransHdl, err := factory.NewTransHandler(&remote.ServerOption{
-		SvcSearcher: mock_remote.NewDefaultSvcSearcher(),
-		InitOrResetRPCInfoFunc: func(info rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-			return rpcinfo.NewRPCInfo(rpcinfo.NewEndpointInfo(
-				mocks.MockService2Name, mocks.Mock2Method, nil, make(map[string]string)), nil,
-				rpcinfo.NewInvocation(mocks.MockServiceName, mocks.MockStreamingMethod),
-				rpcinfo.NewRPCConfig(),
-				rpcinfo.NewRPCStats())
-		},
-		TracerCtl: traceCtl,
-		TTHeaderStreamingOptions: remote.TTHeaderStreamingOptions{
-			TransportOptions: []interface{}{
-				WithServerHeaderFrameHandler(&mockHeaderFrameReadHandler{
-					ripTag: ripTag,
-				}),
+func TestOnRead(t *testing.T) {
+	prepare := func() (ctx context.Context, ripTag string, tracer *mockTracer, transHdl *svrTransHandler, wconn netpoll.Connection, wb *writerBuffer, mockConn *mockNetpollConn) {
+		ripTag = "rip"
+		tracer = &mockTracer{}
+		traceCtl := &rpcinfo.TraceController{}
+		traceCtl.Append(tracer)
+		factory := NewSvrTransHandlerFactory()
+		rawTransHdl, err := factory.NewTransHandler(&remote.ServerOption{
+			SvcSearcher: mock_remote.NewDefaultSvcSearcher(),
+			InitOrResetRPCInfoFunc: func(info rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+				return rpcinfo.NewRPCInfo(rpcinfo.NewEndpointInfo(
+					mocks.MockService2Name, mocks.Mock2Method, nil, make(map[string]string)), nil,
+					rpcinfo.NewInvocation(mocks.MockServiceName, mocks.MockStreamingMethod),
+					rpcinfo.NewRPCConfig(),
+					rpcinfo.NewRPCStats())
 			},
-		},
-	})
-	test.Assert(t, err == nil, err)
-	transHdl := rawTransHdl.(*svrTransHandler)
+			TracerCtl: traceCtl,
+			TTHeaderStreamingOptions: remote.TTHeaderStreamingOptions{
+				TransportOptions: []interface{}{
+					WithServerHeaderFrameHandler(&mockHeaderFrameReadHandler{
+						ripTag: ripTag,
+					}),
+				},
+			},
+		})
+		test.Assert(t, err == nil, err)
+		transHdl = rawTransHdl.(*svrTransHandler)
 
-	rfd, wfd := netpoll.GetSysFdPairs()
-	rconn, err := netpoll.NewFDConnection(rfd)
-	test.Assert(t, err == nil, err)
-	wconn, err := netpoll.NewFDConnection(wfd)
-	test.Assert(t, err == nil, err)
-	wbuf := newWriterBuffer(wconn.Writer())
+		rfd, wfd := netpoll.GetSysFdPairs()
+		rconn, err := netpoll.NewFDConnection(rfd)
+		test.Assert(t, err == nil, err)
+		wconn, err = netpoll.NewFDConnection(wfd)
+		test.Assert(t, err == nil, err)
+		wb = newWriterBuffer(wconn.Writer())
 
-	mockConn := &mockNetpollConn{
-		Conn:   mocks.Conn{},
-		reader: rconn.Reader(),
-		writer: rconn.Writer(),
+		mockConn = &mockNetpollConn{
+			Conn:   mocks.Conn{},
+			reader: rconn.Reader(),
+			writer: rconn.Writer(),
+		}
+
+		ctx, err = transHdl.OnActive(context.Background(), mockConn)
+		test.Assert(t, err == nil, err)
+		return
 	}
 
-	ctx, aerr := transHdl.OnActive(context.Background(), mockConn)
-	test.Assert(t, aerr == nil, aerr)
-	defer func() {
-		wconn.Close()
-		_, aerr = transHdl.provider.OnInactive(ctx, mockConn)
-		test.Assert(t, aerr == nil, aerr)
-	}()
-
 	t.Run("invoking handler successfully", func(t *testing.T) {
+		ctx, ripTag, tracer, transHdl, wconn, wbuf, mockConn := prepare()
 		tracer.finishFunc = func(ctx context.Context) {
 			ri := rpcinfo.GetRPCInfo(ctx)
 			test.Assert(t, ri != nil, ri)
@@ -170,10 +170,12 @@ func TestOnStream(t *testing.T) {
 			test.Assert(t, ok)
 			test.Assert(t, rip == "127.0.0.1:8888", rip)
 		}
+		var invoked int32
 		transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+			atomic.StoreInt32(&invoked, 1)
 			return nil
 		})
-		err = EncodeFrame(context.Background(), wbuf, &Frame{
+		err := EncodeFrame(context.Background(), wbuf, &Frame{
 			streamFrame: streamFrame{
 				sid:    1,
 				method: mocks.MockStreamingMethod,
@@ -186,13 +188,17 @@ func TestOnStream(t *testing.T) {
 		test.Assert(t, err == nil, err)
 		err = wbuf.Flush()
 		test.Assert(t, err == nil, err)
-		nctx, st, err := transHdl.provider.OnStream(ctx, mockConn)
+		go func() {
+			time.Sleep(1 * time.Second)
+			wconn.Close()
+		}()
+		err = transHdl.OnRead(ctx, mockConn)
 		test.Assert(t, err == nil, err)
-		err = transHdl.OnStream(nctx, mockConn, st)
-		test.Assert(t, err == nil, err)
+		test.Assert(t, atomic.LoadInt32(&invoked) == 1)
 	})
 
 	t.Run("invoking handler panic", func(t *testing.T) {
+		ctx, ripTag, tracer, transHdl, wconn, wbuf, mockConn := prepare()
 		tracer.finishFunc = func(ctx context.Context) {
 			ri := rpcinfo.GetRPCInfo(ctx)
 			test.Assert(t, ri != nil, ri)
@@ -202,6 +208,7 @@ func TestOnStream(t *testing.T) {
 			ok, pErr := ri.Stats().Panicked()
 			test.Assert(t, ok)
 			test.Assert(t, errors.Is(pErr.(error), kerrors.ErrPanic), pErr)
+			test.Assert(t, errors.Is(ri.Stats().Error(), kerrors.ErrPanic))
 		}
 		transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
 			defer func() {
@@ -214,7 +221,7 @@ func TestOnStream(t *testing.T) {
 			}()
 			panic("test")
 		})
-		err = EncodeFrame(context.Background(), wbuf, &Frame{
+		err := EncodeFrame(context.Background(), wbuf, &Frame{
 			streamFrame: streamFrame{
 				sid:    1,
 				method: mocks.MockStreamingMethod,
@@ -227,14 +234,16 @@ func TestOnStream(t *testing.T) {
 		test.Assert(t, err == nil, err)
 		err = wbuf.Flush()
 		test.Assert(t, err == nil, err)
-		nctx, st, err := transHdl.provider.OnStream(ctx, mockConn)
+		go func() {
+			time.Sleep(1 * time.Second)
+			wconn.Close()
+		}()
+		err = transHdl.OnRead(ctx, mockConn)
 		test.Assert(t, err == nil, err)
-		err = transHdl.OnStream(nctx, mockConn, st)
-		test.Assert(t, errors.Is(err, kerrors.ErrPanic), err)
-		transHdl.OnError(ctx, err, mockConn)
 	})
 
 	t.Run("invoking handler throws biz error", func(t *testing.T) {
+		ctx, ripTag, tracer, transHdl, wconn, wbuf, mockConn := prepare()
 		tracer.finishFunc = func(ctx context.Context) {
 			ri := rpcinfo.GetRPCInfo(ctx)
 			test.Assert(t, ri != nil, ri)
@@ -257,7 +266,7 @@ func TestOnStream(t *testing.T) {
 			}()
 			return kerrors.NewBizStatusError(10000, "biz-error test")
 		})
-		err = EncodeFrame(context.Background(), wbuf, &Frame{
+		err := EncodeFrame(context.Background(), wbuf, &Frame{
 			streamFrame: streamFrame{
 				sid:    1,
 				method: mocks.MockStreamingMethod,
@@ -270,9 +279,11 @@ func TestOnStream(t *testing.T) {
 		test.Assert(t, err == nil, err)
 		err = wbuf.Flush()
 		test.Assert(t, err == nil, err)
-		nctx, st, err := transHdl.provider.OnStream(ctx, mockConn)
-		test.Assert(t, err == nil, err)
-		err = transHdl.OnStream(nctx, mockConn, st)
+		go func() {
+			time.Sleep(1 * time.Second)
+			wconn.Close()
+		}()
+		err = transHdl.OnRead(ctx, mockConn)
 		test.Assert(t, err == nil, err)
 	})
 }

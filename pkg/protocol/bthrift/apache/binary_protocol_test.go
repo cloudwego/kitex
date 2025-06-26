@@ -18,14 +18,14 @@ package apache
 
 import (
 	"context"
+	"testing"
+
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift/internal/test"
-	"testing"
 )
 
 func TestBinaryProtocolWrite(t *testing.T) {
-
 	var bytes []byte
 	w := bufiox.NewBytesWriter(&bytes)
 	bp := NewBinaryProtocol(nil, w)
@@ -120,7 +120,6 @@ func TestBinaryProtocolWrite(t *testing.T) {
 }
 
 func TestBinaryProtocolRead(t *testing.T) {
-
 	var bytes []byte
 	bw := bufiox.NewBytesWriter(&bytes)
 	w := thrift.NewBufferWriter(bw)
