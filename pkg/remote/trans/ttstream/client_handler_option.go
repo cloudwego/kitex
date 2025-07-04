@@ -16,40 +16,43 @@
 
 package ttstream
 
-// ClientProviderOption define client provider options
-type ClientProviderOption func(cp *clientProvider)
+// ClientHandlerOption define client handler options
+type ClientHandlerOption func(cp *clientTransHandler)
+
+// Deprecated: use ClientHandlerOption instead
+type ClientProviderOption = ClientHandlerOption
 
 // WithClientMetaFrameHandler register TTHeader Streaming meta frame handler
-func WithClientMetaFrameHandler(handler MetaFrameHandler) ClientProviderOption {
-	return func(cp *clientProvider) {
+func WithClientMetaFrameHandler(handler MetaFrameHandler) ClientHandlerOption {
+	return func(cp *clientTransHandler) {
 		cp.metaHandler = handler
 	}
 }
 
 // WithClientHeaderFrameHandler register TTHeader Streaming header frame handler
-func WithClientHeaderFrameHandler(handler HeaderFrameWriteHandler) ClientProviderOption {
-	return func(cp *clientProvider) {
+func WithClientHeaderFrameHandler(handler HeaderFrameWriteHandler) ClientHandlerOption {
+	return func(cp *clientTransHandler) {
 		cp.headerHandler = handler
 	}
 }
 
 // WithClientLongConnPool using long connection pool for client
-func WithClientLongConnPool(config LongConnConfig) ClientProviderOption {
-	return func(cp *clientProvider) {
+func WithClientLongConnPool(config LongConnConfig) ClientHandlerOption {
+	return func(cp *clientTransHandler) {
 		cp.transPool = newLongConnTransPool(config)
 	}
 }
 
 // WithClientShortConnPool using short connection pool for client
-func WithClientShortConnPool() ClientProviderOption {
-	return func(cp *clientProvider) {
+func WithClientShortConnPool() ClientHandlerOption {
+	return func(cp *clientTransHandler) {
 		cp.transPool = newShortConnTransPool()
 	}
 }
 
 // WithClientMuxConnPool using mux connection pool for client
-func WithClientMuxConnPool(config MuxConnConfig) ClientProviderOption {
-	return func(cp *clientProvider) {
+func WithClientMuxConnPool(config MuxConnConfig) ClientHandlerOption {
+	return func(cp *clientTransHandler) {
 		cp.transPool = newMuxConnTransPool(config)
 	}
 }

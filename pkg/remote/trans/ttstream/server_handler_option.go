@@ -16,19 +16,15 @@
 
 package ttstream
 
-// ServerProviderOption define server provider options
-type ServerProviderOption func(pc *serverProvider)
+// ServerHandlerOption define server provider options
+type ServerHandlerOption func(pc *svrTransHandler)
 
-// WithServerMetaFrameHandler register TTHeader Streaming meta frame handler
-func WithServerMetaFrameHandler(handler MetaFrameHandler) ServerProviderOption {
-	return func(sp *serverProvider) {
-		sp.metaHandler = handler
-	}
-}
+// Deprecated: use ServerHandlerOption instead
+type ServerProviderOption = ServerHandlerOption
 
 // WithServerHeaderFrameHandler register TTHeader Streaming header frame handler
-func WithServerHeaderFrameHandler(handler HeaderFrameReadHandler) ServerProviderOption {
-	return func(sp *serverProvider) {
+func WithServerHeaderFrameHandler(handler HeaderFrameReadHandler) ServerHandlerOption {
+	return func(sp *svrTransHandler) {
 		sp.headerHandler = handler
 	}
 }
