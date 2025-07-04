@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloudwego/dynamicgo/meta"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
+	_ "github.com/cloudwego/dynamicgo/thrift/annotation"
 	"github.com/cloudwego/thriftgo/parser"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
