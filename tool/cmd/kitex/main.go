@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/cloudwego/kitex/tool/cmd/kitex/utils"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util/env"
 
 	"github.com/cloudwego/kitex/tool/cmd/kitex/sdk"
 
@@ -33,7 +34,6 @@ import (
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
 	"github.com/cloudwego/kitex/tool/internal_pkg/prutal"
-	"github.com/cloudwego/kitex/tool/internal_pkg/util/env"
 )
 
 var args kargs.Arguments
@@ -97,13 +97,17 @@ func main() {
 			os.Exit(versions.CompatibilityCheckExitCode)
 		}
 	}
-	if args.IsProtobuf() && !env.UseProtoc() {
-		g := prutal.NewPrutalGen(args.Config)
-		if err := g.Process(); err != nil {
-			log.Errorf("%s", err)
-			os.Exit(1)
+	if args.IsProtobuf() {
+		// Whether using protoc or prutal, no longer generate the fast api for protobuf
+		args.Config.NoFastAPI = true
+		if !env.UseProtoc() {
+			g := prutal.NewPrutalGen(args.Config)
+			if err := g.Process(); err != nil {
+				log.Errorf("%s", err)
+				os.Exit(1)
+			}
+			return
 		}
-		return
 	}
 
 	out := new(bytes.Buffer)
