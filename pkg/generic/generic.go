@@ -28,23 +28,22 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-// Generic ...
-type Generic interface {
-	Closer
+type DeprecatedBinaryThriftGeneric interface {
+	Generic
 	// PayloadCodec return codec implement
 	// this is used for generic which does not need IDL
 	PayloadCodec() remote.PayloadCodec
+}
+
+// Generic ...
+type Generic interface {
+	Closer
 	// PayloadCodecType return the type of codec
 	PayloadCodecType() serviceinfo.PayloadCodec
-	// RawThriftBinaryGeneric must be framed
-	Framed() bool
-	// GetMethod is to get method name if needed
-	GetMethod(req interface{}, method string) (*Method, error)
+	// Methods return all methods info parsed from idl
+	Methods() (map[string]serviceinfo.MethodInfo, serviceinfo.GenericMethodFunc)
 	// IDLServiceName returns idl service name
 	IDLServiceName() string
-	// MessageReaderWriter returns reader and writer
-	// this is used for generic which needs IDL
-	MessageReaderWriter() interface{}
 }
 
 // Method information
@@ -67,6 +66,12 @@ const (
 // BinaryThriftGeneric raw thrift binary Generic
 func BinaryThriftGeneric() Generic {
 	return &binaryThriftGeneric{}
+}
+
+func BinaryThriftGenericV2(serviceName string) Generic {
+	return &binaryThriftGenericV2{
+		codec: newBinaryThriftCodecV2(serviceName),
+	}
 }
 
 // BinaryPbGeneric raw protobuf binary payload Generic
@@ -223,10 +228,6 @@ var pbCodec = protobuf.NewProtobufCodec()
 
 type binaryThriftGeneric struct{}
 
-func (g *binaryThriftGeneric) Framed() bool {
-	return true
-}
-
 func (g *binaryThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
 	return serviceinfo.Thrift
 }
@@ -236,8 +237,13 @@ func (g *binaryThriftGeneric) PayloadCodec() remote.PayloadCodec {
 	return pc
 }
 
-func (g *binaryThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return &Method{Name: method, Oneway: false}, nil
+func (g *binaryThriftGeneric) Methods() (map[string]serviceinfo.MethodInfo, serviceinfo.GenericMethodFunc) {
+	// note: binary generic cannot be used with multi-service or streaming feature
+	mi := serviceinfo.NewMethodInfo(callHandler, newGenericServiceCallArgs, newGenericServiceCallResult, false)
+	genericMethod := func(streamMode serviceinfo.StreamingMode) serviceinfo.MethodInfo {
+		return mi
+	}
+	return make(map[string]serviceinfo.MethodInfo), genericMethod
 }
 
 func (g *binaryThriftGeneric) Close() error {
@@ -245,10 +251,37 @@ func (g *binaryThriftGeneric) Close() error {
 }
 
 func (g *binaryThriftGeneric) IDLServiceName() string {
-	return ""
+	return serviceinfo.GenericService
 }
 
-func (g *binaryThriftGeneric) MessageReaderWriter() interface{} {
+type binaryThriftGenericV2 struct {
+	codec *binaryThriftCodecV2
+}
+
+func (b *binaryThriftGenericV2) IDLServiceName() string {
+	return b.codec.svcName
+}
+
+func (b *binaryThriftGenericV2) PayloadCodecType() serviceinfo.PayloadCodec {
+	return serviceinfo.Thrift
+}
+
+func (b *binaryThriftGenericV2) Methods() (map[string]serviceinfo.MethodInfo, serviceinfo.GenericMethodFunc) {
+	rw := b.codec.getMessageReaderWriter()
+	methods := map[string]serviceinfo.MethodInfo{
+		serviceinfo.GenericClientStreamingMethod:        newMethodInfo(rw, serviceinfo.StreamingClient, false),
+		serviceinfo.GenericServerStreamingMethod:        newMethodInfo(rw, serviceinfo.StreamingServer, false),
+		serviceinfo.GenericBidirectionalStreamingMethod: newMethodInfo(rw, serviceinfo.StreamingBidirectional, false),
+		serviceinfo.GenericMethod:                       newMethodInfo(rw, serviceinfo.StreamingNone, false),
+	}
+	genericMethod := func(streamMode serviceinfo.StreamingMode) serviceinfo.MethodInfo {
+		key := getGenericStreamingMethodInfoKey(streamMode)
+		return methods[key]
+	}
+	return make(map[string]serviceinfo.MethodInfo), genericMethod
+}
+
+func (b *binaryThriftGenericV2) Close() error {
 	return nil
 }
 
@@ -256,20 +289,23 @@ type binaryPbGeneric struct {
 	codec *binaryPbCodec
 }
 
-func (g *binaryPbGeneric) Framed() bool {
-	return false
-}
-
 func (g *binaryPbGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
 	return serviceinfo.Protobuf
 }
 
-func (g *binaryPbGeneric) PayloadCodec() remote.PayloadCodec {
-	return nil
-}
-
-func (g *binaryPbGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return &Method{Name: method, Oneway: false}, nil
+func (g *binaryPbGeneric) Methods() (map[string]serviceinfo.MethodInfo, serviceinfo.GenericMethodFunc) {
+	rw := g.codec.getMessageReaderWriter()
+	methods := map[string]serviceinfo.MethodInfo{
+		serviceinfo.GenericClientStreamingMethod:        newMethodInfo(rw, serviceinfo.StreamingClient, false),
+		serviceinfo.GenericServerStreamingMethod:        newMethodInfo(rw, serviceinfo.StreamingServer, false),
+		serviceinfo.GenericBidirectionalStreamingMethod: newMethodInfo(rw, serviceinfo.StreamingBidirectional, false),
+		serviceinfo.GenericMethod:                       newMethodInfo(rw, serviceinfo.StreamingNone, false),
+	}
+	genericMethod := func(streamMode serviceinfo.StreamingMode) serviceinfo.MethodInfo {
+		key := getGenericStreamingMethodInfoKey(streamMode)
+		return methods[key]
+	}
+	return make(map[string]serviceinfo.MethodInfo), genericMethod
 }
 
 func (g *binaryPbGeneric) Close() error {
@@ -292,20 +328,17 @@ type mapThriftGeneric struct {
 	codec *mapThriftCodec
 }
 
-func (g *mapThriftGeneric) Framed() bool {
-	return false
-}
-
 func (g *mapThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
 	return serviceinfo.Thrift
 }
 
-func (g *mapThriftGeneric) PayloadCodec() remote.PayloadCodec {
-	return nil
-}
-
-func (g *mapThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return g.codec.getMethod(req, method)
+func (g *mapThriftGeneric) Methods() (map[string]serviceinfo.MethodInfo, serviceinfo.GenericMethodFunc) {
+	functions := g.codec.getServiceDescriptor().Functions
+	res := make(map[string]serviceinfo.MethodInfo, len(functions))
+	for name, fn := range functions {
+		res[name] = newMethodInfo(g.codec.getMessageReaderWriter(), fn.StreamingMode, fn.Oneway)
+	}
+	return res, nil
 }
 
 func (g *mapThriftGeneric) Close() error {
@@ -316,10 +349,6 @@ func (g *mapThriftGeneric) IDLServiceName() string {
 	return g.codec.svcName
 }
 
-func (g *mapThriftGeneric) MessageReaderWriter() interface{} {
-	return g.codec.getMessageReaderWriter()
-}
-
 func (g *mapThriftGeneric) GetExtra(key string) string {
 	return g.codec.extra[key]
 }
@@ -328,20 +357,17 @@ type jsonThriftGeneric struct {
 	codec *jsonThriftCodec
 }
 
-func (g *jsonThriftGeneric) Framed() bool {
-	return g.codec.dynamicgoEnabled
-}
-
 func (g *jsonThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
 	return serviceinfo.Thrift
 }
 
-func (g *jsonThriftGeneric) PayloadCodec() remote.PayloadCodec {
-	return nil
-}
-
-func (g *jsonThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return g.codec.getMethod(req, method)
+func (g *jsonThriftGeneric) Methods() (map[string]serviceinfo.MethodInfo, serviceinfo.GenericMethodFunc) {
+	functions := g.codec.getServiceDescriptor().Functions
+	res := make(map[string]serviceinfo.MethodInfo, len(functions))
+	for name, fn := range functions {
+		res[name] = newMethodInfo(g.codec.getMessageReaderWriter(), fn.StreamingMode, fn.Oneway)
+	}
+	return res, nil
 }
 
 func (g *jsonThriftGeneric) Close() error {
@@ -352,10 +378,6 @@ func (g *jsonThriftGeneric) IDLServiceName() string {
 	return g.codec.svcName
 }
 
-func (g *jsonThriftGeneric) MessageReaderWriter() interface{} {
-	return g.codec.getMessageReaderWriter()
-}
-
 func (g *jsonThriftGeneric) GetExtra(key string) string {
 	return g.codec.extra[key]
 }
@@ -364,20 +386,17 @@ type jsonPbGeneric struct {
 	codec *jsonPbCodec
 }
 
-func (g *jsonPbGeneric) Framed() bool {
-	return false
-}
-
 func (g *jsonPbGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
 	return serviceinfo.Protobuf
 }
 
-func (g *jsonPbGeneric) PayloadCodec() remote.PayloadCodec {
-	return nil
-}
-
-func (g *jsonPbGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return g.codec.getMethod(req, method)
+func (g *jsonPbGeneric) Methods() (map[string]serviceinfo.MethodInfo, serviceinfo.GenericMethodFunc) {
+	functions := g.codec.getServiceDescriptor().Methods()
+	res := make(map[string]serviceinfo.MethodInfo, len(functions))
+	for name, fn := range functions {
+		res[name] = newMethodInfo(g.codec.getMessageReaderWriter(), getStreamingMode(fn), false)
+	}
+	return res, nil
 }
 
 func (g *jsonPbGeneric) Close() error {
@@ -388,10 +407,6 @@ func (g *jsonPbGeneric) IDLServiceName() string {
 	return g.codec.svcName
 }
 
-func (g *jsonPbGeneric) MessageReaderWriter() interface{} {
-	return g.codec.getMessageReaderWriter()
-}
-
 func (g *jsonPbGeneric) GetExtra(key string) string {
 	return g.codec.extra[key]
 }
@@ -400,20 +415,17 @@ type httpThriftGeneric struct {
 	codec *httpThriftCodec
 }
 
-func (g *httpThriftGeneric) Framed() bool {
-	return g.codec.dynamicgoEnabled
-}
-
 func (g *httpThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
 	return serviceinfo.Thrift
 }
 
-func (g *httpThriftGeneric) PayloadCodec() remote.PayloadCodec {
-	return nil
-}
-
-func (g *httpThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return g.codec.getMethod(req)
+func (g *httpThriftGeneric) Methods() (map[string]serviceinfo.MethodInfo, serviceinfo.GenericMethodFunc) {
+	functions := g.codec.getServiceDescriptor().Functions
+	res := make(map[string]serviceinfo.MethodInfo, len(functions))
+	for name, fn := range functions {
+		res[name] = newMethodInfo(g.codec.getMessageReaderWriter(), fn.StreamingMode, fn.Oneway)
+	}
+	return res, nil
 }
 
 func (g *httpThriftGeneric) Close() error {
@@ -424,10 +436,6 @@ func (g *httpThriftGeneric) IDLServiceName() string {
 	return g.codec.svcName
 }
 
-func (g *httpThriftGeneric) MessageReaderWriter() interface{} {
-	return g.codec.getMessageReaderWriter()
-}
-
 func (g *httpThriftGeneric) GetExtra(key string) string {
 	return g.codec.extra[key]
 }
@@ -436,20 +444,17 @@ type httpPbThriftGeneric struct {
 	codec *httpPbThriftCodec
 }
 
-func (g *httpPbThriftGeneric) Framed() bool {
-	return false
-}
-
 func (g *httpPbThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
 	return serviceinfo.Thrift
 }
 
-func (g *httpPbThriftGeneric) PayloadCodec() remote.PayloadCodec {
-	return nil
-}
-
-func (g *httpPbThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return g.codec.getMethod(req)
+func (g *httpPbThriftGeneric) Methods() (map[string]serviceinfo.MethodInfo, serviceinfo.GenericMethodFunc) {
+	functions := g.codec.getServiceDescriptor().Functions
+	res := make(map[string]serviceinfo.MethodInfo, len(functions))
+	for name, fn := range functions {
+		res[name] = newMethodInfo(g.codec.getMessageReaderWriter(), fn.StreamingMode, fn.Oneway)
+	}
+	return res, nil
 }
 
 func (g *httpPbThriftGeneric) Close() error {
@@ -458,10 +463,6 @@ func (g *httpPbThriftGeneric) Close() error {
 
 func (g *httpPbThriftGeneric) IDLServiceName() string {
 	return g.codec.svcName
-}
-
-func (g *httpPbThriftGeneric) MessageReaderWriter() interface{} {
-	return g.codec.getMessageReaderWriter()
 }
 
 func (g *httpPbThriftGeneric) GetExtra(key string) string {
@@ -475,4 +476,38 @@ func HasIDLInfo(g Generic) bool {
 	default:
 		return true
 	}
+}
+
+func newMethodInfo(readWriter interface{}, sm serviceinfo.StreamingMode, oneway bool) serviceinfo.MethodInfo {
+	methodInfoGetter := func(handler serviceinfo.MethodHandler) serviceinfo.MethodInfo {
+		return serviceinfo.NewMethodInfo(
+			handler,
+			func() interface{} {
+				args := &Args{}
+				args.SetCodec(readWriter)
+				return args
+			},
+			func() interface{} {
+				result := &Result{}
+				result.SetCodec(readWriter)
+				return result
+			},
+			oneway,
+			serviceinfo.WithStreamingMode(sm),
+		)
+	}
+	var streamHandlerGetter func(mi serviceinfo.MethodInfo) serviceinfo.MethodHandler
+	switch sm {
+	case serviceinfo.StreamingClient:
+		streamHandlerGetter = clientStreamingHandlerGetter
+	case serviceinfo.StreamingServer:
+		streamHandlerGetter = serverStreamingHandlerGetter
+	case serviceinfo.StreamingBidirectional:
+		streamHandlerGetter = bidiStreamingHandlerGetter
+	}
+	if streamHandlerGetter != nil {
+		// note: construct method info twice to make the method handler obtain the args/results constructor.
+		return methodInfoGetter(streamHandlerGetter(methodInfoGetter(nil)))
+	}
+	return methodInfoGetter(callHandler)
 }

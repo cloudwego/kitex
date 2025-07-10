@@ -43,6 +43,8 @@ const (
 	GenericBidirectionalStreamingMethod = "$GenericBidirectionalStreamingMethod"
 )
 
+type GenericMethodFunc func(streamMode StreamingMode) MethodInfo
+
 // ServiceInfo to record meta info of service
 type ServiceInfo struct {
 	// deprecated, for compatibility
@@ -70,7 +72,7 @@ type ServiceInfo struct {
 
 	// GenericMethod returns a MethodInfo for the given name.
 	// It is used by generic calls only.
-	GenericMethod func(name string) MethodInfo
+	GenericMethod GenericMethodFunc
 }
 
 // GetPackageName returns the PackageName.

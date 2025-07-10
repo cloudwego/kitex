@@ -19,8 +19,10 @@ package server
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -38,10 +40,55 @@ func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, smw servi
 	return &service{svcInfo: svcInfo, handler: handler, serviceMiddlewares: smw}
 }
 
+type unknownService struct {
+	mutex   sync.RWMutex
+	svcs    map[string]*service
+	handler interface{}
+}
+
+func (u *unknownService) getSvc(svcName string) *service {
+	u.mutex.RLock()
+	svc := u.svcs[svcName]
+	u.mutex.RUnlock()
+	return svc
+}
+
+func (u *unknownService) getOrStoreSvc(svcName string, codecType serviceinfo.PayloadCodec) *service {
+	u.mutex.RLock()
+	svc, ok := u.svcs[svcName]
+	u.mutex.RUnlock()
+	if ok {
+		return svc
+	}
+	u.mutex.Lock()
+	defer u.mutex.Unlock()
+	svc, ok = u.svcs[svcName]
+	if ok {
+		return svc
+	}
+	var g generic.Generic
+	switch codecType {
+	case serviceinfo.Thrift:
+		g = generic.BinaryThriftGenericV2(svcName)
+	case serviceinfo.Protobuf:
+		g = generic.BinaryPbGeneric(svcName, "")
+	default:
+		u.svcs[svcName] = nil
+		return nil
+	}
+	svc = &service{
+		svcInfo: generic.ServiceInfoWithGeneric(g),
+		handler: u.handler,
+	}
+	u.svcs[svcName] = svc
+	return svc
+}
+
 type services struct {
 	methodSvcsMap map[string][]*service // key: method name
 	svcMap        map[string]*service   // key: service name
 	fallbackSvc   *service
+	unknownSvc    *unknownService
 
 	refuseTrafficWithoutServiceName bool
 }
@@ -60,12 +107,24 @@ func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interfac
 		serviceMWs.MW = endpoint.Chain(registerOpts.Middlewares...)
 	}
 
+	// unknown service
+	if registerOpts.IsUnknownService {
+		if s.unknownSvc != nil {
+			return errors.New("multiple unknown services cannot be registered")
+		}
+		s.unknownSvc = &unknownService{svcs: map[string]*service{}}
+		return nil
+	}
+
 	svc := newService(svcInfo, handler, serviceMWs)
 	if registerOpts.IsFallbackService {
 		if s.fallbackSvc != nil {
 			return fmt.Errorf("multiple fallback services cannot be registered. [%s] is already registered as a fallback service", s.fallbackSvc.svcInfo.ServiceName)
 		}
 		s.fallbackSvc = svc
+	}
+	if _, ok := s.svcMap[svcInfo.ServiceName]; ok {
+		return fmt.Errorf("service [%s] has already been registered", svcInfo.ServiceName)
 	}
 	s.svcMap[svcInfo.ServiceName] = svc
 	// method search map
@@ -105,10 +164,23 @@ func (s *services) check(refuseTrafficWithoutServiceName bool) error {
 	return nil
 }
 
-func (s *services) SearchService(svcName, methodName string, strict bool) *serviceinfo.ServiceInfo {
+func (s *services) getService(svcName string) *service {
+	if svc := s.svcMap[svcName]; svc != nil {
+		return svc
+	}
+	if s.unknownSvc != nil {
+		return s.unknownSvc.getSvc(svcName)
+	}
+	return nil
+}
+
+func (s *services) SearchService(svcName, methodName string, strict bool, codecType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
 	if strict || s.refuseTrafficWithoutServiceName {
 		if svc := s.svcMap[svcName]; svc != nil {
 			return svc.svcInfo
+		}
+		if s.unknownSvc != nil {
+			return s.unknownSvc.getOrStoreSvc(svcName, codecType).svcInfo
 		}
 		return nil
 	}
@@ -129,6 +201,24 @@ func (s *services) SearchService(svcName, methodName string, strict bool) *servi
 		}
 	}
 	if svc != nil {
+		return svc.svcInfo
+	}
+	if s.unknownSvc != nil {
+		return s.unknownSvc.getOrStoreSvc(svcName, codecType).svcInfo
+	}
+	return nil
+}
+
+func (s *services) hasRegisteredService() bool {
+	return len(s.svcMap) > 0 || s.unknownSvc != nil
+}
+
+// getTargetSvcInfo returns the service info if there is only one service registered.
+func (s *services) getTargetSvcInfo() *serviceinfo.ServiceInfo {
+	if len(s.svcMap) != 1 {
+		return nil
+	}
+	for _, svc := range s.svcMap {
 		return svc.svcInfo
 	}
 	return nil

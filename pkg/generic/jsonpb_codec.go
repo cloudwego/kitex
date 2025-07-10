@@ -107,6 +107,10 @@ func (c *jsonPbCodec) getMethod(req interface{}, method string) (*Method, error)
 	return &Method{method, false, getStreamingMode(fnSvc)}, nil
 }
 
+func (c *jsonPbCodec) getServiceDescriptor() *dproto.ServiceDescriptor {
+	return c.svcDsc.Load().(*dproto.ServiceDescriptor)
+}
+
 func (c *jsonPbCodec) Name() string {
 	return "JSONPb"
 }

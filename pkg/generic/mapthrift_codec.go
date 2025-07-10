@@ -128,6 +128,10 @@ func (c *mapThriftCodec) getMethod(req interface{}, method string) (*Method, err
 	return &Method{method, fnSvc.Oneway, fnSvc.StreamingMode}, nil
 }
 
+func (c *mapThriftCodec) getServiceDescriptor() *descriptor.ServiceDescriptor {
+	return c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+}
+
 func (c *mapThriftCodec) Name() string {
 	return "MapThrift"
 }

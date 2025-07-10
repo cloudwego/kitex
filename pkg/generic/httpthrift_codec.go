@@ -157,6 +157,10 @@ func (c *httpThriftCodec) getMethod(req interface{}) (*Method, error) {
 	return &Method{function.Name, function.Oneway, function.StreamingMode}, nil
 }
 
+func (c *httpThriftCodec) getServiceDescriptor() *descriptor.ServiceDescriptor {
+	return c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+}
+
 func (c *httpThriftCodec) Name() string {
 	return "HttpThrift"
 }

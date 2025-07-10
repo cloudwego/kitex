@@ -59,7 +59,7 @@ func NewInvoker(opts ...Option) Invoker {
 
 // Init does initialization job for invoker.
 func (s *tInvoker) Init() (err error) {
-	if len(s.server.svcs.svcMap) == 0 {
+	if !s.svcs.hasRegisteredService() {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
 	s.initBasicRemoteOption()

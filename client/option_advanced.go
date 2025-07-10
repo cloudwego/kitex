@@ -37,7 +37,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/cloudwego/kitex/transport"
 )
 
 // WithHTTPConnection specifies client use RPC over http.
@@ -175,10 +174,9 @@ func WithGeneric(g generic.Generic) Option {
 		if g == nil {
 			panic("invalid Generic: nil")
 		}
-		if g.Framed() {
-			rpcinfo.AsMutableRPCConfig(o.Configs).SetTransportProtocol(transport.Framed)
+		if bg, ok := g.(generic.DeprecatedBinaryThriftGeneric); ok {
+			o.RemoteOpt.PayloadCodec = bg.PayloadCodec()
 		}
-		o.RemoteOpt.PayloadCodec = g.PayloadCodec()
 	}}
 }
 

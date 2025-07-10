@@ -34,6 +34,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	ktransport "github.com/cloudwego/kitex/transport"
 )
@@ -156,7 +157,7 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 	}()
 
 	ink := ri.Invocation().(rpcinfo.InvocationSetter)
-	sinfo := t.opt.SvcSearcher.SearchService(st.Service(), st.Method(), false)
+	sinfo := t.opt.SvcSearcher.SearchService(st.Service(), st.Method(), true, serviceinfo.Thrift) // fixme: use PayloadCodec
 	if sinfo == nil {
 		return remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", st.Service()))
 	}

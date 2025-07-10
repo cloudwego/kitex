@@ -55,7 +55,7 @@ type WriteJSON struct {
 var _ MessageWriter = (*WriteJSON)(nil)
 
 // Write converts msg to protobuf wire format and returns an output bytebuffer
-func (m *WriteJSON) Write(ctx context.Context, msg interface{}, method string, isClient bool) (interface{}, error) {
+func (m *WriteJSON) WritePb(ctx context.Context, msg interface{}, method string, isClient bool) (interface{}, error) {
 	var s string
 	if msg == nil {
 		s = "{}"
@@ -107,7 +107,7 @@ type ReadJSON struct {
 var _ MessageReader = (*ReadJSON)(nil)
 
 // Read reads data from actualMsgBuf and convert to json string
-func (m *ReadJSON) Read(ctx context.Context, method string, isClient bool, actualMsgBuf []byte) (interface{}, error) {
+func (m *ReadJSON) ReadPb(ctx context.Context, method string, isClient bool, actualMsgBuf []byte) (interface{}, error) {
 	// create dynamic message here, once method string has been extracted
 	fnDsc := m.dynamicgoSvcDsc.LookupMethodByName(method)
 	if fnDsc == nil {

@@ -25,9 +25,16 @@ type RegisterOption struct {
 	F func(o *RegisterOptions)
 }
 
+func WithUnknownService() RegisterOption {
+	return RegisterOption{F: func(o *RegisterOptions) {
+		o.IsUnknownService = true
+	}}
+}
+
 // RegisterOptions is used to config service registration.
 type RegisterOptions struct {
 	IsFallbackService bool
+	IsUnknownService  bool
 	Middlewares       []endpoint.Middleware
 }
 

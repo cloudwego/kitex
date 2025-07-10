@@ -14,10 +14,16 @@
  * limitations under the License.
  */
 
-package proto
+package thrift
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/bytedance/gopkg/lang/dirtmake"
+	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 )
 
 type RawReaderWriter struct {
@@ -40,8 +46,13 @@ type RawWriter struct{}
 var _ MessageWriter = (*RawWriter)(nil)
 
 // Write returns the copy of data
-func (m *RawWriter) WritePb(ctx context.Context, msg interface{}, method string, isClient bool) (interface{}, error) {
-	return msg, nil
+func (m *RawWriter) Write(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+	buf, ok := msg.([]byte)
+	if !ok {
+		return fmt.Errorf("thrift binary generic msg is not []byte, method=%v", method)
+	}
+	_, err := out.WriteBinary(buf)
+	return err
 }
 
 // NewRawReader build RawReader
@@ -55,8 +66,13 @@ type RawReader struct{}
 var _ MessageReader = (*RawReader)(nil)
 
 // Read returns the copy of data
-func (m *RawReader) ReadPb(ctx context.Context, method string, isClient bool, actualMsgBuf []byte) (interface{}, error) {
-	copied := make([]byte, len(actualMsgBuf))
-	copy(copied, actualMsgBuf)
-	return copied, nil
+func (m *RawReader) Read(ctx context.Context, method string, isClient bool, dataLen int, in bufiox.Reader) (interface{}, error) {
+	if dataLen > 0 {
+		buf := dirtmake.Bytes(dataLen, dataLen)
+		_, err := in.ReadBinary(buf)
+		return buf, err
+	}
+	d := thrift.NewSkipDecoder(in)
+	defer d.Release()
+	return d.Next(thrift.STRUCT)
 }

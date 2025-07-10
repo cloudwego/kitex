@@ -83,7 +83,7 @@ func NewProtocolInfo(tp transport.Protocol, ct serviceinfo.PayloadCodec) Protoco
 // ServiceSearcher is used to search the service info by service name and method name,
 // strict equals to true means the service name must match the registered service name.
 type ServiceSearcher interface {
-	SearchService(svcName, methodName string, strict bool) *serviceinfo.ServiceInfo
+	SearchService(svcName, methodName string, strict bool, codecType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo
 }
 
 // Message is the core abstraction for Kitex message.
@@ -193,7 +193,7 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 		}
 		return m.targetSvcInfo, nil
 	}
-	svcInfo := m.svcSearcher.SearchService(svcName, methodName, false)
+	svcInfo := m.svcSearcher.SearchService(svcName, methodName, false, m.ProtocolInfo().CodecType)
 	if svcInfo == nil {
 		return nil, NewTransErrorWithMsg(UnknownService, fmt.Sprintf("unknown service %s, method %s", svcName, methodName))
 	}

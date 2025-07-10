@@ -1294,16 +1294,10 @@ func newStreamingServer(svcName string, args []streamingMethodArg, mws []endpoin
 		Methods:     methods,
 	}
 	svr := &server{
-		svcs: &services{
-			svcMap: map[string]*service{
-				svcName: {
-					svcInfo:            svcInfo,
-					serviceMiddlewares: serviceMiddlewares{MW: endpoint.Chain(mws...)},
-				},
-			},
-		},
-		opt: internal_server.NewOptions(nil),
+		svcs: newServices(),
+		opt:  internal_server.NewOptions(nil),
 	}
+	svr.svcs.addService(svcInfo, nil, &RegisterOptions{Middlewares: mws})
 	return svr
 }
 

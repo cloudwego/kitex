@@ -147,6 +147,10 @@ func (c *jsonThriftCodec) getMethod(req interface{}, method string) (*Method, er
 	return &Method{method, fnSvc.Oneway, fnSvc.StreamingMode}, nil
 }
 
+func (c *jsonThriftCodec) getServiceDescriptor() *descriptor.ServiceDescriptor {
+	return c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+}
+
 func (c *jsonThriftCodec) Name() string {
 	return "JSONThrift"
 }

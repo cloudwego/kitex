@@ -129,16 +129,8 @@ func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, 
 	_args.Method = method
 	_args.Request = request
 
-	mt, err := gc.g.GetMethod(request, method)
-	if err != nil {
-		return nil, err
-	}
-	if mt.Oneway {
-		return nil, gc.kClient.Call(ctx, mt.Name, _args, nil)
-	}
-
 	_result := mtInfo.NewResult().(*generic.Result)
-	if err = gc.kClient.Call(ctx, mt.Name, _args, _result); err != nil {
+	if err = gc.kClient.Call(ctx, method, _args, _result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

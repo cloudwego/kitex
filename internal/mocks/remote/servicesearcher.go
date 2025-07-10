@@ -45,7 +45,7 @@ func NewDefaultSvcSearcher() *MockSvcSearcher {
 	return &MockSvcSearcher{svcMap: s, methodSvcMap: m}
 }
 
-func (s *MockSvcSearcher) SearchService(svcName, methodName string, strict bool) *serviceinfo.ServiceInfo {
+func (s *MockSvcSearcher) SearchService(svcName, methodName string, strict bool, codecType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
 	if strict {
 		if svc := s.svcMap[svcName]; svc != nil {
 			return svc

@@ -68,7 +68,7 @@ func (g *Args) WritePb(ctx context.Context, method string) (interface{}, error) 
 		return nil, err
 	}
 	if w, ok := g.inner.(proto.MessageWriter); ok {
-		return w.Write(ctx, g.Request, method, true)
+		return w.WritePb(ctx, g.Request, method, true)
 	}
 	return nil, fmt.Errorf("unexpected Args writer type: %T", g.inner)
 }
@@ -94,7 +94,7 @@ func (g *Args) ReadPb(ctx context.Context, method string, in []byte) error {
 	if w, ok := g.inner.(proto.MessageReader); ok {
 		g.Method = method
 		var err error
-		g.Request, err = w.Read(ctx, method, false, in)
+		g.Request, err = w.ReadPb(ctx, method, false, in)
 		return err
 	}
 	return fmt.Errorf("unexpected Args reader type: %T", g.inner)
@@ -137,7 +137,7 @@ func (r *Result) WritePb(ctx context.Context, method string) (interface{}, error
 		return nil, err
 	}
 	if w, ok := r.inner.(proto.MessageWriter); ok {
-		return w.Write(ctx, r.Success, method, false)
+		return w.WritePb(ctx, r.Success, method, false)
 	}
 	return nil, fmt.Errorf("unexpected Result writer type: %T", r.inner)
 }
@@ -161,7 +161,7 @@ func (r *Result) ReadPb(ctx context.Context, method string, in []byte) error {
 	}
 	if w, ok := r.inner.(proto.MessageReader); ok {
 		var err error
-		r.Success, err = w.Read(ctx, method, true, in)
+		r.Success, err = w.ReadPb(ctx, method, true, in)
 		return err
 	}
 	return fmt.Errorf("unexpected Result reader type: %T", r.inner)

@@ -223,7 +223,7 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 	// set send grpc compressor at server to encode reply pack
 	remote.SetSendCompressor(ri, s.SendCompress())
 
-	svcInfo := t.svcSearcher.SearchService(serviceName, methodName, true)
+	svcInfo := t.svcSearcher.SearchService(serviceName, methodName, true, ri.Config().PayloadCodec())
 	var methodInfo serviceinfo.MethodInfo
 	if svcInfo != nil {
 		methodInfo = svcInfo.MethodInfo(methodName)

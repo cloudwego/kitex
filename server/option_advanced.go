@@ -134,7 +134,9 @@ func WithGeneric(g generic.Generic) Option {
 		if g == nil {
 			panic("invalid Generic: nil")
 		}
-		o.RemoteOpt.PayloadCodec = g.PayloadCodec()
+		if bg, ok := g.(generic.DeprecatedBinaryThriftGeneric); ok {
+			o.RemoteOpt.PayloadCodec = bg.PayloadCodec()
+		}
 	}}
 }
 
