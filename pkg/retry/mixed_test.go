@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -727,4 +728,26 @@ func TestNewRetryer4MixedRetry(t *testing.T) {
 		test.Assert(t, err == nil, err)
 		test.Assert(t, r.(*mixedRetryer).enable)
 	})
+}
+
+func TestAllRPCFinishedRetryPanic(t *testing.T) {
+	var callCount int32 = 0
+	defer func() {
+		t.Logf("callCount: %d", callCount)
+	}()
+
+	rc := NewRetryContainer()
+	mp := NewMixedPolicyWithResultRetry(100, AllErrorRetry())
+	mp.WithMaxRetryTimes(3) // retryTimes = 3, doneCount will become 4
+	p := BuildMixedPolicy(mp)
+
+	alwaysRPCFinished := func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+		atomic.AddInt32(&callCount, 1)
+		return genRPCInfo(), nil, kerrors.ErrRPCFinish
+	}
+
+	ri := genRPCInfo()
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	_, _, err := rc.WithRetryIfNeeded(ctx, &p, alwaysRPCFinished, ri, nil)
+	test.Assert(t, strings.Contains(err.Error(), "KITEX: panic in retry"), err)
 }
