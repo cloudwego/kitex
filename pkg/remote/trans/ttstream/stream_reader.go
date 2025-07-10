@@ -37,9 +37,9 @@ type streamMsg struct {
 	exception error
 }
 
-func newStreamReader() *streamReader {
+func newStreamReader(opts ...container.PipeOption) *streamReader {
 	sio := new(streamReader)
-	sio.pipe = container.NewPipe[streamMsg]()
+	sio.pipe = container.NewPipe[streamMsg](opts...)
 	return sio
 }
 
