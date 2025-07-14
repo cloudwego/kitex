@@ -70,10 +70,12 @@ type ServiceSearcher interface {
 
 const keyServiceSearcher = "rpc_info_service_searcher"
 
+// GetServiceSearcher returns the service searcher from rpcinfo.RPCInfo.
 func GetServiceSearcher(ri rpcinfo.RPCInfo) ServiceSearcher {
 	return ri.Invocation().Extra(keyServiceSearcher).(ServiceSearcher)
 }
 
+// SetServiceSearcher sets the service searcher to rpcinfo.RPCInfo.
 func SetServiceSearcher(ri rpcinfo.RPCInfo, svcSearcher ServiceSearcher) {
 	setter := ri.Invocation().(rpcinfo.InvocationSetter)
 	setter.SetExtra(keyServiceSearcher, svcSearcher)

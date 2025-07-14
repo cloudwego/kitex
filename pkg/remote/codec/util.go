@@ -50,16 +50,14 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 	inkSetter.SetMethodName(methodName)
 	var svcInfo *serviceinfo.ServiceInfo
 	var methodInfo serviceinfo.MethodInfo
-	if svcInfo = ink.ServiceInfo(); svcInfo == nil {
-		// for ping pong server, svc info is nil until the request decoded
-		svcSearcher := remote.GetServiceSearcher(ri)
-		if svcSearcher == nil {
-			return errors.New("RPCInfo doesn't contains a service searcher")
-		}
-		svcInfo = svcSearcher.SearchService(ink.ServiceName(), methodName, false)
-		if svcInfo == nil {
-			return remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s, method %s", ink.ServiceName(), methodName))
-		}
+	// for ping pong server, svc info is nil until the request decoded
+	svcSearcher := remote.GetServiceSearcher(ri)
+	if svcSearcher == nil {
+		return errors.New("RPCInfo doesn't contains a service searcher")
+	}
+	svcInfo = svcSearcher.SearchService(ink.ServiceName(), methodName, false)
+	if svcInfo == nil {
+		return remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s, method %s", ink.ServiceName(), methodName))
 	}
 	if methodInfo = svcInfo.MethodInfo(methodName); methodInfo == nil {
 		return remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s (service %s)", methodName, ink.ServiceName()))
