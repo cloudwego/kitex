@@ -30,7 +30,7 @@ func TestSetOrCheckMethodName(t *testing.T) {
 	svcSearcher := mocksremote.NewDefaultSvcSearcher()
 
 	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil),
-		rpcinfo.NewServerInvocation(), rpcinfo.NewServerRPCConfig(), rpcinfo.NewRPCStats())
+		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	remote.SetServiceSearcher(ri, svcSearcher)
 	msg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
 	err := SetOrCheckMethodName("mock", msg)
@@ -42,7 +42,7 @@ func TestSetOrCheckMethodName(t *testing.T) {
 	test.Assert(t, ri.To().Method() == "mock")
 
 	ri = rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil),
-		rpcinfo.NewServerInvocation(), rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
+		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	ri.Invocation().(rpcinfo.InvocationSetter).SetServiceName(mocks.MockServiceName)
 	remote.SetServiceSearcher(ri, svcSearcher)
 	msg = remote.NewMessage(nil, ri, remote.Call, remote.Server)
@@ -51,7 +51,7 @@ func TestSetOrCheckMethodName(t *testing.T) {
 	test.Assert(t, err.Error() == "unknown method dummy (service MockService)")
 
 	ri = rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil),
-		rpcinfo.NewServerInvocation(), rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
+		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	remote.SetServiceSearcher(ri, svcSearcher)
 	msg = remote.NewMessage(nil, ri, remote.Call, remote.Server)
 	err = SetOrCheckMethodName("dummy", msg)

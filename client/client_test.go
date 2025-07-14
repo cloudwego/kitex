@@ -1095,7 +1095,7 @@ func Test_initTransportProtocol(t *testing.T) {
 		svcInfo := &serviceinfo.ServiceInfo{
 			PayloadCodec: serviceinfo.Protobuf,
 		}
-		rpcConfig := rpcinfo.NewClientRPCConfig()
+		rpcConfig := rpcinfo.NewRPCConfig()
 
 		initTransportProtocol(svcInfo, rpcConfig)
 		test.Assert(t, rpcConfig.PayloadCodec() == serviceinfo.Protobuf, rpcConfig.PayloadCodec())
@@ -1106,7 +1106,7 @@ func Test_initTransportProtocol(t *testing.T) {
 		svcInfo := &serviceinfo.ServiceInfo{
 			PayloadCodec: serviceinfo.Protobuf,
 		}
-		rpcConfig := rpcinfo.NewClientRPCConfig()
+		rpcConfig := rpcinfo.NewRPCConfig()
 		rpcinfo.AsMutableRPCConfig(rpcConfig).SetTransportProtocol(transport.GRPC)
 
 		initTransportProtocol(svcInfo, rpcConfig)
@@ -1118,7 +1118,7 @@ func Test_initTransportProtocol(t *testing.T) {
 		svcInfo := &serviceinfo.ServiceInfo{
 			PayloadCodec: serviceinfo.Thrift,
 		}
-		rpcConfig := rpcinfo.NewClientRPCConfig()
+		rpcConfig := rpcinfo.NewRPCConfig()
 		rpcinfo.AsMutableRPCConfig(rpcConfig).SetTransportProtocol(transport.GRPC)
 
 		initTransportProtocol(svcInfo, rpcConfig)
@@ -1254,7 +1254,7 @@ func TestRewriteProtocol(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		cfg := rpcinfo.NewClientRPCConfig()
+		cfg := rpcinfo.NewRPCConfig()
 		mcfg := rpcinfo.AsMutableRPCConfig(cfg)
 		mcfg.SetTransportProtocol(tc.tp)
 		purifyProtocol(mcfg, tc.tp, tc.streamCall)

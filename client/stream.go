@@ -169,20 +169,13 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 			return
 		}
 
-		clientStream := newStream(ctx, st, scm, kc, ri, kc.getStreamingMode(ri), sendEP, recvEP, kc.opt.StreamOptions.EventHandler, grpcSendEP, grpcRecvEP)
+		clientStream := newStream(ctx, st, scm, kc, ri, ri.Invocation().MethodInfo().StreamingMode(),
+			sendEP, recvEP, kc.opt.StreamOptions.EventHandler, grpcSendEP, grpcRecvEP)
 		rresp := resp.(*streaming.Result)
 		rresp.ClientStream = clientStream
 		rresp.Stream = clientStream.GetGRPCStream()
 		return
 	}, nil
-}
-
-func (kc *kClient) getStreamingMode(ri rpcinfo.RPCInfo) serviceinfo.StreamingMode {
-	methodInfo := ri.Invocation().MethodInfo()
-	if methodInfo == nil {
-		return serviceinfo.StreamingNone
-	}
-	return methodInfo.StreamingMode()
 }
 
 type stream struct {

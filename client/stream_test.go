@@ -108,7 +108,7 @@ func TestStreaming(t *testing.T) {
 			), nil,
 		),
 		rpcinfo.NewInvocation("mock_service", "mock_method"),
-		rpcinfo.NewClientRPCConfig(),
+		rpcinfo.NewRPCConfig(),
 		rpcinfo.NewRPCStats(),
 	)
 	rpcinfo.AsMutableRPCConfig(mockRPCInfo.Config()).SetTransportProtocol(transport.GRPC)

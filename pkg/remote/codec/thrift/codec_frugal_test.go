@@ -46,7 +46,7 @@ type MockNoTagArgs struct {
 func initNoTagSendMsg(tp transport.Protocol) remote.Message {
 	var _args MockNoTagArgs
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewClientRPCConfig(), nil)
+	ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
 	msg := remote.NewMessage(&_args, ri, remote.Call, remote.Client)
 	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
 	mcfg.SetTransportProtocol(tp)
@@ -66,7 +66,7 @@ func initFrugalTagSendMsg(tp transport.Protocol) remote.Message {
 		StrList: []string{"0", "1", "2"},
 	}
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewClientRPCConfig(), nil)
+	ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
 	msg := remote.NewMessage(&_args, ri, remote.Call, remote.Client)
 	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
 	mcfg.SetTransportProtocol(tp)

@@ -58,7 +58,7 @@ func TestClientReadMetainfo(t *testing.T) {
 }
 
 func TestClientWriteMetainfo(t *testing.T) {
-	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	ctx := context.Background()
 	ctx = metainfo.WithValue(ctx, "tk", "tv")
 	ctx = metainfo.WithPersistentValue(ctx, "pk", "pv")
@@ -86,7 +86,7 @@ func TestClientWriteMetainfo(t *testing.T) {
 }
 
 func TestServerReadMetainfo(t *testing.T) {
-	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	ctx0 := context.Background()
 	msg := remote.NewMessage(nil, ri, remote.Call, remote.Client)
 
@@ -124,7 +124,7 @@ func TestServerReadMetainfo(t *testing.T) {
 }
 
 func TestServerWriteMetainfo(t *testing.T) {
-	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(nil, ri, remote.Call, remote.Client)
 
 	ctx := context.Background()

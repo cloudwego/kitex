@@ -43,7 +43,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader)
 				return cfg
 			}(),
@@ -55,7 +55,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
 				return cfg
 			}(),
@@ -67,7 +67,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
 				return cfg
 			}(),
@@ -79,7 +79,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
 				return cfg
 			}(),
@@ -91,7 +91,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
 				return cfg
@@ -104,7 +104,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
 				return cfg
@@ -117,7 +117,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
 				return cfg
@@ -130,7 +130,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
 				return cfg
@@ -143,7 +143,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
 				return cfg
@@ -156,7 +156,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
 				return cfg
@@ -169,7 +169,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
@@ -183,7 +183,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
@@ -197,7 +197,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
@@ -211,7 +211,7 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 			nil,
 			func() rpcinfo.RPCConfig {
-				cfg := rpcinfo.NewClientRPCConfig()
+				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
@@ -231,7 +231,7 @@ func TestIsGRPC(t *testing.T) {
 }
 
 func TestHTTP2ClientOnConnectStream(t *testing.T) {
-	cfg := rpcinfo.NewClientRPCConfig()
+	cfg := rpcinfo.NewRPCConfig()
 	fromInfo := rpcinfo.NewEndpointInfo("fromServiceName", "fromMethod", nil, nil)
 	toInfo := rpcinfo.NewEndpointInfo("toServiceName", "toMethod", nil, nil)
 	ri := rpcinfo.NewRPCInfo(fromInfo, toInfo, rpcinfo.NewInvocation("", ""), cfg, rpcinfo.NewRPCStats())
@@ -258,7 +258,7 @@ func TestHTTP2ClientOnConnectStream(t *testing.T) {
 }
 
 func TestHTTP2ServerOnReadStream(t *testing.T) {
-	cfg := rpcinfo.NewClientRPCConfig()
+	cfg := rpcinfo.NewRPCConfig()
 	ri := rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(), rpcinfo.EmptyEndpointInfo(), rpcinfo.NewInvocation("", ""), cfg, rpcinfo.NewRPCStats())
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 

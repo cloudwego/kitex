@@ -50,7 +50,7 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	t.Parallel()
 
 	s := rpcinfo.NewEndpointInfo("mockService", "mockMethod", nil, nil)
-	c := rpcinfo.NewClientRPCConfig()
+	c := rpcinfo.NewRPCConfig()
 	r := rpcinfo.NewRPCInfo(nil, s, nil, c, rpcinfo.NewRPCStats())
 	m := rpcinfo.AsMutableRPCConfig(c)
 	m.SetRPCTimeout(time.Millisecond * 500)
@@ -244,7 +244,7 @@ func TestRpcTimeoutMWCancelByBusiness(t *testing.T) {
 
 func mockRPCInfo(timeout time.Duration) rpcinfo.RPCInfo {
 	s := rpcinfo.NewEndpointInfo("mockService", "mockMethod", nil, nil)
-	c := rpcinfo.NewClientRPCConfig()
+	c := rpcinfo.NewRPCConfig()
 	mc := rpcinfo.AsMutableRPCConfig(c)
 	_ = mc.SetRPCTimeout(timeout)
 	return rpcinfo.NewRPCInfo(nil, s, nil, c, rpcinfo.NewRPCStats())
@@ -316,7 +316,7 @@ func Test_isBusinessTimeout(t *testing.T) {
 
 func BenchmarkRPCTimeoutMW(b *testing.B) {
 	s := rpcinfo.NewEndpointInfo("mockService", "mockMethod", nil, nil)
-	c := rpcinfo.NewClientRPCConfig()
+	c := rpcinfo.NewRPCConfig()
 	r := rpcinfo.NewRPCInfo(nil, s, nil, c, rpcinfo.NewRPCStats())
 	m := rpcinfo.AsMutableRPCConfig(c)
 	m.SetRPCTimeout(20 * time.Millisecond)

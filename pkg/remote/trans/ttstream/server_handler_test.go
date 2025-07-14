@@ -128,7 +128,7 @@ func TestOnRead(t *testing.T) {
 				return rpcinfo.NewRPCInfo(rpcinfo.NewEndpointInfo(
 					mocks.MockService2Name, mocks.Mock2Method, nil, make(map[string]string)), nil,
 					rpcinfo.NewInvocation(mocks.MockServiceName, mocks.MockStreamingMethod),
-					rpcinfo.NewServerRPCConfig(),
+					rpcinfo.NewRPCConfig(),
 					rpcinfo.NewRPCStats())
 			},
 			TracerCtl: traceCtl,

@@ -62,7 +62,7 @@ func TestMain(m *testing.M) {
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
 			toInfo := rpcinfo.EmptyEndpointInfo()
-			rpcCfg := rpcinfo.NewServerRPCConfig()
+			rpcCfg := rpcinfo.NewRPCConfig()
 			mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
 			mCfg.SetReadWriteTimeout(rwTimeout)
 			ink := rpcinfo.NewInvocation("", method)

@@ -28,7 +28,7 @@ func TestFreezeRPCInfo(t *testing.T) {
 		EmptyEndpointInfo(),
 		EmptyEndpointInfo(),
 		NewInvocation("service", "method"),
-		NewClientRPCConfig(),
+		NewRPCConfig(),
 		NewRPCStats(),
 	)
 	ctx := NewCtxWithRPCInfo(context.Background(), ri)

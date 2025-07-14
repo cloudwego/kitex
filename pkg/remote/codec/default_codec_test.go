@@ -66,7 +66,7 @@ func TestThriftProtocolCheck(t *testing.T) {
 			var msg remote.Message
 
 			resetRIAndMSG := func() {
-				ri = rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewServerRPCConfig(), rpcinfo.NewRPCStats())
+				ri = rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 				msg = remote.NewMessage(req, ri, remote.Call, remote.Server)
 			}
 
@@ -156,7 +156,7 @@ func TestProtobufProtocolCheck(t *testing.T) {
 			var rbf remote.ByteBuffer
 			var isTTHeader bool
 			var flagBuf []byte
-			ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewServerRPCConfig(), rpcinfo.NewRPCStats())
+			ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 			msg := remote.NewMessage(req, ri, remote.Call, remote.Server)
 
 			// 1. isTTHeader framed
@@ -177,7 +177,7 @@ func TestProtobufProtocolCheck(t *testing.T) {
 			test.Assert(t, ri.Config().TransportProtocol() == transport.TTHeaderFramed)
 			test.Assert(t, ri.Config().PayloadCodec() == serviceinfo.Protobuf)
 
-			ri = rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
+			ri = rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 			msg = remote.NewMessage(req, ri, remote.Call, remote.Server)
 			// 2. protobuf framed
 			flagBuf = make([]byte, 8*2)
@@ -377,9 +377,8 @@ func TestCodecTypeNotMatchWithServiceInfoPayloadCodec(t *testing.T) {
 			var req interface{}
 			remote.PutPayloadCode(serviceinfo.Thrift, mpc)
 			remote.PutPayloadCode(serviceinfo.Protobuf, mpc)
-			ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewServerRPCConfig(), rpcinfo.NewRPCStats())
+			ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 			mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
-			mcfg.SetTransportProtocol(transport.PurePayload) // reset protocol
 			codec := NewDefaultCodec()
 
 			// case 1: the payloadCodec of svcInfo is Protobuf, CodecType of message is Thrift

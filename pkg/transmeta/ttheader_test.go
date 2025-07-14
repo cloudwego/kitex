@@ -32,7 +32,7 @@ import (
 
 func TestIsTTHeader(t *testing.T) {
 	t.Run("with ttheader", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 		msg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
 		mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
 		mcfg.SetTransportProtocol(transport.TTHeader)
@@ -40,7 +40,7 @@ func TestIsTTHeader(t *testing.T) {
 		test.Assert(t, isTTHeader(msg))
 	})
 	t.Run("with ttheader framed", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 		msg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
 		mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
 		mcfg.SetTransportProtocol(transport.TTHeaderFramed)
@@ -52,7 +52,7 @@ func TestIsTTHeader(t *testing.T) {
 func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	ctx := context.Background()
 
-	cfg := rpcinfo.NewClientRPCConfig()
+	cfg := rpcinfo.NewRPCConfig()
 	cfgMutable := rpcinfo.AsMutableRPCConfig(cfg)
 	cfgMutable.SetRPCTimeout(time.Millisecond * 100)
 	cfgMutable.SetConnectTimeout(time.Millisecond * 1000)
@@ -98,7 +98,7 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 func TestTTHeaderServerReadMetainfo(t *testing.T) {
 	ctx := context.Background()
 	ri := rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(), nil, rpcinfo.NewInvocation("", ""),
-		rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
+		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(nil, ri, remote.Call, remote.Client)
 
 	hd := map[uint16]string{
@@ -129,7 +129,7 @@ func TestTTHeaderServerReadMetainfo(t *testing.T) {
 func TestTTHeaderServerWriteMetainfo(t *testing.T) {
 	ctx := context.Background()
 	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil), rpcinfo.NewInvocation("", ""),
-		rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
+		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(nil, ri, remote.Call, remote.Client)
 
 	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())

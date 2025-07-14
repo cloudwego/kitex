@@ -232,16 +232,8 @@ func (r *rpcConfig) Recycle() {
 	rpcConfigPool.Put(r)
 }
 
-// NewClientRPCConfig creates a default RPCConfig.
-func NewClientRPCConfig() RPCConfig {
-	r := rpcConfigPool.Get().(*rpcConfig)
-	// Since Kitex v0.13.0, the default transport protocol has been changed to framed from buffered.
-	r.transportProtocol = transport.Framed
-	return r
-}
-
-// NewServerRPCConfig creates a default RPCConfig for server.
-func NewServerRPCConfig() RPCConfig {
+// NewRPCConfig creates a default RPCConfig.
+func NewRPCConfig() RPCConfig {
 	r := rpcConfigPool.Get().(*rpcConfig)
 	return r
 }

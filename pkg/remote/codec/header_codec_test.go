@@ -308,14 +308,14 @@ func mockCliRPCInfo() rpcinfo.RPCInfo {
 		rpcinfo.EmptyEndpointInfo(),
 		remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: mockServiceName}, mockMethod).ImmutableView(),
 		rpcinfo.NewInvocation("", mockMethod),
-		rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
+		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 }
 
 func mockSvrRPCInfo() rpcinfo.RPCInfo {
 	return rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(),
 		rpcinfo.FromBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: mockServiceName}),
 		rpcinfo.NewServerInvocation(),
-		rpcinfo.NewServerRPCConfig(), rpcinfo.NewRPCStats())
+		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 }
 
 type mockMsg struct {

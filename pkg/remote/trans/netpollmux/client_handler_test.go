@@ -198,7 +198,7 @@ func TestReadTimeout(t *testing.T) {
 	}
 	conn := newMuxCliConn(npconn)
 
-	cfg := rpcinfo.NewClientRPCConfig()
+	cfg := rpcinfo.NewRPCConfig()
 	rwTimeout := 1 * time.Second
 	rpcinfo.AsMutableRPCConfig(cfg).SetRPCTimeout(rwTimeout)
 

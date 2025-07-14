@@ -540,7 +540,7 @@ func TestDifferentMethodConfig(t *testing.T) {
 	// case2: other method do backup request
 	method2 := "method2"
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{Method: method2}, method2).ImmutableView()
-	ri = rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method2), rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
+	ri = rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method2), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	ctx = rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	_, ok, err = rc.WithRetryIfNeeded(ctx, &Policy{}, rpcCall, ri, nil)
 	test.Assert(t, err == nil, err)

@@ -36,7 +36,7 @@ import (
 var (
 	option     Option
 	applyRes   string
-	rpcConfig  = rpcinfo.AsMutableRPCConfig(rpcinfo.NewClientRPCConfig())
+	rpcConfig  = rpcinfo.AsMutableRPCConfig(rpcinfo.NewRPCConfig())
 	remoteInfo = remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{
 		ServiceName: "service",
 		Method:      "method0",
@@ -140,7 +140,7 @@ func BenchmarkStringsBuilder(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			co := callOptionsPool.Get().(*CallOptions)
-			co.configs = rpcinfo.NewClientRPCConfig().(rpcinfo.MutableRPCConfig)
+			co.configs = rpcinfo.NewRPCConfig().(rpcinfo.MutableRPCConfig)
 			co.svr = remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "method")
 			var buf strings.Builder
 			buf.Grow(64)

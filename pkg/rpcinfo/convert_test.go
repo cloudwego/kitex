@@ -116,7 +116,7 @@ func TestAsMutableRPCConfig(t *testing.T) {
 	test.Assert(t, rpcinfo.AsMutableRPCConfig(rpcinfo.RPCConfig(nil)) == nil)
 	test.Assert(t, rpcinfo.AsMutableRPCConfig(new(MockRPCConfig)) == nil)
 
-	c1 := rpcinfo.NewClientRPCConfig()
+	c1 := rpcinfo.NewRPCConfig()
 	mc := rpcinfo.AsMutableRPCConfig(c1)
 	test.Assert(t, mc != nil)
 	test.Assert(t, !mc.IsRPCTimeoutLocked())

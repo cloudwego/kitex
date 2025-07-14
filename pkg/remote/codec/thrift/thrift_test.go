@@ -92,7 +92,7 @@ func TestWithContext(t *testing.T) {
 				return nil
 			}}
 			ink := rpcinfo.NewInvocation("", "mock")
-			ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewClientRPCConfig(), nil)
+			ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
 			msg := remote.NewMessage(req, ri, remote.Call, remote.Client)
 			mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
 			mcfg.SetTransportProtocol(transport.TTHeader)
@@ -109,7 +109,7 @@ func TestWithContext(t *testing.T) {
 					return nil
 				}}
 				ink := rpcinfo.NewInvocation("", "mock")
-				ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewClientRPCConfig(), nil)
+				ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
 				msg := remote.NewMessage(resp, ri, remote.Call, remote.Client)
 				mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
 				mcfg.SetTransportProtocol(transport.TTHeader)
@@ -247,7 +247,7 @@ func TestException(t *testing.T) {
 		t.Run(tb.Name, func(t *testing.T) {
 			ctx := context.Background()
 			ink := rpcinfo.NewInvocation("", "mock")
-			ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewClientRPCConfig(), nil)
+			ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
 			errInfo := "mock exception"
 			transErr := remote.NewTransErrorWithMsg(remote.UnknownMethod, errInfo)
 			// encode server side
@@ -349,7 +349,7 @@ func TestSkipDecoder(t *testing.T) {
 
 func newMsg(data interface{}) remote.Message {
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.EmptyEndpointInfo(), ink, rpcinfo.NewClientRPCConfig(), nil)
+	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.EmptyEndpointInfo(), ink, rpcinfo.NewRPCConfig(), nil)
 	return remote.NewMessage(data, ri, remote.Call, remote.Client)
 }
 

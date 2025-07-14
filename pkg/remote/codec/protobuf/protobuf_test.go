@@ -142,7 +142,7 @@ func TestFastCodec(t *testing.T) {
 func TestException(t *testing.T) {
 	ctx := context.Background()
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewClientRPCConfig(), nil)
+	ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
 	errInfo := "mock exception"
 	transErr := remote.NewTransErrorWithMsg(remote.UnknownMethod, errInfo)
 	// encode server side
@@ -225,7 +225,7 @@ func initMockReqArgsSendMsg() remote.Message {
 
 func initSendMsg(tp transport.Protocol, m any) remote.Message {
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewClientRPCConfig(), nil)
+	ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
 	msg := remote.NewMessage(m, ri, remote.Call, remote.Client)
 	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
 	mcfg.SetTransportProtocol(tp)

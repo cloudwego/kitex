@@ -258,20 +258,6 @@ func (s *clientStream) Context() context.Context {
 	return s.ctx
 }
 
-func (s *clientStream) getPayloadCodecFromContentType() (serviceinfo.PayloadCodec, error) {
-	var subType string
-	if s.conn != nil {
-		// actually it must be non nil, but for unit testing compatibility, we still need to check it
-		subType = s.conn.s.ContentSubtype()
-	}
-	switch subType {
-	case contentSubTypeThrift:
-		return serviceinfo.Thrift, nil
-	default:
-		return serviceinfo.Protobuf, nil
-	}
-}
-
 func streamingHeaderToHTTP2MD(header streaming.Header) metadata.MD {
 	md := metadata.MD{}
 	for k, v := range header {

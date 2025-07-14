@@ -231,7 +231,7 @@ func NewOptions(opts []Option) *Options {
 		Svr:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
 		MetaHandlers: []remote.MetaHandler{transmeta.MetainfoClientHandler},
 		RemoteOpt:    newClientRemoteOption(),
-		Configs:      rpcinfo.NewClientRPCConfig(),
+		Configs:      rpcinfo.NewRPCConfig(),
 		Locks:        NewConfigLocks(),
 		Once:         configutil.NewOptionOnce(),
 		HTTPResolver: http.NewDefaultResolver(),
@@ -244,6 +244,8 @@ func NewOptions(opts []Option) *Options {
 
 		GRPCConnectOpts: new(grpc.ConnectOptions),
 	}
+	// Since Kitex v0.13.0, the default transport protocol has been changed to framed from buffered.
+	rpcinfo.AsMutableRPCConfig(o.Configs).SetTransportProtocol(transport.Framed)
 	o.UnaryOptions.opts = o
 	o.Apply(opts)
 

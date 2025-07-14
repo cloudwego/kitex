@@ -32,7 +32,7 @@ func newMockRPCInfo() rpcinfo.RPCInfo {
 	c := rpcinfo.NewEndpointInfo("", method, nil, nil)
 	s := rpcinfo.NewEndpointInfo("", method, nil, nil)
 	ink := rpcinfo.NewInvocation("", method)
-	cfg := rpcinfo.NewClientRPCConfig()
+	cfg := rpcinfo.NewRPCConfig()
 	ri := rpcinfo.NewRPCInfo(c, s, ink, cfg, rpcinfo.NewRPCStats())
 	return ri
 }

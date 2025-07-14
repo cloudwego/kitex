@@ -372,7 +372,7 @@ func newMockRPCInfo() rpcinfo.RPCInfo {
 	endpointTags[rpcinfo.HTTPURL] = "https://github.com/cloudwego/kitex"
 	s := rpcinfo.NewEndpointInfo("", method, nil, endpointTags)
 	ink := rpcinfo.NewInvocation("", method)
-	cfg := rpcinfo.NewClientRPCConfig()
+	cfg := rpcinfo.NewRPCConfig()
 	rpcinfo.AsMutableRPCConfig(cfg).SetPayloadCodec(serviceinfo.Protobuf)
 	ri := rpcinfo.NewRPCInfo(c, s, ink, cfg, rpcinfo.NewRPCStats())
 	return ri
