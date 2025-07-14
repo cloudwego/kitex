@@ -72,7 +72,7 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 	}()
 
 	if m := ri.Invocation().MethodInfo(); m == nil {
-		err = kerrors.ErrRemoteOrNetwork.WithCause(fmt.Errorf("method info is nil, methodName=%s, serviceInfo=%+v", method, kc.svcInfo))
+		err = kerrors.ErrNonExistentMethod(kc.svcInfo.ServiceName, method)
 		reportErr = err
 		return err
 	}
@@ -129,7 +129,7 @@ func (kc *kClient) StreamX(ctx context.Context, method string) (streaming.Client
 	}()
 
 	if m := ri.Invocation().MethodInfo(); m == nil {
-		err = kerrors.ErrRemoteOrNetwork.WithCause(fmt.Errorf("method info is nil, methodName=%s, serviceInfo=%+v", method, kc.svcInfo))
+		err = kerrors.ErrNonExistentMethod(kc.svcInfo.ServiceName, method)
 		reportErr = err
 		return nil, err
 	}

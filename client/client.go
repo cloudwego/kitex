@@ -402,7 +402,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	ctx = retry.PrepareRetryContext(ctx)
 
 	if m := ri.Invocation().MethodInfo(); m == nil {
-		err = kerrors.ErrRemoteOrNetwork.WithCause(fmt.Errorf("method info is nil, methodName=%s, serviceInfo=%+v", method, kc.svcInfo))
+		err = kerrors.ErrNonExistentMethod(kc.svcInfo.ServiceName, method)
 	} else if kc.opt.UnaryOptions.RetryContainer == nil {
 		// call without retry policy
 		err = kc.eps(ctx, request, response)
