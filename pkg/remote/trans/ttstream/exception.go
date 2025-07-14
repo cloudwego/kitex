@@ -17,7 +17,6 @@
 package ttstream
 
 import (
-	"context"
 	"errors"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -36,13 +35,13 @@ var (
 	errIllegalOperation     = newExceptionType("illegal operation", kerrors.ErrStreamingProtocol, 12005)
 	errTransport            = newExceptionType("transport is closing", kerrors.ErrStreamingProtocol, 12006)
 
-	errBizCancel          = newExceptionType("biz code canceled with cancel()", kerrors.ErrStreamingCanceled, 12007)
-	errBizCancelWithCause = newExceptionType("biz code canceled with cancelCause(error)", kerrors.ErrStreamingCanceled, 12008)
+	errBizCancel          = newExceptionType("business code canceled with cancel()", kerrors.ErrStreamingCanceled, 12007)
+	errBizCancelWithCause = newExceptionType("business code canceled with cancelCause(error)", kerrors.ErrStreamingCanceled, 12008)
 	errUpstreamCancel     = newExceptionType("upstream canceled", kerrors.ErrStreamingCanceled, 12009)
 	errDownstreamCancel   = newExceptionType("downstream canceled", kerrors.ErrStreamingCanceled, 12010)
 	errInternalCancel     = newExceptionType("internal canceled", kerrors.ErrStreamingCanceled, 12011)
 
-	errBizTimeout                  = newExceptionType("biz code sets timeout with context.WithTimeout or context.WithDeadline", kerrors.ErrStreamingTimeout, 12012)
+	errBizTimeout                  = newExceptionType("business code sets timeout with context.WithTimeout or context.WithDeadline", kerrors.ErrStreamingTimeout, 12012)
 	errUpstreamTransmissionTimeout = newExceptionType("timeout due to upstream configuring timeout in context", kerrors.ErrStreamingTimeout, 12013)
 )
 
@@ -89,18 +88,4 @@ func (e *exceptionType) TypeId() int32 {
 // Code is used for uniform code retrieving by Kitex in the future
 func (e *exceptionType) Code() int32 {
 	return e.TypeId()
-}
-
-// todo: refine this function
-func contextException(err error) *exceptionType {
-	switch err {
-	case context.Canceled:
-		// todo: predefined exception
-		return errBizCancel
-	}
-	ex, ok := err.(*exceptionType)
-	if ok {
-		return ex
-	}
-	return newExceptionType("default context exception", nil, 12009)
 }
