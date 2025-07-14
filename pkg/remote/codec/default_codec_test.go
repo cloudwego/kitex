@@ -66,7 +66,7 @@ func TestThriftProtocolCheck(t *testing.T) {
 			var msg remote.Message
 
 			resetRIAndMSG := func() {
-				ri = rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+				ri = rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewServerRPCConfig(), rpcinfo.NewRPCStats())
 				msg = remote.NewMessage(req, ri, remote.Call, remote.Server)
 			}
 
@@ -86,7 +86,7 @@ func TestThriftProtocolCheck(t *testing.T) {
 			rbf.Flush()
 			err := checkPayload(flagBuf, msg, rbf, isTTheader, 10)
 			test.Assert(t, err == nil, err)
-			test.Assert(t, ri.Config().TransportProtocol() == transport.TTHeaderFramed)
+			test.Assert(t, ri.Config().TransportProtocol() == transport.TTHeader)
 			test.Assert(t, msg.RPCInfo().Config().TransportProtocol()&transport.TTHeader == transport.TTHeader)
 			test.Assert(t, ri.Config().PayloadCodec() == serviceinfo.Thrift)
 
@@ -156,7 +156,7 @@ func TestProtobufProtocolCheck(t *testing.T) {
 			var rbf remote.ByteBuffer
 			var isTTHeader bool
 			var flagBuf []byte
-			ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+			ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewServerRPCConfig(), rpcinfo.NewRPCStats())
 			msg := remote.NewMessage(req, ri, remote.Call, remote.Server)
 
 			// 1. isTTHeader framed
@@ -377,7 +377,7 @@ func TestCodecTypeNotMatchWithServiceInfoPayloadCodec(t *testing.T) {
 			var req interface{}
 			remote.PutPayloadCode(serviceinfo.Thrift, mpc)
 			remote.PutPayloadCode(serviceinfo.Protobuf, mpc)
-			ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+			ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewServerRPCConfig(), rpcinfo.NewRPCStats())
 			mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
 			mcfg.SetTransportProtocol(transport.PurePayload) // reset protocol
 			codec := NewDefaultCodec()

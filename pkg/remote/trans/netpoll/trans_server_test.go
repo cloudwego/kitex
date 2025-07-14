@@ -50,7 +50,7 @@ func TestMain(m *testing.M) {
 	svrOpt = &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
-			rpcCfg := rpcinfo.NewRPCConfig()
+			rpcCfg := rpcinfo.NewServerRPCConfig()
 			mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
 			mCfg.SetReadWriteTimeout(rwTimeout)
 			ink := rpcinfo.NewInvocation("", method)

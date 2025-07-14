@@ -193,7 +193,7 @@ func NewOptions(opts []Option) *Options {
 	ropt := newServerRemoteOption()
 	o := &Options{
 		Svr:          &rpcinfo.EndpointBasicInfo{},
-		Configs:      rpcinfo.NewRPCConfig(),
+		Configs:      rpcinfo.NewServerRPCConfig(),
 		Once:         configutil.NewOptionOnce(),
 		MetaHandlers: []remote.MetaHandler{transmeta.MetainfoServerHandler},
 		RemoteOpt:    ropt,

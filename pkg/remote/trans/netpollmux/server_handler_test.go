@@ -51,7 +51,7 @@ var (
 func newTestRpcInfo() rpcinfo.RPCInfo {
 	fromInfo := rpcinfo.EmptyEndpointInfo()
 	toInfo := rpcinfo.EmptyEndpointInfo()
-	rpcCfg := rpcinfo.NewRPCConfig()
+	rpcCfg := rpcinfo.NewServerRPCConfig()
 	mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
 	mCfg.SetReadWriteTimeout(rwTimeout)
 	ink := rpcinfo.NewInvocation("", method)
@@ -428,7 +428,7 @@ func TestInvokeError(t *testing.T) {
 		InitOrResetRPCInfoFunc: func(rpcInfo rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
 			toInfo := rpcinfo.EmptyEndpointInfo()
-			rpcCfg := rpcinfo.NewRPCConfig()
+			rpcCfg := rpcinfo.NewServerRPCConfig()
 			mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
 			mCfg.SetReadWriteTimeout(rwTimeout)
 			ink := rpcinfo.NewInvocation("", method)

@@ -315,7 +315,7 @@ func mockSvrRPCInfo() rpcinfo.RPCInfo {
 	return rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(),
 		rpcinfo.FromBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: mockServiceName}),
 		rpcinfo.NewServerInvocation(),
-		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+		rpcinfo.NewServerRPCConfig(), rpcinfo.NewRPCStats())
 }
 
 type mockMsg struct {

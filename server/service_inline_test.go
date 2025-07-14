@@ -51,7 +51,7 @@ func constructClientRPCInfo() rpcinfo.RPCInfo {
 			Tags:        nil,
 		}),
 		rpcinfo.NewServerInvocation(),
-		rpcinfo.AsMutableRPCConfig(rpcinfo.NewRPCConfig()).Clone().ImmutableView(),
+		rpcinfo.AsMutableRPCConfig(rpcinfo.NewServerRPCConfig()).Clone().ImmutableView(),
 		rpcStats.ImmutableView(),
 	)
 	if v, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {

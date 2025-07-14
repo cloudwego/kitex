@@ -58,7 +58,7 @@ func Test_serverTimeoutMW(t *testing.T) {
 	from := rpcinfo.NewEndpointInfo("from_service", "from_method", addr, nil)
 	to := rpcinfo.NewEndpointInfo("to_service", "to_method", nil, nil)
 	newCtxWithRPCInfo := func(timeout time.Duration) context.Context {
-		cfg := rpcinfo.NewRPCConfig()
+		cfg := rpcinfo.NewServerRPCConfig()
 		_ = rpcinfo.AsMutableRPCConfig(cfg).SetRPCTimeout(timeout)
 		ri := rpcinfo.NewRPCInfo(from, to, nil, cfg, nil)
 		return rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)

@@ -30,7 +30,7 @@ func TestSetOrCheckMethodName(t *testing.T) {
 	svcSearcher := mocksremote.NewDefaultSvcSearcher()
 
 	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil),
-		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+		rpcinfo.NewServerInvocation(), rpcinfo.NewServerRPCConfig(), rpcinfo.NewRPCStats())
 	remote.SetServiceSearcher(ri, svcSearcher)
 	msg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
 	err := SetOrCheckMethodName("mock", msg)

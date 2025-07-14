@@ -222,8 +222,7 @@ func (r *rpcConfig) initialize() {
 	r.connectTimeout = defaultConnectTimeout
 	r.readWriteTimeout = defaultReadWriteTimeout
 	r.ioBufferSize = defaultBufferSize
-	// Since Kitex v0.13.0, the default transport protocol has been changed to framed from buffered.
-	r.transportProtocol = transport.Framed
+	r.transportProtocol = 0
 	r.interactionMode = defaultInteractionMode
 }
 
@@ -235,6 +234,14 @@ func (r *rpcConfig) Recycle() {
 
 // NewRPCConfig creates a default RPCConfig.
 func NewRPCConfig() RPCConfig {
+	r := rpcConfigPool.Get().(*rpcConfig)
+	// Since Kitex v0.13.0, the default transport protocol has been changed to framed from buffered.
+	r.transportProtocol = transport.Framed
+	return r
+}
+
+// NewServerRPCConfig creates a default RPCConfig for server.
+func NewServerRPCConfig() RPCConfig {
 	r := rpcConfigPool.Get().(*rpcConfig)
 	return r
 }
