@@ -151,19 +151,6 @@ func TestCall(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
-func TestCallNoMethod(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	cli := newMockClient(t, ctrl)
-	ctx := context.Background()
-	req := new(MockTStruct)
-	res := new(MockTStruct)
-
-	err := cli.Call(ctx, "mock_method_not_found", req, res)
-	test.Assert(t, strings.Contains(err.Error(), "remote or network error: method info is nil, methodName=mock_method_not_found"))
-}
-
 func TestCallWithContextBackup(t *testing.T) {
 	localsession.InitDefaultManager(localsession.DefaultManagerOptions())
 	d, dd := "d", "dd"
@@ -1096,7 +1083,7 @@ func TestMethodInfoIsNil(t *testing.T) {
 	req, res := new(MockTStruct), new(MockTStruct)
 	err := cli.Call(context.Background(), "notExist", req, res)
 	test.Assert(t, err != nil)
-	test.Assert(t, strings.Contains(err.Error(), "method info is nil"))
+	test.Assert(t, err.Error() == "internal exception: non-existent method, service: MockService, method: notExist")
 }
 
 func mb(byteSize uint64) float32 {
@@ -1108,7 +1095,7 @@ func Test_initTransportProtocol(t *testing.T) {
 		svcInfo := &serviceinfo.ServiceInfo{
 			PayloadCodec: serviceinfo.Protobuf,
 		}
-		rpcConfig := rpcinfo.NewRPCConfig()
+		rpcConfig := rpcinfo.NewClientRPCConfig()
 
 		initTransportProtocol(svcInfo, rpcConfig)
 		test.Assert(t, rpcConfig.PayloadCodec() == serviceinfo.Protobuf, rpcConfig.PayloadCodec())
@@ -1119,7 +1106,7 @@ func Test_initTransportProtocol(t *testing.T) {
 		svcInfo := &serviceinfo.ServiceInfo{
 			PayloadCodec: serviceinfo.Protobuf,
 		}
-		rpcConfig := rpcinfo.NewRPCConfig()
+		rpcConfig := rpcinfo.NewClientRPCConfig()
 		rpcinfo.AsMutableRPCConfig(rpcConfig).SetTransportProtocol(transport.GRPC)
 
 		initTransportProtocol(svcInfo, rpcConfig)
@@ -1131,7 +1118,7 @@ func Test_initTransportProtocol(t *testing.T) {
 		svcInfo := &serviceinfo.ServiceInfo{
 			PayloadCodec: serviceinfo.Thrift,
 		}
-		rpcConfig := rpcinfo.NewRPCConfig()
+		rpcConfig := rpcinfo.NewClientRPCConfig()
 		rpcinfo.AsMutableRPCConfig(rpcConfig).SetTransportProtocol(transport.GRPC)
 
 		initTransportProtocol(svcInfo, rpcConfig)
@@ -1267,7 +1254,7 @@ func TestRewriteProtocol(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		cfg := rpcinfo.NewRPCConfig()
+		cfg := rpcinfo.NewClientRPCConfig()
 		mcfg := rpcinfo.AsMutableRPCConfig(cfg)
 		mcfg.SetTransportProtocol(tc.tp)
 		purifyProtocol(mcfg, tc.tp, tc.streamCall)

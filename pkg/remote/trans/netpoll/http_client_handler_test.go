@@ -63,7 +63,7 @@ func TestHTTPWrite(t *testing.T) {
 		},
 	}
 	rwTimeout := time.Second
-	cfg := rpcinfo.NewRPCConfig()
+	cfg := rpcinfo.NewClientRPCConfig()
 	rpcinfo.AsMutableRPCConfig(cfg).SetReadWriteTimeout(rwTimeout)
 	to := rpcinfo.NewEndpointInfo("", "", nil, map[string]string{
 		rpcinfo.HTTPURL: "https://example.com",
@@ -102,7 +102,7 @@ func TestHTTPRead(t *testing.T) {
 		},
 	}
 
-	cfg := rpcinfo.NewRPCConfig()
+	cfg := rpcinfo.NewClientRPCConfig()
 	rpcinfo.AsMutableRPCConfig(cfg).SetRPCTimeout(rwTimeout)
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, rpcinfo.NewRPCStats())
 	ctx := context.Background()
@@ -139,7 +139,7 @@ func TestHTTPOnMessage(t *testing.T) {
 // TestAddMetaInfo test http_client_handler addMetaInfo success
 func TestAddMetaInfo(t *testing.T) {
 	// 1. prepare mock data
-	cfg := rpcinfo.NewRPCConfig()
+	cfg := rpcinfo.NewClientRPCConfig()
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, rpcinfo.NewRPCStats())
 	var req interface{}
 	msg := remote.NewMessage(req, ri, remote.Reply, remote.Client)

@@ -44,7 +44,7 @@ func TestDialerMWNoAddr(t *testing.T) {
 	defer ctrl.Finish()
 
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
-	conf := rpcinfo.NewRPCConfig()
+	conf := rpcinfo.NewClientRPCConfig()
 	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
@@ -65,7 +65,7 @@ func TestGetConnDial(t *testing.T) {
 	from := rpcinfo.NewEndpointInfo("from", "method", nil, nil)
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
 	to.SetInstance(discovery.NewInstance(addr.Network(), addr.String(), discovery.DefaultWeight, nil))
-	conf := rpcinfo.NewRPCConfig()
+	conf := rpcinfo.NewClientRPCConfig()
 	ri := rpcinfo.NewRPCInfo(from, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
@@ -90,7 +90,7 @@ func TestGetConnByPool(t *testing.T) {
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
 	to.SetInstance(discovery.NewInstance(addr.Network(), addr.String(), discovery.DefaultWeight, nil))
 
-	conf := rpcinfo.NewRPCConfig()
+	conf := rpcinfo.NewClientRPCConfig()
 	ri := rpcinfo.NewRPCInfo(from, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 	connPool := connpool.NewLongPool("destService", poolCfg)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
@@ -135,7 +135,7 @@ func BenchmarkGetConn(b *testing.B) {
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
 	to.SetInstance(discovery.NewInstance(addr.Network(), addr.String(), discovery.DefaultWeight, nil))
 
-	conf := rpcinfo.NewRPCConfig()
+	conf := rpcinfo.NewClientRPCConfig()
 	ri := rpcinfo.NewRPCInfo(from, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	connPool := connpool.NewLongPool("destService", poolCfg)

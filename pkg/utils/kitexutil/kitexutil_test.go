@@ -347,7 +347,7 @@ func buildRPCInfo(caller, fromMethod, callee, method, idlServiceName string, fro
 	from := rpcinfo.NewEndpointInfo(caller, fromMethod, fromAddr, nil)
 	to := rpcinfo.NewEndpointInfo(callee, method, nil, nil)
 	ink := rpcinfo.NewInvocation(idlServiceName, method)
-	config := rpcinfo.NewRPCConfig()
+	config := rpcinfo.NewClientRPCConfig()
 	config.(rpcinfo.MutableRPCConfig).SetTransportProtocol(tp)
 
 	stats := rpcinfo.NewRPCStats()

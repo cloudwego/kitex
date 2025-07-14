@@ -316,7 +316,7 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	// end to close the connection or prevent further operation on it.
 	iv := rpcinfo.NewInvocation("none", "none")
 	iv.SetSeqID(0)
-	ri := rpcinfo.NewRPCInfo(nil, nil, iv, rpcinfo.NewRPCConfig(), nil)
+	ri := rpcinfo.NewRPCInfo(nil, nil, iv, rpcinfo.NewClientRPCConfig(), nil)
 	data := NewControlFrame()
 	msg := remote.NewMessage(data, ri, remote.Reply, remote.Server)
 	cfg := rpcinfo.AsMutableRPCConfig(ri.Config())

@@ -60,7 +60,7 @@ func TestPutRPCInfo(t *testing.T) {
 		rpcinfo.NewEndpointInfo(svcName, method, netAddr, tags),
 		rpcinfo.NewEndpointInfo(svcName, method, netAddr, tags),
 		rpcinfo.NewInvocation(svcName, method),
-		rpcinfo.NewRPCConfig(),
+		rpcinfo.NewClientRPCConfig(),
 		rpcinfo.NewRPCStats(),
 	)
 

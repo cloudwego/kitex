@@ -46,7 +46,7 @@ func TestNewClientNoAddr(t *testing.T) {
 	ctx := context.Background()
 
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
-	conf := rpcinfo.NewRPCConfig()
+	conf := rpcinfo.NewClientRPCConfig()
 	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 
 	hdlr := mocksremote.NewMockClientTransHandler(ctrl)
@@ -100,7 +100,7 @@ func newMockRPCInfo(addr net.Addr) rpcinfo.RPCInfo {
 	from := rpcinfo.NewEndpointInfo("from", "method", nil, nil)
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
 	to.SetInstance(discovery.NewInstance(addr.Network(), addr.String(), discovery.DefaultWeight, nil))
-	conf := rpcinfo.NewRPCConfig()
+	conf := rpcinfo.NewClientRPCConfig()
 	ri := rpcinfo.NewRPCInfo(from, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 
 	return ri

@@ -308,7 +308,7 @@ func mockCliRPCInfo() rpcinfo.RPCInfo {
 		rpcinfo.EmptyEndpointInfo(),
 		remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: mockServiceName}, mockMethod).ImmutableView(),
 		rpcinfo.NewInvocation("", mockMethod),
-		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+		rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
 }
 
 func mockSvrRPCInfo() rpcinfo.RPCInfo {

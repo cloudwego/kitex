@@ -32,7 +32,7 @@ func TestUtil(t *testing.T) {
 		NewEndpointInfo("client", "client_method", nil, nil),
 		NewEndpointInfo("server", "server_method", nil, nil),
 		NewInvocation("service", "method"),
-		NewRPCConfig(),
+		NewClientRPCConfig(),
 		NewRPCStats(),
 	)
 

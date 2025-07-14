@@ -487,7 +487,7 @@ func TestRefuseTrafficWithoutServiceNameOption(t *testing.T) {
 }
 
 func NewRemoteMsgWithPayloadType(ct serviceinfo.PayloadCodec) remote.Message {
-	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
 	remoteMsg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
 	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
 	mcfg.SetTransportProtocol(transport.TTHeader)

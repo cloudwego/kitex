@@ -32,7 +32,7 @@ func TestCalculateEventCost(t *testing.T) {
 		rpcinfo.NewEndpointInfo("client", "client_method", nil, nil),
 		rpcinfo.NewEndpointInfo("server", "server_method", nil, nil),
 		rpcinfo.NewInvocation("service", "method"),
-		rpcinfo.NewRPCConfig(),
+		rpcinfo.NewClientRPCConfig(),
 		rpcinfo.NewRPCStats(),
 	)
 

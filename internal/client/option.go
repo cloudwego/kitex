@@ -231,7 +231,7 @@ func NewOptions(opts []Option) *Options {
 		Svr:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
 		MetaHandlers: []remote.MetaHandler{transmeta.MetainfoClientHandler},
 		RemoteOpt:    newClientRemoteOption(),
-		Configs:      rpcinfo.NewRPCConfig(),
+		Configs:      rpcinfo.NewClientRPCConfig(),
 		Locks:        NewConfigLocks(),
 		Once:         configutil.NewOptionOnce(),
 		HTTPResolver: http.NewDefaultResolver(),

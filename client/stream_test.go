@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -86,10 +85,10 @@ func TestStreamNoMethod(t *testing.T) {
 	}
 	_ = kc.init()
 	_, err := kc.StreamX(ctx, "mock_method_not_found")
-	test.Assert(t, strings.Contains(err.Error(), "remote or network error: method info is nil, methodName=mock_method_not_found"))
+	test.Assert(t, err.Error() == "internal exception: non-existent method, service: MockService, method: mock_method_not_found")
 
 	err = kc.Stream(ctx, "mock_method_not_found", req, resp)
-	test.Assert(t, strings.Contains(err.Error(), "remote or network error: method info is nil, methodName=mock_method_not_found"))
+	test.Assert(t, err.Error() == "internal exception: non-existent method, service: MockService, method: mock_method_not_found")
 }
 
 func TestStreaming(t *testing.T) {
@@ -109,7 +108,7 @@ func TestStreaming(t *testing.T) {
 			), nil,
 		),
 		rpcinfo.NewInvocation("mock_service", "mock_method"),
-		rpcinfo.NewRPCConfig(),
+		rpcinfo.NewClientRPCConfig(),
 		rpcinfo.NewRPCStats(),
 	)
 	rpcinfo.AsMutableRPCConfig(mockRPCInfo.Config()).SetTransportProtocol(transport.GRPC)

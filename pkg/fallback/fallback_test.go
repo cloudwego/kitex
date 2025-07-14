@@ -173,6 +173,6 @@ var (
 
 func genRPCInfo() rpcinfo.RPCInfo {
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{Method: method}, method).ImmutableView()
-	ri := rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method), rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
 	return ri
 }

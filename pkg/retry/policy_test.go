@@ -484,7 +484,7 @@ func genRPCInfo() rpcinfo.RPCInfo {
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{Method: method}, method).ImmutableView()
 	riStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 	riStats.SetLevel(stats.LevelDetailed)
-	ri := rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method), rpcinfo.NewRPCConfig(), riStats.ImmutableView())
+	ri := rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method), rpcinfo.NewClientRPCConfig(), riStats.ImmutableView())
 	return ri
 }
 
@@ -492,13 +492,13 @@ func genRPCInfoWithFirstStats(firstRI rpcinfo.RPCInfo) rpcinfo.RPCInfo {
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{Method: method}, method).ImmutableView()
 	riStats := rpcinfo.AsMutableRPCStats(firstRI.Stats().CopyForRetry())
 	riStats.SetLevel(stats.LevelDetailed)
-	ri := rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method), rpcinfo.NewRPCConfig(), riStats.ImmutableView())
+	ri := rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method), rpcinfo.NewClientRPCConfig(), riStats.ImmutableView())
 	return ri
 }
 
 func genRPCInfoWithRemoteTag(tags map[string]string) rpcinfo.RPCInfo {
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{Method: method, Tags: tags}, method).ImmutableView()
-	ri := rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method), rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
 	return ri
 }
 

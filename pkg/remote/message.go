@@ -72,7 +72,8 @@ const keyServiceSearcher = "rpc_info_service_searcher"
 
 // GetServiceSearcher returns the service searcher from rpcinfo.RPCInfo.
 func GetServiceSearcher(ri rpcinfo.RPCInfo) ServiceSearcher {
-	return ri.Invocation().Extra(keyServiceSearcher).(ServiceSearcher)
+	svcInfo, _ := ri.Invocation().Extra(keyServiceSearcher).(ServiceSearcher)
+	return svcInfo
 }
 
 // SetServiceSearcher sets the service searcher to rpcinfo.RPCInfo.

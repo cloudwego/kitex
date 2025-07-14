@@ -177,7 +177,7 @@ func TestProtobufProtocolCheck(t *testing.T) {
 			test.Assert(t, ri.Config().TransportProtocol() == transport.TTHeaderFramed)
 			test.Assert(t, ri.Config().PayloadCodec() == serviceinfo.Protobuf)
 
-			ri = rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+			ri = rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewClientRPCConfig(), rpcinfo.NewRPCStats())
 			msg = remote.NewMessage(req, ri, remote.Call, remote.Server)
 			// 2. protobuf framed
 			flagBuf = make([]byte, 8*2)

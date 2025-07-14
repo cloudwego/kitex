@@ -44,7 +44,7 @@ func TestGonetConnExtensionSetReadTimeout(t *testing.T) {
 		return nil
 	}).AnyTimes()
 
-	cfg := rpcinfo.NewRPCConfig()
+	cfg := rpcinfo.NewClientRPCConfig()
 	mcfg := rpcinfo.AsMutableRPCConfig(cfg)
 
 	// client
