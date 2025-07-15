@@ -57,9 +57,6 @@ func (pg *PrutalGen) initPackageInfo(f *prutalgen.Proto) *generator.PackageInfo 
 }
 
 func (pg *PrutalGen) generateClientServerFiles(f *prutalgen.Proto, p *generator.PackageInfo) error {
-	if pg.c.Use != "" {
-		return nil
-	}
 	log.Debugf("[INFO] Generate %q at %q\n", f.ProtoFile, f.GoImport)
 	for _, s := range p.Services {
 		p.ServiceInfo = s
@@ -101,6 +98,10 @@ func (pg *PrutalGen) Process() error {
 
 		p := pg.initPackageInfo(f)
 		pg.pp = append(pg.pp, p)
+
+		if pg.c.Use != "" {
+			continue
+		}
 
 		// generate the structs and interfaces
 		genStructsAndKitexInterfaces(f, c, srcPath)
