@@ -78,7 +78,7 @@ func (s *clientStream) SendMsg(ctx context.Context, res any) error {
 	if state := atomic.LoadInt32(&s.state); state != streamStateActive {
 		if ex := s.clientStreamException.Load(); ex == nil {
 			// todo: predefine error here
-			return errIllegalOperation.WithCause(errors.New("stream is closed send"))
+			return errIllegalOperation.WithSide(clientTransport).WithCause(errors.New("stream is closed send"))
 		} else {
 			return ex.(error)
 		}

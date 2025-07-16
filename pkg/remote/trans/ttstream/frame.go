@@ -230,9 +230,13 @@ func DecodePayload(ctx context.Context, payload []byte, msg any) error {
 }
 
 func EncodeException(ctx context.Context, method string, seq int32, ex error) ([]byte, error) {
-	exception, ok := ex.(gopkgthrift.FastCodec)
-	if !ok {
-		exception = gopkgthrift.NewApplicationException(remote.InternalError, ex.Error())
+	var appEx *gopkgthrift.ApplicationException
+	switch et := ex.(type) {
+	case *exceptionType:
+		appEx = gopkgthrift.NewApplicationException(et.typeId, et.message)
+	case gopkgthrift.FastCodec:
+	default:
+		appEx = gopkgthrift.NewApplicationException(remote.InternalError, ex.Error())
 	}
-	return gopkgthrift.MarshalFastMsg(method, gopkgthrift.EXCEPTION, seq, exception)
+	return gopkgthrift.MarshalFastMsg(method, gopkgthrift.EXCEPTION, seq, appEx)
 }

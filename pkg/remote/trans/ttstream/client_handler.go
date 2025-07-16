@@ -131,7 +131,7 @@ func (s *stream) convertContextErr(ctx context.Context) error {
 	switch cErr {
 	// biz code invokes cancel()
 	case context.Canceled:
-		return errBizCancel
+		return errBizCancel.NewBuilder().WithSide(clientTransport)
 	case context.DeadlineExceeded:
 		// triggered by upstream transmission timeout
 		// - gRPC handler
@@ -140,10 +140,10 @@ func (s *stream) convertContextErr(ctx context.Context) error {
 		// todo: considering print information of case above
 		tm, ok := internal_stream.GetTransmissionTimeout(ctx)
 		if ok && s.transmissionTimeoutEffect {
-			return errUpstreamTransmissionTimeout.WithCause(fmt.Errorf("timeout: %s", tm))
+			return errUpstreamTransmissionTimeout.WithSide(clientTransport).WithCause(fmt.Errorf("timeout: %s", tm))
 		}
 		// biz code injects timeout
-		return errBizTimeout
+		return errBizTimeout.NewBuilder().WithSide(clientTransport)
 	}
 
 	// todo: consider cancelCause API
@@ -154,5 +154,5 @@ func (s *stream) convertContextErr(ctx context.Context) error {
 	if ex, ok := cErr.(tException); ok {
 		return ex
 	}
-	return errInternalCancel.WithCause(cErr)
+	return errInternalCancel.WithSide(clientTransport).WithCause(cErr)
 }

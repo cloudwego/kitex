@@ -154,7 +154,7 @@ func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
 	return s.writeFrame(dataFrameType, nil, nil, payload)
 }
 
-func (s *stream) RecvMsg(ctx context.Context, data any, kind int32) error {
+func (s *stream) RecvMsg(ctx context.Context, data any, side sideType) error {
 	if s.recvTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, s.recvTimeout)
@@ -163,7 +163,7 @@ func (s *stream) RecvMsg(ctx context.Context, data any, kind int32) error {
 	payload, err := s.reader.output(ctx)
 	if err != nil {
 		// todo: put this close function into reader's callback
-		s.close(err, true, kind)
+		s.close(err, true, side)
 		return err
 	}
 	err = DecodePayload(ctx, payload, data)
@@ -196,7 +196,7 @@ func (s *stream) closeSend(exception error) error {
 	return s.sendTrailer(exception)
 }
 
-func (s *stream) close(exception error, rst bool, kind int32) error {
+func (s *stream) close(exception error, rst bool, side sideType) error {
 	if atomic.SwapInt32(&s.state, streamStateInactive) == streamStateInactive {
 		// stream has been closed
 		return nil
@@ -213,7 +213,7 @@ func (s *stream) close(exception error, rst bool, kind int32) error {
 	default:
 	}
 	s.reader.close(exception)
-	if kind == clientTransport && exception != nil {
+	if side == clientTransport && exception != nil {
 		s.clientStreamException.Store(exception)
 	}
 	if rst {
@@ -354,15 +354,15 @@ func (s *stream) onReadMetaFrame(fr *Frame) (err error) {
 	return s.metaFrameHandler.OnMetaFrame(s.ctx, fr.meta, fr.header, fr.payload)
 }
 
-func (s *stream) onReadHeaderFrame(fr *Frame) (err error) {
+func (s *stream) onReadHeaderFrame(fr *Frame, side sideType) (err error) {
 	if s.header != nil {
-		return errUnexpectedHeader.WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
+		return errUnexpectedHeader.WithSide(side).WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
 	}
 	s.header = fr.header
 	select {
 	case s.headerSig <- streamSigActive:
 	default:
-		return errUnexpectedHeader.WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
+		return errUnexpectedHeader.WithSide(side).WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
 	}
 	klog.Debugf("stream[%s] read header: %v", s.method, fr.header)
 	return nil
@@ -375,18 +375,18 @@ func (s *stream) onReadDataFrame(fr *Frame) (err error) {
 
 // onReadTrailerFrame by client: unblock recv function and return EOF if no unread frame
 // onReadTrailerFrame by server: unblock recv function and return EOF if no unread frame
-func (s *stream) onReadTrailerFrame(fr *Frame, kind int32) (err error) {
+func (s *stream) onReadTrailerFrame(fr *Frame, side sideType) (err error) {
 	var exception error
 	// when server-side returns non-biz error, it will be wrapped as ApplicationException stored in trailer frame payload
 	if len(fr.payload) > 0 {
 		// exception is type of (*thrift.ApplicationException)
 		_, _, err = thrift.UnmarshalFastMsg(fr.payload, nil)
-		exception = errApplicationException.WithCause(err)
+		exception = errApplicationException.WithSide(side).WithCause(err)
 	} else if len(fr.trailer) > 0 {
 		// when server-side returns biz error, payload is empty and biz error information is stored in trailer frame header
 		bizErr, err := transmeta.ParseBizStatusErr(fr.trailer)
 		if err != nil {
-			exception = errIllegalBizErr.WithCause(err)
+			exception = errIllegalBizErr.WithSide(side).WithCause(err)
 		} else if bizErr != nil {
 			// bizErr is independent of rpc exception handling
 			exception = bizErr
@@ -407,16 +407,16 @@ func (s *stream) onReadTrailerFrame(fr *Frame, kind int32) (err error) {
 	// if client recv trailer, server handler must be return,
 	// so we don't need to send data anymore
 	// if server recv trailer, we only need to close recv but still can send data
-	if kind == clientTransport {
+	if side == clientTransport {
 		// for client stream, if trailer frame is received, finish the lifecycle for compatibility
 		s.closeSend(nil)
-		return s.close(exception, false, kind)
+		return s.close(exception, false, side)
 	}
-	err = s.close(exception, false, kind)
+	err = s.close(exception, false, side)
 	return err
 }
 
-func (s *stream) onReadRstFrame(fr *Frame, kind int32) (err error) {
+func (s *stream) onReadRstFrame(fr *Frame, side sideType) (err error) {
 	var rstEx error
 	var ex *thrift.ApplicationException
 	if len(fr.payload) > 0 {
@@ -429,10 +429,11 @@ func (s *stream) onReadRstFrame(fr *Frame, kind int32) (err error) {
 		klog.Infof("KITEX: stream[%d] recv rst frame without payload", s.sid)
 		ex = defaultRstException
 	}
-	if kind == clientTransport {
-		rstEx = errDownstreamCancel.WithCauseAndTypeId(ex, ex.TypeId())
+	// todo: retrieve endpoint information and hop_index
+	if side == clientTransport {
+		rstEx = errDownstreamCancel.NewBuilder().WithSide(side).WithCauseAndTypeId(ex, ex.TypeId())
 	} else {
-		rstEx = errUpstreamCancel.WithCauseAndTypeId(err, ex.TypeId())
+		rstEx = errUpstreamCancel.NewBuilder().WithSide(side).WithCauseAndTypeId(err, ex.TypeId())
 	}
 	// todo: compare with gRPC to deal with header/trailer behaviour
 	s.trailer = fr.trailer
@@ -448,7 +449,7 @@ func (s *stream) onReadRstFrame(fr *Frame, kind int32) (err error) {
 
 	klog.Debugf("stream[%d] recv trailer: %v, exception: %v", s.sid, s.trailer, rstEx)
 	// when receiving rst frame, we should close stream and there is no need to send rst frame
-	err = s.close(rstEx, false, kind)
+	err = s.close(rstEx, false, side)
 	return err
 }
 
