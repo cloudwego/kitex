@@ -69,5 +69,5 @@ func (s *serverStream) CloseSend(exception error) error {
 	if err != nil {
 		return err
 	}
-	return s.close(nil, false)
+	return s.close(nil, false, false)
 }

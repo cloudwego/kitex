@@ -40,10 +40,11 @@ var (
 
 	errBizCancel = newCanceledExceptionType("user code invoking stream RPC with context processed by context.WithCancel or context.WithTimeout, then invoking cancel() actively",
 		kerrors.ErrStreamingCanceled, 12007)
-	errBizCancelWithCause = newCanceledExceptionType("user code canceled with cancelCause(error)", kerrors.ErrStreamingCanceled, 12008)
-	errDownstreamCancel   = newCanceledExceptionType("canceled by downstream", kerrors.ErrStreamingCanceled, 12010)
-	errUpstreamCancel     = newCanceledExceptionType("canceled by upstream", kerrors.ErrStreamingCanceled, 12009)
-	errInternalCancel     = newCanceledExceptionType("internal canceled", kerrors.ErrStreamingCanceled, 12011)
+	// todo: support cancelWithCause
+	//errBizCancelWithCause = newCanceledExceptionType("user code canceled with cancelCause(error)", kerrors.ErrStreamingCanceled, 12008)
+	errDownstreamCancel = newCanceledExceptionType("canceled by downstream", kerrors.ErrStreamingCanceled, 12010)
+	errUpstreamCancel   = newCanceledExceptionType("canceled by upstream", kerrors.ErrStreamingCanceled, 12009)
+	errInternalCancel   = newCanceledExceptionType("internal canceled", kerrors.ErrStreamingCanceled, 12011)
 )
 
 type exceptionType struct {

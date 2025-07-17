@@ -1,7 +1,7 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/DMwangnima/gopkg v0.1.2-0.20250716123414-677156316f8d h1:srThqdikGV4wiWmFv4xVt0uHER/SSc3T1dhyc1q4yKI=
-github.com/DMwangnima/gopkg v0.1.2-0.20250716123414-677156316f8d/go.mod h1:FQuXsRWRsSqJLsMVd5SYzp8/Z1y5gXKnVvRrWUOsCMI=
+github.com/DMwangnima/gopkg v0.1.2-0.20250717101901-83ad500447c9 h1:Oz1CQcHOtfcddOk27WEwLs1Lj32ExZ098j3t2QRoAF8=
+github.com/DMwangnima/gopkg v0.1.2-0.20250717101901-83ad500447c9/go.mod h1:FQuXsRWRsSqJLsMVd5SYzp8/Z1y5gXKnVvRrWUOsCMI=
 github.com/bytedance/gopkg v0.1.1/go.mod h1:576VvJ+eJgyCzdjS+c4+77QF3p7ubbtiKARP3TxducM=
 github.com/bytedance/gopkg v0.1.2 h1:8o2feYuxknDpN+O7kPwvSXfMEKfYvJYiA2K7aonoMEQ=
 github.com/bytedance/gopkg v0.1.2/go.mod h1:576VvJ+eJgyCzdjS+c4+77QF3p7ubbtiKARP3TxducM=

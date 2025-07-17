@@ -180,6 +180,7 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 // it is invoked in container.Pipe
 func (s *stream) ctxDoneCallback(ctx context.Context) {
 	var finalEx tException
+	var isCascadeRst bool
 	cErr := ctx.Err()
 	switch cErr {
 	// biz code invokes cancel()
@@ -188,12 +189,13 @@ func (s *stream) ctxDoneCallback(ctx context.Context) {
 	default:
 		if tEx, ok := cErr.(tException); ok {
 			finalEx = tEx
+			isCascadeRst = true
 		} else {
 			finalEx = errInternalCancel.NewBuilder().WithSide(clientSide).WithCause(cErr)
 		}
 	}
 
-	s.close(finalEx, true)
+	s.close(finalEx, true, isCascadeRst)
 }
 
 func (s *stream) RegisterCloseCallback(cb func(error)) {
@@ -239,7 +241,7 @@ func (s *stream) closeRecv(exception error) error {
 	return nil
 }
 
-func (s *stream) close(exception error, sendRst bool) error {
+func (s *stream) close(exception error, sendRst bool, isCascadeRst bool) error {
 	if atomic.SwapInt32(&s.state, streamStateInactive) == streamSigInactive {
 		// stream has been closed
 		return nil
@@ -254,7 +256,7 @@ func (s *stream) close(exception error, sendRst bool) error {
 	}
 	s.reader.close(exception)
 	if sendRst {
-		s.sendRst(exception)
+		s.sendRst(exception, isCascadeRst)
 	}
 	if s.side == clientSide {
 		// for client-side stream, if trailer frame is received, finish the lifecycle
@@ -347,7 +349,7 @@ func (s *stream) sendTrailer(exception error) (err error) {
 	return err
 }
 
-func (s *stream) sendRst(exception error) (err error) {
+func (s *stream) sendRst(exception error, isCascadeRst bool) (err error) {
 	// todo: support inject intInfo and strInfo
 	klog.Debugf("stream[%d] send rst: err=%v", s.sid, exception)
 	var payload []byte
@@ -359,11 +361,11 @@ func (s *stream) sendRst(exception error) (err error) {
 		}
 	}
 	var header streaming.Header
-	if s.rpcInfo != nil {
+	if !isCascadeRst && s.rpcInfo != nil {
 		clin := s.rpcInfo.From().ServiceName()
 		if clin != "" {
 			header = make(streaming.Header)
-			header["clin"] = clin
+			header[ttheader.HeaderCascadingLinkInitialNode] = clin
 		}
 	}
 	return s.writeFrame(rstFrameType, header, nil, payload)
@@ -430,7 +432,7 @@ func (s *stream) onReadTrailerFrame(fr *Frame) (err error) {
 	klog.Debugf("stream[%d] recv trailer: %v, exception: %v", s.sid, s.trailer, exception)
 	// client-side stream recv trailer, the lifecycle of whole stream has ended
 	if s.side == clientSide {
-		return s.close(exception, false)
+		return s.close(exception, false, false)
 	}
 	// server-side stream recv trailer, we only need to close recv but still can send data
 	return s.closeRecv(exception)
@@ -454,7 +456,7 @@ func (s *stream) onReadRstFrame(fr *Frame) (err error) {
 	by := "unknown hop"
 	if fr.header != nil {
 		// cascading link initial node
-		clin, ok := fr.header["clin"]
+		clin, ok := fr.header[ttheader.HeaderCascadingLinkInitialNode]
 		if ok {
 			by = clin
 		}
@@ -478,6 +480,6 @@ func (s *stream) onReadRstFrame(fr *Frame) (err error) {
 
 	klog.Debugf("stream[%d] recv trailer: %v, exception: %v", s.sid, s.trailer, rstEx)
 	// when receiving rst frame, we should close stream and there is no need to send rst frame
-	err = s.close(rstEx, false)
+	err = s.close(rstEx, false, false)
 	return err
 }
