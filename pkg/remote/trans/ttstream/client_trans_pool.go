@@ -23,6 +23,6 @@ import (
 var dialer = netpoll.NewDialer()
 
 type transPool interface {
-	Get(network, addr string) (trans *transport, err error)
-	Put(trans *transport)
+	Get(network, addr string) (trans *clientTransport, err error)
+	Put(trans *clientTransport)
 }
