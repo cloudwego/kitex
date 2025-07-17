@@ -33,6 +33,7 @@ import (
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
@@ -68,12 +69,12 @@ func TestTransportBasic(t *testing.T) {
 	intHeader[0] = "test"
 	strHeader := make(streaming.Header)
 	strHeader["key"] = "val"
-	ctrans := newTransport(clientTransport, cconn, nil)
+	ctrans := newTransport(clientSide, cconn, nil)
 	ctx := context.Background()
-	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	rawClientStream := newClientSideStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
 	err = ctrans.WriteStream(ctx, rawClientStream, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
-	strans := newTransport(serverTransport, sconn, nil)
+	strans := newTransport(serverSide, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 
@@ -138,12 +139,12 @@ func TestTransportServerStreaming(t *testing.T) {
 
 	intHeader := make(IntHeader)
 	strHeader := make(streaming.Header)
-	ctrans := newTransport(clientTransport, cconn, nil)
+	ctrans := newTransport(clientSide, cconn, nil)
 	ctx := context.Background()
-	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	rawClientStream := newClientSideStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
 	err = ctrans.WriteStream(ctx, rawClientStream, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
-	strans := newTransport(serverTransport, sconn, nil)
+	strans := newTransport(serverSide, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 
@@ -204,12 +205,12 @@ func TestTransportException(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// server send data
-	ctrans := newTransport(clientTransport, cconn, nil)
+	ctrans := newTransport(clientSide, cconn, nil)
 	ctx := context.Background()
-	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	rawClientStream := newClientSideStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
 	err = ctrans.WriteStream(ctx, rawClientStream, make(IntHeader), make(streaming.Header))
 	test.Assert(t, err == nil, err)
-	strans := newTransport(serverTransport, sconn, nil)
+	strans := newTransport(serverSide, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 	cStream := newClientStream(rawClientStream)
@@ -238,7 +239,7 @@ func TestTransportException(t *testing.T) {
 
 	// server send illegal frame
 	ctx = context.Background()
-	rawClientStream = newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	rawClientStream = newClientSideStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
 	err = ctrans.WriteStream(ctx, rawClientStream, make(IntHeader), make(streaming.Header))
 	test.Assert(t, err == nil, err)
 	rawServerStream, err = strans.ReadStream(context.Background())
@@ -273,12 +274,12 @@ func Test_clientStreamReceiveTrailer(t *testing.T) {
 	intHeader[0] = "test"
 	strHeader := make(streaming.Header)
 	strHeader["key"] = "val"
-	ctrans := newTransport(clientTransport, cconn, nil)
+	ctrans := newTransport(clientSide, cconn, nil)
 	ctx := context.Background()
-	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	rawClientStream := newClientSideStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
 	err = ctrans.WriteStream(ctx, rawClientStream, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
-	strans := newTransport(serverTransport, sconn, nil)
+	strans := newTransport(serverSide, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 
@@ -327,14 +328,14 @@ func Test_clientStreamReceiveMetaFrame(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	sconn, err := netpoll.NewFDConnection(sfd)
 	test.Assert(t, err == nil, err)
-	ctrans := newTransport(clientTransport, cconn, nil)
+	ctrans := newTransport(clientSide, cconn, nil)
 
 	testMethod := "Bidi"
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
 		nil, remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)}, testMethod), nil, nil, nil,
 	))
 	finishCh := make(chan struct{})
-	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: testMethod})
+	rawClientStream := newClientSideStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: testMethod})
 	rawClientStream.setMetaFrameHandler(&mockMetaFrameHandler{
 		onMetaFrame: func(ctx context.Context, intHeader IntHeader, header streaming.Header, payload []byte) error {
 			ri := rpcinfo.GetRPCInfo(ctx)
@@ -391,4 +392,67 @@ func Test_clientStreamReceiveMetaFrame(t *testing.T) {
 	ti, ok := ri.To().Tag(ttheader.HeaderTransToIDC)
 	test.Assert(t, ok)
 	test.Assert(t, ti == "idc")
+}
+
+func TestTransportCancel(t *testing.T) {
+	cfd, sfd := netpoll.GetSysFdPairs()
+	cconn, err := netpoll.NewFDConnection(cfd)
+	test.Assert(t, err == nil, err)
+	sconn, err := netpoll.NewFDConnection(sfd)
+	test.Assert(t, err == nil, err)
+
+	intHeader := make(IntHeader)
+	strHeader := make(streaming.Header)
+	ctrans := newTransport(clientSide, cconn, nil)
+	cCtx, cancel := context.WithCancel(context.Background())
+	cliLocalSvc := "ttstream client-side"
+	rawClientStream := newClientSideStream(cCtx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	rawClientStream.rpcInfo = rpcinfo.NewRPCInfo(
+		rpcinfo.NewEndpointInfo(cliLocalSvc, "Bidi", nil, nil), nil, nil, nil, nil)
+	err = ctrans.WriteStream(cCtx, rawClientStream, intHeader, strHeader)
+	test.Assert(t, err == nil, err)
+	strans := newTransport(serverSide, sconn, nil)
+	rawServerStream, err := strans.ReadStream(context.Background())
+	test.Assert(t, err == nil, err)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	// client
+	go func() {
+		defer wg.Done()
+		cs := newClientStream(rawClientStream)
+		req := new(testRequest)
+		req.B = "hello"
+		res := new(testResponse)
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			cancel()
+		}()
+		cErr := cs.RecvMsg(cCtx, res)
+		test.Assert(t, cErr != nil)
+		test.Assert(t, errors.Is(cErr, kerrors.ErrStreamingCanceled), cErr)
+		test.Assert(t, errors.Is(cErr, errBizCancel), cErr)
+		t.Logf("client-side stream Recv err: %s", cErr)
+		isEmpty := true
+		ctrans.streams.Range(func(key, value any) bool {
+			isEmpty = false
+			return false
+		})
+		test.Assert(t, isEmpty)
+	}()
+
+	// server
+	ss := newServerStream(rawServerStream)
+	err = ss.SendHeader(strHeader)
+	test.Assert(t, err == nil, err)
+
+	req := new(testRequest)
+	sErr := ss.RecvMsg(ss.ctx, req)
+	test.Assert(t, sErr != nil)
+	test.Assert(t, errors.Is(sErr, kerrors.ErrStreamingCanceled))
+	test.Assert(t, errors.Is(sErr, errUpstreamCancel), sErr)
+	test.Assert(t, strings.Contains(sErr.Error(), cliLocalSvc))
+	t.Logf("server-side stream Recv err: %s", sErr)
+
+	wg.Wait()
 }

@@ -19,6 +19,7 @@ package ttstream
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
@@ -64,12 +65,28 @@ func (s *clientStream) Trailer() (streaming.Trailer, error) {
 	return nil, errors.New("invalid stream signal")
 }
 
-func (s *clientStream) RecvMsg(ctx context.Context, req any) error {
-	return s.stream.RecvMsg(ctx, req)
+func (s *clientStream) SendMsg(ctx context.Context, req any) error {
+	if state := atomic.LoadInt32(&s.state); state != streamStateActive {
+		if ex := s.stream.clientStreamException.Load(); ex == nil {
+			// todo: add client side information
+			return errIllegalOperation.WithCause(errors.New("stream is closed send"))
+		} else {
+			return ex.(error)
+		}
+	}
+	return s.stream.SendMsg(ctx, req)
+}
+
+func (s *clientStream) RecvMsg(ctx context.Context, resp any) error {
+	return s.stream.RecvMsg(ctx, resp)
 }
 
 // CloseSend by clientStream only send trailer frame and will not close the stream
 func (s *clientStream) CloseSend(ctx context.Context) error {
+	// todo: think about close stream multiple times
+	if !atomic.CompareAndSwapInt32(&s.state, streamStateActive, streamStateHalfCloseLocal) {
+		return nil
+	}
 	return s.closeSend(nil)
 }
 

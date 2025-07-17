@@ -34,9 +34,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
+type sideType int32
+
 const (
-	clientTransport int32 = 1
-	serverTransport int32 = 2
+	clientSide sideType = 1
+	serverSide sideType = 2
 
 	streamCacheSize = 32
 	frameCacheSize  = 256
@@ -48,7 +50,7 @@ func isIgnoreError(err error) bool {
 
 // transport is used to read/write frames and disturbed frames to different streams
 type transport struct {
-	kind int32
+	side sideType
 	conn netpoll.Connection
 	pool transPool
 	// transport should operate directly on stream
@@ -60,11 +62,11 @@ type transport struct {
 	closedTrigger chan struct{}
 }
 
-func newTransport(kind int32, conn netpoll.Connection, pool transPool) *transport {
+func newTransport(side sideType, conn netpoll.Connection, pool transPool) *transport {
 	// TODO: let it configurable
 	_ = conn.SetReadTimeout(0)
 	t := &transport{
-		kind:          kind,
+		side:          side,
 		conn:          conn,
 		pool:          pool,
 		streams:       sync.Map{},
@@ -82,7 +84,7 @@ func newTransport(kind int32, conn netpoll.Connection, pool transPool) *transpor
 		defer func() {
 			if err != nil {
 				if !isIgnoreError(err) {
-					klog.Warnf("transport[%d-%s] loop read err: %v", t.kind, t.Addr(), err)
+					klog.Warnf("transport[%d-%s] loop read err: %v", t.side, t.Addr(), err)
 				}
 				// if connection is closed by peer, loop read should return ErrConnClosed error,
 				// so we should close transport here
@@ -97,7 +99,7 @@ func newTransport(kind int32, conn netpoll.Connection, pool transPool) *transpor
 		defer func() {
 			if err != nil {
 				if !isIgnoreError(err) {
-					klog.Warnf("transport[%d-%s] loop write err: %v", t.kind, t.Addr(), err)
+					klog.Warnf("transport[%d-%s] loop write err: %v", t.side, t.Addr(), err)
 				}
 				_ = t.Close(err)
 			}
@@ -109,10 +111,10 @@ func newTransport(kind int32, conn netpoll.Connection, pool transPool) *transpor
 }
 
 func (t *transport) Addr() net.Addr {
-	switch t.kind {
-	case clientTransport:
+	switch t.side {
+	case clientSide:
 		return t.conn.LocalAddr()
-	case serverTransport:
+	case serverSide:
 		return t.conn.RemoteAddr()
 	}
 	return nil
@@ -127,12 +129,13 @@ func (t *transport) Close(exception error) (err error) {
 	if !atomic.CompareAndSwapInt32(&t.closedFlag, 0, 1) {
 		return nil
 	}
-	klog.Debugf("transport[%d-%s] is closing", t.kind, t.Addr())
+	klog.Debugf("transport[%d-%s] is closing", t.side, t.Addr())
 	// send trailer first
 	t.streams.Range(func(key, value any) bool {
 		s := value.(*stream)
+		// todo: using close
 		_ = s.closeSend(exception)
-		_ = s.closeRecv(exception, t.kind)
+		_ = s.closeRecv(exception)
 		return true
 	})
 	// then close stream and frame pipes
@@ -151,7 +154,7 @@ func (t *transport) IsActive() bool {
 }
 
 func (t *transport) storeStream(s *stream) {
-	klog.Debugf("transport[%d-%s] store stream: sid=%d", t.kind, t.Addr(), s.sid)
+	klog.Debugf("transport[%d-%s] store stream: sid=%d", t.side, t.Addr(), s.sid)
 	t.streams.Store(s.sid, s)
 }
 
@@ -165,7 +168,7 @@ func (t *transport) loadStream(sid int32) (s *stream, ok bool) {
 }
 
 func (t *transport) deleteStream(sid int32) {
-	klog.Debugf("transport[%d-%s] delete stream: sid=%d", t.kind, t.Addr(), sid)
+	klog.Debugf("transport[%d-%s] delete stream: sid=%d", t.side, t.Addr(), sid)
 	// remove stream from transport
 	t.streams.Delete(sid)
 }
@@ -176,12 +179,15 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		return err
 	}
 	defer recycleFrame(fr)
-	klog.Debugf("transport[%d] DecodeFrame: frame=%s", t.kind, fr)
+	klog.Debugf("transport[%d] DecodeFrame: frame=%s", t.side, fr)
 
 	var s *stream
-	if fr.typ == headerFrameType && t.kind == serverTransport {
+	if fr.typ == headerFrameType && t.side == serverSide {
 		// server recv a header frame, we should create a new stream
-		s = newStream(context.Background(), t, fr.streamFrame)
+		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cFunc := newContextWithCancelReason(ctx, cancel)
+		s = newServerSideStream(ctx, t, fr.streamFrame)
+		s.cancelFunc = cFunc
 		t.storeStream(s)
 		err = t.spipe.Write(context.Background(), s)
 	} else {
@@ -189,7 +195,7 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		var ok bool
 		s, ok = t.loadStream(fr.sid)
 		if !ok {
-			klog.Errorf("transport[%d] read a unknown stream: frame[%s]", t.kind, fr.String())
+			klog.Errorf("transport[%d] read a unknown stream: frame[%s]", t.side, fr.String())
 			// ignore unknown stream error
 			err = nil
 		} else {
@@ -205,7 +211,10 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 				err = s.onReadDataFrame(fr)
 			case trailerFrameType:
 				// process trailer frame: close the stream read direction
-				err = s.onReadTrailerFrame(fr, t.kind)
+				err = s.onReadTrailerFrame(fr)
+			case rstFrameType:
+				// process rst frame: finish the stream lifecycle
+				err = s.onReadRstFrame(fr)
 			}
 		}
 	}
@@ -243,7 +252,7 @@ func (t *transport) loopWrite() error {
 		}
 		for i := 0; i < n; i++ {
 			fr := fcache[i]
-			klog.Debugf("transport[%d] EncodeFrame: frame=%s", t.kind, fr)
+			klog.Debugf("transport[%d] EncodeFrame: frame=%s", t.side, fr)
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
 				return err
 			}
@@ -262,7 +271,7 @@ func (t *transport) WriteFrame(fr *Frame) (err error) {
 
 func (t *transport) CloseStream(sid int32) (err error) {
 	t.deleteStream(sid)
-	// clientTransport may require to return the transport to transPool
+	// clientSide may require to return the transport to transPool
 	if t.pool != nil {
 		t.pool.Put(t)
 	}
@@ -289,7 +298,7 @@ func genStreamID() int32 {
 func (t *transport) WriteStream(
 	ctx context.Context, s *stream, intHeader IntHeader, strHeader streaming.Header,
 ) error {
-	if t.kind != clientTransport {
+	if t.side != clientSide {
 		return fmt.Errorf("transport already be used as other kind")
 	}
 
@@ -305,7 +314,7 @@ func (t *transport) WriteStream(
 // ReadStream wait for a new incoming stream on current connection
 // it's typically used by server side
 func (t *transport) ReadStream(ctx context.Context) (*stream, error) {
-	if t.kind != serverTransport {
+	if t.side != serverSide {
 		return nil, fmt.Errorf("transport already be used as other kind")
 	}
 READ:

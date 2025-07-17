@@ -81,7 +81,7 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	}
 
 	// create new stream
-	s := newStream(ctx, trans, streamFrame{sid: genStreamID(), method: method})
+	s := newClientSideStream(ctx, trans, streamFrame{sid: genStreamID(), method: method})
 	// stream should be configured before WriteStream or there would be a race condition for metaFrameHandler
 	s.setRecvTimeout(rconfig.StreamRecvTimeout())
 	s.setMetaFrameHandler(c.metaHandler)
@@ -99,7 +99,7 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 
 func registerStreamCancelCallback(ctx context.Context, s *stream) {
 	ktx.RegisterCancelCallback(ctx, func() {
-		_ = s.cancel()
+		//_ = s.cancel()
 		// it's safe to call closeSend twice
 		// we do closeSend here to ensure stream can be closed normally
 		s.closeSend(nil)

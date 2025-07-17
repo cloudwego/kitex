@@ -98,7 +98,7 @@ func (tl *muxConnTransList) Get(network, addr string) (*transport, error) {
 	if err != nil {
 		return nil, err
 	}
-	trans = newTransport(clientTransport, conn, tl.pool)
+	trans = newTransport(clientSide, conn, tl.pool)
 	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
 		// peer close
 		_ = trans.Close(errTransport.WithCause(errors.New("connection closed by peer")))

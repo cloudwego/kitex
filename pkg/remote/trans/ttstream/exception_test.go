@@ -80,3 +80,48 @@ func TestGetTypeId(t *testing.T) {
 		test.Assert(t, errWithTypeId.TypeId() == testcase.expectTypeId, errWithTypeId)
 	}
 }
+
+func TestCanceledException(t *testing.T) {
+	t.Run("biz cancel", func(t *testing.T) {
+		bizCancelEx := errBizCancel.NewBuilder().WithSide(clientSide)
+		t.Log(bizCancelEx)
+		test.Assert(t, errors.Is(bizCancelEx, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(bizCancelEx, errBizCancel))
+	})
+
+	t.Run("downstream cancel", func(t *testing.T) {
+		ex0 := errDownstreamCancel.NewBuilder().WithSide(clientSide).WithTriggeredBy("Mesh Egress").WithCauseAndTypeId(errors.New("mesh timeout"), 1204)
+		t.Log(ex0)
+		test.Assert(t, errors.Is(ex0, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex0, errDownstreamCancel))
+		test.Assert(t, ex0.TypeId() == 1204, ex0.TypeId())
+	})
+
+	t.Run("upstream cancel", func(t *testing.T) {
+		bizCancelEx := errBizCancel.NewBuilder().WithSide(clientSide)
+		ex0 := errUpstreamCancel.NewBuilder().WithSide(clientSide).WithTriggeredBy("p.s.m").WithCauseAndTypeId(thrift.NewApplicationException(bizCancelEx.typeId, bizCancelEx.message), 9999)
+		t.Log(ex0)
+		test.Assert(t, errors.Is(ex0, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex0, errUpstreamCancel))
+		test.Assert(t, ex0.TypeId() == 9999, ex0.TypeId())
+		ex1 := errUpstreamCancel.NewBuilder().WithSide(clientSide).WithTriggeredBy("Mesh Ingress").WithCauseAndTypeId(errors.New("mesh timeout"), 1204)
+		t.Log(ex1)
+		test.Assert(t, errors.Is(ex1, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex1, errUpstreamCancel))
+		test.Assert(t, ex1.TypeId() == 1204, ex1.TypeId())
+		ex2 := errUpstreamCancel.NewBuilder().WithSide(clientSide).WithTriggeredBy("p.s.m").WithCauseAndTypeId(errors.New("doubao cancel with code"), 9999)
+		t.Log(ex2)
+		test.Assert(t, errors.Is(ex2, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex2, errUpstreamCancel))
+		test.Assert(t, ex2.TypeId() == 9999, ex2.TypeId())
+		ex3 := errUpstreamCancel.NewBuilder().WithSide(serverSide).WithTriggeredBy("p.s.m").WithCauseAndTypeId(thrift.NewApplicationException(bizCancelEx.typeId, bizCancelEx.message), bizCancelEx.typeId)
+		t.Log(ex3)
+		test.Assert(t, errors.Is(ex3, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex3, errUpstreamCancel))
+		test.Assert(t, ex3.TypeId() == bizCancelEx.TypeId(), ex3.TypeId())
+		ex4 := errUpstreamCancel.NewBuilder().WithSide(serverSide).WithTriggeredBy("AGW").WithCause(errors.New("AGW internal error"))
+		t.Log(ex4)
+		test.Assert(t, errors.Is(ex4, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex4, errUpstreamCancel))
+	})
+}

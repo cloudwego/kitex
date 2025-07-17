@@ -2,6 +2,8 @@ module github.com/cloudwego/kitex
 
 go 1.19
 
+replace github.com/cloudwego/gopkg v0.1.5 => github.com/DMwangnima/gopkg v0.1.2-0.20250716123414-677156316f8d
+
 require (
 	github.com/bytedance/gopkg v0.1.2
 	github.com/bytedance/sonic v1.13.3
