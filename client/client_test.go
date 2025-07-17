@@ -54,6 +54,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
 	"github.com/cloudwego/kitex/transport"
@@ -1284,4 +1285,33 @@ func Test_initRPCInfoWithStreamClientCallOption(t *testing.T) {
 	ctx = NewCtxWithCallOptions(context.Background(), streamcall.GetCallOptions([]streamcall.Option{streamcall.WithRecvTimeout(callOptTimeout)}))
 	_, ri, _ = cli.initRPCInfo(ctx, mtd, 0, nil, true)
 	test.Assert(t, ri.Config().StreamRecvTimeout() == callOptTimeout)
+}
+
+func TestStreamCleanupConfigWithNewClient(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// 1. Default behavior: not configured, should be enabled, interval 5s
+	cli := newMockClient(t, ctrl, WithTransportProtocol(transport.GRPCStreaming))
+	opt := cli.(*kcFinalizerClient).opt
+	test.Assert(t, opt.GRPCConnectOpts.StreamCleanupEnabled == true, "default should be enabled")
+	test.Assert(t, opt.GRPCConnectOpts.StreamCleanupInterval == 5*time.Second, "default interval should be 5s")
+
+	// 2. Explicitly disabled
+	cli = newMockClient(t, ctrl,
+		WithTransportProtocol(transport.GRPCStreaming),
+		WithStreamOptions(WithStreamCleanupConfig(&streaming.StreamCleanupConfig{Enable: false, CleanInterval: 0})),
+	)
+	opt = cli.(*kcFinalizerClient).opt
+	test.Assert(t, opt.GRPCConnectOpts.StreamCleanupEnabled == false, "should be disabled")
+	test.Assert(t, opt.GRPCConnectOpts.StreamCleanupInterval == 0, "should be 0")
+
+	// 3. Explicitly enabled and custom interval
+	cli = newMockClient(t, ctrl,
+		WithTransportProtocol(transport.GRPCStreaming),
+		WithStreamOptions(WithStreamCleanupConfig(&streaming.StreamCleanupConfig{Enable: true, CleanInterval: 3 * time.Second})),
+	)
+	opt = cli.(*kcFinalizerClient).opt
+	test.Assert(t, opt.GRPCConnectOpts.StreamCleanupEnabled == true, "should be enabled")
+	test.Assert(t, opt.GRPCConnectOpts.StreamCleanupInterval == 3*time.Second, "should be 3s")
 }
