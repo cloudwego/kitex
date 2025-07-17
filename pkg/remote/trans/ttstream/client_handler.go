@@ -24,7 +24,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
@@ -81,27 +80,14 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	}
 
 	// create new stream
-	s := newStream(ctx, trans, streamFrame{sid: genStreamID(), method: method})
+	cs := newClientStream(ctx, trans, streamFrame{sid: genStreamID(), method: method})
 	// stream should be configured before WriteStream or there would be a race condition for metaFrameHandler
-	s.setRecvTimeout(rconfig.StreamRecvTimeout())
-	s.setMetaFrameHandler(c.metaHandler)
+	cs.setRecvTimeout(rconfig.StreamRecvTimeout())
+	cs.setMetaFrameHandler(c.metaHandler)
 
-	if err = trans.WriteStream(ctx, s, intHeader, strHeader); err != nil {
+	if err = trans.WriteStream(ctx, cs, intHeader, strHeader); err != nil {
 		return nil, err
 	}
 
-	// if ctx from server side, we should cancel the stream when server handler already returned
-	registerStreamCancelCallback(ctx, s)
-
-	cs := newClientStream(s)
 	return cs, err
-}
-
-func registerStreamCancelCallback(ctx context.Context, s *stream) {
-	ktx.RegisterCancelCallback(ctx, func() {
-		_ = s.cancel()
-		// it's safe to call closeSend twice
-		// we do closeSend here to ensure stream can be closed normally
-		s.closeSend(nil)
-	})
 }

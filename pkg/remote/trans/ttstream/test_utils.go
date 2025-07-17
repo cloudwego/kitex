@@ -27,6 +27,16 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
+type mockStreamWriter struct{}
+
+func (m mockStreamWriter) WriteFrame(f *Frame) error {
+	return nil
+}
+
+func (m mockStreamWriter) CloseStream(sid int32) error {
+	return nil
+}
+
 func newTestStreamPipe(sinfo *serviceinfo.ServiceInfo, method string) (*clientStream, *serverStream, error) {
 	cfd, sfd := netpoll.GetSysFdPairs()
 	cconn, err := netpoll.NewFDConnection(cfd)
@@ -40,17 +50,17 @@ func newTestStreamPipe(sinfo *serviceinfo.ServiceInfo, method string) (*clientSt
 
 	intHeader := make(IntHeader)
 	strHeader := make(streaming.Header)
-	ctrans := newTransport(clientTransport, cconn, nil)
+	ctrans := newClientTransport(cconn, nil)
 	ctx := context.Background()
-	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: method})
-	if err = ctrans.WriteStream(ctx, rawClientStream, intHeader, strHeader); err != nil {
+	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: method})
+	if err = ctrans.WriteStream(ctx, cs, intHeader, strHeader); err != nil {
 		return nil, nil, err
 	}
-	strans := newTransport(serverTransport, sconn, nil)
-	rawServerStream, err := strans.ReadStream(context.Background())
+	strans := newServerTransport(sconn)
+	ss, err := strans.ReadStream(context.Background())
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return newClientStream(rawClientStream), newServerStream(rawServerStream), nil
+	return cs, ss, nil
 }

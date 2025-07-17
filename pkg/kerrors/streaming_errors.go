@@ -19,3 +19,6 @@ package kerrors
 // ErrStreamingProtocol is the parent type of all streaming protocol(e.g. gRPC, TTHeader Streaming)
 // related but not user-aware errors.
 var ErrStreamingProtocol = &basicError{"streaming protocol error"}
+
+// ErrStreamingCanceled is the parent type of all streaming canceled errors
+var ErrStreamingCanceled = &basicError{"streaming canceled"}

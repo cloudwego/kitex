@@ -30,16 +30,14 @@ import (
 
 func TestErrors(t *testing.T) {
 	causeErr := fmt.Errorf("test1")
-	newErr := errIllegalFrame.WithCause(causeErr)
+	newErr := errIllegalFrame.newBuilder().withCause(causeErr)
 	test.Assert(t, errors.Is(newErr, errIllegalFrame), newErr)
 	test.Assert(t, errors.Is(newErr, kerrors.ErrStreamingProtocol), newErr)
-	test.Assert(t, strings.Contains(newErr.Error(), errIllegalFrame.Error()))
 	test.Assert(t, strings.Contains(newErr.Error(), causeErr.Error()))
 
-	appErr := errApplicationException.WithCause(causeErr)
+	appErr := errApplicationException.newBuilder().withCause(causeErr)
 	test.Assert(t, errors.Is(appErr, errApplicationException), appErr)
 	test.Assert(t, !errors.Is(appErr, kerrors.ErrStreamingProtocol), appErr)
-	test.Assert(t, strings.Contains(appErr.Error(), errApplicationException.Error()))
 	test.Assert(t, strings.Contains(appErr.Error(), causeErr.Error()))
 }
 
@@ -55,6 +53,18 @@ func TestCommonParentKerror(t *testing.T) {
 		test.Assert(t, errors.Is(err, kerrors.ErrStreamingProtocol), err)
 	}
 	test.Assert(t, !errors.Is(errApplicationException, kerrors.ErrStreamingProtocol))
+
+	// canceled Exception
+	errs = []error{
+		errBizCancel,
+		errBizCancelWithCause,
+		errDownstreamCancel,
+		errUpstreamCancel,
+		errInternalCancel,
+	}
+	for _, err := range errs {
+		test.Assert(t, errors.Is(err, kerrors.ErrStreamingCanceled), err)
+	}
 }
 
 func TestGetTypeId(t *testing.T) {
@@ -70,13 +80,102 @@ func TestGetTypeId(t *testing.T) {
 		{err: errIllegalFrame, expectTypeId: 12004},
 		{err: errIllegalOperation, expectTypeId: 12005},
 		{err: errTransport, expectTypeId: 12006},
-		{err: errApplicationException.WithCause(exception), expectTypeId: 1000},
-		{err: errApplicationException.WithCause(normalErr), expectTypeId: 12001},
+		{err: errApplicationException.newBuilder().withCauseAndTypeId(exception, 1000), expectTypeId: 1000},
+		{err: errApplicationException.newBuilder().withCause(normalErr), expectTypeId: 12001},
 	}
 
 	for _, testcase := range testcases {
-		errWithTypeId, ok := testcase.err.(tException)
+		errWithTypeId, ok := testcase.err.(*Exception)
 		test.Assert(t, ok)
 		test.Assert(t, errWithTypeId.TypeId() == testcase.expectTypeId, errWithTypeId)
 	}
+}
+
+func TestCanceledException(t *testing.T) {
+	t.Run("biz cancel", func(t *testing.T) {
+		// [ttstream error, code=12007] [client-side stream] user code invoking stream RPC with context processed
+		// by context.WithCancel or context.WithTimeout, then invoking cancel() actively
+		bizCancelEx := errBizCancel.newBuilder().withSide(clientSide)
+		t.Log(bizCancelEx)
+		test.Assert(t, errors.Is(bizCancelEx, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(bizCancelEx, errBizCancel))
+	})
+
+	t.Run("downstream cancel", func(t *testing.T) {
+		// [ttstream error, code=1111] [client-side stream] [canceled path: Proxy Egress] proxy timeout
+		ex0 := errDownstreamCancel.newBuilder().withSide(clientSide).setOrAppendCancelPath("Proxy Egress").withCauseAndTypeId(errors.New("proxy timeout"), 1111)
+		t.Log(ex0)
+		test.Assert(t, errors.Is(ex0, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex0, errDownstreamCancel))
+		test.Assert(t, ex0.TypeId() == 1111, ex0.TypeId())
+	})
+
+	t.Run("upstream cancel", func(t *testing.T) {
+		bizCancelEx := errBizCancel.newBuilder().withSide(clientSide)
+		// [ttstream error, code=12007] [server-side stream] [canceled path: ttstream ServiceA]
+		// user code invoking stream RPC with context processed by context.WithCancel or context.WithTimeout, then invoking cancel() actively
+		ex0 := errUpstreamCancel.newBuilder().withSide(serverSide).setOrAppendCancelPath("ttstream ServiceA").withCauseAndTypeId(thrift.NewApplicationException(bizCancelEx.TypeId(), bizCancelEx.getMessage()), bizCancelEx.TypeId())
+		t.Log(ex0)
+		test.Assert(t, errors.Is(ex0, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex0, errUpstreamCancel))
+		test.Assert(t, ex0.TypeId() == bizCancelEx.TypeId(), ex0.TypeId())
+		// [ttstream error, code=1111] [server-side stream] [canceled path: Proxy Ingress] proxy timeout
+		ex1 := errUpstreamCancel.newBuilder().withSide(serverSide).setOrAppendCancelPath("Proxy Ingress").withCauseAndTypeId(errors.New("proxy timeout"), 1111)
+		t.Log(ex1)
+		test.Assert(t, errors.Is(ex1, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex1, errUpstreamCancel))
+		test.Assert(t, ex1.TypeId() == 1111, ex1.TypeId())
+		// [ttstream error, code=9999] [server-side stream] [canceled path: ttstream ServiceA] user cancels with code
+		ex2 := errUpstreamCancel.newBuilder().withSide(serverSide).setOrAppendCancelPath("ttstream ServiceA").withCauseAndTypeId(errors.New("user cancels with code"), 9999)
+		t.Log(ex2)
+		test.Assert(t, errors.Is(ex2, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex2, errUpstreamCancel))
+		test.Assert(t, ex2.TypeId() == 9999, ex2.TypeId())
+		// cascading cancel
+		// [ttstream error, code=12007] [client-side stream] [canceled path: ttstream ServiceA -> ttstream ServiceB]
+		// user code invoking stream RPC with context processed by context.WithCancel or context.WithTimeout, then invoking cancel() actively
+		ex3 := ex0.newBuilder().withSide(clientSide).setOrAppendCancelPath("ttstream ServiceB")
+		t.Log(ex3)
+		test.Assert(t, errors.Is(ex3, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex3, errUpstreamCancel))
+		test.Assert(t, ex3.TypeId() == bizCancelEx.TypeId(), ex3.TypeId())
+		// cascading cancel
+		// [ttstream error, code=1111] [client-side stream] [canceled path: Proxy Ingress -> ttstream ServiceB] proxy timeout
+		ex4 := ex1.newBuilder().withSide(clientSide).setOrAppendCancelPath("ttstream ServiceB")
+		t.Log(ex4)
+		test.Assert(t, errors.Is(ex4, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex4, errUpstreamCancel))
+		// cascading cancel
+		// [ttstream error, code=9999] [client-side stream] [canceled path: ttstream ServiceA -> ttstream ServiceB] user cancels with code
+		ex5 := ex2.newBuilder().withSide(clientSide).setOrAppendCancelPath("ttstream ServiceB")
+		t.Log(ex5)
+		test.Assert(t, errors.Is(ex5, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex5, errUpstreamCancel))
+	})
+}
+
+func Test_utilFuncs(t *testing.T) {
+	// test formatCancelPath
+	t.Run("formatCancelPath", func(t *testing.T) {
+		// empty cancelPath
+		testCp := ""
+		res := formatCancelPath(testCp)
+		test.Assert(t, res == "", res)
+		// single node
+		testCp = "A"
+		res = formatCancelPath(testCp)
+		test.Assert(t, res == "A", res)
+		// two nodes
+		testCp = "A,B"
+		res = formatCancelPath(testCp)
+		test.Assert(t, res == "A -> B", res)
+		// three nodes with empty node name
+		testCp = "A,B,"
+		res = formatCancelPath(testCp)
+		test.Assert(t, res == "A -> B -> ", res)
+		// multiple nodes with empty node name
+		testCp = "A,B,,,"
+		res = formatCancelPath(testCp)
+		test.Assert(t, res == "A -> B ->  ->  -> ", res)
+	})
 }
