@@ -45,17 +45,17 @@ type muxConnTransList struct {
 	L          sync.RWMutex
 	size       int
 	cursor     uint32
-	transports []*transport
-	pool       transPool
+	transports []*clientTransport
+	pool       *muxConnTransPool
 }
 
-func newMuxConnTransList(size int, pool transPool) *muxConnTransList {
+func newMuxConnTransList(size int, pool *muxConnTransPool) *muxConnTransList {
 	tl := new(muxConnTransList)
 	if size <= 0 {
 		size = runtime.GOMAXPROCS(0)
 	}
 	tl.size = size
-	tl.transports = make([]*transport, size)
+	tl.transports = make([]*clientTransport, size)
 	tl.pool = pool
 	return tl
 }
@@ -72,7 +72,7 @@ func (tl *muxConnTransList) Close() {
 	tl.L.Unlock()
 }
 
-func (tl *muxConnTransList) Get(network, addr string) (*transport, error) {
+func (tl *muxConnTransList) Get(network, addr string) (*clientTransport, error) {
 	// fast path
 	idx := atomic.AddUint32(&tl.cursor, 1) % uint32(tl.size)
 	tl.L.RLock()
@@ -98,10 +98,10 @@ func (tl *muxConnTransList) Get(network, addr string) (*transport, error) {
 	if err != nil {
 		return nil, err
 	}
-	trans = newTransport(clientTransport, conn, tl.pool)
+	trans = newClientTransport(conn, tl.pool)
 	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
 		// peer close
-		_ = trans.Close(errTransport.WithCause(errors.New("connection closed by peer")))
+		_ = trans.Close(errTransport.newBuilder().withCause(errors.New("connection closed by peer")))
 		return nil
 	})
 	tl.transports[idx] = trans
@@ -123,7 +123,7 @@ type muxConnTransPool struct {
 	cleanerOnce int32
 }
 
-func (p *muxConnTransPool) Get(network, addr string) (trans *transport, err error) {
+func (p *muxConnTransPool) Get(network, addr string) (trans *clientTransport, err error) {
 	v, ok := p.pool.Load(addr)
 	if !ok {
 		// multi concurrent Get should get the same TransList object
@@ -132,7 +132,7 @@ func (p *muxConnTransPool) Get(network, addr string) (trans *transport, err erro
 	return v.(*muxConnTransList).Get(network, addr)
 }
 
-func (p *muxConnTransPool) Put(trans *transport) {
+func (p *muxConnTransPool) Put(trans *clientTransport) {
 	p.activity.Store(trans.conn.RemoteAddr().String(), time.Now())
 
 	idleTimeout := p.config.MaxIdleTimeout
