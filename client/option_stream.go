@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/endpoint/cep"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -100,5 +101,33 @@ func WithStreamSendMiddlewareBuilder(mwb cep.StreamSendMiddlewareBuilder) Stream
 		di.Push(fmt.Sprintf("WithStreamSendMiddlewareBuilder(%+v)", utils.GetFuncName(mwb)))
 
 		o.StreamSendMiddlewareBuilders = append(o.StreamSendMiddlewareBuilders, mwb)
+	}}
+}
+
+// WithStreamCleanupConfig enables and configures stream cleanup for monitoring cancelled streams.
+// This is the unified configuration interface for all transport protocols (GRPC, TTHeader Streaming, etc.).
+//
+// Parameters:
+//   - enable: whether to enable stream cleanup, default is true
+//   - cleanInterval: interval for cleanup task, default is 5 seconds, must be > 0
+//
+// The stream cleanup task will periodically scan all active streams and clean up those that have been cancelled.
+// This helps prevent stream leaks when users call cancel() but don't call Recv() to sense the cancel signal.
+//
+
+func WithStreamCleanupConfig(cfg *streaming.StreamCleanupConfig) StreamOption {
+	return StreamOption{F: func(o *StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamCleanupConfig(%+v)", cfg))
+		if cfg == nil {
+			panic("WithStreamCleanupConfig: config must not be nil")
+		}
+		if cfg.Enable && cfg.CleanInterval <= 0 {
+			panic("WithStreamCleanupConfig: cleanInterval must be greater than 0 when enabled")
+		}
+		// When disabled, set cleanInterval to 0 automatically
+		if !cfg.Enable && cfg.CleanInterval != 0 {
+			cfg.CleanInterval = 0
+		}
+		o.StreamCleanupConfig = cfg
 	}}
 }

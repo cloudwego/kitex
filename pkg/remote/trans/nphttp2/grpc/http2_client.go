@@ -38,6 +38,7 @@ import (
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -55,6 +56,44 @@ import (
 // Streaming QPS is generally not too high, if there is a requirement for timeliness, then consider making it configurable.
 // To reduce the overhead of goroutines in a multi-connection scenario, use the Sync SharedTicker
 var ticker = utils.NewSyncSharedTicker(5 * time.Second)
+
+// getStreamCleanupTicker returns a ticker for stream cleanup based on the configuration.
+// If stream cleanup is disabled, it returns nil.
+func getStreamCleanupTicker(opts ConnectOptions) *utils.SharedTicker {
+	if !opts.StreamCleanupEnabled {
+		return nil
+	}
+
+	interval := opts.StreamCleanupInterval
+	if interval <= 0 {
+		interval = 5 * time.Second // default to 5 seconds
+	}
+
+	// Use a global map to share tickers with the same interval
+	return getSharedTickerForInterval(interval)
+}
+
+// Global map to share tickers with the same interval
+var (
+	streamCleanupTickers    sync.Map
+	streamCleanupTickersSfg singleflight.Group
+)
+
+// getSharedTickerForInterval returns a shared ticker for the given interval
+func getSharedTickerForInterval(interval time.Duration) *utils.SharedTicker {
+	if existing, ok := streamCleanupTickers.Load(interval); ok {
+		return existing.(*utils.SharedTicker)
+	}
+
+	// Use singleflight to prevent creating multiple tickers for the same interval
+	result, _, _ := streamCleanupTickersSfg.Do(interval.String(), func() (interface{}, error) {
+		ticker := utils.NewSyncSharedTicker(interval)
+		streamCleanupTickers.Store(interval, ticker)
+		return ticker, nil
+	})
+
+	return result.(*utils.SharedTicker)
+}
 
 // http2Client implements the ClientTransport interface with HTTP2.
 type http2Client struct {
@@ -119,6 +158,11 @@ type http2Client struct {
 	onClose func()
 
 	bufferPool *bufferPool
+
+	// Stream cleanup configuration
+	streamCleanupEnabled  bool
+	streamCleanupInterval time.Duration
+	streamCleanupTask     *closeStreamTask
 }
 
 // newHTTP2Client constructs a connected ClientTransport to addr based on HTTP2
@@ -209,13 +253,26 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		}
 	}
 	t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst)
-	task := &closeStreamTask{t: t}
+
+	// Setup stream cleanup task if enabled
+	t.streamCleanupEnabled = opts.StreamCleanupEnabled
+	t.streamCleanupInterval = opts.StreamCleanupInterval
+	streamCleanupTicker := getStreamCleanupTicker(opts)
+	if streamCleanupTicker != nil {
+		t.streamCleanupTask = &closeStreamTask{
+			t:      t,
+			ticker: streamCleanupTicker,
+		}
+		streamCleanupTicker.Add(t.streamCleanupTask)
+	}
+
 	t.onClose = func() {
 		onClose()
 		// when http2Client has been closed, remove this task
-		ticker.Delete(task)
+		if t.streamCleanupTask != nil && t.streamCleanupTask.ticker != nil {
+			t.streamCleanupTask.ticker.Delete(t.streamCleanupTask)
+		}
 	}
-	ticker.Add(task)
 
 	// Start the reader goroutine for incoming message. Each transport has
 	// a dedicated goroutine which reads HTTP2 frame from network. Then it
@@ -292,6 +349,7 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 type closeStreamTask struct {
 	t              *http2Client
 	toCloseStreams []*Stream
+	ticker         *utils.SharedTicker // reference to the ticker for cleanup
 }
 
 func (task *closeStreamTask) Tick() {
@@ -667,6 +725,19 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 	t.controlBuf.executeAndPut(addBackStreamQuota, cleanup)
 	// This will unblock write.
 	close(s.done)
+}
+
+// GetStreamCleanupStats returns the stream cleanup statistics.
+// This method is used for monitoring and observability.
+func (t *http2Client) GetStreamCleanupStats() interface{} {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	return map[string]interface{}{
+		"cleanup_enabled":      t.streamCleanupEnabled,
+		"cleanup_interval":     t.streamCleanupInterval.String(),
+		"active_streams_count": len(t.activeStreams),
+	}
 }
 
 // Close kicks off the shutdown process of the transport. This should be called

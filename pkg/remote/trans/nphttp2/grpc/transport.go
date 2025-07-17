@@ -33,6 +33,7 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
@@ -636,6 +637,10 @@ type ConnectOptions struct {
 	ShortConn bool
 	// TLSConfig
 	TLSConfig *tls.Config
+	// StreamCleanupEnabled enables monitoring cancelled streams and cleaning them up
+	StreamCleanupEnabled bool
+	// StreamCleanupInterval sets the interval for stream cleanup task
+	StreamCleanupInterval time.Duration
 }
 
 // NewServerTransport creates a ServerTransport with conn or non-nil error

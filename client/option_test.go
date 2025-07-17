@@ -49,6 +49,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/xds"
 	"github.com/cloudwego/kitex/transport"
@@ -774,4 +775,40 @@ func checkOneOptionDebugInfo(t *testing.T, opt Option, expectStr string) error {
 		return fmt.Errorf("DebugInfo not match with expect str:\n debugInfo=%s", o.DebugInfo[0])
 	}
 	return nil
+}
+
+func TestWithStreamCleanupUnified(t *testing.T) {
+	// Test default behavior (no configuration) - need GRPC transport to trigger default config
+	opts := client.NewOptions([]client.Option{WithTransportProtocol(transport.GRPCStreaming)})
+	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupEnabled == true, "default should be enabled")
+	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupInterval == 5*time.Second, "default interval should be 5s")
+
+	// Test explicit configuration
+	opts = client.NewOptions([]client.Option{
+		WithTransportProtocol(transport.GRPCStreaming),
+		WithStreamOptions(WithStreamCleanupConfig(&streaming.StreamCleanupConfig{Enable: false, CleanInterval: 0})),
+	})
+	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupEnabled == false, "should be disabled")
+	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupInterval == 0, "should be 0")
+
+	opts = client.NewOptions([]client.Option{
+		WithTransportProtocol(transport.GRPCStreaming),
+		WithStreamOptions(WithStreamCleanupConfig(&streaming.StreamCleanupConfig{Enable: true, CleanInterval: 3 * time.Second})),
+	})
+	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupEnabled == true, "should be enabled")
+	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupInterval == 3*time.Second, "should be 3s")
+}
+
+func TestWithStreamCleanupConfig(t *testing.T) {
+	// Test default behavior (no configuration)
+	opts := client.NewOptions([]client.Option{})
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig == nil, "default should be nil until GRPCStreaming")
+
+	// Test explicit configuration
+	opts = client.NewOptions([]client.Option{
+		WithStreamOptions(WithStreamCleanupConfig(&streaming.StreamCleanupConfig{Enable: false, CleanInterval: 0})),
+	})
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig != nil, "should have explicit config")
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.Enable == false, "should be disabled")
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.CleanInterval == 0, "should be 0")
 }
