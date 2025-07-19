@@ -60,6 +60,18 @@ type transport struct {
 	fpipe         *container.Pipe[*Frame]  // out-coming frame pipe
 	closedFlag    int32
 	closedTrigger chan struct{}
+
+	streamCleanupCfg streaming.StreamCleanupConfig // only valid in client-side transport, once configured, should not be modified anymore
+}
+
+func newTransportWithStreamCleanup(side sideType, conn netpoll.Connection, pool transPool, cfg streaming.StreamCleanupConfig) *transport {
+	t := newTransport(side, conn, pool)
+	t.streamCleanupCfg = cfg
+	if t.streamCleanupCfg.Enable {
+		ticker := globalTickerManager.getOrSetNewTicker(t.streamCleanupCfg.CleanInterval)
+		ticker.Add(t)
+	}
+	return t
 }
 
 func newTransport(side sideType, conn netpoll.Connection, pool transPool) *transport {
@@ -130,20 +142,23 @@ func (t *transport) Close(exception error) (err error) {
 		return nil
 	}
 	klog.Debugf("transport[%d-%s] is closing", t.side, t.Addr())
-	// send trailer first
+	// close streams first
 	t.streams.Range(func(key, value any) bool {
 		s := value.(*stream)
-		// todo: using close
-		_ = s.closeSend(exception)
-		_ = s.closeRecv(exception)
+		_ = s.close(exception, false, false)
 		return true
 	})
 	// then close stream and frame pipes
 	t.spipe.Close()
 	t.fpipe.Close()
+	if t.streamCleanupCfg.Enable {
+		ticker := globalTickerManager.getOrSetNewTicker(t.streamCleanupCfg.CleanInterval)
+		ticker.Delete(t)
+	}
 	return err
 }
 
+// WaitClosed waits for send loop and recv loop closed
 func (t *transport) WaitClosed() {
 	<-t.closedTrigger
 	<-t.closedTrigger
@@ -195,7 +210,7 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		var ok bool
 		s, ok = t.loadStream(fr.sid)
 		if !ok {
-			klog.Errorf("transport[%d] read a unknown stream: frame[%s]", t.side, fr.String())
+			//klog.Errorf("transport[%d] read a unknown stream: frame[%s]", t.side, fr.String())
 			// ignore unknown stream error
 			err = nil
 		} else {

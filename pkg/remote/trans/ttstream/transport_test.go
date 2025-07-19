@@ -394,7 +394,91 @@ func Test_clientStreamReceiveMetaFrame(t *testing.T) {
 	test.Assert(t, ti == "idc")
 }
 
-func TestTransportCancel(t *testing.T) {
+type mockProxy struct {
+	// for upstream
+	upSt *serverStream
+	// for downstream
+	downSt     *clientStream
+	nodeName   string
+	finishedCh chan struct{}
+}
+
+func newMockProxy(upSt *serverStream, downSt *clientStream, nodeName string) *mockProxy {
+	return &mockProxy{
+		upSt:       upSt,
+		downSt:     downSt,
+		nodeName:   nodeName,
+		finishedCh: make(chan struct{}),
+	}
+}
+
+func (m *mockProxy) SendRstToUpstream(t *testing.T, ex error) {
+	err := m.upSt.stream.close(ex, true, true)
+	test.Assert(t, err == nil, err)
+}
+
+func (m *mockProxy) SendRstToDownstream(t *testing.T, ex error) {
+	err := m.downSt.stream.close(ex, true, true)
+	test.Assert(t, err == nil, err)
+}
+
+func (m *mockProxy) Run(t *testing.T) {
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for {
+			req := new(testRequest)
+			rErr := m.upSt.RecvMsg(m.downSt.ctx, req)
+			if rErr != nil {
+				// client -> server transition ended
+				if rErr == io.EOF {
+					t.Logf("[%s] upstream client -> server finished normally", m.nodeName)
+					m.downSt.CloseSend(m.downSt.ctx)
+				} else {
+					// cascading cancel
+					test.Assert(t, errors.Is(rErr, kerrors.ErrStreamingCanceled), rErr)
+					test.Assert(t, errors.Is(rErr, errUpstreamCancel), rErr)
+					t.Logf("[%s] upstream client -> server err: %v", m.nodeName, rErr)
+				}
+				return
+			}
+			// todo: deal with err
+			sErr := m.downSt.SendMsg(m.downSt.ctx, req)
+			test.Assert(t, sErr == nil, sErr)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for {
+			resp := new(testResponse)
+			rErr := m.downSt.RecvMsg(m.downSt.ctx, resp)
+			if rErr != nil {
+				if errors.Is(rErr, errDownstreamCancel) {
+					t.Logf("[%s] downstream server -> client transit rst, err: %v", m.nodeName, rErr)
+					m.SendRstToUpstream(t, rErr)
+				}
+				m.upSt.CloseSend(rErr)
+				t.Logf("[%s] downstream server -> client finished, err: %v", m.nodeName, rErr)
+				return
+			}
+			sErr := m.upSt.SendMsg(m.upSt.ctx, resp)
+			// todo: deal with this err
+			test.Assert(t, sErr == nil, sErr)
+		}
+	}()
+	go func() {
+		wg.Wait()
+		t.Log("mockProxy run finished")
+		close(m.finishedCh)
+	}()
+}
+
+func (m *mockProxy) Wait() {
+	<-m.finishedCh
+}
+
+func initTestStreams(t *testing.T, cCtx context.Context, method string, cliNodeName, srvNodeName string) (*clientStream, *serverStream) {
 	cfd, sfd := netpoll.GetSysFdPairs()
 	cconn, err := netpoll.NewFDConnection(cfd)
 	test.Assert(t, err == nil, err)
@@ -403,56 +487,359 @@ func TestTransportCancel(t *testing.T) {
 
 	intHeader := make(IntHeader)
 	strHeader := make(streaming.Header)
-	ctrans := newTransport(clientSide, cconn, nil)
-	cCtx, cancel := context.WithCancel(context.Background())
-	cliLocalSvc := "ttstream client-side"
-	rawClientStream := newClientSideStream(cCtx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	cleanupCfg := streaming.StreamCleanupConfig{
+		Enable:        true,
+		CleanInterval: 100 * time.Millisecond,
+	}
+	ctrans := newTransportWithStreamCleanup(clientSide, cconn, nil, cleanupCfg)
+	rawClientStream := newClientSideStream(cCtx, ctrans, streamFrame{sid: genStreamID(), method: method})
 	rawClientStream.rpcInfo = rpcinfo.NewRPCInfo(
-		rpcinfo.NewEndpointInfo(cliLocalSvc, "Bidi", nil, nil), nil, nil, nil, nil)
+		rpcinfo.NewEndpointInfo(cliNodeName, method, nil, nil), nil, nil, nil, nil)
 	err = ctrans.WriteStream(cCtx, rawClientStream, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
 	strans := newTransport(serverSide, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
+	rawServerStream.rpcInfo = rpcinfo.NewRPCInfo(
+		rpcinfo.NewEndpointInfo(srvNodeName, method, nil, nil), nil, nil, nil, nil)
+	return newClientStream(rawClientStream), newServerStream(rawServerStream)
+}
 
+func sendClientStreaming(t *testing.T, cliSt *clientStream) context.Context {
+	return cliSt.ctx
+}
+
+func recvClientStreaming(t *testing.T, srvSt *serverStream) context.Context {
+	return srvSt.ctx
+}
+
+func sendServerStreaming(t *testing.T, cliSt *clientStream) context.Context {
+	req := new(testRequest)
+	req.A = 1
+	cCtx := cliSt.ctx
+	cErr := cliSt.SendMsg(cCtx, req)
+	test.Assert(t, cErr == nil, cErr)
+	cErr = cliSt.CloseSend(cCtx)
+	test.Assert(t, cErr == nil, cErr)
+	return cCtx
+}
+
+func recvServerStreaming(t *testing.T, srvSt *serverStream) context.Context {
+	req := new(testRequest)
+	sCtx := srvSt.ctx
+	sErr := srvSt.RecvMsg(sCtx, req)
+	test.Assert(t, sErr == nil, sErr)
+	return sCtx
+}
+
+var bizCancelMatrix = map[string]func(t *testing.T, cliSt *clientStream, srvSt *serverStream, cancel context.CancelFunc){
+	"ClientStreaming - cancel without sending any req":          clientStreamingCancelWithoutSendingAnyReq,
+	"ClientStreaming - cancel during normal interaction":        clientStreamingCancelDuringNormalInteraction,
+	"ClientStreaming - defer cancel()":                          clientStreamingDeferCancel,
+	"ServerStreaming - cancel remote service responding slowly": serverStreamingCancelRemoteServiceRespondingSlowly,
+	"ServerStreaming - cancel during normal interaction":        serverStreamingCancelDuringNormalInteraction,
+	"ServerStreaming - defer cancel()":                          serverStreamingDeferCancel,
+}
+
+func clientStreamingCancelWithoutSendingAnyReq(t *testing.T, cliSt *clientStream, srvSt *serverStream, cancel context.CancelFunc) {
 	var wg sync.WaitGroup
 	wg.Add(1)
-	// client
+	sendCh := make(chan struct{})
 	go func() {
 		defer wg.Done()
-		cs := newClientStream(rawClientStream)
-		req := new(testRequest)
-		req.B = "hello"
-		res := new(testResponse)
+		cCtx := sendClientStreaming(t, cliSt)
 		go func() {
 			time.Sleep(100 * time.Millisecond)
 			cancel()
 		}()
-		cErr := cs.RecvMsg(cCtx, res)
+		<-sendCh
+		req := new(testRequest)
+		req.A = 1
+		cErr := cliSt.SendMsg(cCtx, req)
 		test.Assert(t, cErr != nil)
 		test.Assert(t, errors.Is(cErr, kerrors.ErrStreamingCanceled), cErr)
 		test.Assert(t, errors.Is(cErr, errBizCancel), cErr)
-		t.Logf("client-side stream Recv err: %s", cErr)
-		isEmpty := true
-		ctrans.streams.Range(func(key, value any) bool {
-			isEmpty = false
-			return false
-		})
-		test.Assert(t, isEmpty)
+		t.Logf("client-side stream Send err: %v", cErr)
 	}()
-
-	// server
-	ss := newServerStream(rawServerStream)
-	err = ss.SendHeader(strHeader)
-	test.Assert(t, err == nil, err)
-
+	sCtx := recvClientStreaming(t, srvSt)
 	req := new(testRequest)
-	sErr := ss.RecvMsg(ss.ctx, req)
+	sErr := srvSt.RecvMsg(sCtx, req)
 	test.Assert(t, sErr != nil)
-	test.Assert(t, errors.Is(sErr, kerrors.ErrStreamingCanceled))
+	test.Assert(t, errors.Is(sErr, kerrors.ErrStreamingCanceled), sErr)
 	test.Assert(t, errors.Is(sErr, errUpstreamCancel), sErr)
-	test.Assert(t, strings.Contains(sErr.Error(), cliLocalSvc))
-	t.Logf("server-side stream Recv err: %s", sErr)
-
+	t.Logf("server-side stream Recv err: %v", sErr)
+	close(sendCh)
 	wg.Wait()
+}
+
+func clientStreamingCancelDuringNormalInteraction(t *testing.T, cliSt *clientStream, srvSt *serverStream, cancel context.CancelFunc) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		cCtx := sendClientStreaming(t, cliSt)
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			cancel()
+		}()
+		for {
+			req := new(testRequest)
+			req.A = 1
+			cErr := cliSt.SendMsg(cCtx, req)
+			if cErr == nil {
+				time.Sleep(10 * time.Millisecond)
+				continue
+			}
+			t.Logf("client-side stream Send err: %v", cErr)
+			return
+		}
+	}()
+	sCtx := recvClientStreaming(t, srvSt)
+	for {
+		req := new(testRequest)
+		sErr := srvSt.RecvMsg(sCtx, req)
+		if sErr == nil {
+			continue
+		}
+		test.Assert(t, errors.Is(sErr, kerrors.ErrStreamingCanceled), sErr)
+		test.Assert(t, errors.Is(sErr, errUpstreamCancel), sErr)
+		t.Logf("server-side stream Recv err: %v", sErr)
+		break
+	}
+	wg.Wait()
+}
+
+func clientStreamingDeferCancel(t *testing.T, cliSt *clientStream, srvSt *serverStream, cancel context.CancelFunc) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		cCtx := sendClientStreaming(t, cliSt)
+		defer cancel()
+		for i := 0; i < 5; i++ {
+			req := new(testRequest)
+			req.A = 1
+			cErr := cliSt.SendMsg(cCtx, req)
+			test.Assert(t, cErr == nil, cErr)
+		}
+	}()
+	sCtx := recvClientStreaming(t, srvSt)
+	for {
+		req := new(testRequest)
+		sErr := srvSt.RecvMsg(sCtx, req)
+		if sErr == nil {
+			continue
+		}
+		test.Assert(t, errors.Is(sErr, kerrors.ErrStreamingCanceled), sErr)
+		test.Assert(t, errors.Is(sErr, errUpstreamCancel), sErr)
+		t.Logf("server-side stream Recv err: %v", sErr)
+		break
+	}
+	wg.Wait()
+}
+
+func serverStreamingCancelRemoteServiceRespondingSlowly(t *testing.T, cliSt *clientStream, srvSt *serverStream, cancel context.CancelFunc) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	sendCh := make(chan struct{})
+	go func() {
+		defer wg.Done()
+		cCtx := sendServerStreaming(t, cliSt)
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			cancel()
+		}()
+		resp := new(testResponse)
+		cErr := cliSt.RecvMsg(cCtx, resp)
+		test.Assert(t, cErr != nil)
+		test.Assert(t, errors.Is(cErr, kerrors.ErrStreamingCanceled), cErr)
+		test.Assert(t, errors.Is(cErr, errBizCancel), cErr)
+		t.Logf("client-side stream Recv err: %v", cErr)
+		close(sendCh)
+	}()
+	sCtx := recvServerStreaming(t, srvSt)
+	<-sendCh
+	for {
+		resp := new(testResponse)
+		resp.A = 1
+		sErr := srvSt.SendMsg(sCtx, resp)
+		if sErr == nil {
+			continue
+		}
+		test.Assert(t, errors.Is(sErr, kerrors.ErrStreamingCanceled), sErr)
+		test.Assert(t, errors.Is(sErr, errUpstreamCancel), sErr)
+		t.Logf("server-side stream Send err: %v", sErr)
+		break
+	}
+	wg.Wait()
+}
+
+func serverStreamingCancelDuringNormalInteraction(t *testing.T, cliSt *clientStream, srvSt *serverStream, cancel context.CancelFunc) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		cCtx := sendServerStreaming(t, cliSt)
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			cancel()
+		}()
+		for {
+			resp := new(testResponse)
+			cErr := cliSt.RecvMsg(cCtx, resp)
+			if cErr == nil {
+				continue
+			}
+			test.Assert(t, cErr != nil)
+			test.Assert(t, errors.Is(cErr, kerrors.ErrStreamingCanceled), cErr)
+			test.Assert(t, errors.Is(cErr, errBizCancel), cErr)
+			t.Logf("client-side stream Recv err: %v", cErr)
+			return
+		}
+	}()
+	sCtx := recvServerStreaming(t, srvSt)
+	for {
+		resp := new(testResponse)
+		resp.A = 1
+		sErr := srvSt.SendMsg(sCtx, resp)
+		if sErr == nil {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		test.Assert(t, errors.Is(sErr, kerrors.ErrStreamingCanceled), sErr)
+		test.Assert(t, errors.Is(sErr, errUpstreamCancel), sErr)
+		t.Logf("server-side stream Send err: %v", sErr)
+		break
+	}
+	wg.Wait()
+}
+
+func serverStreamingDeferCancel(t *testing.T, cliSt *clientStream, srvSt *serverStream, cancel context.CancelFunc) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		cCtx := sendServerStreaming(t, cliSt)
+		defer cancel()
+		for i := 0; i < 5; i++ {
+			resp := new(testResponse)
+			cErr := cliSt.RecvMsg(cCtx, resp)
+			test.Assert(t, cErr == nil, cErr)
+		}
+	}()
+	sCtx := recvServerStreaming(t, srvSt)
+	for {
+		resp := new(testResponse)
+		resp.A = 1
+		sErr := srvSt.SendMsg(sCtx, resp)
+		if sErr == nil {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		test.Assert(t, errors.Is(sErr, kerrors.ErrStreamingCanceled), sErr)
+		test.Assert(t, errors.Is(sErr, errUpstreamCancel), sErr)
+		t.Logf("server-side stream Send err: %v", sErr)
+		break
+	}
+	wg.Wait()
+}
+
+func TestBizCancel(t *testing.T) {
+	cliNodeName := "ttstream client"
+	srvNodeName := "ttstream server"
+	for desc, testFunc := range bizCancelMatrix {
+		t.Run(desc, func(t *testing.T) {
+			cCtx, cancel := context.WithCancel(context.Background())
+			cliSt, srvSt := initTestStreams(t, cCtx, desc, cliNodeName, srvNodeName)
+			testFunc(t, cliSt, srvSt, cancel)
+		})
+	}
+	// todo: implement BidiStreaming
+	t.Run("BidiStreaming - cancel after receiving specific resp", func(t *testing.T) {
+
+	})
+	t.Run("BidiStreaming - cancel individual send loop", func(t *testing.T) {
+
+	})
+	t.Run("BidiStreaming - defer cancel()", func(t *testing.T) {
+
+	})
+}
+
+func initA2Egress2B(t *testing.T, method string) (aCliSt *clientStream, bSrvSt *serverStream, egress *mockProxy, aCancel context.CancelFunc) {
+	egressName := "Egress"
+	// a to egress
+	aCtx, aCancel := context.WithCancel(context.Background())
+	aCliSt, egressSrvSt := initTestStreams(t, aCtx, method, "A", egressName)
+	egressCliSt, bSrvSt := initTestStreams(t, egressSrvSt.ctx, method, egressName, "B")
+	proxy := newMockProxy(egressSrvSt, egressCliSt, egressName)
+	proxy.Run(t)
+	return aCliSt, bSrvSt, proxy, aCancel
+}
+
+func initA2Ingress2B(t *testing.T, method string) (aCliSt *clientStream, bSrvSt *serverStream, egress *mockProxy, aCancel context.CancelFunc) {
+	ingressName := "Ingress"
+	// a to ingress
+	aCtx, aCancel := context.WithCancel(context.Background())
+	aCliSt, ingressSrvSt := initTestStreams(t, aCtx, method, "A", ingressName)
+	ingressCliSt, bSrvSt := initTestStreams(t, ingressSrvSt.ctx, method, ingressName, "B")
+	proxy := newMockProxy(ingressSrvSt, ingressCliSt, ingressName)
+	proxy.Run(t)
+	return aCliSt, bSrvSt, proxy, aCancel
+}
+
+func initA2Egress2Ingress2B(t *testing.T, method string) (aCliSt *clientStream, bSrvSt *serverStream, egress *mockProxy, ingress *mockProxy, aCancel context.CancelFunc) {
+	egressName := "Egress"
+	ingressName := "Ingress"
+	// a to egress
+	aCtx, aCancel := context.WithCancel(context.Background())
+	aCliSt, egressSrvSt := initTestStreams(t, aCtx, method, "A", egressName)
+	// egress to ingress
+	egressCliSt, ingressSrvSt := initTestStreams(t, egressSrvSt.ctx, method, egressName, ingressName)
+	egress = newMockProxy(egressSrvSt, egressCliSt, egressName)
+	egress.Run(t)
+	// ingress to b
+	ingressCliSt, bSrvSt := initTestStreams(t, ingressSrvSt.ctx, method, ingressName, "B")
+	ingress = newMockProxy(ingressSrvSt, ingressCliSt, ingressName)
+	ingress.Run(t)
+	return aCliSt, bSrvSt, egress, ingress, aCancel
+}
+
+func TestProxyCancel(t *testing.T) {
+	t.Run("A biz cancel => Egress => C", func(t *testing.T) {
+		for desc, testFunc := range bizCancelMatrix {
+			t.Run(desc, func(t *testing.T) {
+				aCliSt, bSrvSt, egress, aCancel := initA2Egress2B(t, desc)
+				testFunc(t, aCliSt, bSrvSt, aCancel)
+				egress.Wait()
+			})
+		}
+	})
+	t.Run("A biz cancel => Ingress => B", func(t *testing.T) {
+		for desc, testFunc := range bizCancelMatrix {
+			t.Run(desc, func(t *testing.T) {
+				aCliSt, bSrvSt, ingress, aCancel := initA2Ingress2B(t, desc)
+				testFunc(t, aCliSt, bSrvSt, aCancel)
+				ingress.Wait()
+			})
+		}
+	})
+	t.Run("A biz cancel => Egress => Ingress => C", func(t *testing.T) {
+		for desc, testFunc := range bizCancelMatrix {
+			aCliSt, bSrvSt, egress, ingress, aCancel := initA2Egress2Ingress2B(t, desc)
+			testFunc(t, aCliSt, bSrvSt, aCancel)
+			egress.Wait()
+			ingress.Wait()
+		}
+	})
+	// todo: finish this test
+	//t.Run("A <= Egress cancel => B", func(t *testing.T) {
+	//
+	//})
+	//t.Run("A <= Ingress cancel => B", func(t *testing.T) {
+	//
+	//})
+	//t.Run("sidecar cancel => A => B", func(t *testing.T) {
+	//
+	//})
 }

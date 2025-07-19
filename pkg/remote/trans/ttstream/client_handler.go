@@ -34,16 +34,19 @@ var _ remote.ClientStreamFactory = (*clientTransHandler)(nil)
 func NewCliTransHandlerFactory(opts ...ClientHandlerOption) remote.ClientStreamFactory {
 	cp := new(clientTransHandler)
 	cp.transPool = newMuxConnTransPool(DefaultMuxConnConfig)
+	cp.streamCleanupConfig = defaultStreamCleanupConfig
 	for _, opt := range opts {
 		opt(cp)
 	}
+	cp.transPool.ConfigStreamCleanup(cp.streamCleanupConfig)
 	return cp
 }
 
 type clientTransHandler struct {
-	transPool     transPool
-	metaHandler   MetaFrameHandler
-	headerHandler HeaderFrameWriteHandler
+	transPool           transPool
+	metaHandler         MetaFrameHandler
+	headerHandler       HeaderFrameWriteHandler
+	streamCleanupConfig streaming.StreamCleanupConfig
 }
 
 // NewStream creates a client stream

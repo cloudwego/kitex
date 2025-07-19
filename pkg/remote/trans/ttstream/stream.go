@@ -215,13 +215,7 @@ func (s *stream) closeSend(exception error) error {
 	return err
 }
 
-// closeRecv should be called when following cases happen:
-// client:
-// - transport layer exception
-// - client stream is GCed
-// server:
-// - transport layer exception
-// - server handler return
+// closeRecv called only when server receiving Trailer Frame
 func (s *stream) closeRecv(exception error) error {
 	// client->server data transferring has stopped
 	atomic.CompareAndSwapInt32(&s.state, streamStateActive, streamStateHalfCloseRemote)
@@ -234,16 +228,13 @@ func (s *stream) closeRecv(exception error) error {
 	default:
 	}
 	s.reader.close(exception)
-	if s.side == clientSide {
-		// for client stream, if trailer frame is received, finish the lifecycle
-		s.closeSend(nil)
-	}
 	return nil
 }
 
-func (s *stream) close(exception error, sendRst bool, isCascadeRst bool) error {
-	if atomic.SwapInt32(&s.state, streamStateInactive) == streamSigInactive {
-		// stream has been closed
+func (s *stream) close(exception error, sendRst, isCascadeRst bool) error {
+	oldState := atomic.SwapInt32(&s.state, streamStateInactive)
+	if oldState == streamStateInactive {
+		// stream has been closed before
 		return nil
 	}
 	select {
@@ -259,11 +250,19 @@ func (s *stream) close(exception error, sendRst bool, isCascadeRst bool) error {
 		s.sendRst(exception, isCascadeRst)
 	}
 	if s.side == clientSide {
-		// for client-side stream, if trailer frame is received, finish the lifecycle
-		// todo: think about the error returned by closeSend
-		s.closeSend(nil)
+		if exception != nil {
+			s.clientStreamException.Store(exception)
+		}
+		if oldState != streamStateHalfCloseLocal {
+			// For client-side stream, if trailer frame is received, finish the lifecycle directly.
+			// But Some downstream components may not be upgraded and need to receive a Trailer Frame to end the Stream's lifecycle.
+			// For better compatibility, we choose to send a Trailer Frame when the client-side Stream is closed to.
+			//
+			// remove this logic in the future.
+			s.closeSend(nil)
+		}
 	} else {
-		// for server-side stream
+		// for server-side stream, support cascading cancel
 		s.cancelFunc(exception)
 	}
 	s.runCloseCallback(exception)
@@ -367,6 +366,24 @@ func (s *stream) sendRst(exception error, isCascadeRst bool) (err error) {
 			header = make(streaming.Header)
 			header[ttheader.HeaderCascadingLinkInitialNode] = clin
 		}
+	}
+	return s.writeFrame(rstFrameType, header, nil, payload)
+}
+
+// only for test
+func (s *stream) sendRstFrame(exception error, initialNode string) error {
+	var payload []byte
+	var err error
+	if exception != nil {
+		payload, err = EncodeException(context.Background(), s.method, s.sid, exception)
+		if err != nil {
+			return err
+		}
+	}
+	var header streaming.Header
+	if initialNode != "" {
+		header = make(streaming.Header)
+		header[ttheader.HeaderCascadingLinkInitialNode] = initialNode
 	}
 	return s.writeFrame(rstFrameType, header, nil, payload)
 }
