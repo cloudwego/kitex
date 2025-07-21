@@ -226,7 +226,6 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 	svcInfo := t.svcSearcher.SearchService(serviceName, methodName, true)
 	var methodInfo serviceinfo.MethodInfo
 	if svcInfo != nil {
-		ink.SetServiceInfo(svcInfo)
 		methodInfo = svcInfo.MethodInfo(methodName)
 	}
 

@@ -64,7 +64,6 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 	}
 	inkSetter.SetPackageName(svcInfo.GetPackageName())
 	inkSetter.SetServiceName(svcInfo.ServiceName)
-	inkSetter.SetServiceInfo(svcInfo)
 	inkSetter.SetMethodInfo(methodInfo)
 
 	// unknown method doesn't set methodName for RPCInfo.To(), or lead inconsistent with old version

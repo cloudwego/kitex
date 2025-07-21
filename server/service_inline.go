@@ -74,7 +74,6 @@ func (s *server) constructServerRPCInfo(svrCtx context.Context, cliRPCInfo rpcin
 		ink.SetServiceName(serviceName)
 		svc := s.svcs.svcMap[serviceName]
 		svcInfo := svc.svcInfo
-		ink.SetServiceInfo(svcInfo)
 		ink.SetMethodInfo(svcInfo.MethodInfo(method))
 	}
 	rpcinfo.AsMutableEndpointInfo(svrRPCInfo.To()).SetMethod(method)

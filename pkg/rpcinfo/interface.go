@@ -92,7 +92,6 @@ type Invocation interface {
 	PackageName() string
 	ServiceName() string
 	MethodName() string
-	ServiceInfo() *serviceinfo.ServiceInfo
 	MethodInfo() serviceinfo.MethodInfo
 	StreamingMode() serviceinfo.StreamingMode
 	SeqID() int32

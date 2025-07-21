@@ -186,7 +186,6 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 		return
 	}
 	ink.SetServiceName(sinfo.ServiceName)
-	ink.SetServiceInfo(sinfo)
 	ink.SetMethodName(st.Method())
 	ink.SetMethodInfo(minfo)
 	ink.SetStreamingMode(minfo.StreamingMode())

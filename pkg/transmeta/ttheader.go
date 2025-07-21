@@ -79,7 +79,8 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 		hd[transmeta.ConnectTimeout] = strconv.Itoa(int(ri.Config().ConnectTimeout().Milliseconds()))
 	}
 	transInfo.PutTransIntInfo(hd)
-	if idlSvcName := getIDLSvcName(ri.Invocation().ServiceInfo(), ri); idlSvcName != "" {
+	svcInfo, _ := ri.Invocation().Extra(rpcinfo.InvocationServiceInfoKey).(*serviceinfo.ServiceInfo)
+	if idlSvcName := getIDLSvcName(svcInfo, ri); idlSvcName != "" {
 		if strInfo := transInfo.TransStrInfo(); strInfo != nil {
 			strInfo[transmeta.HeaderIDLServiceName] = idlSvcName
 		} else {
