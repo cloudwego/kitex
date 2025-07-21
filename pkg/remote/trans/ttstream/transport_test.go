@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
@@ -413,12 +414,12 @@ func newMockProxy(upSt *serverStream, downSt *clientStream, nodeName string) *mo
 }
 
 func (m *mockProxy) SendRstToUpstream(t *testing.T, ex error) {
-	err := m.upSt.stream.close(ex, true, true)
+	err := m.upSt.stream.close(ex, true, m.nodeName)
 	test.Assert(t, err == nil, err)
 }
 
 func (m *mockProxy) SendRstToDownstream(t *testing.T, ex error) {
-	err := m.downSt.stream.close(ex, true, true)
+	err := m.downSt.stream.close(ex, true, m.nodeName)
 	test.Assert(t, err == nil, err)
 }
 
@@ -445,7 +446,11 @@ func (m *mockProxy) Run(t *testing.T) {
 			}
 			// todo: deal with err
 			sErr := m.downSt.SendMsg(m.downSt.ctx, req)
-			test.Assert(t, sErr == nil, sErr)
+			if sErr == nil {
+				continue
+			}
+			test.Assert(t, errors.Is(sErr, kerrors.ErrStreamingCanceled), sErr)
+			t.Logf("[%s] downstream client -> server err: %v", m.nodeName, sErr)
 		}
 	}()
 	go func() {
@@ -463,7 +468,10 @@ func (m *mockProxy) Run(t *testing.T) {
 				return
 			}
 			sErr := m.upSt.SendMsg(m.upSt.ctx, resp)
-			// todo: deal with this err
+			if sErr == nil {
+				continue
+			}
+			test.Assert(t, errors.Is(sErr, kerrors.ErrStreamingCanceled), sErr)
 			test.Assert(t, sErr == nil, sErr)
 		}
 	}()
@@ -744,6 +752,14 @@ func serverStreamingDeferCancel(t *testing.T, cliSt *clientStream, srvSt *server
 	wg.Wait()
 }
 
+func bidiStreamingCancelSerialSend(t *testing.T, cliSt *clientStream, srvSt *serverStream, cancel context.CancelFunc) {
+
+}
+
+func bidiStreamingCancelIndividual(t *testing.T, cliSt *clientStream, srvSt *serverStream, cancel context.CancelFunc) {
+
+}
+
 func TestBizCancel(t *testing.T) {
 	cliNodeName := "ttstream client"
 	srvNodeName := "ttstream server"
@@ -755,7 +771,7 @@ func TestBizCancel(t *testing.T) {
 		})
 	}
 	// todo: implement BidiStreaming
-	t.Run("BidiStreaming - cancel after receiving specific resp", func(t *testing.T) {
+	t.Run("BidiStreaming - cancel serial send", func(t *testing.T) {
 
 	})
 	t.Run("BidiStreaming - cancel individual send loop", func(t *testing.T) {
@@ -842,4 +858,13 @@ func TestProxyCancel(t *testing.T) {
 	//t.Run("sidecar cancel => A => B", func(t *testing.T) {
 	//
 	//})
+}
+
+func TestMetainfoTransit(t *testing.T) {
+	ctx := metainfo.WithValue(context.Background(), "key", "val")
+	v0, _ := metainfo.GetValue(ctx, "key")
+	t.Logf("v0: %s", v0)
+	ctx = metainfo.WithValue(ctx, "key", "val1")
+	v1, _ := metainfo.GetValue(ctx, "key")
+	t.Logf("v1: %s", v1)
 }

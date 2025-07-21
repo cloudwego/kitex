@@ -145,7 +145,7 @@ func (t *transport) Close(exception error) (err error) {
 	// close streams first
 	t.streams.Range(func(key, value any) bool {
 		s := value.(*stream)
-		_ = s.close(exception, false, false)
+		_ = s.close(exception, false, "")
 		return true
 	})
 	// then close stream and frame pipes

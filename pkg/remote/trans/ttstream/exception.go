@@ -28,6 +28,7 @@ type tException interface {
 	Error() string
 	TypeId() int32
 	Message() string
+	TriggeredBy() string
 }
 
 var (
@@ -90,6 +91,10 @@ func (e *exceptionType) TypeId() int32 {
 // Code is used for uniform code retrieving by Kitex in the future
 func (e *exceptionType) Code() int32 {
 	return e.TypeId()
+}
+
+func (e *exceptionType) TriggeredBy() string {
+	return ""
 }
 
 const (
@@ -186,6 +191,10 @@ func (e *canceledExceptionType) WithTriggeredBy(by string) *canceledExceptionTyp
 
 func (e *canceledExceptionType) isTriggeredBySet() bool {
 	return e.bitSet&setTriggeredBy != 0
+}
+
+func (e *canceledExceptionType) TriggeredBy() string {
+	return e.triggeredBy
 }
 
 func (e *canceledExceptionType) Is(target error) bool {

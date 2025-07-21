@@ -180,22 +180,26 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 // it is invoked in container.Pipe
 func (s *stream) ctxDoneCallback(ctx context.Context) {
 	var finalEx tException
-	var isCascadeRst bool
+	var initialNode string
 	cErr := ctx.Err()
 	switch cErr {
 	// biz code invokes cancel()
 	case context.Canceled:
 		finalEx = errBizCancel.NewBuilder().WithSide(clientSide)
+		if s.rpcInfo != nil {
+			initialNode = s.rpcInfo.From().ServiceName()
+		}
 	default:
 		if tEx, ok := cErr.(tException); ok {
+			// 此处需要 copy 出来一个新的错误出来，否则显示的是 server-side stream，这是错误的，必须是 client-side stream
 			finalEx = tEx
-			isCascadeRst = true
+			initialNode = tEx.TriggeredBy()
 		} else {
 			finalEx = errInternalCancel.NewBuilder().WithSide(clientSide).WithCause(cErr)
 		}
 	}
 
-	s.close(finalEx, true, isCascadeRst)
+	s.close(finalEx, true, initialNode)
 }
 
 func (s *stream) RegisterCloseCallback(cb func(error)) {
@@ -231,7 +235,7 @@ func (s *stream) closeRecv(exception error) error {
 	return nil
 }
 
-func (s *stream) close(exception error, sendRst, isCascadeRst bool) error {
+func (s *stream) close(exception error, sendRst bool, initialNode string) error {
 	oldState := atomic.SwapInt32(&s.state, streamStateInactive)
 	if oldState == streamStateInactive {
 		// stream has been closed before
@@ -247,7 +251,7 @@ func (s *stream) close(exception error, sendRst, isCascadeRst bool) error {
 	}
 	s.reader.close(exception)
 	if sendRst {
-		s.sendRst(exception, isCascadeRst)
+		s.sendRst(exception, initialNode)
 	}
 	if s.side == clientSide {
 		if exception != nil {
@@ -348,8 +352,7 @@ func (s *stream) sendTrailer(exception error) (err error) {
 	return err
 }
 
-func (s *stream) sendRst(exception error, isCascadeRst bool) (err error) {
-	// todo: support inject intInfo and strInfo
+func (s *stream) sendRst(exception error, initialNode string) (err error) {
 	klog.Debugf("stream[%d] send rst: err=%v", s.sid, exception)
 	var payload []byte
 	if exception != nil {
@@ -360,12 +363,9 @@ func (s *stream) sendRst(exception error, isCascadeRst bool) (err error) {
 		}
 	}
 	var header streaming.Header
-	if !isCascadeRst && s.rpcInfo != nil {
-		clin := s.rpcInfo.From().ServiceName()
-		if clin != "" {
-			header = make(streaming.Header)
-			header[ttheader.HeaderCascadingLinkInitialNode] = clin
-		}
+	if initialNode != "" {
+		header = make(streaming.Header)
+		header[ttheader.HeaderCascadingLinkInitialNode] = initialNode
 	}
 	return s.writeFrame(rstFrameType, header, nil, payload)
 }
@@ -449,7 +449,7 @@ func (s *stream) onReadTrailerFrame(fr *Frame) (err error) {
 	klog.Debugf("stream[%d] recv trailer: %v, exception: %v", s.sid, s.trailer, exception)
 	// client-side stream recv trailer, the lifecycle of whole stream has ended
 	if s.side == clientSide {
-		return s.close(exception, false, false)
+		return s.close(exception, false, "")
 	}
 	// server-side stream recv trailer, we only need to close recv but still can send data
 	return s.closeRecv(exception)
@@ -458,7 +458,7 @@ func (s *stream) onReadTrailerFrame(fr *Frame) (err error) {
 var defaultRstException = thrift.NewApplicationException(13, "rst")
 
 func (s *stream) onReadRstFrame(fr *Frame) (err error) {
-	var rstEx error
+	var rstEx *canceledExceptionType
 	var ex *thrift.ApplicationException
 	if len(fr.payload) > 0 {
 		// exception is type of (*thrift.ApplicationException)
@@ -470,7 +470,7 @@ func (s *stream) onReadRstFrame(fr *Frame) (err error) {
 		klog.Infof("KITEX: stream[%d] recv rst frame without payload", s.sid)
 		ex = defaultRstException
 	}
-	by := "unknown hop"
+	var by string
 	if fr.header != nil {
 		// cascading link initial node
 		clin, ok := fr.header[ttheader.HeaderCascadingLinkInitialNode]
@@ -479,9 +479,14 @@ func (s *stream) onReadRstFrame(fr *Frame) (err error) {
 		}
 	}
 	if s.side == clientSide {
-		rstEx = errDownstreamCancel.NewBuilder().WithSide(s.side).WithTriggeredBy(by).WithCauseAndTypeId(ex, ex.TypeId())
+		rstEx = errDownstreamCancel.NewBuilder().WithSide(s.side)
 	} else {
-		rstEx = errUpstreamCancel.NewBuilder().WithSide(s.side).WithTriggeredBy(by).WithCauseAndTypeId(ex, ex.TypeId())
+		rstEx = errUpstreamCancel.NewBuilder().WithSide(s.side)
+	}
+	if by != "" {
+		rstEx = rstEx.WithTriggeredBy(by).WithCauseAndTypeId(ex, ex.TypeId())
+	} else {
+		rstEx = rstEx.WithCauseAndTypeId(ex, ex.TypeId())
 	}
 	// todo: compare with gRPC to deal with header/trailer behaviour
 	s.trailer = fr.trailer
@@ -497,6 +502,6 @@ func (s *stream) onReadRstFrame(fr *Frame) (err error) {
 
 	klog.Debugf("stream[%d] recv trailer: %v, exception: %v", s.sid, s.trailer, rstEx)
 	// when receiving rst frame, we should close stream and there is no need to send rst frame
-	err = s.close(rstEx, false, false)
+	err = s.close(rstEx, false, "")
 	return err
 }
