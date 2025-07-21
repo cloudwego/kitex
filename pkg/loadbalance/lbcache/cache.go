@@ -172,6 +172,7 @@ func (b *BalancerFactory) Get(ctx context.Context, target rpcinfo.EndpointInfo) 
 			b:      b,
 			target: desc,
 		}
+		klog.CtxInfof(ctx, "[DEBUG] BalancerFactory Get, target=%s", desc)
 		bl.res.Store(res)
 		bl.sharedTicker = getSharedTicker(bl, b.opts.RefreshInterval)
 		b.cache.Store(desc, bl)
@@ -194,6 +195,7 @@ type Balancer struct {
 }
 
 func (bl *Balancer) Refresh() {
+	klog.Infof("[DEBUG] invoke refresh, target=%s", bl.target)
 	res, err := bl.b.resolver.Resolve(context.Background(), bl.target)
 	if err != nil {
 		klog.Warnf("KITEX: resolver refresh failed, key=%s error=%s", bl.target, err.Error())
@@ -203,6 +205,7 @@ func (bl *Balancer) Refresh() {
 	prev := bl.res.Load().(discovery.Result)
 	if bl.b.rebalancer != nil {
 		if ch, ok := bl.b.resolver.Diff(res.CacheKey, prev, res); ok {
+			klog.Infof("[DEBUG] rebalance, target=%s, change=%v", bl.target, ch)
 			bl.b.rebalancer.Rebalance(ch)
 		}
 	}
