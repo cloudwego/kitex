@@ -794,10 +794,19 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 	}
 
 	// Export read-only views to external users.
+	// Create invocation with context awareness
+	invocation := rpcinfo.NewInvocation(svcInfo.ServiceName, method, svcInfo.GetPackageName())
+
+	// Check if we have a custom sequence ID in the context
+	if seqID, ok := ctx.Value(rpcinfo.CtxKeySequenceID).(int32); ok && seqID > 0 {
+		// invocation is *invocation which implements InvocationSetter
+		invocation.SetSeqID(seqID)
+	}
+
 	ri := rpcinfo.NewRPCInfo(
 		rpcinfo.FromBasicInfo(opt.Cli),
 		rmt.ImmutableView(),
-		rpcinfo.NewInvocation(svcInfo.ServiceName, method, svcInfo.GetPackageName()),
+		invocation,
 		cfg.ImmutableView(),
 		rpcStats.ImmutableView(),
 	)

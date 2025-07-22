@@ -17,12 +17,27 @@
 package rpcinfo
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
+
+// CtxKeySequenceID is the context key for passing custom sequence IDs
+const CtxKeySequenceID = "kitex_sequence_id"
+
+// WithSequenceID returns a new context with the given sequence ID
+func WithSequenceID(ctx context.Context, seqID int32) context.Context {
+	return context.WithValue(ctx, CtxKeySequenceID, seqID)
+}
+
+// GetSequenceID retrieves the sequence ID from the context
+func GetSequenceID(ctx context.Context) (int32, bool) {
+	seqID, ok := ctx.Value(CtxKeySequenceID).(int32)
+	return seqID, ok
+}
 
 var (
 	_              Invocation       = (*invocation)(nil)
