@@ -2251,7 +2251,10 @@ func Test_isIgnorable(t *testing.T) {
 func Test_closeStreamTask(t *testing.T) {
 	// replace ticker to reduce test time
 	ticker = utils.NewSyncSharedTicker(10 * time.Millisecond)
-	server, ct := setUp(t, 0, math.MaxUint32, cancel)
+	server, ct := setUpWithOptions(t, 0, &ServerConfig{}, cancel, ConnectOptions{
+		StreamCleanupEnabled:  true,
+		StreamCleanupInterval: 10 * time.Millisecond,
+	})
 	callHdr := &CallHdr{
 		Host:   "localhost",
 		Method: "foo.Small",

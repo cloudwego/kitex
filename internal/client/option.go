@@ -191,11 +191,11 @@ type Options struct {
 	CloseCallbacks []func() error
 	WarmUpOption   *warmup.ClientOption
 
-	// GRPC
+	// gRPC
 	GRPCConnPoolSize uint32
 	GRPCConnectOpts  *grpc.ConnectOptions
 
-	// TTHeaderStreaming
+	// TTHeader Streaming
 	TTHeaderStreamingOptions TTHeaderStreamingOptions
 
 	// XDS
@@ -283,33 +283,33 @@ func (o *Options) initRemoteOpt() {
 		o.GRPCConnectOpts.StreamCleanupInterval = o.StreamOptions.StreamCleanupConfig.CleanInterval
 	}
 
-	// configure grpc
+	// configure gRPC
 	if o.Configs.TransportProtocol()&transport.GRPC == transport.GRPC {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
-			// grpc unary short connection
+			// gRPC unary short connection
 			o.GRPCConnectOpts.ShortConn = true
 		}
 		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
-	// configure grpc streaming
+	// configure gRPC streaming
 	if o.Configs.TransportProtocol()&(transport.GRPC|transport.GRPCStreaming) == transport.GRPCStreaming {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
-			// grpc unary short connection
+			// gRPC unary short connection
 			o.GRPCConnectOpts.ShortConn = true
 		}
 
 		o.RemoteOpt.GRPCStreamingConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.GRPCStreamingCliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
-	// configure ttheader streaming
+	// configure TTHeader Streaming
 	if o.Configs.TransportProtocol()&transport.TTHeaderStreaming == transport.TTHeaderStreaming {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
 			// configure short conn pool
 			o.TTHeaderStreamingOptions.TransportOptions = append(o.TTHeaderStreamingOptions.TransportOptions, ttstream.WithClientShortConnPool())
 		}
 
-		// Apply stream cleanup configuration from StreamOptions to TTHeader transport
+		// Apply stream cleanup configuration from StreamOptions to TTHeader Streaming transport
 		if o.StreamOptions.StreamCleanupConfig == nil {
 			o.StreamOptions.StreamCleanupConfig = &streaming.StreamCleanupConfig{
 				Enable:        true,
