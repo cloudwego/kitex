@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -125,4 +126,53 @@ func (m *mockRebalancer) Delete(ch discovery.Change) {
 	if m.deleteFunc != nil {
 		m.deleteFunc(ch)
 	}
+}
+
+type mockResolver struct{}
+
+func (m *mockResolver) Target(ctx context.Context, target rpcinfo.EndpointInfo) (description string) {
+	return "target"
+}
+
+func (m *mockResolver) Resolve(ctx context.Context, desc string) (discovery.Result, error) {
+	return discovery.Result{}, nil
+}
+
+func (m *mockResolver) Diff(cacheKey string, prev, next discovery.Result) (discovery.Change, bool) {
+	return discovery.Change{}, false
+}
+
+func (m *mockResolver) Name() string {
+	return "name"
+}
+
+var _ discovery.Resolver = &mockResolver{}
+
+func TestConcurrentGet(t *testing.T) {
+	cacheOpts := Options{Cacheable: false, RefreshInterval: time.Second, ExpireInterval: 5 * time.Second}
+	bf := newBalancerFactory(&mockResolver{}, loadbalance.NewWeightedBalancer(), cacheOpts)
+	m := sync.Map{}
+	wg := sync.WaitGroup{}
+
+	// concurrent get
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			b, err := bf.Get(context.Background(), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			m.Store(b, b)
+		}()
+	}
+	wg.Wait()
+
+	// check if length == 1, (target -> balancer, 1:1)
+	cnt := 0
+	m.Range(func(key, value any) bool {
+		cnt++
+		return true
+	})
+	test.Assert(t, cnt == 1, cnt)
 }
