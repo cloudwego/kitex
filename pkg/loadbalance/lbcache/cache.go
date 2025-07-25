@@ -163,6 +163,10 @@ func (b *BalancerFactory) Get(ctx context.Context, target rpcinfo.EndpointInfo) 
 		return val.(*Balancer), nil
 	}
 	val, err, _ := b.sfg.Do(desc, func() (interface{}, error) {
+		if v, ok := b.cache.Load(desc); ok {
+			// cache may be set already
+			return v.(*Balancer), nil
+		}
 		res, err := b.resolver.Resolve(ctx, desc)
 		if err != nil {
 			return nil, err
