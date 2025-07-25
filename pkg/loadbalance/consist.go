@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bytedance/gopkg/util/xxhash3"
-	"golang.org/x/sync/singleflight"
+	"github.com/cloudwego/kitex/internal/utils/singleflightutil"
 
+	"github.com/bytedance/gopkg/util/xxhash3"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -226,7 +226,7 @@ func buildConsistResult(info *consistInfo, key uint64) *consistResult {
 type consistBalancer struct {
 	cachedConsistInfo sync.Map
 	opt               ConsistentHashOption
-	sfg               singleflight.Group
+	sfg               singleflightutil.Group
 }
 
 // NewConsistBalancer creates a new consist balancer with the given option.
@@ -247,13 +247,17 @@ func NewConsistBalancer(opt ConsistentHashOption) Loadbalancer {
 func (cb *consistBalancer) GetPicker(e discovery.Result) Picker {
 	var ci *consistInfo
 	if e.Cacheable {
-		cii, ok := cb.cachedConsistInfo.Load(e.CacheKey)
-		if !ok {
-			cii, _, _ = cb.sfg.Do(e.CacheKey, func() (interface{}, error) {
-				return cb.newConsistInfo(e), nil
-			})
-			cb.cachedConsistInfo.Store(e.CacheKey, cii)
-		}
+		cii, _, _ := cb.sfg.CheckAndDo(
+			e.CacheKey,
+			func() (any, bool) {
+				return cb.cachedConsistInfo.Load(e.CacheKey)
+			},
+			func() (interface{}, error) {
+				res := cb.newConsistInfo(e)
+				cb.cachedConsistInfo.Store(e.CacheKey, res)
+				return res, nil
+			},
+		)
 		ci = cii.(*consistInfo)
 	} else {
 		ci = cb.newConsistInfo(e)

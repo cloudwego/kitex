@@ -24,7 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/sync/singleflight"
+	"github.com/cloudwego/kitex/internal/utils/singleflightutil"
 
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -41,7 +41,7 @@ const (
 
 var (
 	balancerFactories    sync.Map // key: resolver name + loadbalance name
-	balancerFactoriesSfg singleflight.Group
+	balancerFactoriesSfg singleflightutil.Group
 )
 
 // Options for create builder
@@ -88,7 +88,7 @@ type BalancerFactory struct {
 	resolver   discovery.Resolver
 	balancer   loadbalance.Loadbalancer
 	rebalancer loadbalance.Rebalancer
-	sfg        singleflight.Group
+	sfg        singleflightutil.Group
 }
 
 func cacheKey(resolver, balancer string, opts Options) string {
@@ -120,15 +120,15 @@ func NewBalancerFactory(resolver discovery.Resolver, balancer loadbalance.Loadba
 		return newBalancerFactory(resolver, balancer, opts)
 	}
 	uniqueKey := cacheKey(resolver.Name(), balancer.Name(), opts)
-	val, ok := balancerFactories.Load(uniqueKey)
-	if ok {
-		return val.(*BalancerFactory)
-	}
-	val, _, _ = balancerFactoriesSfg.Do(uniqueKey, func() (interface{}, error) {
-		b := newBalancerFactory(resolver, balancer, opts)
-		balancerFactories.Store(uniqueKey, b)
-		return b, nil
-	})
+	val, _, _ := balancerFactoriesSfg.CheckAndDo(uniqueKey,
+		func() (any, bool) {
+			return balancerFactories.Load(uniqueKey)
+		},
+		func() (interface{}, error) {
+			b := newBalancerFactory(resolver, balancer, opts)
+			balancerFactories.Store(uniqueKey, b)
+			return b, nil
+		})
 	return val.(*BalancerFactory)
 }
 
@@ -158,29 +158,25 @@ func renameResultCacheKey(res *discovery.Result, resolverName string) {
 // Get create a new balancer if not exists
 func (b *BalancerFactory) Get(ctx context.Context, target rpcinfo.EndpointInfo) (*Balancer, error) {
 	desc := b.resolver.Target(ctx, target)
-	val, ok := b.cache.Load(desc)
-	if ok {
-		return val.(*Balancer), nil
-	}
-	val, err, _ := b.sfg.Do(desc, func() (interface{}, error) {
-		if v, ok := b.cache.Load(desc); ok {
-			// cache may be set already
-			return v.(*Balancer), nil
-		}
-		res, err := b.resolver.Resolve(ctx, desc)
-		if err != nil {
-			return nil, err
-		}
-		renameResultCacheKey(&res, b.resolver.Name())
-		bl := &Balancer{
-			b:      b,
-			target: desc,
-		}
-		bl.res.Store(res)
-		bl.sharedTicker = getSharedTicker(bl, b.opts.RefreshInterval)
-		b.cache.Store(desc, bl)
-		return bl, nil
-	})
+	val, err, _ := b.sfg.CheckAndDo(desc,
+		func() (any, bool) {
+			return b.cache.Load(desc)
+		},
+		func() (interface{}, error) {
+			res, err := b.resolver.Resolve(ctx, desc)
+			if err != nil {
+				return nil, err
+			}
+			renameResultCacheKey(&res, b.resolver.Name())
+			bl := &Balancer{
+				b:      b,
+				target: desc,
+			}
+			bl.res.Store(res)
+			bl.sharedTicker = getSharedTicker(bl, b.opts.RefreshInterval)
+			b.cache.Store(desc, bl)
+			return bl, nil
+		})
 	if err != nil {
 		return nil, err
 	}

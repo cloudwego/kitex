@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/singleflight"
+	"github.com/cloudwego/kitex/internal/utils/singleflightutil"
 
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -28,24 +28,21 @@ import (
 var (
 	// insert, not delete
 	sharedTickers    sync.Map
-	sharedTickersSfg singleflight.Group
+	sharedTickersSfg singleflightutil.Group
 )
 
 func getSharedTicker(b *Balancer, refreshInterval time.Duration) *utils.SharedTicker {
-	sti, ok := sharedTickers.Load(refreshInterval)
-	if ok {
-		st := sti.(*utils.SharedTicker)
-		st.Add(b)
-		return st
-	}
-	v, _, _ := sharedTickersSfg.Do(refreshInterval.String(), func() (interface{}, error) {
-		st := utils.NewSharedTicker(refreshInterval)
-		sharedTickers.Store(refreshInterval, st)
-		return st, nil
-	})
+	v, _, _ := sharedTickersSfg.CheckAndDo(
+		refreshInterval.String(),
+		func() (any, bool) {
+			return sharedTickers.Load(refreshInterval)
+		},
+		func() (interface{}, error) {
+			st := utils.NewSharedTicker(refreshInterval)
+			sharedTickers.Store(refreshInterval, st)
+			return st, nil
+		})
 	st := v.(*utils.SharedTicker)
-	// Add without singleflight,
-	// because we need all refreshers those call this function to add themselves to SharedTicker
 	st.Add(b)
 	return st
 }

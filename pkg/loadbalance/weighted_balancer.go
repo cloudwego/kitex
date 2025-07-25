@@ -19,7 +19,7 @@ package loadbalance
 import (
 	"sync"
 
-	"golang.org/x/sync/singleflight"
+	"github.com/cloudwego/kitex/internal/utils/singleflightutil"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -35,7 +35,7 @@ const (
 type weightedBalancer struct {
 	kind        int
 	pickerCache sync.Map
-	sfg         singleflight.Group
+	sfg         singleflightutil.Group
 }
 
 // NewWeightedBalancer creates a loadbalancer using weighted-round-robin algorithm.
@@ -73,15 +73,15 @@ func (wb *weightedBalancer) GetPicker(e discovery.Result) Picker {
 		picker := wb.createPicker(e)
 		return picker
 	}
-
-	picker, ok := wb.pickerCache.Load(e.CacheKey)
-	if !ok {
-		picker, _, _ = wb.sfg.Do(e.CacheKey, func() (interface{}, error) {
+	picker, _, _ := wb.sfg.CheckAndDo(e.CacheKey,
+		func() (any, bool) {
+			return wb.pickerCache.Load(e.CacheKey)
+		},
+		func() (interface{}, error) {
 			p := wb.createPicker(e)
 			wb.pickerCache.Store(e.CacheKey, p)
 			return p, nil
 		})
-	}
 	return picker.(Picker)
 }
 
