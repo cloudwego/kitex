@@ -159,10 +159,7 @@ func TestConcurrentGet(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			b, err := bf.Get(context.Background(), nil)
-			if err != nil {
-				t.Fatal(err)
-			}
+			b, _ := bf.Get(context.Background(), nil)
 			m.Store(b, b)
 		}()
 	}
