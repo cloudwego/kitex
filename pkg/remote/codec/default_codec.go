@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"sync/atomic"
 
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
@@ -29,7 +28,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
-	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/transport"
@@ -387,13 +385,6 @@ func checkRPCState(ctx context.Context, message remote.Message) error {
 	}
 	if ctx.Err() == context.DeadlineExceeded || ctx.Err() == context.Canceled {
 		return kerrors.ErrRPCFinish
-	}
-	if respOp, ok := ctx.Value(retry.CtxRespOp).(*int32); ok {
-		if !atomic.CompareAndSwapInt32(respOp, retry.OpNo, retry.OpDoing) {
-			// previous call is being handling or done
-			// this flag is used to check request status in retry(backup request) scene
-			return kerrors.ErrRPCFinish
-		}
 	}
 	return nil
 }
