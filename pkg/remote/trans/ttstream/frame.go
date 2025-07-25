@@ -40,6 +40,7 @@ const (
 	headerFrameType  int32 = 2
 	dataFrameType    int32 = 3
 	trailerFrameType int32 = 4
+	rstFrameType     int32 = 5
 )
 
 var frameTypeToString = map[int32]string{
@@ -47,6 +48,7 @@ var frameTypeToString = map[int32]string{
 	headerFrameType:  ttheader.FrameTypeHeader,
 	dataFrameType:    ttheader.FrameTypeData,
 	trailerFrameType: ttheader.FrameTypeTrailer,
+	rstFrameType:     ttheader.FrameTypeRst,
 }
 
 var framePool sync.Pool
@@ -104,7 +106,7 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr *Frame) (err erro
 	param.IntInfo[ttheader.ToMethod] = fr.method
 
 	switch fr.typ {
-	case headerFrameType, metaFrameType:
+	case headerFrameType, metaFrameType, rstFrameType:
 		param.StrInfo = fr.header
 	case trailerFrameType:
 		param.StrInfo = fr.trailer
@@ -158,6 +160,9 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	case ttheader.FrameTypeTrailer:
 		ftype = trailerFrameType
 		ftrailer = dp.StrInfo
+	case ttheader.FrameTypeRst:
+		ftype = rstFrameType
+		fheader = dp.StrInfo
 	default:
 		return nil, errIllegalFrame.WithCause(fmt.Errorf("unexpected frame type: %v", dp.IntInfo[ttheader.FrameType]))
 	}
@@ -225,9 +230,34 @@ func DecodePayload(ctx context.Context, payload []byte, msg any) error {
 }
 
 func EncodeException(ctx context.Context, method string, seq int32, ex error) ([]byte, error) {
-	exception, ok := ex.(gopkgthrift.FastCodec)
-	if !ok {
-		exception = gopkgthrift.NewApplicationException(remote.InternalError, ex.Error())
+	var appEx gopkgthrift.FastCodec
+	switch et := ex.(type) {
+	case tException:
+		appEx = gopkgthrift.NewApplicationException(et.TypeId(), et.Message())
+	case gopkgthrift.FastCodec:
+		appEx = et
+	default:
+		appEx = gopkgthrift.NewApplicationException(remote.InternalError, ex.Error())
 	}
-	return gopkgthrift.MarshalFastMsg(method, gopkgthrift.EXCEPTION, seq, exception)
+
+	return gopkgthrift.MarshalFastMsg(method, gopkgthrift.EXCEPTION, seq, appEx)
+}
+
+func unmarshalException(buf []byte) (*gopkgthrift.ApplicationException, error) {
+	_, msgType, _, i, err := gopkgthrift.Binary.ReadMessageBegin(buf)
+	if err != nil {
+		return nil, err
+	}
+	if msgType != gopkgthrift.EXCEPTION {
+		// todo: create a string map
+		return nil, fmt.Errorf("thrift message type want Exception, but got %d", msgType)
+	}
+	buf = buf[i:]
+
+	ex := gopkgthrift.NewApplicationException(gopkgthrift.UNKNOWN_APPLICATION_EXCEPTION, "")
+	_, err = ex.FastRead(buf)
+	if err != nil {
+		return nil, err
+	}
+	return ex, nil
 }

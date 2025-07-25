@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/gofunc"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 var DefaultMuxConnConfig = MuxConnConfig{
@@ -46,10 +47,10 @@ type muxConnTransList struct {
 	size       int
 	cursor     uint32
 	transports []*transport
-	pool       transPool
+	pool       *muxConnTransPool
 }
 
-func newMuxConnTransList(size int, pool transPool) *muxConnTransList {
+func newMuxConnTransList(size int, pool *muxConnTransPool) *muxConnTransList {
 	tl := new(muxConnTransList)
 	if size <= 0 {
 		size = runtime.GOMAXPROCS(0)
@@ -98,7 +99,8 @@ func (tl *muxConnTransList) Get(network, addr string) (*transport, error) {
 	if err != nil {
 		return nil, err
 	}
-	trans = newTransport(clientTransport, conn, tl.pool)
+	trans = newTransportWithStreamCleanup(clientSide, conn, tl.pool, tl.pool.cleanupConfig)
+	trans = newTransport(clientSide, conn, tl.pool)
 	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
 		// peer close
 		_ = trans.Close(errTransport.WithCause(errors.New("connection closed by peer")))
@@ -117,10 +119,11 @@ func newMuxConnTransPool(config MuxConnConfig) transPool {
 }
 
 type muxConnTransPool struct {
-	config      MuxConnConfig
-	pool        sync.Map // addr:*muxConnTransList
-	activity    sync.Map // addr:lastActive
-	cleanerOnce int32
+	config        MuxConnConfig
+	pool          sync.Map // addr:*muxConnTransList
+	activity      sync.Map // addr:lastActive
+	cleanerOnce   int32
+	cleanupConfig streaming.StreamCleanupConfig
 }
 
 func (p *muxConnTransPool) Get(network, addr string) (trans *transport, err error) {
@@ -167,4 +170,8 @@ func (p *muxConnTransPool) Put(trans *transport) {
 			time.Sleep(idleTimeout)
 		}
 	}, gofunc.NewBasicInfo("", trans.Addr().String()))
+}
+
+func (p *muxConnTransPool) ConfigStreamCleanup(cfg streaming.StreamCleanupConfig) {
+	p.cleanupConfig = cfg
 }

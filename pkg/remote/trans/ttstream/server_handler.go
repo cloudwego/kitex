@@ -113,7 +113,7 @@ type onDisConnectSetter interface {
 // OnActive will be called when a connection accepted
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	nconn := conn.(netpoll.Connection)
-	trans := newTransport(serverTransport, nconn, nil)
+	trans := newTransport(serverSide, nconn, nil)
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
 		// server only close transport when peer connection closed
 		_ = trans.Close(nil)

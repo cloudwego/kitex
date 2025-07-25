@@ -18,6 +18,7 @@ package ttstream
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
@@ -54,6 +55,10 @@ func (s *serverStream) RecvMsg(ctx context.Context, req any) error {
 
 // SendMsg should send left header first
 func (s *serverStream) SendMsg(ctx context.Context, res any) error {
+	if st := atomic.LoadInt32(&s.state); st == streamStateInactive {
+		return s.ctx.Err()
+	}
+	// todo: consider SendHeader and status change
 	if s.wheader != nil {
 		if err := s.sendHeader(); err != nil {
 			return err
@@ -69,5 +74,5 @@ func (s *serverStream) CloseSend(exception error) error {
 	if err != nil {
 		return err
 	}
-	return s.closeRecv(nil, serverTransport)
+	return s.close(nil, false, "")
 }

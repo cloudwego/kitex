@@ -80,3 +80,58 @@ func TestGetTypeId(t *testing.T) {
 		test.Assert(t, errWithTypeId.TypeId() == testcase.expectTypeId, errWithTypeId)
 	}
 }
+
+func TestCanceledException(t *testing.T) {
+	t.Run("biz cancel", func(t *testing.T) {
+		// [ttstream error, code=12007] [client-side stream] user code invoking stream RPC with context processed
+		// by context.WithCancel or context.WithTimeout, then invoking cancel() actively
+		bizCancelEx := errBizCancel.newBuilder().withSide(clientSide)
+		t.Log(bizCancelEx)
+		test.Assert(t, errors.Is(bizCancelEx, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(bizCancelEx, errBizCancel))
+	})
+
+	t.Run("downstream cancel", func(t *testing.T) {
+		// [ttstream error, code=1111] [client-side stream] [canceled by downstream Proxy Egress] proxy timeout
+		ex0 := errDownstreamCancel.newBuilder().withSide(clientSide).setOrAppendVia("Proxy Egress").withCauseAndTypeId(errors.New("proxy timeout"), 1111)
+		t.Log(ex0)
+		test.Assert(t, errors.Is(ex0, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex0, errDownstreamCancel))
+		test.Assert(t, ex0.TypeId() == 1111, ex0.TypeId())
+	})
+
+	t.Run("upstream cancel", func(t *testing.T) {
+		bizCancelEx := errBizCancel.newBuilder().withSide(clientSide)
+		// [ttstream error, code=12007] [client-side stream] [canceled by upstream ttstream ServiceA]
+		// user code invoking stream RPC with context processed by context.WithCancel or context.WithTimeout, then invoking cancel() actively
+		ex0 := errUpstreamCancel.newBuilder().withSide(clientSide).setOrAppendVia("ttstream ServiceA").withCauseAndTypeId(thrift.NewApplicationException(bizCancelEx.TypeId(), bizCancelEx.Message()), bizCancelEx.TypeId())
+		t.Log(ex0)
+		test.Assert(t, errors.Is(ex0, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex0, errUpstreamCancel))
+		test.Assert(t, ex0.TypeId() == bizCancelEx.TypeId(), ex0.TypeId())
+		// [ttstream error, code=1111] [client-side stream] [canceled by upstream Proxy Ingress] proxy timeout
+		ex1 := errUpstreamCancel.newBuilder().withSide(clientSide).setOrAppendVia("Proxy Ingress").withCauseAndTypeId(errors.New("proxy timeout"), 1111)
+		t.Log(ex1)
+		test.Assert(t, errors.Is(ex1, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex1, errUpstreamCancel))
+		test.Assert(t, ex1.TypeId() == 1111, ex1.TypeId())
+		// [ttstream error, code=9999] [client-side stream] [canceled by upstream ttstream ServiceA] user cancels with code
+		ex2 := errUpstreamCancel.newBuilder().withSide(clientSide).setOrAppendVia("ttstream ServiceA").withCauseAndTypeId(errors.New("user cancels with code"), 9999)
+		t.Log(ex2)
+		test.Assert(t, errors.Is(ex2, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex2, errUpstreamCancel))
+		test.Assert(t, ex2.TypeId() == 9999, ex2.TypeId())
+		// [ttstream error, code=12007] [server-side stream] [canceled by upstream ttstream ServiceA]
+		// user code invoking stream RPC with context processed by context.WithCancel or context.WithTimeout, then invoking cancel() actively
+		ex3 := errUpstreamCancel.newBuilder().withSide(serverSide).setOrAppendVia("ttstream ServiceA").withCauseAndTypeId(thrift.NewApplicationException(bizCancelEx.TypeId(), bizCancelEx.Message()), bizCancelEx.TypeId())
+		t.Log(ex3)
+		test.Assert(t, errors.Is(ex3, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex3, errUpstreamCancel))
+		test.Assert(t, ex3.TypeId() == bizCancelEx.TypeId(), ex3.TypeId())
+		// [ttstream error, code=12009] [server-side stream] [canceled by sidecar] sidecar internal error
+		ex4 := errUpstreamCancel.newBuilder().withSide(serverSide).setOrAppendVia("sidecar").withCause(errors.New("sidecar internal error"))
+		t.Log(ex4)
+		test.Assert(t, errors.Is(ex4, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex4, errUpstreamCancel))
+	})
+}

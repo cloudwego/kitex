@@ -16,6 +16,8 @@
 
 package ttstream
 
+import "github.com/cloudwego/kitex/pkg/streaming"
+
 // ClientHandlerOption define client handler options
 type ClientHandlerOption func(cp *clientTransHandler)
 
@@ -54,5 +56,14 @@ func WithClientShortConnPool() ClientHandlerOption {
 func WithClientMuxConnPool(config MuxConnConfig) ClientHandlerOption {
 	return func(cp *clientTransHandler) {
 		cp.transPool = newMuxConnTransPool(config)
+	}
+}
+
+// WithClientStreamCleanupConfig configs details of cleaning up canceled streams
+// - Whether to enable
+// - If enabled, cleaning up interval
+func WithClientStreamCleanupConfig(config streaming.StreamCleanupConfig) ClientHandlerOption {
+	return func(cp *clientTransHandler) {
+		cp.streamCleanupConfig = config
 	}
 }

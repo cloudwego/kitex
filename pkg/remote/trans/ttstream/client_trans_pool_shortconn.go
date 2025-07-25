@@ -19,13 +19,17 @@ package ttstream
 import (
 	"errors"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 func newShortConnTransPool() transPool {
 	return &shortConnTransPool{}
 }
 
-type shortConnTransPool struct{}
+type shortConnTransPool struct {
+	cleanupConfig streaming.StreamCleanupConfig
+}
 
 func (p *shortConnTransPool) Get(network, addr string) (*transport, error) {
 	// create new connection
@@ -34,10 +38,14 @@ func (p *shortConnTransPool) Get(network, addr string) (*transport, error) {
 		return nil, err
 	}
 	// create new transport
-	trans := newTransport(clientTransport, conn, p)
+	trans := newTransport(clientSide, conn, p)
 	return trans, nil
 }
 
 func (p *shortConnTransPool) Put(trans *transport) {
 	_ = trans.Close(errTransport.WithCause(errors.New("short connection closed")))
+}
+
+func (p *shortConnTransPool) ConfigStreamCleanup(cfg streaming.StreamCleanupConfig) {
+	p.cleanupConfig = cfg
 }

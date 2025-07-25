@@ -18,6 +18,8 @@ package ttstream
 
 import (
 	"github.com/cloudwego/netpoll"
+
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 var dialer = netpoll.NewDialer()
@@ -25,4 +27,5 @@ var dialer = netpoll.NewDialer()
 type transPool interface {
 	Get(network, addr string) (trans *transport, err error)
 	Put(trans *transport)
+	ConfigStreamCleanup(cfg streaming.StreamCleanupConfig)
 }
