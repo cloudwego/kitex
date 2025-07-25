@@ -547,6 +547,9 @@ var bizCancelMatrix = map[string]func(t *testing.T, cliSt *clientStream, srvSt *
 	"ServerStreaming - cancel remote service responding slowly": serverStreamingCancelRemoteServiceRespondingSlowly,
 	"ServerStreaming - cancel during normal interaction":        serverStreamingCancelDuringNormalInteraction,
 	"ServerStreaming - defer cancel()":                          serverStreamingDeferCancel,
+	"BidiStreaming - cancel serial send":                        bidiStreamingCancelSerialSend,
+	"BidiStreaming - cancel individual send loop":               bidiStreamingCancelIndividual,
+	"BidiStreaming - defer cancel()":                            bidiStreamingDeferCancel,
 }
 
 func clientStreamingCancelWithoutSendingAnyReq(t *testing.T, cliSt *clientStream, srvSt *serverStream, cancel context.CancelFunc) {
@@ -752,11 +755,74 @@ func serverStreamingDeferCancel(t *testing.T, cliSt *clientStream, srvSt *server
 	wg.Wait()
 }
 
+// client logic: send->recv->send->recv->...
+// server logic: recv->send->recv->send->...
+// after 100ms, client cancels the context
+// expect: server will receive the cancel signal and return errUpstreamCancel
 func bidiStreamingCancelSerialSend(t *testing.T, cliSt *clientStream, srvSt *serverStream, cancel context.CancelFunc) {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ctx := cliSt.ctx
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			cancel()
+		}()
+		for {
+			// 发送请求
+			req := new(testRequest)
+			req.A = 1
+			err := cliSt.SendMsg(ctx, req)
+			if err != nil {
+				t.Logf("client SendMsg err: %v", err)
+				// 期望被 cancel
+				test.Assert(t, errors.Is(err, kerrors.ErrStreamingCanceled), err)
+				test.Assert(t, errors.Is(err, errBizCancel), err)
+				break
+			}
+			// 接收响应
+			resp := new(testResponse)
+			err = cliSt.RecvMsg(ctx, resp)
+			if err != nil {
+				t.Logf("client RecvMsg err: %v", err)
+				// 期望被 cancel
+				test.Assert(t, errors.Is(err, kerrors.ErrStreamingCanceled), err)
+				test.Assert(t, errors.Is(err, errBizCancel), err)
+				break
+			}
+		}
+	}()
 
+	ctx := srvSt.ctx
+	for {
+		req := new(testRequest)
+		err := srvSt.RecvMsg(ctx, req)
+		if err != nil {
+			t.Logf("server RecvMsg err: %v", err)
+			test.Assert(t, errors.Is(err, kerrors.ErrStreamingCanceled), err)
+			test.Assert(t, errors.Is(err, errUpstreamCancel), err)
+			break
+		}
+		resp := new(testResponse)
+		resp.A = req.A
+		err = srvSt.SendMsg(ctx, resp)
+		if err != nil {
+			t.Logf("server SendMsg err: %v", err)
+			test.Assert(t, errors.Is(err, kerrors.ErrStreamingCanceled), err)
+			test.Assert(t, errors.Is(err, errUpstreamCancel), err)
+			break
+		}
+	}
+
+	wg.Wait()
 }
 
 func bidiStreamingCancelIndividual(t *testing.T, cliSt *clientStream, srvSt *serverStream, cancel context.CancelFunc) {
+
+}
+
+func bidiStreamingDeferCancel(t *testing.T, cliSt *clientStream, srvSt *serverStream, cancel context.CancelFunc) {
 
 }
 

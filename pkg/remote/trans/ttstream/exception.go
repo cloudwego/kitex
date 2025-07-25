@@ -39,13 +39,13 @@ var (
 	errIllegalOperation     = newExceptionType("illegal operation", kerrors.ErrStreamingProtocol, 12005)
 	errTransport            = newExceptionType("transport is closing", kerrors.ErrStreamingProtocol, 12006)
 
-	errBizCancel = newCanceledExceptionType("user code invoking stream RPC with context processed by context.WithCancel or context.WithTimeout, then invoking cancel() actively",
+	errBizCancel = newException("user code invoking stream RPC with context processed by context.WithCancel or context.WithTimeout, then invoking cancel() actively",
 		kerrors.ErrStreamingCanceled, 12007)
 	// todo: support cancelWithCause
 	// errBizCancelWithCause = newCanceledExceptionType("user code canceled with cancelCause(error)", kerrors.ErrStreamingCanceled, 12008)
-	errDownstreamCancel = newCanceledExceptionType("canceled by downstream", kerrors.ErrStreamingCanceled, 12010)
-	errUpstreamCancel   = newCanceledExceptionType("canceled by upstream", kerrors.ErrStreamingCanceled, 12009)
-	errInternalCancel   = newCanceledExceptionType("internal canceled", kerrors.ErrStreamingCanceled, 12011)
+	errDownstreamCancel = newException("canceled by downstream", kerrors.ErrStreamingCanceled, 12010)
+	errUpstreamCancel   = newException("canceled by upstream", kerrors.ErrStreamingCanceled, 12009)
+	errInternalCancel   = newException("internal canceled", kerrors.ErrStreamingCanceled, 12011)
 )
 
 type exceptionType struct {
@@ -103,30 +103,29 @@ const (
 	setCause
 )
 
-type canceledExceptionType struct {
-	side sideType
+type Exception struct {
+	message string
+	typeId  int32
 
-	triggeredBy string
-	message     string
+	side sideType
+	via  string
 
 	parent error
 	cause  error
 
-	typeId int32
-
 	bitSet uint8
 }
 
-func newCanceledExceptionType(message string, parent error, typeId int32) *canceledExceptionType {
-	return &canceledExceptionType{message: message, parent: parent, typeId: typeId}
+func newException(message string, parent error, typeId int32) *Exception {
+	return &Exception{message: message, parent: parent, typeId: typeId}
 }
 
-func (e *canceledExceptionType) NewBuilder() *canceledExceptionType {
+func (e *Exception) newBuilder() *Exception {
 	newEx := *e
 	return &newEx
 }
 
-func (e *canceledExceptionType) Error() string {
+func (e *Exception) Error() string {
 	var strBuilder strings.Builder
 	strBuilder.WriteString(fmt.Sprintf("[ttstream error, code=%d] ", e.typeId))
 
@@ -139,84 +138,88 @@ func (e *canceledExceptionType) Error() string {
 		}
 	}
 
-	if e.isTriggeredBySet() {
-		strBuilder.WriteString("[")
-		strBuilder.WriteString(e.message)
-		strBuilder.WriteString(" ")
-		strBuilder.WriteString(e.triggeredBy)
+	if e.isViaSet() {
+		strBuilder.WriteString("[canceled ")
+		if e.viaMultipleNodes() {
+			strBuilder.WriteString("link: ")
+		} else {
+			strBuilder.WriteString(" by ")
+		}
+		strBuilder.WriteString(e.via)
 		strBuilder.WriteString("] ")
 	}
 
 	if e.isCauseSet() {
 		strBuilder.WriteString(e.cause.Error())
-	} else if !e.isTriggeredBySet() {
+	} else {
 		strBuilder.WriteString(e.message)
 	}
 
 	return strBuilder.String()
 }
 
-func (e *canceledExceptionType) WithCause(cause error) *canceledExceptionType {
+func (e *Exception) withCause(cause error) *Exception {
 	e.cause = cause
 	e.bitSet |= setCause
 	return e
 }
 
-func (e *canceledExceptionType) WithCauseAndTypeId(cause error, typeId int32) *canceledExceptionType {
+func (e *Exception) withCauseAndTypeId(cause error, typeId int32) *Exception {
 	e.cause = cause
 	e.typeId = typeId
 	e.bitSet |= setCause
 	return e
 }
 
-func (e *canceledExceptionType) isCauseSet() bool {
+func (e *Exception) isCauseSet() bool {
 	return e.bitSet&setCause != 0
 }
 
-func (e *canceledExceptionType) WithSide(side sideType) *canceledExceptionType {
+func (e *Exception) withSide(side sideType) *Exception {
 	e.side = side
 	e.bitSet |= setSide
 	return e
 }
 
-func (e *canceledExceptionType) isSideSet() bool {
+func (e *Exception) isSideSet() bool {
 	return e.bitSet&setSide != 0
 }
 
-func (e *canceledExceptionType) WithTriggeredBy(by string) *canceledExceptionType {
-	e.triggeredBy = by
+func (e *Exception) setOrAppendVia(via string) *Exception {
+	if len(e.via) > 0 {
+		e.via = e.via + "," + via
+	} else {
+		e.via = via
+	}
 	e.bitSet |= setTriggeredBy
 	return e
 }
 
-func (e *canceledExceptionType) isTriggeredBySet() bool {
+func (e *Exception) isViaSet() bool {
 	return e.bitSet&setTriggeredBy != 0
 }
 
-func (e *canceledExceptionType) TriggeredBy() string {
-	return e.triggeredBy
+func (e *Exception) viaMultipleNodes() bool {
+	if strings.Contains(e.via, ",") {
+		return true
+	}
+	return false
 }
 
-func (e *canceledExceptionType) Is(target error) bool {
-	if rawEx, ok := target.(*canceledExceptionType); ok {
+func (e *Exception) Is(target error) bool {
+	if rawEx, ok := target.(*Exception); ok {
 		return rawEx.message == e.message
 	}
 	return target == e || errors.Is(e.parent, target) || errors.Is(e.cause, target)
 }
 
-func (e *canceledExceptionType) Message() string {
+func (e *Exception) Message() string {
 	if e.isCauseSet() {
 		return e.cause.Error()
-	} else if !e.isTriggeredBySet() {
-		return e.message
 	}
-	return ""
+	return e.message
 }
 
-func (e *canceledExceptionType) TypeId() int32 {
+func (e *Exception) TypeId() int32 {
 	return e.typeId
-}
-
-func (e *canceledExceptionType) Code() int32 {
-	return e.TypeId()
 }

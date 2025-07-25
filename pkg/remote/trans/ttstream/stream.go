@@ -179,23 +179,23 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 // ctxDoneCallback convert ctx.Err() to ttstream related err and close client-side stream.
 // it is invoked in container.Pipe
 func (s *stream) ctxDoneCallback(ctx context.Context) {
-	var finalEx tException
+	var finalEx *Exception
 	var initialNode string
 	cErr := ctx.Err()
 	switch cErr {
 	// biz code invokes cancel()
 	case context.Canceled:
-		finalEx = errBizCancel.NewBuilder().WithSide(clientSide)
+		finalEx = errBizCancel.newBuilder().withSide(clientSide)
 		if s.rpcInfo != nil {
 			initialNode = s.rpcInfo.From().ServiceName()
 		}
 	default:
-		if tEx, ok := cErr.(tException); ok {
+		if tEx, ok := cErr.(*Exception); ok {
 			// 此处需要 copy 出来一个新的错误出来，否则显示的是 server-side stream，这是错误的，必须是 client-side stream
 			finalEx = tEx
-			initialNode = tEx.TriggeredBy()
+			initialNode = tEx.via
 		} else {
-			finalEx = errInternalCancel.NewBuilder().WithSide(clientSide).WithCause(cErr)
+			finalEx = errInternalCancel.newBuilder().withSide(clientSide).withCause(cErr)
 		}
 	}
 
@@ -458,19 +458,20 @@ func (s *stream) onReadTrailerFrame(fr *Frame) (err error) {
 var defaultRstException = thrift.NewApplicationException(13, "rst")
 
 func (s *stream) onReadRstFrame(fr *Frame) (err error) {
-	var rstEx *canceledExceptionType
-	var ex *thrift.ApplicationException
+	var rstEx *Exception
+	var appEx *thrift.ApplicationException
 	if len(fr.payload) > 0 {
 		// exception is type of (*thrift.ApplicationException)
-		ex, err = unmarshalApplicationException(fr.payload)
+		appEx, err = unmarshalException(fr.payload)
 		if err != nil {
-			return err
+			klog.Errorf("KITEX: stream[%d] unmarshal Exception in rst frame failed, err: %v", s.sid, err)
+			appEx = defaultRstException
 		}
 	} else {
 		klog.Infof("KITEX: stream[%d] recv rst frame without payload", s.sid)
-		ex = defaultRstException
+		appEx = defaultRstException
 	}
-	var by string
+	var via string
 	if fr.header != nil {
 		// cascading link initial node
 		clin, ok := fr.header[ttheader.HeaderCascadingLinkInitialNode]
@@ -479,14 +480,14 @@ func (s *stream) onReadRstFrame(fr *Frame) (err error) {
 		}
 	}
 	if s.side == clientSide {
-		rstEx = errDownstreamCancel.NewBuilder().WithSide(s.side)
+		rstEx = errDownstreamCancel.newBuilder().withSide(s.side)
 	} else {
-		rstEx = errUpstreamCancel.NewBuilder().WithSide(s.side)
+		rstEx = errUpstreamCancel.newBuilder().withSide(s.side)
 	}
 	if by != "" {
-		rstEx = rstEx.WithTriggeredBy(by).WithCauseAndTypeId(ex, ex.TypeId())
+		rstEx = rstEx.setOrAppendVia(by).withCauseAndTypeId(ex, ex.TypeId())
 	} else {
-		rstEx = rstEx.WithCauseAndTypeId(ex, ex.TypeId())
+		rstEx = rstEx.withCauseAndTypeId(ex, ex.TypeId())
 	}
 	// todo: compare with gRPC to deal with header/trailer behaviour
 	s.trailer = fr.trailer

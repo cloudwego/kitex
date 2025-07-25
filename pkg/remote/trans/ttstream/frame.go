@@ -243,7 +243,7 @@ func EncodeException(ctx context.Context, method string, seq int32, ex error) ([
 	return gopkgthrift.MarshalFastMsg(method, gopkgthrift.EXCEPTION, seq, appEx)
 }
 
-func unmarshalApplicationException(buf []byte) (*gopkgthrift.ApplicationException, error) {
+func unmarshalException(buf []byte) (*gopkgthrift.ApplicationException, error) {
 	_, msgType, _, i, err := gopkgthrift.Binary.ReadMessageBegin(buf)
 	if err != nil {
 		return nil, err
