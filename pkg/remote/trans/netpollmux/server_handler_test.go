@@ -28,12 +28,12 @@ import (
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mockmessage "github.com/cloudwego/kitex/internal/mocks/message"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -50,13 +50,14 @@ var (
 
 func newTestRpcInfo() rpcinfo.RPCInfo {
 	fromInfo := rpcinfo.EmptyEndpointInfo()
+	toInfo := rpcinfo.EmptyEndpointInfo()
 	rpcCfg := rpcinfo.NewRPCConfig()
 	mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
 	mCfg.SetReadWriteTimeout(rwTimeout)
 	ink := rpcinfo.NewInvocation("", method)
 	rpcStat := rpcinfo.NewRPCStats()
 
-	rpcInfo := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
+	rpcInfo := rpcinfo.NewRPCInfo(fromInfo, toInfo, ink, rpcCfg, rpcStat)
 	rpcinfo.AsMutableEndpointInfo(rpcInfo.From()).SetAddress(addr)
 
 	return rpcInfo
@@ -79,8 +80,11 @@ func init() {
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 				in.Skip(3 * codec.Size32)
 				_, err := in.ReadString(len(body))
-				msg.SpecifyServiceInfo(mocks.MockServiceName, mocks.MockMethod)
-				return err
+				if err != nil {
+					return err
+				}
+				msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter).SetServiceName(mocks.MockServiceName)
+				return codec.SetOrCheckMethodName(mocks.MockMethod, msg)
 			},
 		},
 		SvcSearcher:      svcSearcher,
@@ -146,16 +150,9 @@ func TestMuxSvrWrite(t *testing.T) {
 
 	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
 
-	msg := &MockMessage{
+	msg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return rpcInfo
-		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
-				},
-			}
 		},
 	}
 
@@ -197,16 +194,9 @@ func TestMuxSvrOnRead(t *testing.T) {
 
 	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
 
-	msg := &MockMessage{
+	msg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return rpcInfo
-		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
-				},
-			}
 		},
 	}
 
@@ -286,16 +276,9 @@ func TestPanicAfterMuxSvrOnRead(t *testing.T) {
 	// pipeline nil panic
 	svrTransHdlr.SetPipeline(nil)
 
-	msg := &MockMessage{
+	msg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return rpcInfo
-		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
-				},
-			}
 		},
 	}
 
@@ -361,16 +344,9 @@ func TestRecoverAfterOnReadPanic(t *testing.T) {
 
 	rpcInfo := newTestRpcInfo()
 
-	msg := &MockMessage{
+	msg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return rpcInfo
-		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
-				},
-			}
 		},
 	}
 
@@ -441,16 +417,9 @@ func TestInvokeError(t *testing.T) {
 
 	rpcInfo := newTestRpcInfo()
 
-	msg := &MockMessage{
+	msg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return rpcInfo
-		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
-				},
-			}
 		},
 	}
 
@@ -458,12 +427,13 @@ func TestInvokeError(t *testing.T) {
 	opt := &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(rpcInfo rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
+			toInfo := rpcinfo.EmptyEndpointInfo()
 			rpcCfg := rpcinfo.NewRPCConfig()
 			mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
 			mCfg.SetReadWriteTimeout(rwTimeout)
 			ink := rpcinfo.NewInvocation("", method)
 			rpcStat := rpcinfo.NewRPCStats()
-			nri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
+			nri := rpcinfo.NewRPCInfo(fromInfo, toInfo, ink, rpcCfg, rpcStat)
 			rpcinfo.AsMutableEndpointInfo(nri.From()).SetAddress(addr)
 			return nri
 		},
@@ -476,8 +446,11 @@ func TestInvokeError(t *testing.T) {
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 				in.Skip(3 * codec.Size32)
 				_, err := in.ReadString(len(body))
-				msg.SpecifyServiceInfo(mocks.MockServiceName, mocks.MockMethod)
-				return err
+				if err != nil {
+					return err
+				}
+				msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter).SetServiceName(mocks.MockServiceName)
+				return codec.SetOrCheckMethodName(mocks.MockMethod, msg)
 			},
 		},
 		SvcSearcher:      svcSearcher,
@@ -597,16 +570,9 @@ func TestInvokeNoMethod(t *testing.T) {
 
 	rpcInfo := newTestRpcInfo()
 
-	msg := &MockMessage{
+	msg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return rpcInfo
-		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
-				},
-			}
 		},
 	}
 
@@ -720,16 +686,9 @@ func TestMuxSvrOnReadHeartbeat(t *testing.T) {
 	}
 	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(newOpt)
 
-	msg := &MockMessage{
+	msg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return rpcInfo
-		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
-				},
-			}
 		},
 	}
 

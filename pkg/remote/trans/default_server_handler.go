@@ -70,13 +70,8 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, err)
 	}()
 
-	svcInfo := sendMsg.ServiceInfo()
-	if svcInfo != nil {
-		if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
-			if methodInfo.OneWay() {
-				return ctx, nil
-			}
-		}
+	if methodInfo := ri.Invocation().MethodInfo(); methodInfo != nil && methodInfo.OneWay() {
+		return ctx, nil
 	}
 
 	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
@@ -147,6 +142,7 @@ func (t *svrTransHandler) newCtxWithRPCInfo(ctx context.Context, conn net.Conn) 
 // The connection should be closed after returning error.
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
 	ctx, ri := t.newCtxWithRPCInfo(ctx, conn)
+	remote.SetServiceSearcher(ri, t.svcSearcher)
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	var recvMsg remote.Message
 	var sendMsg remote.Message
@@ -183,7 +179,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	}()
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
-	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearcher, ri, remote.Call, remote.Server)
+	recvMsg = remote.NewMessage(nil, ri, remote.Call, remote.Server)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
 	if err != nil {
@@ -192,26 +188,18 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		return err
 	}
 
-	svcInfo := recvMsg.ServiceInfo()
 	// heartbeat processing
 	// recvMsg.MessageType would be set to remote.Heartbeat in previous Read procedure
 	// if specified codec support heartbeat
 	if recvMsg.MessageType() == remote.Heartbeat {
-		sendMsg = remote.NewMessage(nil, svcInfo, ri, remote.Heartbeat, remote.Server)
+		sendMsg = remote.NewMessage(nil, ri, remote.Heartbeat, remote.Server)
 	} else {
 		// reply processing
-		var methodInfo serviceinfo.MethodInfo
-		if methodInfo, err = GetMethodInfo(ri, svcInfo); err != nil {
-			// it won't be error, because the method has been checked in decode, err check here just do defensive inspection
-			t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true, true)
-			// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded,
-			// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
-			return err
-		}
+		methodInfo := ri.Invocation().MethodInfo()
 		if methodInfo.OneWay() {
-			sendMsg = remote.NewMessage(nil, svcInfo, ri, remote.Reply, remote.Server)
+			sendMsg = remote.NewMessage(nil, ri, remote.Reply, remote.Server)
 		} else {
-			sendMsg = remote.NewMessage(methodInfo.NewResult(), svcInfo, ri, remote.Reply, remote.Server)
+			sendMsg = remote.NewMessage(methodInfo.NewResult(), ri, remote.Reply, remote.Server)
 		}
 
 		ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
@@ -228,7 +216,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		}
 	}
 
-	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
+	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	if ctx, err = t.transPipe.Write(ctx, conn, sendMsg); err != nil {
 		// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
 		return err
@@ -294,21 +282,16 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 		// conn is closed, no need reply
 		return
 	}
-	svcInfo := recvMsg.ServiceInfo()
-	if svcInfo != nil {
-		if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
-			if methodInfo.OneWay() {
-				return
-			}
-		}
+	if methodInfo := ri.Invocation().MethodInfo(); methodInfo != nil && methodInfo.OneWay() {
+		return
 	}
 
 	transErr, isTransErr := err.(*remote.TransError)
 	if !isTransErr {
 		return
 	}
-	errMsg := remote.NewMessage(transErr, svcInfo, ri, remote.Exception, remote.Server)
-	remote.FillSendMsgFromRecvMsg(recvMsg, errMsg)
+	errMsg := remote.NewMessage(transErr, ri, remote.Exception, remote.Server)
+	errMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	if doOnMessage {
 		// if error happen before normal OnMessage, exec it to transfer header trans info into rpcinfo
 		t.transPipe.OnMessage(ctx, recvMsg, errMsg)

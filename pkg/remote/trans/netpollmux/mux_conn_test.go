@@ -23,11 +23,11 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	mockmessage "github.com/cloudwego/kitex/internal/mocks/message"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 // TestOnRequest test muxSvrConn OnRequest return Err
@@ -90,16 +90,9 @@ func TestOnRequest(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	ri := newMockRPCInfo()
-	msg := &MockMessage{
+	msg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return ri
-		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
-				},
-			}
 		},
 	}
 	ctx, err = handler.Write(ctx, conn, msg)

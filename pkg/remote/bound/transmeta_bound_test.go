@@ -62,8 +62,7 @@ func TestTransMetaHandlerWrite(t *testing.T) {
 		metaHandler3 := mocksremote.NewMockMetaHandler(ctrl)
 
 		invokeMessage := invoke.NewMessage(nil, nil)
-		remoteMessage := remote.NewMessage(
-			nil, nil, nil, remote.Call, remote.Client)
+		remoteMessage := remote.NewMessage(nil, nil, remote.Call, remote.Client)
 		ctx := context.Background()
 
 		metaHandler1.EXPECT().WriteMeta(gomock.Any(), remoteMessage).DoAndReturn(func(ctx context.Context, msg remote.Message) (context.Context, error) {
@@ -106,8 +105,7 @@ func TestTransMetaHandlerWrite(t *testing.T) {
 		metaHandler3 := mocksremote.NewMockMetaHandler(ctrl)
 
 		invokeMessage := invoke.NewMessage(nil, nil)
-		remoteMessage := remote.NewMessage(
-			nil, nil, nil, remote.Call, remote.Client)
+		remoteMessage := remote.NewMessage(nil, nil, remote.Call, remote.Client)
 		ctx := context.Background()
 
 		metaHandler1.EXPECT().WriteMeta(ctx, remoteMessage).Return(context.Background(), errFoo).Times(1)
@@ -137,10 +135,8 @@ func TestTransMetaHandlerOnMessage(t *testing.T) {
 		metaHandler2 := mocksremote.NewMockMetaHandler(ctrl)
 		metaHandler3 := mocksremote.NewMockMetaHandler(ctrl)
 
-		args := remote.NewMessage(
-			nil, nil, nil, remote.Call, remote.Client)
-		result := remote.NewMessage(
-			nil, nil, nil, remote.Reply, remote.Client)
+		args := remote.NewMessage(nil, nil, remote.Call, remote.Client)
+		result := remote.NewMessage(nil, nil, remote.Reply, remote.Client)
 		ctx := context.Background()
 
 		metaHandler1.EXPECT().ReadMeta(gomock.Any(), result).DoAndReturn(func(ctx context.Context, msg remote.Message) (context.Context, error) {
@@ -186,10 +182,8 @@ func TestTransMetaHandlerOnMessage(t *testing.T) {
 		to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
 		ri := rpcinfo.NewRPCInfo(nil, to, ink, nil, nil)
 
-		args := remote.NewMessage(
-			nil, nil, ri, remote.Call, remote.Server)
-		result := remote.NewMessage(
-			nil, nil, nil, remote.Reply, remote.Server)
+		args := remote.NewMessage(nil, ri, remote.Call, remote.Server)
+		result := remote.NewMessage(nil, nil, remote.Reply, remote.Server)
 		ctx := context.Background()
 
 		metaHandler1.EXPECT().ReadMeta(ctx, args).Return(context.Background(), nil).Times(1)
@@ -218,10 +212,8 @@ func TestTransMetaHandlerOnMessage(t *testing.T) {
 		to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
 		ri := rpcinfo.NewRPCInfo(nil, to, ink, nil, nil)
 
-		args := remote.NewMessage(
-			nil, nil, ri, remote.Call, remote.Server)
-		result := remote.NewMessage(
-			nil, nil, nil, remote.Reply, remote.Server)
+		args := remote.NewMessage(nil, ri, remote.Call, remote.Server)
+		result := remote.NewMessage(nil, nil, remote.Reply, remote.Server)
 		ctx := context.Background()
 
 		tk1, tv1 := "tk1", "tv1"
@@ -256,16 +248,16 @@ func TestTransMetaHandlerOnMessage(t *testing.T) {
 // TestGetValidMsg test getValidMsg function with message of server side and client side.
 func TestGetValidMsg(t *testing.T) {
 	t.Run("Test getValidMsg server side read args", func(t *testing.T) {
-		args := remote.NewMessage(nil, nil, nil, remote.Call, remote.Server)
-		result := remote.NewMessage(nil, nil, nil, remote.Reply, remote.Server)
+		args := remote.NewMessage(nil, nil, remote.Call, remote.Server)
+		result := remote.NewMessage(nil, nil, remote.Reply, remote.Server)
 		msg, isServer := getValidMsg(args, result)
 		test.Assert(t, isServer)
 		test.Assert(t, args == msg)
 	})
 
 	t.Run("Test getValidMsg client side read result", func(t *testing.T) {
-		args := remote.NewMessage(nil, nil, nil, remote.Call, remote.Client)
-		result := remote.NewMessage(nil, nil, nil, remote.Reply, remote.Client)
+		args := remote.NewMessage(nil, nil, remote.Call, remote.Client)
+		result := remote.NewMessage(nil, nil, remote.Reply, remote.Client)
 		msg, isServer := getValidMsg(args, result)
 		test.Assert(t, !isServer)
 		test.Assert(t, result == msg)

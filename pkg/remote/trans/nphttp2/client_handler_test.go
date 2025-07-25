@@ -36,12 +36,13 @@ func TestClientHandler(t *testing.T) {
 	opt := newMockClientOption()
 	ctx := newMockCtxWithRPCInfo()
 	msg := newMockNewMessage()
-	msg.ProtocolInfoFunc = func() remote.ProtocolInfo {
-		return remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Protobuf)
-	}
+	ri := newMockRPCInfo()
 	msg.RPCInfoFunc = func() rpcinfo.RPCInfo {
-		return newMockRPCInfo()
+		return ri
 	}
+	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	mcfg.SetTransportProtocol(transport.PurePayload)
+	mcfg.SetPayloadCodec(serviceinfo.Protobuf)
 	conn, err := opt.ConnPool.Get(ctx, "tcp", mockAddr0, remote.ConnOption{Dialer: opt.Dialer, ConnectTimeout: time.Second})
 	test.Assert(t, err == nil, err)
 

@@ -1083,7 +1083,7 @@ func TestMethodInfoIsNil(t *testing.T) {
 	req, res := new(MockTStruct), new(MockTStruct)
 	err := cli.Call(context.Background(), "notExist", req, res)
 	test.Assert(t, err != nil)
-	test.Assert(t, strings.Contains(err.Error(), "method info is nil"))
+	test.Assert(t, err.Error() == "internal exception: non-existent method, service: MockService, method: notExist")
 }
 
 func mb(byteSize uint64) float32 {

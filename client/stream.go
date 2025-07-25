@@ -60,6 +60,7 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	var reportErr error
 	var err error
+	var cs streaming.ClientStream
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
 			err = rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, false)
@@ -70,7 +71,13 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 		}
 	}()
 
-	cs, err := kc.sEps(ctx)
+	if m := ri.Invocation().MethodInfo(); m == nil {
+		err = kerrors.ErrNonExistentMethod(kc.svcInfo.ServiceName, method)
+		reportErr = err
+		return err
+	}
+
+	cs, err = kc.sEps(ctx)
 	if err != nil {
 		reportErr = err
 		return err
@@ -121,6 +128,12 @@ func (kc *kClient) StreamX(ctx context.Context, method string) (streaming.Client
 		}
 	}()
 
+	if m := ri.Invocation().MethodInfo(); m == nil {
+		err = kerrors.ErrNonExistentMethod(kc.svcInfo.ServiceName, method)
+		reportErr = err
+		return nil, err
+	}
+
 	cs, err = kc.sEps(ctx)
 	if err != nil {
 		reportErr = err
@@ -156,20 +169,13 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 			return
 		}
 
-		clientStream := newStream(ctx, st, scm, kc, ri, kc.getStreamingMode(ri), sendEP, recvEP, kc.opt.StreamOptions.EventHandler, grpcSendEP, grpcRecvEP)
+		clientStream := newStream(ctx, st, scm, kc, ri, ri.Invocation().MethodInfo().StreamingMode(),
+			sendEP, recvEP, kc.opt.StreamOptions.EventHandler, grpcSendEP, grpcRecvEP)
 		rresp := resp.(*streaming.Result)
 		rresp.ClientStream = clientStream
 		rresp.Stream = clientStream.GetGRPCStream()
 		return
 	}, nil
-}
-
-func (kc *kClient) getStreamingMode(ri rpcinfo.RPCInfo) serviceinfo.StreamingMode {
-	methodInfo := kc.svcInfo.MethodInfo(ri.Invocation().MethodName())
-	if methodInfo == nil {
-		return serviceinfo.StreamingNone
-	}
-	return methodInfo.StreamingMode()
 }
 
 type stream struct {

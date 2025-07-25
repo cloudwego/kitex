@@ -103,13 +103,8 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, nil)
 	}()
 
-	svcInfo := sendMsg.ServiceInfo()
-	if svcInfo != nil {
-		if methodInfo, _ := trans.GetMethodInfo(ri, svcInfo); methodInfo != nil {
-			if methodInfo.OneWay() {
-				return ctx, nil
-			}
-		}
+	if methodInfo := ri.Invocation().MethodInfo(); methodInfo != nil && methodInfo.OneWay() {
+		return ctx, nil
 	}
 
 	wbuf := netpoll.NewLinkBuffer()
@@ -204,6 +199,7 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	// it's recycled in defer.
 	muxSvrConn, _ := muxSvrConnCtx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
 	rpcInfo := muxSvrConn.pool.Get().(rpcinfo.RPCInfo)
+	remote.SetServiceSearcher(rpcInfo, t.svcSearcher)
 	rpcInfoCtx := rpcinfo.NewCtxWithRPCInfo(muxSvrConnCtx, rpcInfo)
 
 	// This is the request-level, one-shot ctx.
@@ -239,7 +235,7 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	}()
 
 	// read
-	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearcher, rpcInfo, remote.Call, remote.Server)
+	recvMsg = remote.NewMessage(nil, rpcInfo, remote.Call, remote.Server)
 	bufReader := np.NewReaderByteBuffer(reader)
 	err = t.readWithByteBuffer(ctx, bufReader, recvMsg)
 	if err != nil {
@@ -251,20 +247,14 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		return
 	}
 
-	svcInfo := recvMsg.ServiceInfo()
 	if recvMsg.MessageType() == remote.Heartbeat {
-		sendMsg = remote.NewMessage(nil, svcInfo, rpcInfo, remote.Heartbeat, remote.Server)
+		sendMsg = remote.NewMessage(nil, rpcInfo, remote.Heartbeat, remote.Server)
 	} else {
-		var methodInfo serviceinfo.MethodInfo
-		if methodInfo, err = trans.GetMethodInfo(rpcInfo, svcInfo); err != nil {
-			closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, true)
-			t.OnError(ctx, err, muxSvrConn)
-			return
-		}
+		methodInfo := rpcInfo.Invocation().MethodInfo()
 		if methodInfo.OneWay() {
-			sendMsg = remote.NewMessage(nil, svcInfo, rpcInfo, remote.Reply, remote.Server)
+			sendMsg = remote.NewMessage(nil, rpcInfo, remote.Reply, remote.Server)
 		} else {
-			sendMsg = remote.NewMessage(methodInfo.NewResult(), svcInfo, rpcInfo, remote.Reply, remote.Server)
+			sendMsg = remote.NewMessage(methodInfo.NewResult(), rpcInfo, remote.Reply, remote.Server)
 		}
 
 		ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
@@ -277,7 +267,7 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		}
 	}
 
-	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
+	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	if ctx, err = t.transPipe.Write(ctx, muxSvrConn, sendMsg); err != nil {
 		t.OnError(ctx, err, muxSvrConn)
 		closeConn = true
@@ -326,10 +316,12 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	// end to close the connection or prevent further operation on it.
 	iv := rpcinfo.NewInvocation("none", "none")
 	iv.SetSeqID(0)
-	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
+	ri := rpcinfo.NewRPCInfo(nil, nil, iv, rpcinfo.NewRPCConfig(), nil)
 	data := NewControlFrame()
-	msg := remote.NewMessage(data, nil, ri, remote.Reply, remote.Server)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+	msg := remote.NewMessage(data, ri, remote.Reply, remote.Server)
+	cfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	cfg.SetTransportProtocol(transport.TTHeader)
+	cfg.SetPayloadCodec(serviceinfo.Thrift)
 	msg.TransInfo().TransStrInfo()[transmeta.HeaderConnectionReadyToReset] = "1"
 
 	// wait until all notifications are sent and clients stop using those connections
@@ -425,20 +417,15 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 func (t *svrTransHandler) writeErrorReplyIfNeeded(
 	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool,
 ) (shouldCloseConn bool) {
-	svcInfo := recvMsg.ServiceInfo()
-	if svcInfo != nil {
-		if methodInfo, _ := trans.GetMethodInfo(ri, svcInfo); methodInfo != nil {
-			if methodInfo.OneWay() {
-				return
-			}
-		}
+	if methodInfo := ri.Invocation().MethodInfo(); methodInfo != nil && methodInfo.OneWay() {
+		return
 	}
 	transErr, isTransErr := err.(*remote.TransError)
 	if !isTransErr {
 		return
 	}
-	errMsg := remote.NewMessage(transErr, svcInfo, ri, remote.Exception, remote.Server)
-	remote.FillSendMsgFromRecvMsg(recvMsg, errMsg)
+	errMsg := remote.NewMessage(transErr, ri, remote.Exception, remote.Server)
+	errMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	if doOnMessage {
 		// if error happen before normal OnMessage, exec it to transfer header trans info into rpcinfo
 		t.transPipe.OnMessage(ctx, recvMsg, errMsg)

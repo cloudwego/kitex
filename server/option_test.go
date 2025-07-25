@@ -460,12 +460,13 @@ func TestWithProfilerMessageTagging(t *testing.T) {
 	iSvr := svr.(*server)
 	from := rpcinfo.NewEndpointInfo("caller", "", nil, nil)
 	to := rpcinfo.NewEndpointInfo("callee", "method", nil, nil)
-	ri := rpcinfo.NewRPCInfo(from, to, nil, nil, nil)
+	ri := rpcinfo.NewRPCInfo(from, to, rpcinfo.NewInvocation("", ""), nil, nil)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	svcInfo := mocks.ServiceInfo()
 	svcSearcher := newServices()
 	svcSearcher.addService(svcInfo, mocks.MyServiceHandler(), &RegisterOptions{})
-	msg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server)
+	remote.SetServiceSearcher(ri, svcSearcher)
+	msg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
 
 	newCtx, tags := iSvr.opt.RemoteOpt.ProfilerMessageTagging(ctx, msg)
 	test.Assert(t, len(tags) == 8)
@@ -486,7 +487,10 @@ func TestRefuseTrafficWithoutServiceNameOption(t *testing.T) {
 }
 
 func NewRemoteMsgWithPayloadType(ct serviceinfo.PayloadCodec) remote.Message {
-	remoteMsg := remote.NewMessage(nil, nil, nil, remote.Call, remote.Server)
-	remoteMsg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, ct))
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+	remoteMsg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
+	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	mcfg.SetTransportProtocol(transport.TTHeader)
+	mcfg.SetPayloadCodec(ct)
 	return remoteMsg
 }

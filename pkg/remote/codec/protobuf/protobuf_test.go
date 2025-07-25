@@ -26,6 +26,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -141,7 +142,7 @@ func TestFastCodec(t *testing.T) {
 func TestException(t *testing.T) {
 	ctx := context.Background()
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
+	ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
 	errInfo := "mock exception"
 	transErr := remote.NewTransErrorWithMsg(remote.UnknownMethod, errInfo)
 	// encode server side
@@ -224,9 +225,11 @@ func initMockReqArgsSendMsg() remote.Message {
 
 func initSendMsg(tp transport.Protocol, m any) remote.Message {
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-	msg := remote.NewMessage(m, svcInfo, ri, remote.Call, remote.Client)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
+	ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
+	msg := remote.NewMessage(m, ri, remote.Call, remote.Client)
+	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	mcfg.SetTransportProtocol(tp)
+	mcfg.SetPayloadCodec(svcInfo.PayloadCodec)
 	return msg
 }
 
@@ -237,20 +240,25 @@ func initMockReqArgsRecvMsg() remote.Message {
 
 func initRecvMsg(m any) remote.Message {
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-	msg := remote.NewMessage(m, svcInfo, ri, remote.Call, remote.Server)
+	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.EmptyEndpointInfo(), ink, nil, nil)
+	remote.SetServiceSearcher(ri, mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+		svcInfo.ServiceName: svcInfo,
+	}))
+	msg := remote.NewMessage(m, ri, remote.Call, remote.Server)
 	return msg
 }
 
 func initServerErrorMsg(tp transport.Protocol, ri rpcinfo.RPCInfo, transErr *remote.TransError) remote.Message {
-	errMsg := remote.NewMessage(transErr, svcInfo, ri, remote.Exception, remote.Server)
-	errMsg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
+	errMsg := remote.NewMessage(transErr, ri, remote.Exception, remote.Server)
+	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	mcfg.SetTransportProtocol(tp)
+	mcfg.SetPayloadCodec(svcInfo.PayloadCodec)
 	return errMsg
 }
 
 func initClientRecvMsg(ri rpcinfo.RPCInfo) remote.Message {
 	var resp interface{}
-	clientRecvMsg := remote.NewMessage(resp, svcInfo, ri, remote.Reply, remote.Client)
+	clientRecvMsg := remote.NewMessage(resp, ri, remote.Reply, remote.Client)
 	return clientRecvMsg
 }
 

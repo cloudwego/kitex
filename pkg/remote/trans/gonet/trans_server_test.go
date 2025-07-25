@@ -31,6 +31,7 @@ import (
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -60,20 +61,21 @@ func TestMain(m *testing.M) {
 	svrOpt = &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
+			toInfo := rpcinfo.EmptyEndpointInfo()
 			rpcCfg := rpcinfo.NewRPCConfig()
 			mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
 			mCfg.SetReadWriteTimeout(rwTimeout)
 			ink := rpcinfo.NewInvocation("", method)
 			rpcStat := rpcinfo.NewRPCStats()
-			nri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
+			nri := rpcinfo.NewRPCInfo(fromInfo, toInfo, ink, rpcCfg, rpcStat)
 			rpcinfo.AsMutableEndpointInfo(nri.From()).SetAddress(addr)
 			return nri
 		},
 		Codec: &MockCodec{
 			EncodeFunc: nil,
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-				msg.SpecifyServiceInfo(mocks.MockServiceName, mocks.MockMethod)
-				return nil
+				msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter).SetServiceName(mocks.MockServiceName)
+				return codec.SetOrCheckMethodName(mocks.MockMethod, msg)
 			},
 		},
 		SvcSearcher:   mocksremote.NewDefaultSvcSearcher(),

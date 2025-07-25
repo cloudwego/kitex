@@ -244,6 +244,8 @@ func NewOptions(opts []Option) *Options {
 
 		GRPCConnectOpts: new(grpc.ConnectOptions),
 	}
+	// Since Kitex v0.13.0, the default transport protocol has been changed to framed from buffered.
+	rpcinfo.AsMutableRPCConfig(o.Configs).SetTransportProtocol(transport.Framed)
 	o.UnaryOptions.opts = o
 	o.Apply(opts)
 

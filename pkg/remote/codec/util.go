@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 const (
@@ -37,25 +38,33 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 	if methodName == "" {
 		return fmt.Errorf("method name that receive is empty")
 	}
-	if callMethodName == methodName {
-		return nil
-	}
-	// the server's callMethodName may not be empty if RPCInfo is based on connection multiplexing
-	// for the server side callMethodName ! = methodName is normal
 	if message.RPCRole() == remote.Client {
+		if callMethodName == methodName {
+			return nil
+		}
+		// the server's callMethodName may not be empty if RPCInfo is based on connection multiplexing
+		// for the server side callMethodName ! = methodName is normal
 		return fmt.Errorf("wrong method name, expect=%s, actual=%s", callMethodName, methodName)
 	}
-	inkSetter, ok := ink.(rpcinfo.InvocationSetter)
-	if !ok {
-		return errors.New("the interface Invocation doesn't implement InvocationSetter")
-	}
+	inkSetter := ink.(rpcinfo.InvocationSetter)
 	inkSetter.SetMethodName(methodName)
-	svcInfo, err := message.SpecifyServiceInfo(ink.ServiceName(), methodName)
-	if err != nil {
-		return err
+	var svcInfo *serviceinfo.ServiceInfo
+	var methodInfo serviceinfo.MethodInfo
+	// for ping pong server, svc info is nil until the request decoded
+	svcSearcher := remote.GetServiceSearcher(ri)
+	if svcSearcher == nil {
+		return errors.New("RPCInfo doesn't contains a service searcher")
+	}
+	svcInfo = svcSearcher.SearchService(ink.ServiceName(), methodName, false)
+	if svcInfo == nil {
+		return remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s, method %s", ink.ServiceName(), methodName))
+	}
+	if methodInfo = svcInfo.MethodInfo(methodName); methodInfo == nil {
+		return remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s (service %s)", methodName, ink.ServiceName()))
 	}
 	inkSetter.SetPackageName(svcInfo.GetPackageName())
 	inkSetter.SetServiceName(svcInfo.ServiceName)
+	inkSetter.SetMethodInfo(methodInfo)
 
 	// unknown method doesn't set methodName for RPCInfo.To(), or lead inconsistent with old version
 	rpcinfo.AsMutableEndpointInfo(ri.To()).SetMethod(methodName)
