@@ -108,7 +108,7 @@ type stream struct {
 	trailerSig chan int32
 
 	state                 int32
-	clientStreamException atomic.Value     // type must be of *exceptionType, only valid in client-side stream
+	clientStreamException atomic.Value     // type must be of *Exception, only valid in client-side stream
 	cancelFunc            cancelWithReason // only valid in server-side stream
 
 	recvTimeout      time.Duration
@@ -235,7 +235,7 @@ func (s *stream) closeRecv(exception error) error {
 	return nil
 }
 
-func (s *stream) close(exception error, sendRst bool, initialNode string) error {
+func (s *stream) close(exception *Exception, sendRst bool, initialNode string) error {
 	oldState := atomic.SwapInt32(&s.state, streamStateInactive)
 	if oldState == streamStateInactive {
 		// stream has been closed before
@@ -284,7 +284,7 @@ func (s *stream) setMetaFrameHandler(metaHandler MetaFrameHandler) {
 	s.metaFrameHandler = metaHandler
 }
 
-func (s *stream) runCloseCallback(exception error) {
+func (s *stream) runCloseCallback(exception *Exception) {
 	if len(s.closeCallback) > 0 {
 		for _, cb := range s.closeCallback {
 			cb(exception)
@@ -365,7 +365,7 @@ func (s *stream) sendRst(exception error, initialNode string) (err error) {
 	var header streaming.Header
 	if initialNode != "" {
 		header = make(streaming.Header)
-		header[ttheader.HeaderCascadingLinkInitialNode] = initialNode
+		header[ttheader.HeaderVia] = initialNode
 	}
 	return s.writeFrame(rstFrameType, header, nil, payload)
 }
@@ -383,7 +383,7 @@ func (s *stream) sendRstFrame(exception error, initialNode string) error {
 	var header streaming.Header
 	if initialNode != "" {
 		header = make(streaming.Header)
-		header[ttheader.HeaderCascadingLinkInitialNode] = initialNode
+		header[ttheader.HeaderVia] = initialNode
 	}
 	return s.writeFrame(rstFrameType, header, nil, payload)
 }
@@ -474,9 +474,9 @@ func (s *stream) onReadRstFrame(fr *Frame) (err error) {
 	var via string
 	if fr.header != nil {
 		// cascading link initial node
-		clin, ok := fr.header[ttheader.HeaderCascadingLinkInitialNode]
+		hdrVia, ok := fr.header[ttheader.HeaderVia]
 		if ok {
-			by = clin
+			via = hdrVia
 		}
 	}
 	if s.side == clientSide {
@@ -484,12 +484,11 @@ func (s *stream) onReadRstFrame(fr *Frame) (err error) {
 	} else {
 		rstEx = errUpstreamCancel.newBuilder().withSide(s.side)
 	}
-	if by != "" {
-		rstEx = rstEx.setOrAppendVia(by).withCauseAndTypeId(ex, ex.TypeId())
+	if via != "" {
+		rstEx = rstEx.setOrAppendVia(via).withCauseAndTypeId(appEx, appEx.TypeId())
 	} else {
-		rstEx = rstEx.withCauseAndTypeId(ex, ex.TypeId())
+		rstEx = rstEx.withCauseAndTypeId(appEx, appEx.TypeId())
 	}
-	// todo: compare with gRPC to deal with header/trailer behaviour
 	s.trailer = fr.trailer
 	select {
 	case s.trailerSig <- streamSigActive:

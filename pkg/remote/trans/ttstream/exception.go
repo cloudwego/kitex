@@ -32,12 +32,12 @@ type tException interface {
 }
 
 var (
-	errApplicationException = newExceptionType("application exception", nil, 12001)
-	errUnexpectedHeader     = newExceptionType("unexpected header frame", kerrors.ErrStreamingProtocol, 12002)
-	errIllegalBizErr        = newExceptionType("illegal bizErr", kerrors.ErrStreamingProtocol, 12003)
-	errIllegalFrame         = newExceptionType("illegal frame", kerrors.ErrStreamingProtocol, 12004)
-	errIllegalOperation     = newExceptionType("illegal operation", kerrors.ErrStreamingProtocol, 12005)
-	errTransport            = newExceptionType("transport is closing", kerrors.ErrStreamingProtocol, 12006)
+	errApplicationException = newException("application exception", nil, 12001)
+	errUnexpectedHeader     = newException("unexpected header frame", kerrors.ErrStreamingProtocol, 12002)
+	errIllegalBizErr        = newException("illegal bizErr", kerrors.ErrStreamingProtocol, 12003)
+	errIllegalFrame         = newException("illegal frame", kerrors.ErrStreamingProtocol, 12004)
+	errIllegalOperation     = newException("illegal operation", kerrors.ErrStreamingProtocol, 12005)
+	errTransport            = newException("transport is closing", kerrors.ErrStreamingProtocol, 12006)
 
 	errBizCancel = newException("user code invoking stream RPC with context processed by context.WithCancel or context.WithTimeout, then invoking cancel() actively",
 		kerrors.ErrStreamingCanceled, 12007)
