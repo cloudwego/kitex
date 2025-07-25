@@ -49,6 +49,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
@@ -108,6 +109,9 @@ type StreamOptions struct {
 	StreamRecvMiddlewareBuilders []cep.StreamRecvMiddlewareBuilder
 	StreamSendMiddlewares        []cep.StreamSendMiddleware
 	StreamSendMiddlewareBuilders []cep.StreamSendMiddlewareBuilder
+
+	// Stream cleanup configuration for monitoring cancelled streams
+	StreamCleanupConfig *streaming.StreamCleanupConfig
 }
 
 func (o *StreamOptions) InitMiddlewares(ctx context.Context) {
@@ -187,11 +191,11 @@ type Options struct {
 	CloseCallbacks []func() error
 	WarmUpOption   *warmup.ClientOption
 
-	// GRPC
+	// gRPC
 	GRPCConnPoolSize uint32
 	GRPCConnectOpts  *grpc.ConnectOptions
 
-	// TTHeaderStreaming
+	// TTHeader Streaming
 	TTHeaderStreamingOptions TTHeaderStreamingOptions
 
 	// XDS
@@ -260,37 +264,61 @@ func NewOptions(opts []Option) *Options {
 		}
 		o.StatsLevel = &level
 	}
+
 	return o
 }
 
 func (o *Options) initRemoteOpt() {
 	var zero connpool2.IdleConfig
 
-	// configure grpc
+	// Apply stream cleanup configuration
+	if o.Configs.TransportProtocol()&(transport.GRPC|transport.GRPCStreaming) != 0 {
+		if o.StreamOptions.StreamCleanupConfig == nil {
+			o.StreamOptions.StreamCleanupConfig = &streaming.StreamCleanupConfig{
+				Enable:        true,
+				CleanInterval: 5 * time.Second,
+			}
+		}
+		o.GRPCConnectOpts.StreamCleanupEnabled = o.StreamOptions.StreamCleanupConfig.Enable
+		o.GRPCConnectOpts.StreamCleanupInterval = o.StreamOptions.StreamCleanupConfig.CleanInterval
+	}
+
+	// configure gRPC
 	if o.Configs.TransportProtocol()&transport.GRPC == transport.GRPC {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
-			// grpc unary short connection
+			// gRPC unary short connection
 			o.GRPCConnectOpts.ShortConn = true
 		}
 		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
-	// configure grpc streaming
+	// configure gRPC streaming
 	if o.Configs.TransportProtocol()&(transport.GRPC|transport.GRPCStreaming) == transport.GRPCStreaming {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
-			// grpc unary short connection
+			// gRPC unary short connection
 			o.GRPCConnectOpts.ShortConn = true
 		}
+
 		o.RemoteOpt.GRPCStreamingConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.GRPCStreamingCliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
-	// configure ttheader streaming
+	// configure TTHeader Streaming
 	if o.Configs.TransportProtocol()&transport.TTHeaderStreaming == transport.TTHeaderStreaming {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
 			// configure short conn pool
 			o.TTHeaderStreamingOptions.TransportOptions = append(o.TTHeaderStreamingOptions.TransportOptions, ttstream.WithClientShortConnPool())
 		}
+
+		// Apply stream cleanup configuration from StreamOptions to TTHeader Streaming transport
+		if o.StreamOptions.StreamCleanupConfig == nil {
+			o.StreamOptions.StreamCleanupConfig = &streaming.StreamCleanupConfig{
+				Enable:        true,
+				CleanInterval: 5 * time.Second,
+			}
+		}
+
 		o.RemoteOpt.TTHeaderStreamingCliHandlerFactory = ttstream.NewCliTransHandlerFactory(o.TTHeaderStreamingOptions.TransportOptions...)
+
 	}
 	if o.RemoteOpt.ConnPool == nil {
 		if o.PoolCfg != nil {
