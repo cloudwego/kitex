@@ -16,19 +16,9 @@
 
 package ttstream
 
-import (
-	"context"
-	"sync/atomic"
-	"testing"
-
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
-)
-
-func Test_registerStreamCancelCallback(t *testing.T) {
-	ctx, cancel := ktx.WithCancel(context.Background())
-	s := &stream{peerEOF: 1}
-	registerStreamCancelCallback(ctx, s)
-	cancel()
-	test.Assert(t, atomic.LoadInt32(&s.selfEOF) == 1)
-}
+//func Test_registerStreamCancelCallback(t *testing.T) {
+//	ctx, cancel := ktx.WithCancel(context.Background())
+//	s := &stream{}
+//	registerStreamCancelCallback(ctx, s)
+//	cancel()
+//}

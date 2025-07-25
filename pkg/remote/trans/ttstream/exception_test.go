@@ -80,3 +80,61 @@ func TestGetTypeId(t *testing.T) {
 		test.Assert(t, errWithTypeId.TypeId() == testcase.expectTypeId, errWithTypeId)
 	}
 }
+
+func TestCanceledException(t *testing.T) {
+	t.Run("biz cancel", func(t *testing.T) {
+		bizCancelEx := errBizCancel.NewBuilder().WithSide(clientTransport)
+		t.Log(bizCancelEx)
+		test.Assert(t, errors.Is(bizCancelEx, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(bizCancelEx, errBizCancel))
+	})
+
+	t.Run("downstream cancel", func(t *testing.T) {
+		ex0 := errDownstreamCancel.NewBuilder().WithSide(clientTransport).WithTriggeredBy("Mesh Egress").WithCauseAndTypeId(errors.New("mesh timeout"), 1204)
+		t.Log(ex0)
+		test.Assert(t, errors.Is(ex0, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex0, errDownstreamCancel))
+	})
+
+	t.Run("upstream cancel", func(t *testing.T) {
+		bizCancelEx := errBizCancel.NewBuilder().WithSide(clientTransport)
+		ex0 := errUpstreamCancel.NewBuilder().WithSide(clientTransport).WithTriggeredBy("p.s.m").WithCauseAndTypeId(thrift.NewApplicationException(bizCancelEx.typeId, bizCancelEx.message), 9999)
+		t.Log(ex0)
+		test.Assert(t, errors.Is(ex0, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex0, errUpstreamCancel))
+		ex1 := errUpstreamCancel.NewBuilder().WithSide(clientTransport).WithTriggeredBy("Mesh Ingress").WithCauseAndTypeId(errors.New("mesh timeout"), 1204)
+		t.Log(ex1)
+		test.Assert(t, errors.Is(ex1, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex1, errUpstreamCancel))
+		ex2 := errUpstreamCancel.NewBuilder().WithSide(clientTransport).WithTriggeredBy("p.s.m").WithCauseAndTypeId(errors.New("doubao cancel with code"), 9999)
+		t.Log(ex2)
+		test.Assert(t, errors.Is(ex2, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex2, errUpstreamCancel))
+		ex3 := errUpstreamCancel.NewBuilder().WithSide(serverTransport).WithTriggeredBy("p.s.m").WithCauseAndTypeId(thrift.NewApplicationException(bizCancelEx.typeId, bizCancelEx.message), bizCancelEx.typeId)
+		t.Log(ex3)
+		test.Assert(t, errors.Is(ex3, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex3, errUpstreamCancel))
+		ex4 := errUpstreamCancel.NewBuilder().WithSide(serverTransport).WithTriggeredBy("AGW").WithCause(errors.New("AGW internal error"))
+		t.Log(ex4)
+		test.Assert(t, errors.Is(ex4, kerrors.ErrStreamingCanceled))
+		test.Assert(t, errors.Is(ex4, errUpstreamCancel))
+	})
+}
+
+func TestTimeoutException(t *testing.T) {
+	t.Run("biz timeout", func(t *testing.T) {
+		cliEx := errBizTimeout.NewBuilder().WithSide(clientTransport)
+		t.Log(cliEx)
+		test.Assert(t, errors.Is(cliEx, kerrors.ErrStreamingTimeout))
+		test.Assert(t, errors.Is(cliEx, errBizTimeout))
+
+		srvEx := errBizTimeout.NewBuilder().WithTriggeredBy("p.s.m").WithSide(serverTransport)
+		t.Log(srvEx)
+		test.Assert(t, errors.Is(srvEx, kerrors.ErrStreamingTimeout))
+		test.Assert(t, errors.Is(srvEx, errBizTimeout))
+	})
+
+	t.Run("transmission timeout", func(t *testing.T) {
+
+	})
+}
