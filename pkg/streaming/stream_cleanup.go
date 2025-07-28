@@ -19,6 +19,6 @@ package streaming
 import "time"
 
 type StreamCleanupConfig struct {
-	Enable        bool          // Whether stream cleanup is enabled
+	Disable       bool          // Whether stream cleanup is disabled
 	CleanInterval time.Duration // Cleanup interval
 }

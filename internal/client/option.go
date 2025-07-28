@@ -275,11 +275,11 @@ func (o *Options) initRemoteOpt() {
 	if o.Configs.TransportProtocol()&(transport.GRPC|transport.GRPCStreaming) != 0 {
 		if o.StreamOptions.StreamCleanupConfig == nil {
 			o.StreamOptions.StreamCleanupConfig = &streaming.StreamCleanupConfig{
-				Enable:        true,
+				Disable:       false,
 				CleanInterval: 5 * time.Second,
 			}
 		}
-		o.GRPCConnectOpts.StreamCleanupEnabled = o.StreamOptions.StreamCleanupConfig.Enable
+		o.GRPCConnectOpts.StreamCleanupDisabled = o.StreamOptions.StreamCleanupConfig.Disable
 		o.GRPCConnectOpts.StreamCleanupInterval = o.StreamOptions.StreamCleanupConfig.CleanInterval
 	}
 
@@ -312,7 +312,7 @@ func (o *Options) initRemoteOpt() {
 		// Apply stream cleanup configuration from StreamOptions to TTHeader Streaming transport
 		if o.StreamOptions.StreamCleanupConfig == nil {
 			o.StreamOptions.StreamCleanupConfig = &streaming.StreamCleanupConfig{
-				Enable:        true,
+				Disable:       false,
 				CleanInterval: 5 * time.Second,
 			}
 		}

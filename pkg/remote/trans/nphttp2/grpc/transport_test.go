@@ -2252,7 +2252,7 @@ func Test_closeStreamTask(t *testing.T) {
 	// replace ticker to reduce test time
 	ticker = utils.NewSyncSharedTicker(10 * time.Millisecond)
 	server, ct := setUpWithOptions(t, 0, &ServerConfig{}, cancel, ConnectOptions{
-		StreamCleanupEnabled:  true,
+		StreamCleanupDisabled: false,
 		StreamCleanupInterval: 10 * time.Millisecond,
 	})
 	callHdr := &CallHdr{
@@ -2293,7 +2293,7 @@ func TestStreamGetHeaderValid(t *testing.T) {
 func TestConfigurableStreamCleanup(t *testing.T) {
 	// Test with stream cleanup enabled
 	server, ct := setUpWithOptions(t, 0, &ServerConfig{}, normal, ConnectOptions{
-		StreamCleanupEnabled:  true,
+		StreamCleanupDisabled: false,
 		StreamCleanupInterval: 100 * time.Millisecond,
 	})
 	defer server.stop()
@@ -2311,7 +2311,7 @@ func TestConfigurableStreamCleanup(t *testing.T) {
 	// Check initial stats
 	stats := ct.GetStreamCleanupStats()
 	statsMap := stats.(map[string]interface{})
-	test.Assert(t, statsMap["cleanup_enabled"] == true)
+	test.Assert(t, statsMap["cleanup_disabled"] == false)
 	test.Assert(t, statsMap["cleanup_interval"] == "100ms")
 	test.Assert(t, statsMap["active_streams_count"] == 1)
 
@@ -2336,7 +2336,7 @@ func TestConfigurableStreamCleanup(t *testing.T) {
 func TestStreamCleanupDisabled(t *testing.T) {
 	// Test with stream cleanup disabled
 	server, ct := setUpWithOptions(t, 0, &ServerConfig{}, normal, ConnectOptions{
-		StreamCleanupEnabled:  false,
+		StreamCleanupDisabled: true,
 		StreamCleanupInterval: 100 * time.Millisecond,
 	})
 	defer server.stop()
@@ -2354,7 +2354,7 @@ func TestStreamCleanupDisabled(t *testing.T) {
 	// Check initial stats
 	stats := ct.GetStreamCleanupStats()
 	statsMap := stats.(map[string]interface{})
-	test.Assert(t, statsMap["cleanup_enabled"] == false)
+	test.Assert(t, statsMap["cleanup_disabled"] == true)
 
 	// Cancel the stream
 	cancel()

@@ -780,22 +780,22 @@ func checkOneOptionDebugInfo(t *testing.T, opt Option, expectStr string) error {
 func TestWithStreamCleanupUnified(t *testing.T) {
 	// Test default behavior (no configuration) - need GRPC transport to trigger default config
 	opts := client.NewOptions([]client.Option{WithTransportProtocol(transport.GRPCStreaming)})
-	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupEnabled == true, "default should be enabled")
+	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupDisabled == false, "default should be enabled")
 	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupInterval == 5*time.Second, "default interval should be 5s")
 
 	// Test explicit configuration
 	opts = client.NewOptions([]client.Option{
 		WithTransportProtocol(transport.GRPCStreaming),
-		WithStreamOptions(WithStreamCleanupConfig(&streaming.StreamCleanupConfig{Enable: false, CleanInterval: 0})),
+		WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{Disable: true, CleanInterval: 0})),
 	})
-	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupEnabled == false, "should be disabled")
+	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupDisabled == true, "should be disabled")
 	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupInterval == 0, "should be 0")
 
 	opts = client.NewOptions([]client.Option{
 		WithTransportProtocol(transport.GRPCStreaming),
-		WithStreamOptions(WithStreamCleanupConfig(&streaming.StreamCleanupConfig{Enable: true, CleanInterval: 3 * time.Second})),
+		WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{Disable: false, CleanInterval: 3 * time.Second})),
 	})
-	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupEnabled == true, "should be enabled")
+	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupDisabled == false, "should be enabled")
 	test.Assert(t, opts.GRPCConnectOpts.StreamCleanupInterval == 3*time.Second, "should be 3s")
 }
 
@@ -804,11 +804,27 @@ func TestWithStreamCleanupConfig(t *testing.T) {
 	opts := client.NewOptions([]client.Option{})
 	test.Assert(t, opts.StreamOptions.StreamCleanupConfig == nil, "default should be nil until GRPCStreaming")
 
-	// Test explicit configuration
+	// Test explicit configuration with both parameters
 	opts = client.NewOptions([]client.Option{
-		WithStreamOptions(WithStreamCleanupConfig(&streaming.StreamCleanupConfig{Enable: false, CleanInterval: 0})),
+		WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{Disable: true, CleanInterval: 0})),
 	})
 	test.Assert(t, opts.StreamOptions.StreamCleanupConfig != nil, "should have explicit config")
-	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.Enable == false, "should be disabled")
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.Disable == true, "should be disabled")
 	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.CleanInterval == 0, "should be 0")
+
+	// Test user only sets Disable (CleanInterval should default to 0)
+	opts = client.NewOptions([]client.Option{
+		WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{Disable: true})),
+	})
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig != nil, "should have explicit config")
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.Disable == true, "should be disabled")
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.CleanInterval == 0, "CleanInterval should default to 0")
+
+	// Test user only sets CleanInterval (Disable should default to false)
+	opts = client.NewOptions([]client.Option{
+		WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{CleanInterval: 3 * time.Second})),
+	})
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig != nil, "should have explicit config")
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.Disable == false, "Disable should default to false")
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.CleanInterval == 3*time.Second, "should be 3s")
 }

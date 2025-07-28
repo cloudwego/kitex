@@ -60,7 +60,7 @@ var ticker = utils.NewSyncSharedTicker(5 * time.Second)
 // getStreamCleanupTicker returns a ticker for stream cleanup based on the configuration.
 // If stream cleanup is disabled, it returns nil.
 func getStreamCleanupTicker(opts ConnectOptions) *utils.SharedTicker {
-	if !opts.StreamCleanupEnabled {
+	if opts.StreamCleanupDisabled {
 		return nil
 	}
 
@@ -160,7 +160,7 @@ type http2Client struct {
 	bufferPool *bufferPool
 
 	// Stream cleanup configuration
-	streamCleanupEnabled  bool
+	streamCleanupDisabled bool
 	streamCleanupInterval time.Duration
 	streamCleanupTask     *closeStreamTask
 }
@@ -255,7 +255,7 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst)
 
 	// Setup stream cleanup task if enabled
-	t.streamCleanupEnabled = opts.StreamCleanupEnabled
+	t.streamCleanupDisabled = opts.StreamCleanupDisabled
 	t.streamCleanupInterval = opts.StreamCleanupInterval
 	streamCleanupTicker := getStreamCleanupTicker(opts)
 	if streamCleanupTicker != nil {
@@ -734,7 +734,7 @@ func (t *http2Client) GetStreamCleanupStats() interface{} {
 	defer t.mu.Unlock()
 
 	return map[string]interface{}{
-		"cleanup_enabled":      t.streamCleanupEnabled,
+		"cleanup_disabled":     t.streamCleanupDisabled,
 		"cleanup_interval":     t.streamCleanupInterval.String(),
 		"active_streams_count": len(t.activeStreams),
 	}

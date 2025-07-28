@@ -637,8 +637,8 @@ type ConnectOptions struct {
 	ShortConn bool
 	// TLSConfig
 	TLSConfig *tls.Config
-	// StreamCleanupEnabled enables monitoring cancelled streams and cleaning them up
-	StreamCleanupEnabled bool
+	// StreamCleanupDisabled disables monitoring cancelled streams and cleaning them up
+	StreamCleanupDisabled bool
 	// StreamCleanupInterval sets the interval for stream cleanup task
 	StreamCleanupInterval time.Duration
 }
