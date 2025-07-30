@@ -19,6 +19,7 @@ package rpcinfo
 import (
 	"context"
 	"io"
+	"os"
 	"runtime/debug"
 
 	"github.com/cloudwego/kitex/internal"
@@ -26,6 +27,19 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
+
+var reportStreamEventEnabled = true
+
+func init() {
+	env := os.Getenv("KITEX_DISABLE_REPORT_STREAM_EVENT")
+	if env == "true" {
+		reportStreamEventEnabled = false
+	}
+}
+
+func isReportStreamEventEnabled() bool {
+	return reportStreamEventEnabled
+}
 
 // StreamEventReporter should be implemented by any tracer that wants to report stream events
 type StreamEventReporter interface {
@@ -84,7 +98,7 @@ func buildStreamingEvent(statsEvent stats.Event, err error) Event {
 
 // ReportStreamEvent is for collecting Recv/Send events on stream
 func (c *TraceController) ReportStreamEvent(ctx context.Context, statsEvent stats.Event, err error) {
-	if !c.HasStreamEventReporter() {
+	if !c.HasStreamEventReporter() || !isReportStreamEventEnabled() {
 		return
 	}
 	// we should ignore event if stream.RecvMsg return EOF
