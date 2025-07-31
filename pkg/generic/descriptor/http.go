@@ -105,6 +105,9 @@ func (req *HTTPRequest) GetHost() string {
 
 // GetParam implements http.RequestGetter of dynamicgo
 func (req *HTTPRequest) GetParam(key string) string {
+	if req.Params == nil {
+		return ""
+	}
 	return req.Params.ByName(key)
 }
 
