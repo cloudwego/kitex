@@ -40,6 +40,7 @@ const (
 	headerFrameType  int32 = 2
 	dataFrameType    int32 = 3
 	trailerFrameType int32 = 4
+	rstFrameType     int32 = 5
 )
 
 var frameTypeToString = map[int32]string{
@@ -47,6 +48,7 @@ var frameTypeToString = map[int32]string{
 	headerFrameType:  ttheader.FrameTypeHeader,
 	dataFrameType:    ttheader.FrameTypeData,
 	trailerFrameType: ttheader.FrameTypeTrailer,
+	rstFrameType:     ttheader.FrameTypeRst,
 }
 
 var framePool sync.Pool
@@ -146,6 +148,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	var fheader streaming.Header
 	var ftrailer streaming.Trailer
 	fmeta := dp.IntInfo
+	// todo: fix me, if dp.IntInfo is nil, there would be a panic
 	switch dp.IntInfo[ttheader.FrameType] {
 	case ttheader.FrameTypeMeta:
 		ftype = metaFrameType
@@ -158,6 +161,8 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	case ttheader.FrameTypeTrailer:
 		ftype = trailerFrameType
 		ftrailer = dp.StrInfo
+	case ttheader.FrameTypeRst:
+		ftype = rstFrameType
 	default:
 		return nil, errIllegalFrame.WithCause(fmt.Errorf("unexpected frame type: %v", dp.IntInfo[ttheader.FrameType]))
 	}
@@ -225,9 +230,13 @@ func DecodePayload(ctx context.Context, payload []byte, msg any) error {
 }
 
 func EncodeException(ctx context.Context, method string, seq int32, ex error) ([]byte, error) {
-	exception, ok := ex.(gopkgthrift.FastCodec)
-	if !ok {
-		exception = gopkgthrift.NewApplicationException(remote.InternalError, ex.Error())
+	var appEx *gopkgthrift.ApplicationException
+	switch et := ex.(type) {
+	case *exceptionType:
+		appEx = gopkgthrift.NewApplicationException(et.typeId, et.message)
+	case gopkgthrift.FastCodec:
+	default:
+		appEx = gopkgthrift.NewApplicationException(remote.InternalError, ex.Error())
 	}
-	return gopkgthrift.MarshalFastMsg(method, gopkgthrift.EXCEPTION, seq, exception)
+	return gopkgthrift.MarshalFastMsg(method, gopkgthrift.EXCEPTION, seq, appEx)
 }
