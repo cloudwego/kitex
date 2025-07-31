@@ -87,6 +87,9 @@ var NewAPIPath NewHTTPMapping = func(value string) HTTPMapping {
 }
 
 func (m *apiPath) Request(ctx context.Context, req *HTTPRequest, field *FieldDescriptor) (interface{}, bool, error) {
+	if req.Params == nil {
+		return nil, false, nil
+	}
 	val := req.Params.ByName(m.value)
 	return val, val != "", nil
 }
