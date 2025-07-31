@@ -802,13 +802,13 @@ func TestWithStreamCleanupUnified(t *testing.T) {
 func TestWithStreamCleanupConfig(t *testing.T) {
 	// Test default behavior (no configuration)
 	opts := client.NewOptions([]client.Option{})
-	test.Assert(t, opts.StreamOptions.StreamCleanupConfig == nil, "default should be nil until GRPCStreaming")
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.Disable == false, "should not be disabled")
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.CleanInterval == 5*time.Second, "should be 5s")
 
 	// Test explicit configuration with both parameters
 	opts = client.NewOptions([]client.Option{
 		WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{Disable: true, CleanInterval: 0})),
 	})
-	test.Assert(t, opts.StreamOptions.StreamCleanupConfig != nil, "should have explicit config")
 	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.Disable == true, "should be disabled")
 	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.CleanInterval == 0, "should be 0")
 
@@ -816,7 +816,6 @@ func TestWithStreamCleanupConfig(t *testing.T) {
 	opts = client.NewOptions([]client.Option{
 		WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{Disable: true})),
 	})
-	test.Assert(t, opts.StreamOptions.StreamCleanupConfig != nil, "should have explicit config")
 	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.Disable == true, "should be disabled")
 	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.CleanInterval == 0, "CleanInterval should default to 0")
 
@@ -824,7 +823,13 @@ func TestWithStreamCleanupConfig(t *testing.T) {
 	opts = client.NewOptions([]client.Option{
 		WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{CleanInterval: 3 * time.Second})),
 	})
-	test.Assert(t, opts.StreamOptions.StreamCleanupConfig != nil, "should have explicit config")
 	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.Disable == false, "Disable should default to false")
 	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.CleanInterval == 3*time.Second, "should be 3s")
+
+	// Test user only sets CleanInterval to 0
+	opts = client.NewOptions([]client.Option{
+		WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{CleanInterval: 0})),
+	})
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.Disable == false, "Disable should default to false")
+	test.Assert(t, opts.StreamOptions.StreamCleanupConfig.CleanInterval == 5*time.Second, "should be default to 5s")
 }

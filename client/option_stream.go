@@ -104,7 +104,7 @@ func WithStreamSendMiddlewareBuilder(mwb cep.StreamSendMiddlewareBuilder) Stream
 	}}
 }
 
-// WithStreamCleanupConfig enables and configures stream cleanup for monitoring cancelled streams.
+// WithStreamCleanupConfig configures stream cleanup for monitoring client-side cancelled streams.
 // This is the unified configuration interface for all transport protocols (GRPC, TTHeader Streaming, etc.).
 //
 // Parameters:
@@ -113,18 +113,16 @@ func WithStreamSendMiddlewareBuilder(mwb cep.StreamSendMiddlewareBuilder) Stream
 //
 // The stream cleanup task will periodically scan all active streams and clean up those that have been cancelled.
 // This helps prevent stream leaks when users call cancel() but don't call Recv() to sense the cancel signal.
-//
-
 func WithStreamCleanupConfig(cfg streaming.StreamCleanupConfig) StreamOption {
 	return StreamOption{F: func(o *StreamOptions, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithStreamCleanupConfig(%+v)", cfg))
 		if !cfg.Disable && cfg.CleanInterval <= 0 {
-			panic("WithStreamCleanupConfig: cleanInterval must be greater than 0 when enabled")
+			cfg.CleanInterval = 5 * time.Second
 		}
 		// When disabled, set cleanInterval to 0 automatically
 		if cfg.Disable && cfg.CleanInterval != 0 {
 			cfg.CleanInterval = 0
 		}
-		o.StreamCleanupConfig = &cfg
+		o.StreamCleanupConfig = cfg
 	}}
 }

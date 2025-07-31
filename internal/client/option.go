@@ -111,7 +111,16 @@ type StreamOptions struct {
 	StreamSendMiddlewareBuilders []cep.StreamSendMiddlewareBuilder
 
 	// Stream cleanup configuration for monitoring cancelled streams
-	StreamCleanupConfig *streaming.StreamCleanupConfig
+	StreamCleanupConfig streaming.StreamCleanupConfig
+}
+
+func newDefaultStreamOptions() StreamOptions {
+	return StreamOptions{
+		StreamCleanupConfig: streaming.StreamCleanupConfig{
+			Disable:       false,
+			CleanInterval: 5 * time.Second,
+		},
+	}
 }
 
 func (o *StreamOptions) InitMiddlewares(ctx context.Context) {
@@ -191,11 +200,11 @@ type Options struct {
 	CloseCallbacks []func() error
 	WarmUpOption   *warmup.ClientOption
 
-	// gRPC
+	// GRPC
 	GRPCConnPoolSize uint32
 	GRPCConnectOpts  *grpc.ConnectOptions
 
-	// TTHeader Streaming
+	// TTHeaderStreaming
 	TTHeaderStreamingOptions TTHeaderStreamingOptions
 
 	// XDS
@@ -231,15 +240,16 @@ type Option struct {
 // NewOptions creates a new option.
 func NewOptions(opts []Option) *Options {
 	o := &Options{
-		Cli:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
-		Svr:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
-		MetaHandlers: []remote.MetaHandler{transmeta.MetainfoClientHandler},
-		RemoteOpt:    newClientRemoteOption(),
-		Configs:      rpcinfo.NewRPCConfig(),
-		Locks:        NewConfigLocks(),
-		Once:         configutil.NewOptionOnce(),
-		HTTPResolver: http.NewDefaultResolver(),
-		DebugService: diagnosis.NoopService,
+		Cli:           &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
+		Svr:           &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
+		MetaHandlers:  []remote.MetaHandler{transmeta.MetainfoClientHandler},
+		RemoteOpt:     newClientRemoteOption(),
+		Configs:       rpcinfo.NewRPCConfig(),
+		Locks:         NewConfigLocks(),
+		Once:          configutil.NewOptionOnce(),
+		StreamOptions: newDefaultStreamOptions(),
+		HTTPResolver:  http.NewDefaultResolver(),
+		DebugService:  diagnosis.NoopService,
 
 		Bus:    event.NewEventBus(),
 		Events: event.NewQueue(event.MaxEventNum),
@@ -271,52 +281,38 @@ func NewOptions(opts []Option) *Options {
 func (o *Options) initRemoteOpt() {
 	var zero connpool2.IdleConfig
 
-	// Apply stream cleanup configuration
-	if o.Configs.TransportProtocol()&(transport.GRPC|transport.GRPCStreaming) != 0 {
-		if o.StreamOptions.StreamCleanupConfig == nil {
-			o.StreamOptions.StreamCleanupConfig = &streaming.StreamCleanupConfig{
-				Disable:       false,
-				CleanInterval: 5 * time.Second,
-			}
-		}
-		o.GRPCConnectOpts.StreamCleanupDisabled = o.StreamOptions.StreamCleanupConfig.Disable
-		o.GRPCConnectOpts.StreamCleanupInterval = o.StreamOptions.StreamCleanupConfig.CleanInterval
-	}
-
-	// configure gRPC
+	// configure grpc
 	if o.Configs.TransportProtocol()&transport.GRPC == transport.GRPC {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
-			// gRPC unary short connection
+			// grpc unary short connection
 			o.GRPCConnectOpts.ShortConn = true
 		}
+
+		o.GRPCConnectOpts.StreamCleanupDisabled = o.StreamOptions.StreamCleanupConfig.Disable
+		o.GRPCConnectOpts.StreamCleanupInterval = o.StreamOptions.StreamCleanupConfig.CleanInterval
 		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
-	// configure gRPC streaming
+	// configure grpc streaming
 	if o.Configs.TransportProtocol()&(transport.GRPC|transport.GRPCStreaming) == transport.GRPCStreaming {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
-			// gRPC unary short connection
+			// grpc unary short connection
 			o.GRPCConnectOpts.ShortConn = true
 		}
 
+		o.GRPCConnectOpts.StreamCleanupDisabled = o.StreamOptions.StreamCleanupConfig.Disable
+		o.GRPCConnectOpts.StreamCleanupInterval = o.StreamOptions.StreamCleanupConfig.CleanInterval
 		o.RemoteOpt.GRPCStreamingConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.GRPCStreamingCliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
-	// configure TTHeader Streaming
+	// configure ttheader streaming
 	if o.Configs.TransportProtocol()&transport.TTHeaderStreaming == transport.TTHeaderStreaming {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
 			// configure short conn pool
 			o.TTHeaderStreamingOptions.TransportOptions = append(o.TTHeaderStreamingOptions.TransportOptions, ttstream.WithClientShortConnPool())
 		}
 
-		// Apply stream cleanup configuration from StreamOptions to TTHeader Streaming transport
-		if o.StreamOptions.StreamCleanupConfig == nil {
-			o.StreamOptions.StreamCleanupConfig = &streaming.StreamCleanupConfig{
-				Disable:       false,
-				CleanInterval: 5 * time.Second,
-			}
-		}
-
+		// todo: inject StreamCleanupConfig into TTHeader Streaming transport layer
 		o.RemoteOpt.TTHeaderStreamingCliHandlerFactory = ttstream.NewCliTransHandlerFactory(o.TTHeaderStreamingOptions.TransportOptions...)
 
 	}

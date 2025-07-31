@@ -1291,27 +1291,44 @@ func TestStreamCleanupConfigWithNewClient(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	// 1. Default behavior: not configured, should be enabled, interval 5s
-	cli := newMockClient(t, ctrl, WithTransportProtocol(transport.GRPCStreaming))
-	opt := cli.(*kcFinalizerClient).opt
-	test.Assert(t, opt.GRPCConnectOpts.StreamCleanupDisabled == false, "default should be enabled")
-	test.Assert(t, opt.GRPCConnectOpts.StreamCleanupInterval == 5*time.Second, "default interval should be 5s")
+	trans := []transport.Protocol{
+		transport.GRPC,
+		transport.GRPCStreaming,
+	}
+	for _, tran := range trans {
+		t.Run(tran.String(), func(t *testing.T) {
+			// 1. Default behavior: not configured, should be enabled, interval 5s
+			cli := newMockClient(t, ctrl, WithTransportProtocol(tran))
+			opt := cli.(*kcFinalizerClient).opt
+			test.Assert(t, opt.GRPCConnectOpts.StreamCleanupDisabled == false, "default should be enabled")
+			test.Assert(t, opt.GRPCConnectOpts.StreamCleanupInterval == 5*time.Second, "default interval should be 5s")
 
-	// 2. Explicitly disabled
-	cli = newMockClient(t, ctrl,
-		WithTransportProtocol(transport.GRPCStreaming),
-		WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{Disable: true, CleanInterval: 0})),
-	)
-	opt = cli.(*kcFinalizerClient).opt
-	test.Assert(t, opt.GRPCConnectOpts.StreamCleanupDisabled == true, "should be disabled")
-	test.Assert(t, opt.GRPCConnectOpts.StreamCleanupInterval == 0, "should be 0")
+			// 2. Explicitly disabled
+			cli = newMockClient(t, ctrl,
+				WithTransportProtocol(tran),
+				WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{Disable: true, CleanInterval: 0})),
+			)
+			opt = cli.(*kcFinalizerClient).opt
+			test.Assert(t, opt.GRPCConnectOpts.StreamCleanupDisabled == true, "should be disabled")
+			test.Assert(t, opt.GRPCConnectOpts.StreamCleanupInterval == 0, "should be 0")
 
-	// 3. Explicitly enabled and custom interval
-	cli = newMockClient(t, ctrl,
-		WithTransportProtocol(transport.GRPCStreaming),
-		WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{Disable: false, CleanInterval: 3 * time.Second})),
-	)
-	opt = cli.(*kcFinalizerClient).opt
-	test.Assert(t, opt.GRPCConnectOpts.StreamCleanupDisabled == false, "should be enabled")
-	test.Assert(t, opt.GRPCConnectOpts.StreamCleanupInterval == 3*time.Second, "should be 3s")
+			// 3. custom normal interval
+			cli = newMockClient(t, ctrl,
+				WithTransportProtocol(tran),
+				WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{CleanInterval: 3 * time.Second})),
+			)
+			opt = cli.(*kcFinalizerClient).opt
+			test.Assert(t, opt.GRPCConnectOpts.StreamCleanupDisabled == false, "should be enabled")
+			test.Assert(t, opt.GRPCConnectOpts.StreamCleanupInterval == 3*time.Second, "should be 3s")
+
+			// 4. custom abnormal interval
+			cli = newMockClient(t, ctrl,
+				WithTransportProtocol(tran),
+				WithStreamOptions(WithStreamCleanupConfig(streaming.StreamCleanupConfig{CleanInterval: 0})),
+			)
+			opt = cli.(*kcFinalizerClient).opt
+			test.Assert(t, opt.GRPCConnectOpts.StreamCleanupDisabled == false, "should be enabled")
+			test.Assert(t, opt.GRPCConnectOpts.StreamCleanupInterval == 5*time.Second, "should be set to 5s")
+		})
+	}
 }

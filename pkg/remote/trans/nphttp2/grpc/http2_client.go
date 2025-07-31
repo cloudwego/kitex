@@ -51,45 +51,36 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-// ticker is used to manage closeStreamTask.
-// it triggers and cleans up actively cancelled streams every 5s.
-// Streaming QPS is generally not too high, if there is a requirement for timeliness, then consider making it configurable.
-// To reduce the overhead of goroutines in a multi-connection scenario, use the Sync SharedTicker
-var ticker = utils.NewSyncSharedTicker(5 * time.Second)
-
-// getStreamCleanupTicker returns a ticker for stream cleanup based on the configuration.
-// If stream cleanup is disabled, it returns nil.
-func getStreamCleanupTicker(opts ConnectOptions) *utils.SharedTicker {
-	if opts.StreamCleanupDisabled {
-		return nil
-	}
-
-	interval := opts.StreamCleanupInterval
-	if interval <= 0 {
-		interval = 5 * time.Second // default to 5 seconds
-	}
-
-	// Use a global map to share tickers with the same interval
-	return getSharedTickerForInterval(interval)
-}
-
 // Global map to share tickers with the same interval
 var (
-	streamCleanupTickers    sync.Map
+	// each ticker is used to manage closeStreamTask.
+	// it triggers and cleans up actively cancelled streams every interval.
+	// To reduce the overhead of goroutines in a multi-connection scenario, use the Sync SharedTicker
+	streamCleanupTickers    sync.Map // key is interval(time.Duration), val is *utils.SharedTicker
 	streamCleanupTickersSfg singleflight.Group
 )
 
+const defaultStreamCleanupInterval = 5 * time.Second
+
+func init() {
+	// default interval is hot path, register the SharedTicker in advance
+	streamCleanupTickers.Store(defaultStreamCleanupInterval, utils.NewSyncSharedTicker(defaultStreamCleanupInterval))
+}
+
 // getSharedTickerForInterval returns a shared ticker for the given interval
 func getSharedTickerForInterval(interval time.Duration) *utils.SharedTicker {
+	if interval <= 0 {
+		interval = defaultStreamCleanupInterval
+	}
+
 	if existing, ok := streamCleanupTickers.Load(interval); ok {
 		return existing.(*utils.SharedTicker)
 	}
 
 	// Use singleflight to prevent creating multiple tickers for the same interval
 	result, _, _ := streamCleanupTickersSfg.Do(interval.String(), func() (interface{}, error) {
-		ticker := utils.NewSyncSharedTicker(interval)
-		streamCleanupTickers.Store(interval, ticker)
-		return ticker, nil
+		actual, _ := streamCleanupTickers.LoadOrStore(interval, utils.NewSyncSharedTicker(interval))
+		return actual.(*utils.SharedTicker), nil
 	})
 
 	return result.(*utils.SharedTicker)
@@ -162,7 +153,6 @@ type http2Client struct {
 	// Stream cleanup configuration
 	streamCleanupDisabled bool
 	streamCleanupInterval time.Duration
-	streamCleanupTask     *closeStreamTask
 }
 
 // newHTTP2Client constructs a connected ClientTransport to addr based on HTTP2
@@ -255,22 +245,23 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst)
 
 	// Setup stream cleanup task if enabled
+	var streamCleanupTicker *utils.SharedTicker
+	var task *closeStreamTask
 	t.streamCleanupDisabled = opts.StreamCleanupDisabled
 	t.streamCleanupInterval = opts.StreamCleanupInterval
-	streamCleanupTicker := getStreamCleanupTicker(opts)
-	if streamCleanupTicker != nil {
-		t.streamCleanupTask = &closeStreamTask{
-			t:      t,
-			ticker: streamCleanupTicker,
+	if !t.streamCleanupDisabled {
+		streamCleanupTicker = getSharedTickerForInterval(t.streamCleanupInterval)
+		task = &closeStreamTask{
+			t: t,
 		}
-		streamCleanupTicker.Add(t.streamCleanupTask)
+		streamCleanupTicker.Add(task)
 	}
 
 	t.onClose = func() {
 		onClose()
 		// when http2Client has been closed, remove this task
-		if t.streamCleanupTask != nil && t.streamCleanupTask.ticker != nil {
-			t.streamCleanupTask.ticker.Delete(t.streamCleanupTask)
+		if !t.streamCleanupDisabled {
+			streamCleanupTicker.Delete(task)
 		}
 	}
 
@@ -349,7 +340,6 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 type closeStreamTask struct {
 	t              *http2Client
 	toCloseStreams []*Stream
-	ticker         *utils.SharedTicker // reference to the ticker for cleanup
 }
 
 func (task *closeStreamTask) Tick() {
@@ -725,19 +715,6 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 	t.controlBuf.executeAndPut(addBackStreamQuota, cleanup)
 	// This will unblock write.
 	close(s.done)
-}
-
-// GetStreamCleanupStats returns the stream cleanup statistics.
-// This method is used for monitoring and observability.
-func (t *http2Client) GetStreamCleanupStats() interface{} {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	return map[string]interface{}{
-		"cleanup_disabled":     t.streamCleanupDisabled,
-		"cleanup_interval":     t.streamCleanupInterval.String(),
-		"active_streams_count": len(t.activeStreams),
-	}
 }
 
 // Close kicks off the shutdown process of the transport. This should be called
