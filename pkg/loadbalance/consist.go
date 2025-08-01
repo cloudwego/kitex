@@ -248,8 +248,8 @@ func (cb *consistBalancer) GetPicker(e discovery.Result) Picker {
 	if e.Cacheable {
 		cii, _, _ := cb.sfg.CheckAndDo(
 			e.CacheKey,
-			func() (any, bool) {
-				return cb.cachedConsistInfo.Load(e.CacheKey)
+			func(key string) (any, bool) {
+				return cb.cachedConsistInfo.Load(key)
 			},
 			func() (interface{}, error) {
 				res := cb.newConsistInfo(e)

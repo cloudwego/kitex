@@ -28,12 +28,12 @@ type Group struct {
 // CheckAndDo implements a double-checked pattern to ensure that `fn` is executed only once for a given key.
 // It performs an initial check with `checkFn` before calling `singleflight.Do`. If the value is found, return.
 // Otherwise, call `Do` and execute `checkFn` again before executing `fn`.
-func (g *Group) CheckAndDo(key string, checkFn func() (any, bool), fn func() (any, error)) (v any, err error, shared bool) {
-	if value, loaded := checkFn(); loaded {
+func (g *Group) CheckAndDo(key string, checkFn func(key string) (any, bool), fn func() (any, error)) (v any, err error, shared bool) {
+	if value, loaded := checkFn(key); loaded {
 		return value, nil, true
 	}
 	return g.Do(key, func() (any, error) {
-		if value, loaded := checkFn(); loaded {
+		if value, loaded := checkFn(key); loaded {
 			return value, nil
 		}
 		return fn()

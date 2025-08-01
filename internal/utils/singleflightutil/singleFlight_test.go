@@ -39,8 +39,8 @@ func TestCheckAndDo(t *testing.T) {
 			return "new", nil
 		}
 
-		checkFunc := func() (any, bool) {
-			return cache.Load(key)
+		checkFunc := func(str string) (any, bool) {
+			return cache.Load(str)
 		}
 
 		val, err, shared := g.CheckAndDo(key, checkFunc, fn)
@@ -61,8 +61,8 @@ func TestCheckAndDo(t *testing.T) {
 			cache.Store(key, curr)
 			return curr, nil
 		}
-		checkFunc := func() (any, bool) {
-			return cache.Load(key)
+		checkFunc := func(str string) (any, bool) {
+			return cache.Load(str)
 		}
 
 		var wg sync.WaitGroup

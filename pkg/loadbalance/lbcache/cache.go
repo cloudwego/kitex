@@ -120,8 +120,8 @@ func NewBalancerFactory(resolver discovery.Resolver, balancer loadbalance.Loadba
 	}
 	uniqueKey := cacheKey(resolver.Name(), balancer.Name(), opts)
 	val, _, _ := balancerFactoriesSfg.CheckAndDo(uniqueKey,
-		func() (any, bool) {
-			return balancerFactories.Load(uniqueKey)
+		func(key string) (any, bool) {
+			return balancerFactories.Load(key)
 		},
 		func() (interface{}, error) {
 			b := newBalancerFactory(resolver, balancer, opts)
@@ -158,8 +158,8 @@ func renameResultCacheKey(res *discovery.Result, resolverName string) {
 func (b *BalancerFactory) Get(ctx context.Context, target rpcinfo.EndpointInfo) (*Balancer, error) {
 	desc := b.resolver.Target(ctx, target)
 	val, err, _ := b.sfg.CheckAndDo(desc,
-		func() (any, bool) {
-			return b.cache.Load(desc)
+		func(key string) (any, bool) {
+			return b.cache.Load(key)
 		},
 		func() (interface{}, error) {
 			res, err := b.resolver.Resolve(ctx, desc)
