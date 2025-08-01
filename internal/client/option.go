@@ -49,6 +49,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
@@ -108,6 +109,18 @@ type StreamOptions struct {
 	StreamRecvMiddlewareBuilders []cep.StreamRecvMiddlewareBuilder
 	StreamSendMiddlewares        []cep.StreamSendMiddleware
 	StreamSendMiddlewareBuilders []cep.StreamSendMiddlewareBuilder
+
+	// Stream cleanup configuration for monitoring cancelled streams
+	StreamCleanupConfig streaming.StreamCleanupConfig
+}
+
+func newDefaultStreamOptions() StreamOptions {
+	return StreamOptions{
+		StreamCleanupConfig: streaming.StreamCleanupConfig{
+			Disable:       false,
+			CleanInterval: 5 * time.Second,
+		},
+	}
 }
 
 func (o *StreamOptions) InitMiddlewares(ctx context.Context) {
@@ -227,15 +240,16 @@ type Option struct {
 // NewOptions creates a new option.
 func NewOptions(opts []Option) *Options {
 	o := &Options{
-		Cli:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
-		Svr:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
-		MetaHandlers: []remote.MetaHandler{transmeta.MetainfoClientHandler},
-		RemoteOpt:    newClientRemoteOption(),
-		Configs:      rpcinfo.NewRPCConfig(),
-		Locks:        NewConfigLocks(),
-		Once:         configutil.NewOptionOnce(),
-		HTTPResolver: http.NewDefaultResolver(),
-		DebugService: diagnosis.NoopService,
+		Cli:           &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
+		Svr:           &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
+		MetaHandlers:  []remote.MetaHandler{transmeta.MetainfoClientHandler},
+		RemoteOpt:     newClientRemoteOption(),
+		Configs:       rpcinfo.NewRPCConfig(),
+		Locks:         NewConfigLocks(),
+		Once:          configutil.NewOptionOnce(),
+		StreamOptions: newDefaultStreamOptions(),
+		HTTPResolver:  http.NewDefaultResolver(),
+		DebugService:  diagnosis.NoopService,
 
 		Bus:    event.NewEventBus(),
 		Events: event.NewQueue(event.MaxEventNum),
@@ -260,6 +274,7 @@ func NewOptions(opts []Option) *Options {
 		}
 		o.StatsLevel = &level
 	}
+
 	return o
 }
 
@@ -272,6 +287,9 @@ func (o *Options) initRemoteOpt() {
 			// grpc unary short connection
 			o.GRPCConnectOpts.ShortConn = true
 		}
+
+		o.GRPCConnectOpts.StreamCleanupDisabled = o.StreamOptions.StreamCleanupConfig.Disable
+		o.GRPCConnectOpts.StreamCleanupInterval = o.StreamOptions.StreamCleanupConfig.CleanInterval
 		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
@@ -281,6 +299,9 @@ func (o *Options) initRemoteOpt() {
 			// grpc unary short connection
 			o.GRPCConnectOpts.ShortConn = true
 		}
+
+		o.GRPCConnectOpts.StreamCleanupDisabled = o.StreamOptions.StreamCleanupConfig.Disable
+		o.GRPCConnectOpts.StreamCleanupInterval = o.StreamOptions.StreamCleanupConfig.CleanInterval
 		o.RemoteOpt.GRPCStreamingConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.GRPCStreamingCliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
@@ -290,7 +311,10 @@ func (o *Options) initRemoteOpt() {
 			// configure short conn pool
 			o.TTHeaderStreamingOptions.TransportOptions = append(o.TTHeaderStreamingOptions.TransportOptions, ttstream.WithClientShortConnPool())
 		}
+
+		// todo: inject StreamCleanupConfig into TTHeader Streaming transport layer
 		o.RemoteOpt.TTHeaderStreamingCliHandlerFactory = ttstream.NewCliTransHandlerFactory(o.TTHeaderStreamingOptions.TransportOptions...)
+
 	}
 	if o.RemoteOpt.ConnPool == nil {
 		if o.PoolCfg != nil {

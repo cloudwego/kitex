@@ -47,7 +47,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/testutils"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 type server struct {
@@ -2248,33 +2247,6 @@ func Test_isIgnorable(t *testing.T) {
 	test.Assert(t, isIgnorable(ErrConnClosing))
 }
 
-func Test_closeStreamTask(t *testing.T) {
-	// replace ticker to reduce test time
-	ticker = utils.NewSyncSharedTicker(10 * time.Millisecond)
-	server, ct := setUp(t, 0, math.MaxUint32, cancel)
-	callHdr := &CallHdr{
-		Host:   "localhost",
-		Method: "foo.Small",
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	stream, err := ct.NewStream(ctx, callHdr)
-	if err != nil {
-		t.Fatalf("failed to open stream: %v", err)
-	}
-	cancel()
-	// wait for server receiving RstStream Frame
-	<-server.srvReady
-	state := stream.getState()
-	test.Assert(t, state == streamDone, state)
-	ct.mu.Lock()
-	streamNums := len(ct.activeStreams)
-	ct.mu.Unlock()
-	test.Assert(t, streamNums == 0, streamNums)
-
-	ct.Close(errSelfCloseForTest)
-	server.stop()
-}
-
 func TestStreamGetHeaderValid(t *testing.T) {
 	s := &Stream{
 		headerChan:  make(chan struct{}),
@@ -2285,4 +2257,85 @@ func TestStreamGetHeaderValid(t *testing.T) {
 	test.Assert(t, !s.getHeaderValid())
 	close(s.headerChan)
 	test.Assert(t, s.getHeaderValid() == s.headerValid)
+}
+
+func TestConfigurableStreamCleanup(t *testing.T) {
+	t.Run("stream cleanup enabled", func(t *testing.T) {
+		server, ct := setUpWithOptions(t, 0, &ServerConfig{}, normal, ConnectOptions{
+			StreamCleanupDisabled: false,
+			StreamCleanupInterval: 100 * time.Millisecond,
+		})
+		defer server.stop()
+
+		callHdr := &CallHdr{
+			Host:   "localhost",
+			Method: "foo.Small",
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		stream, err := ct.NewStream(ctx, callHdr)
+		if err != nil {
+			t.Fatalf("failed to open stream: %v", err)
+		}
+
+		// Check configure
+		ct.mu.Lock()
+		test.Assert(t, ct.streamCleanupDisabled == false)
+		test.Assert(t, ct.streamCleanupInterval == 100*time.Millisecond)
+		ct.mu.Unlock()
+
+		// Cancel the stream
+		cancel()
+
+		// Wait for cleanup to happen
+		time.Sleep(200 * time.Millisecond)
+
+		// Check stream state
+		state := stream.getState()
+		test.Assert(t, state == streamDone, state)
+
+		// Check that active streams count decreased
+		ct.mu.Lock()
+		test.Assert(t, len(ct.activeStreams) == 0)
+		ct.mu.Unlock()
+
+		ct.Close(errSelfCloseForTest)
+	})
+	t.Run("stream cleanup disabled", func(t *testing.T) {
+		server, ct := setUpWithOptions(t, 0, &ServerConfig{}, normal, ConnectOptions{
+			StreamCleanupDisabled: true,
+			StreamCleanupInterval: 100 * time.Millisecond,
+		})
+		defer server.stop()
+
+		callHdr := &CallHdr{
+			Host:   "localhost",
+			Method: "foo.Small",
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		stream, err := ct.NewStream(ctx, callHdr)
+		if err != nil {
+			t.Fatalf("failed to open stream: %v", err)
+		}
+
+		// Check configure
+		ct.mu.Lock()
+		test.Assert(t, ct.streamCleanupDisabled == true)
+		ct.mu.Unlock()
+
+		// Cancel the stream
+		cancel()
+
+		// Wait and verify stream is NOT automatically cleaned up
+		time.Sleep(200 * time.Millisecond)
+
+		// Check that active streams count does not change
+		ct.mu.Lock()
+		test.Assert(t, len(ct.activeStreams) == 1)
+		ct.mu.Unlock()
+
+		// Manually close the stream
+		ct.CloseStream(stream, ContextErr(context.Canceled))
+
+		ct.Close(errSelfCloseForTest)
+	})
 }

@@ -38,6 +38,7 @@ import (
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -50,11 +51,40 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-// ticker is used to manage closeStreamTask.
-// it triggers and cleans up actively cancelled streams every 5s.
-// Streaming QPS is generally not too high, if there is a requirement for timeliness, then consider making it configurable.
-// To reduce the overhead of goroutines in a multi-connection scenario, use the Sync SharedTicker
-var ticker = utils.NewSyncSharedTicker(5 * time.Second)
+// Global map to share tickers with the same interval
+var (
+	// each ticker is used to manage closeStreamTask.
+	// it triggers and cleans up actively cancelled streams every interval.
+	// To reduce the overhead of goroutines in a multi-connection scenario, use the Sync SharedTicker
+	streamCleanupTickers    sync.Map // key is interval(time.Duration), val is *utils.SharedTicker
+	streamCleanupTickersSfg singleflight.Group
+)
+
+const defaultStreamCleanupInterval = 5 * time.Second
+
+func init() {
+	// default interval is hot path, register the SharedTicker in advance
+	streamCleanupTickers.Store(defaultStreamCleanupInterval, utils.NewSyncSharedTicker(defaultStreamCleanupInterval))
+}
+
+// getSharedTickerForInterval returns a shared ticker for the given interval
+func getSharedTickerForInterval(interval time.Duration) *utils.SharedTicker {
+	if interval <= 0 {
+		interval = defaultStreamCleanupInterval
+	}
+
+	if existing, ok := streamCleanupTickers.Load(interval); ok {
+		return existing.(*utils.SharedTicker)
+	}
+
+	// Use singleflight to prevent creating multiple tickers for the same interval
+	result, _, _ := streamCleanupTickersSfg.Do(interval.String(), func() (interface{}, error) {
+		actual, _ := streamCleanupTickers.LoadOrStore(interval, utils.NewSyncSharedTicker(interval))
+		return actual.(*utils.SharedTicker), nil
+	})
+
+	return result.(*utils.SharedTicker)
+}
 
 // http2Client implements the ClientTransport interface with HTTP2.
 type http2Client struct {
@@ -119,6 +149,10 @@ type http2Client struct {
 	onClose func()
 
 	bufferPool *bufferPool
+
+	// Stream cleanup configuration
+	streamCleanupDisabled bool
+	streamCleanupInterval time.Duration
 }
 
 // newHTTP2Client constructs a connected ClientTransport to addr based on HTTP2
@@ -209,13 +243,27 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		}
 	}
 	t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst)
-	task := &closeStreamTask{t: t}
+
+	// Setup stream cleanup task if enabled
+	var streamCleanupTicker *utils.SharedTicker
+	var task *closeStreamTask
+	t.streamCleanupDisabled = opts.StreamCleanupDisabled
+	t.streamCleanupInterval = opts.StreamCleanupInterval
+	if !t.streamCleanupDisabled {
+		streamCleanupTicker = getSharedTickerForInterval(t.streamCleanupInterval)
+		task = &closeStreamTask{
+			t: t,
+		}
+		streamCleanupTicker.Add(task)
+	}
+
 	t.onClose = func() {
 		onClose()
 		// when http2Client has been closed, remove this task
-		ticker.Delete(task)
+		if !t.streamCleanupDisabled {
+			streamCleanupTicker.Delete(task)
+		}
 	}
-	ticker.Add(task)
 
 	// Start the reader goroutine for incoming message. Each transport has
 	// a dedicated goroutine which reads HTTP2 frame from network. Then it
