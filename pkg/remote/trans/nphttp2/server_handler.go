@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/consts"
@@ -106,6 +107,23 @@ func (t *svrTransHandler) ProtocolMatch(ctx context.Context, conn net.Conn) erro
 			}
 		}
 	}
+
+	// Compatible with bufiox.DefaultReader used in the gonet under the Windows system environmen
+	// FIXME: Same concern as above - the protocol matching should ideally be
+	// implementation-agnostic rather than dependent on specific reader types.
+	if withReader, ok := conn.(interface{ Reader() *bufiox.DefaultReader }); ok {
+		if gnReader := withReader.Reader(); gnReader != nil {
+			// read at most avoid block
+			preface, err := gnReader.Peek(prefaceReadAtMost)
+			if err != nil {
+				return err
+			}
+			if len(preface) >= prefaceReadAtMost && bytes.Equal(preface[:prefaceReadAtMost], grpcTransport.ClientPreface[:prefaceReadAtMost]) {
+				return nil
+			}
+		}
+	}
+
 	return errors.New("error protocol not match")
 }
 
