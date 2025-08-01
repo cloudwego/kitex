@@ -39,6 +39,9 @@ func getSharedTicker(b *Balancer, refreshInterval time.Duration) *utils.SharedTi
 		return st
 	}
 	v, _, _ := sharedTickersSfg.Do(refreshInterval.String(), func() (interface{}, error) {
+		if st, ok := sharedTickers.Load(refreshInterval); ok {
+			return st, nil
+		}
 		st := utils.NewSharedTicker(refreshInterval)
 		sharedTickers.Store(refreshInterval, st)
 		return st, nil

@@ -77,6 +77,9 @@ func (wb *weightedBalancer) GetPicker(e discovery.Result) Picker {
 	picker, ok := wb.pickerCache.Load(e.CacheKey)
 	if !ok {
 		picker, _, _ = wb.sfg.Do(e.CacheKey, func() (interface{}, error) {
+			if p, ok := wb.pickerCache.Load(e.CacheKey); ok {
+				return p, nil
+			}
 			p := wb.createPicker(e)
 			wb.pickerCache.Store(e.CacheKey, p)
 			return p, nil

@@ -250,9 +250,13 @@ func (cb *consistBalancer) GetPicker(e discovery.Result) Picker {
 		cii, ok := cb.cachedConsistInfo.Load(e.CacheKey)
 		if !ok {
 			cii, _, _ = cb.sfg.Do(e.CacheKey, func() (interface{}, error) {
-				return cb.newConsistInfo(e), nil
+				if info, ok := cb.cachedConsistInfo.Load(e.CacheKey); ok {
+					return info, nil
+				}
+				info := cb.newConsistInfo(e)
+				cb.cachedConsistInfo.Store(e.CacheKey, info)
+				return info, nil
 			})
-			cb.cachedConsistInfo.Store(e.CacheKey, cii)
 		}
 		ci = cii.(*consistInfo)
 	} else {

@@ -125,6 +125,9 @@ func NewBalancerFactory(resolver discovery.Resolver, balancer loadbalance.Loadba
 		return val.(*BalancerFactory)
 	}
 	val, _, _ = balancerFactoriesSfg.Do(uniqueKey, func() (interface{}, error) {
+		if b, ok := balancerFactories.Load(uniqueKey); ok {
+			return b, nil
+		}
 		b := newBalancerFactory(resolver, balancer, opts)
 		balancerFactories.Store(uniqueKey, b)
 		return b, nil
