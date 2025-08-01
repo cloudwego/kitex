@@ -22,9 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/utils/singleflightutil"
-
 	"github.com/bytedance/gopkg/util/xxhash3"
+	"github.com/cloudwego/kitex/internal/utils/singleflightutil"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/utils"
 )

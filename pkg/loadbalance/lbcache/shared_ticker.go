@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/internal/utils/singleflightutil"
-
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 

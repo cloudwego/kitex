@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/internal/utils/singleflightutil"
-
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/klog"
