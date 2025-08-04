@@ -38,6 +38,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 type bufferPool struct {
@@ -233,7 +234,7 @@ const (
 // Stream represents an RPC in the transport layer.
 type Stream struct {
 	id           uint32
-	st           ServerTransport  // nil for client side Stream
+	st           *http2Server     // nil for client side Stream
 	ct           *http2Client     // nil for server side Stream
 	ctx          context.Context  // the associated context of the stream
 	cancel       cancelWithReason // always nil for client side Stream
@@ -290,6 +291,11 @@ type Stream struct {
 	closeStreamErr atomic.Value
 	// sourceService is the source service name of this stream
 	sourceService string
+
+	traceMu       sync.Mutex      // protects traceCtx, pendingEvents and traceFinished
+	traceCtx      context.Context // stores the ctx containing rpcinfo and trace span related information
+	pendingEvents []rpcinfo.Event
+	traceFinished bool
 }
 
 // isHeaderSent is only valid on the server-side.
@@ -440,6 +446,24 @@ func (s *Stream) ContentSubtype() string {
 // Context returns the context of the stream.
 func (s *Stream) Context() context.Context {
 	return s.ctx
+}
+
+// SetTraceContext set the trace ctx with rpcinfo and trace span related information, only used in server-side
+func (s *Stream) SetTraceContext(ctx context.Context) {
+	s.traceMu.Lock()
+	s.traceCtx = ctx
+	s.traceMu.Unlock()
+}
+
+// FinishTrace reports remaining pending events and mark trace finished.
+// After this function is called, event report is not allowed
+func (s *Stream) FinishTrace() {
+	s.traceMu.Lock()
+	if len(s.pendingEvents) > 0 {
+		s.st.reportPendingEventsUnlock(s)
+	}
+	s.traceFinished = true
+	s.traceMu.Unlock()
 }
 
 // Method returns the method for the stream.
@@ -609,6 +633,7 @@ type ServerConfig struct {
 	WriteBufferSize            uint32
 	ReadBufferSize             uint32
 	MaxHeaderListSize          *uint32
+	TraceController            *rpcinfo.TraceController
 }
 
 func DefaultServerConfig() *ServerConfig {
@@ -636,6 +661,8 @@ type ConnectOptions struct {
 	ShortConn bool
 	// TLSConfig
 	TLSConfig *tls.Config
+
+	TraceController *rpcinfo.TraceController
 }
 
 // NewServerTransport creates a ServerTransport with conn or non-nil error

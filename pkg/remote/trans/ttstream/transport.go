@@ -31,6 +31,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/container"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
@@ -58,6 +60,8 @@ type transport struct {
 	fpipe         *container.Pipe[*Frame]  // out-coming frame pipe
 	closedFlag    int32
 	closedTrigger chan struct{}
+
+	traceCtl *rpcinfo.TraceController // only used for server-side transport
 }
 
 func newTransport(kind int32, conn netpoll.Connection, pool transPool) *transport {
@@ -77,6 +81,32 @@ func newTransport(kind int32, conn netpoll.Connection, pool transPool) *transpor
 	if t.Addr() != nil {
 		addr = t.Addr().String()
 	}
+	t.startLoops(addr)
+	return t
+}
+
+func newServerTransport(conn netpoll.Connection, ctl *rpcinfo.TraceController) *transport {
+	_ = conn.SetReadTimeout(0)
+	t := &transport{
+		kind:          serverTransport,
+		conn:          conn,
+		streams:       sync.Map{},
+		spipe:         container.NewPipe[*stream](),
+		scache:        make([]*stream, 0, streamCacheSize),
+		fpipe:         container.NewPipe[*Frame](),
+		closedTrigger: make(chan struct{}, 2),
+		traceCtl:      ctl,
+	}
+	addr := ""
+	if t.Addr() != nil {
+		addr = t.Addr().String()
+	}
+	t.startLoops(addr)
+
+	return t
+}
+
+func (t *transport) startLoops(addr string) {
 	gofunc.RecoverGoFuncWithInfo(context.Background(), func() {
 		var err error
 		defer func() {
@@ -105,7 +135,6 @@ func newTransport(kind int32, conn netpoll.Connection, pool transPool) *transpor
 		}()
 		err = t.loopWrite()
 	}, gofunc.NewBasicInfo("", addr))
-	return t
 }
 
 func (t *transport) Addr() net.Addr {
@@ -180,9 +209,10 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 
 	var s *stream
 	if fr.typ == headerFrameType && t.kind == serverTransport {
-		// server recv a header frame, we should create a new stream
 		s = newStream(context.Background(), t, fr.streamFrame)
+		s.setTraceController(t.traceCtl)
 		t.storeStream(s)
+		s.reportEvent(stats.StreamRecvHeader)
 		err = t.spipe.Write(context.Background(), s)
 	} else {
 		// load exist stream
@@ -299,6 +329,7 @@ func (t *transport) WriteStream(
 	if err := t.WriteFrame(fr); err != nil {
 		return err
 	}
+	s.reportEvent(stats.StreamSendHeader)
 	return nil
 }
 

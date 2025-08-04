@@ -106,6 +106,30 @@ func (c *TraceController) ReportStreamEvent(ctx context.Context, statsEvent stat
 	}
 }
 
+// ReportStreamRawEvent is used to collect streaming events with initialized Event
+// for scenarios where an event has been generated but cannot be reported immediately
+// (tracer-related information has not yet been successfully initialized).
+// At this point, the event contains the time at which it occurred.
+//
+// Once this method is invoked, the event must no longer be held.
+func (c *TraceController) ReportStreamRawEvent(ctx context.Context, event Event) {
+	if !c.HasStreamEventReporter() {
+		return
+	}
+
+	defer c.tryRecover(ctx)
+	defer func() {
+		if recyclable, ok := event.(internal.Reusable); ok {
+			recyclable.Recycle()
+		}
+	}()
+	// RPCInfo is likely to be used by each reporter
+	ri := GetRPCInfo(ctx)
+	for i := len(c.streamEventReporters) - 1; i >= 0; i-- {
+		c.streamEventReporters[i].ReportStreamEvent(ctx, ri, event)
+	}
+}
+
 // GetStreamEventHandler returns the stream event handler
 // If there's no StreamEventReporter, nil is returned for client/server to skip adding tracing middlewares
 func (c *TraceController) GetStreamEventHandler() stream.StreamEventHandler {

@@ -209,6 +209,8 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 		}
 	}
 	rCtx = t.startTracer(rCtx, ri)
+	// now, rCtx contains all meta including rpcinfo and trace span
+	s.SetTraceContext(rCtx)
 	defer func() {
 		panicErr := recover()
 		if panicErr != nil {
@@ -218,6 +220,8 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 				klog.CtxErrorf(rCtx, "KITEX: gRPC panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
 			}
 		}
+		// subsequent event report is not allowed
+		s.FinishTrace()
 		t.finishTracer(rCtx, ri, err, panicErr)
 	}()
 

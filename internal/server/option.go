@@ -40,6 +40,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -213,6 +214,8 @@ func NewOptions(opts []Option) *Options {
 		}
 		o.StatsLevel = &level
 	}
+	ropt.GRPCCfg.TraceController = o.TracerCtl
+	ropt.TTHeaderStreamingOptions.TransportOptions = append(ropt.TTHeaderStreamingOptions.TransportOptions, ttstream.WithServerTraceController(o.TracerCtl))
 	return o
 }
 

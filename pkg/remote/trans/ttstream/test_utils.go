@@ -46,7 +46,7 @@ func newTestStreamPipe(sinfo *serviceinfo.ServiceInfo, method string) (*clientSt
 	if err = ctrans.WriteStream(ctx, rawClientStream, intHeader, strHeader); err != nil {
 		return nil, nil, err
 	}
-	strans := newTransport(serverTransport, sconn, nil)
+	strans := newServerTransport(sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	if err != nil {
 		return nil, nil, err

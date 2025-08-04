@@ -73,7 +73,7 @@ func TestTransportBasic(t *testing.T) {
 	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
 	err = ctrans.WriteStream(ctx, rawClientStream, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
-	strans := newTransport(serverTransport, sconn, nil)
+	strans := newServerTransport(sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 
@@ -143,7 +143,7 @@ func TestTransportServerStreaming(t *testing.T) {
 	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
 	err = ctrans.WriteStream(ctx, rawClientStream, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
-	strans := newTransport(serverTransport, sconn, nil)
+	strans := newServerTransport(sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 
@@ -209,7 +209,7 @@ func TestTransportException(t *testing.T) {
 	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
 	err = ctrans.WriteStream(ctx, rawClientStream, make(IntHeader), make(streaming.Header))
 	test.Assert(t, err == nil, err)
-	strans := newTransport(serverTransport, sconn, nil)
+	strans := newServerTransport(sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 	cStream := newClientStream(rawClientStream)
@@ -278,7 +278,7 @@ func Test_clientStreamReceiveTrailer(t *testing.T) {
 	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
 	err = ctrans.WriteStream(ctx, rawClientStream, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
-	strans := newTransport(serverTransport, sconn, nil)
+	strans := newServerTransport(sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 
