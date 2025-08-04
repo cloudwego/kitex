@@ -274,6 +274,7 @@ func (o *Options) initRemoteOpt() {
 			// grpc unary short connection
 			o.GRPCConnectOpts.ShortConn = true
 		}
+		o.GRPCConnectOpts.StreamEventHandler = o.TracerCtl.GetStreamEventHandler()
 		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
@@ -283,6 +284,7 @@ func (o *Options) initRemoteOpt() {
 			// grpc unary short connection
 			o.GRPCConnectOpts.ShortConn = true
 		}
+		o.GRPCConnectOpts.StreamEventHandler = o.TracerCtl.GetStreamEventHandler()
 		o.RemoteOpt.GRPCStreamingConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.GRPCStreamingCliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
@@ -291,6 +293,7 @@ func (o *Options) initRemoteOpt() {
 		if o.PoolCfg != nil && *o.PoolCfg == zero {
 			// configure short conn pool
 			o.TTHeaderStreamingOptions.TransportOptions = append(o.TTHeaderStreamingOptions.TransportOptions, ttstream.WithClientShortConnPool())
+			// todo: ttstream supports inject StreamEventHandler
 		}
 		o.RemoteOpt.TTHeaderStreamingCliHandlerFactory = ttstream.NewCliTransHandlerFactory(o.TTHeaderStreamingOptions.TransportOptions...)
 	}

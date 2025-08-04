@@ -34,6 +34,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
@@ -442,6 +443,12 @@ func (s *Stream) Context() context.Context {
 	return s.ctx
 }
 
+// SetContext set the new ctx, only used in server-side injecting new ctx
+// after tracing information has been initialized
+func (s *Stream) SetContext(ctx context.Context) {
+	s.ctx = ctx
+}
+
 // Method returns the method for the stream.
 func (s *Stream) Method() string {
 	return s.method
@@ -609,6 +616,7 @@ type ServerConfig struct {
 	WriteBufferSize            uint32
 	ReadBufferSize             uint32
 	MaxHeaderListSize          *uint32
+	StreamEventHandler         stream.StreamEventHandler
 }
 
 func DefaultServerConfig() *ServerConfig {
@@ -636,6 +644,8 @@ type ConnectOptions struct {
 	ShortConn bool
 	// TLSConfig
 	TLSConfig *tls.Config
+
+	StreamEventHandler stream.StreamEventHandler
 }
 
 // NewServerTransport creates a ServerTransport with conn or non-nil error
