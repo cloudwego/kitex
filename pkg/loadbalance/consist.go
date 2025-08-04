@@ -91,11 +91,7 @@ func init() {
 
 type virtualNode struct {
 	hash     uint64
-	RealNode *realNode
-}
-
-type realNode struct {
-	Ins discovery.Instance
+	RealNode discovery.Instance
 }
 
 type consistResult struct {
@@ -104,7 +100,7 @@ type consistResult struct {
 }
 
 type consistInfo struct {
-	realNodes    []realNode
+	realNodes    []discovery.Instance
 	virtualNodes []virtualNode
 }
 
@@ -187,7 +183,7 @@ func buildConsistResult(info *consistInfo, key uint64) *consistResult {
 	if index == len(info.virtualNodes) {
 		index = 0
 	}
-	cr.Primary = info.virtualNodes[index].RealNode.Ins
+	cr.Primary = info.virtualNodes[index].RealNode
 	return cr
 	// Todo(DMwangnima): Optimise Replica-related logic
 	// This comment part is previous implementation considering connecting to Replica
@@ -266,19 +262,20 @@ func (cb *consistBalancer) GetPicker(e discovery.Result) Picker {
 
 func (cb *consistBalancer) newConsistInfo(e discovery.Result) *consistInfo {
 	ci := &consistInfo{}
-	ci.realNodes, ci.virtualNodes = cb.buildNodes(e.Instances)
+	ci.realNodes = e.Instances
+	ci.virtualNodes = cb.buildNodes(e.Instances)
 	return ci
 }
 
-func (cb *consistBalancer) buildNodes(ins []discovery.Instance) ([]realNode, []virtualNode) {
-	ret := make([]realNode, len(ins))
-	for i := range ins {
-		ret[i].Ins = ins[i]
-	}
-	return ret, cb.buildVirtualNodes(ret)
+func (cb *consistBalancer) buildNodes(ins []discovery.Instance) []virtualNode {
+	// ret := make([]realNode, len(ins))
+	// for i := range ins {
+	// 	ret[i].Ins = ins[i]
+	// }
+	return cb.buildVirtualNodes(ins)
 }
 
-func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
+func (cb *consistBalancer) buildVirtualNodes(rNodes []discovery.Instance) []virtualNode {
 	totalLen := 0
 	for i := range rNodes {
 		totalLen += cb.getVirtualNodeLen(rNodes[i])
@@ -290,8 +287,8 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 	}
 	maxLen, maxSerial := 0, 0
 	for i := range rNodes {
-		if len(rNodes[i].Ins.Address().String()) > maxLen {
-			maxLen = len(rNodes[i].Ins.Address().String())
+		if len(rNodes[i].Address().String()) > maxLen {
+			maxLen = len(rNodes[i].Address().String())
 		}
 		if vNodeLen := cb.getVirtualNodeLen(rNodes[i]); vNodeLen > maxSerial {
 			maxSerial = vNodeLen
@@ -304,7 +301,7 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 	// record the start index.
 	cur := 0
 	for i := range rNodes {
-		bAddr := utils.StringToSliceByte(rNodes[i].Ins.Address().String())
+		bAddr := utils.StringToSliceByte(rNodes[i].Address().String())
 		// Assign the first few bits of b to string.
 		copy(b, bAddr)
 
@@ -327,7 +324,7 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 			// At this point, the index inside ret should be cur + j.
 			index := cur + j
 			ret[index].hash = xxhash3.Hash(b)
-			ret[index].RealNode = &rNodes[i]
+			ret[index].RealNode = rNodes[i]
 		}
 		cur += vLen
 	}
@@ -337,9 +334,9 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 
 // get virtual node number from one realNode.
 // if cb.opt.Weighted option is false, multiplier is 1, virtual node number is equal to VirtualFactor.
-func (cb *consistBalancer) getVirtualNodeLen(rNode realNode) int {
+func (cb *consistBalancer) getVirtualNodeLen(rNode discovery.Instance) int {
 	if cb.opt.Weighted {
-		return rNode.Ins.Weight() * int(cb.opt.VirtualFactor)
+		return rNode.Weight() * int(cb.opt.VirtualFactor)
 	}
 	return int(cb.opt.VirtualFactor)
 }
