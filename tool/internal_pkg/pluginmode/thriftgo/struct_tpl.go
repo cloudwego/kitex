@@ -741,7 +741,7 @@ const FieldDeepCopyBaseType = `
 			{{- if IsGoStringType .TypeName}}
 			var tmp string
 			if *{{$Src}} != "" {
-				tmp = kutils.StringDeepCopy(*{{$Src}})
+				tmp = *{{$Src}}
 			}
 			{{.Target}} = &tmp
 			{{- else if .Type.Category.IsBinary}}
@@ -758,7 +758,7 @@ const FieldDeepCopyBaseType = `
 	{{- else}}
 		{{- if IsGoStringType .TypeName}}
 		if {{$Src}} != "" {
-			{{.Target}} = kutils.StringDeepCopy({{$Src}})
+			{{.Target}} = {{$Src}}
 		}
 		{{- else if .Type.Category.IsBinary}}
 		if len({{$Src}}) != 0 {
