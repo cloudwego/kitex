@@ -738,13 +738,7 @@ const FieldDeepCopyBaseType = `
 	{{- end}}
 	{{- if .IsPointer}}
 		if {{$Src}} != nil {
-			{{- if IsGoStringType .TypeName}}
-			var tmp string
-			if *{{$Src}} != "" {
-				tmp = kutils.StringDeepCopy(*{{$Src}})
-			}
-			{{.Target}} = &tmp
-			{{- else if .Type.Category.IsBinary}}
+			{{- if .Type.Category.IsBinary}}
 			tmp := make([]byte, len(*{{$Src}}))
 			if len(*{{$Src}}) != 0 {
 				copy(tmp, *{{$Src}})
@@ -756,11 +750,7 @@ const FieldDeepCopyBaseType = `
 			{{- end}}
 		}
 	{{- else}}
-		{{- if IsGoStringType .TypeName}}
-		if {{$Src}} != "" {
-			{{.Target}} = kutils.StringDeepCopy({{$Src}})
-		}
-		{{- else if .Type.Category.IsBinary}}
+		{{- if .Type.Category.IsBinary}}
 		if len({{$Src}}) != 0 {
 			tmp := make([]byte, len({{$Src}}))
 			copy(tmp, {{$Src}})
