@@ -62,7 +62,7 @@ func (c *longConnTransPool) Get(network, addr string) (trans *clientTransport, e
 	if err != nil {
 		return nil, err
 	}
-	trans = newClientTransportWithStreamCleanup(conn, c)
+	trans = newClientTransport(conn, c)
 	// create new transport
 	return trans, nil
 }

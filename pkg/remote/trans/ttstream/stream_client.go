@@ -64,6 +64,8 @@ type clientStream struct {
 	// for Header()/Trailer()
 	headerSig  chan int32
 	trailerSig chan int32
+
+	registeredWatcher bool
 }
 
 func (s *clientStream) Header() (streaming.Header, error) {
@@ -187,10 +189,18 @@ func (s *clientStream) close(exception error, sendRst bool, via string) {
 		s.stream.sendTrailer(nil)
 	}
 	s.runCloseCallback(exception)
+	if s.registeredWatcher {
+		globalWatcher.Deregister(s.ctx)
+	}
 }
 
 func (s *clientStream) setMetaFrameHandler(metaHandler MetaFrameHandler) {
 	s.metaFrameHandler = metaHandler
+}
+
+func (s *clientStream) registerWatcher() {
+	s.registeredWatcher = true
+	globalWatcher.Register(s.ctx, s.ctxDoneCallback)
 }
 
 // === clientStream OnRead callback

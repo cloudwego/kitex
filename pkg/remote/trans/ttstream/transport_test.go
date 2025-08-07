@@ -33,15 +33,13 @@ import (
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
-	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/pkg/utils"
-
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 var testServiceInfo = &serviceinfo.ServiceInfo{
@@ -57,14 +55,6 @@ var testServiceInfo = &serviceinfo.ServiceInfo{
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
 		),
 	},
-}
-
-func TestMain(m *testing.M) {
-	// reduce interval to speed up unit tests
-	globalTicker = utils.NewSyncSharedTicker(200 * time.Millisecond)
-	m.Run()
-	// set back
-	globalTicker = utils.NewSyncSharedTicker(defaultStreamCleanupInterval)
 }
 
 func TestTransportBasic(t *testing.T) {
@@ -500,8 +490,10 @@ func initTestStreams(t *testing.T, cCtx context.Context, method, cliNodeName, sr
 
 	intHeader := make(IntHeader)
 	strHeader := make(streaming.Header)
-	ctrans := newClientTransportWithStreamCleanup(cconn, nil)
+	ctrans := newClientTransport(cconn, nil)
 	cs := newClientStream(cCtx, ctrans, streamFrame{sid: genStreamID(), method: method})
+	cs.registerWatcher()
+	globalWatcher.Register(cs.ctx, cs.ctxDoneCallback)
 	cs.rpcInfo = rpcinfo.NewRPCInfo(
 		rpcinfo.NewEndpointInfo(cliNodeName, method, nil, nil), nil, nil, nil, nil)
 	err = ctrans.WriteStream(cCtx, cs, intHeader, strHeader)

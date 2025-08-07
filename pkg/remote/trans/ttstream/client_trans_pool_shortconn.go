@@ -34,7 +34,7 @@ func (p *shortConnTransPool) Get(network, addr string) (*clientTransport, error)
 		return nil, err
 	}
 	// create new transport
-	trans := newClientTransportWithStreamCleanup(conn, p)
+	trans := newClientTransport(conn, p)
 	return trans, nil
 }
 

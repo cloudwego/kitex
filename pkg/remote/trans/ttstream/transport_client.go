@@ -33,15 +33,14 @@ import (
 )
 
 type clientTransport struct {
-	conn                 netpoll.Connection
-	pool                 transPool
-	streams              sync.Map                       // key=streamID val=clientStream
-	scache               []*clientStream                // size is streamCacheSize
-	spipe                *container.Pipe[*clientStream] // in-coming clientStream pipe
-	fpipe                *container.Pipe[*Frame]        // out-coming frame pipe
-	closedFlag           int32
-	closedTrigger        chan struct{}
-	streamCleanupEnabled bool
+	conn          netpoll.Connection
+	pool          transPool
+	streams       sync.Map                       // key=streamID val=clientStream
+	scache        []*clientStream                // size is streamCacheSize
+	spipe         *container.Pipe[*clientStream] // in-coming clientStream pipe
+	fpipe         *container.Pipe[*Frame]        // out-coming frame pipe
+	closedFlag    int32
+	closedTrigger chan struct{}
 }
 
 func newClientTransport(conn netpoll.Connection, pool transPool) *clientTransport {
@@ -92,13 +91,6 @@ func newClientTransport(conn netpoll.Connection, pool transPool) *clientTranspor
 	return t
 }
 
-func newClientTransportWithStreamCleanup(conn netpoll.Connection, pool transPool) *clientTransport {
-	t := newClientTransport(conn, pool)
-	t.streamCleanupEnabled = true
-	globalTicker.Add(t)
-	return t
-}
-
 func (t *clientTransport) Addr() net.Addr {
 	return t.conn.LocalAddr()
 }
@@ -120,9 +112,7 @@ func (t *clientTransport) Close(exception error) (err error) {
 	// then close stream and frame pipes
 	t.spipe.Close()
 	t.fpipe.Close()
-	if t.streamCleanupEnabled {
-		globalTicker.Delete(t)
-	}
+
 	return err
 }
 

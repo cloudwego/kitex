@@ -16,16 +16,6 @@
 
 package ttstream
 
-import (
-	"time"
-
-	"github.com/cloudwego/kitex/pkg/utils"
-)
-
-const defaultStreamCleanupInterval = 5 * time.Second
-
-var globalTicker = utils.NewSharedTicker(defaultStreamCleanupInterval)
-
 func (t *clientTransport) Tick() {
 	var toCloseStreams []*clientStream
 	t.streams.Range(func(key, value any) bool {

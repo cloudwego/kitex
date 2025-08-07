@@ -22,11 +22,14 @@ import (
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
+	"github.com/cloudwego/kitex/internal/utils/context_watcher"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
+
+var globalWatcher = context_watcher.NewWatcher()
 
 var _ remote.ClientStreamFactory = (*clientTransHandler)(nil)
 
@@ -88,6 +91,7 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	if err = trans.WriteStream(ctx, cs, intHeader, strHeader); err != nil {
 		return nil, err
 	}
+	cs.registerWatcher()
 
 	return cs, err
 }
