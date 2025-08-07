@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/profiler"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/localsession"
 )
 
 // timeoutPool is a worker pool for task with timeout
@@ -98,23 +99,25 @@ func (p *timeoutPool) createWorker(t *timeoutTask) bool {
 		if n == 1 {
 			p.createTicker()
 		}
-		go func(t *timeoutTask) {
-			defer atomic.AddInt32(&p.size, -1)
+		localsession.Go(func() {
+			func(t *timeoutTask) {
+				defer atomic.AddInt32(&p.size, -1)
 
-			t.Run()
-
-			lastactive := time.Now()
-			for t := range p.tasks {
-				if t == nil { // from `createTicker` func
-					if time.Since(lastactive) > p.maxIdleTime {
-						break
-					}
-					continue
-				}
 				t.Run()
-				lastactive = time.Now()
-			}
-		}(t)
+
+				lastactive := time.Now()
+				for t := range p.tasks {
+					if t == nil { // from `createTicker` func
+						if time.Since(lastactive) > p.maxIdleTime {
+							break
+						}
+						continue
+					}
+					t.Run()
+					lastactive = time.Now()
+				}
+			}(t)
+		})
 		return true
 	} else {
 		atomic.AddInt32(&p.size, -1)
@@ -145,7 +148,7 @@ func (p *timeoutPool) RunTask(ctx context.Context, timeout time.Duration,
 	if !p.createWorker(t) {
 		// if created worker, t.Run() will be called in worker goroutine
 		// if NOT, we should go t.Run() here.
-		go t.Run()
+		localsession.Go(t.Run)
 	}
 	return t.Wait()
 }
