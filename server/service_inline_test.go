@@ -107,6 +107,10 @@ func mockHandler(ctx context.Context, handler, args, result interface{}) error {
 		return fmt.Errorf("set metainfo backward fail")
 	}
 
+	if v, ok := ctx.Value(consts.SERVICE_INLINE_CUSTOM_CTX_KEY).(string); !ok || v != "custom_ctx_key" {
+		return fmt.Errorf("custom ctx key mismatch: expected custom_ctx_key, got %s", v)
+	}
+
 	return nil
 }
 
@@ -119,6 +123,8 @@ func TestServiceInline(t *testing.T) {
 		cliCtx := context.Background()
 		cliRPCInfo := constructClientRPCInfo()
 		cliCtx = context.WithValue(cliCtx, consts.SERVICE_INLINE_RPCINFO_KEY, unsafe.Pointer(&cliRPCInfo))
+		cliCtx = context.WithValue(cliCtx, consts.SERVICE_INLINE_CUSTOM_CTX_KEY, "custom_ctx_key")
+
 		eps := iface.BuildServiceInlineInvokeChain()
 		// metainfo check
 		cliCtx = metainfo.WithBackwardValues(cliCtx)
