@@ -200,11 +200,10 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	muxSvrConn, _ := muxSvrConnCtx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
 	rpcInfo := muxSvrConn.pool.Get().(rpcinfo.RPCInfo)
 	remote.SetServiceSearcher(rpcInfo, t.svcSearcher)
-	rpcInfoCtx := rpcinfo.NewCtxWithRPCInfo(muxSvrConnCtx, rpcInfo)
+	ctx := rpcinfo.NewCtxWithRPCInfo(muxSvrConnCtx, rpcInfo)
 
 	// This is the request-level, one-shot ctx.
 	// It adds the tracer principally, thus do not recycle.
-	ctx := t.startTracer(rpcInfoCtx, rpcInfo)
 	var err error
 	var recvMsg remote.Message
 	var sendMsg remote.Message
@@ -223,6 +222,10 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		}
 		if closeConn && conn != nil {
 			conn.Close()
+		}
+		if rpcInfo.Stats().GetEvent(stats.RPCStart) == nil {
+			// Prevent the tracer from failing to start due to decoding failure.
+			t.startTracer(ctx, rpcInfo)
 		}
 		t.finishTracer(ctx, rpcInfo, err, panicErr)
 		remote.RecycleMessage(recvMsg)
@@ -279,6 +282,8 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 // msg is the decoded instance, such as Arg or Result.
 // OnMessage notifies the higher level to process. It's used in async and server-side logic.
 func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
+	// startTracer should be called after transPipe.OnMessage to get header info from args.
+	ctx = t.startTracer(ctx, args.RPCInfo())
 	err := t.inkHdlFunc(ctx, args.Data(), result.Data())
 	return ctx, err
 }

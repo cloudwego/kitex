@@ -163,6 +163,10 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 				err = panicErr
 			}
 		}
+		if ri.Stats().GetEvent(stats.RPCStart) == nil {
+			// Prevent the tracer from failing to start due to decoding failure.
+			ctx = t.startTracer(ctx, ri)
+		}
 		t.finishTracer(ctx, ri, err, panicErr)
 		t.finishProfiler(ctx)
 		remote.RecycleMessage(recvMsg)
@@ -177,7 +181,6 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 			err = nil
 		}
 	}()
-	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
 	recvMsg = remote.NewMessage(nil, ri, remote.Call, remote.Server)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
@@ -227,6 +230,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 // OnMessage implements the remote.ServerTransHandler interface.
 // msg is the decoded instance, such as Arg and Result.
 func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
+	// startTracer should be called after transPipe.OnMessage to get header info from args.
+	ctx = t.startTracer(ctx, args.RPCInfo())
 	err := t.inkHdlFunc(ctx, args.Data(), result.Data())
 	return ctx, err
 }
