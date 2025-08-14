@@ -20,13 +20,13 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"reflect"
 	"testing"
 
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/proto"
+	gproto "google.golang.org/protobuf/proto"
+
 	"github.com/cloudwego/dynamicgo/testdata/kitex_gen/pb/example2"
-	goprotowire "google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
@@ -64,25 +64,22 @@ func TestWrite(t *testing.T) {
 
 	// read into struct using fastread
 	act := &example2.ExampleReq{}
-	l := 0
-	// fmt.Print(out)
-	dataLen := len(buf)
-	// fastRead to get target struct
-	for l < dataLen {
-		id, wtyp, tagLen := goprotowire.ConsumeTag(buf)
-		if tagLen < 0 {
-			t.Fatal("test failed")
-		}
-		l += tagLen
-		buf = buf[tagLen:]
-		offset, err := act.FastRead(buf, int8(wtyp), int32(id))
-		test.Assert(t, err == nil)
-		buf = buf[offset:]
-		l += offset
-	}
+	err = gproto.Unmarshal(buf, act)
 	test.Assert(t, err == nil)
 	// compare exp and act struct
-	test.Assert(t, reflect.DeepEqual(exp, act))
+	test.Assert(t, deepEqual(exp, act))
+}
+
+func deepEqual(a, b interface{}) bool {
+	ajs, err := json.Marshal(a)
+	if err != nil {
+		return false
+	}
+	bjs, err := json.Marshal(b)
+	if err != nil {
+		return false
+	}
+	return string(ajs) == string(bjs)
 }
 
 // Check NewReadJSON converting protobuf wire format to JSON
@@ -102,24 +99,7 @@ func TestRead(t *testing.T) {
 
 	// get expected json struct
 	exp := &example2.ExampleReq{}
-
-	l := 0
-	dataLen := len(in)
-	for l < dataLen {
-		id, wtyp, tagLen := goprotowire.ConsumeTag(in)
-		if tagLen < 0 {
-			t.Fatal("proto data error format")
-		}
-		l += tagLen
-		in = in[tagLen:]
-		offset, err := exp.FastRead(in, int8(wtyp), int32(id))
-		test.Assert(t, err == nil)
-		in = in[offset:]
-		l += offset
-	}
-	if len(in) != 0 {
-		t.Fatal("proto data error format")
-	}
+	err = gproto.Unmarshal(in, exp)
 	test.Assert(t, err == nil)
 
 	act := &example2.ExampleReq{}
@@ -127,7 +107,7 @@ func TestRead(t *testing.T) {
 	test.Assert(t, ok)
 	json.Unmarshal([]byte(str), &act)
 	// compare exp and act struct
-	test.Assert(t, reflect.DeepEqual(exp, act))
+	test.Assert(t, deepEqual(exp, act))
 }
 
 // helper methods
