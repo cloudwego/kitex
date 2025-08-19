@@ -17,16 +17,17 @@
 package proto
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/proto"
-	gproto "google.golang.org/protobuf/proto"
-
-	"github.com/cloudwego/dynamicgo/testdata/kitex_gen/pb/example2"
+	"github.com/jhump/protoreflect/desc/protoparse"
+	"github.com/jhump/protoreflect/dynamic"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
@@ -41,6 +42,21 @@ func TestRun(t *testing.T) {
 	t.Run("TestRead", TestRead)
 }
 
+func makePBDynamicStruct(idl, message string, includes ...string) (*dynamic.Message, error) {
+	parser := &protoparse.Parser{
+		ImportPaths: includes,
+	}
+
+	fds, err := parser.ParseFiles(idl)
+	if err != nil {
+		panic(fmt.Errorf("failed to parse proto file: %v", err))
+	}
+
+	msgDesc := fds[0].FindMessage(message)
+
+	return dynamic.NewMessage(msgDesc), nil
+}
+
 // Check NewWriteJSON converting JSON to protobuf wire format
 func TestWrite(t *testing.T) {
 	method := "ExampleMethod"
@@ -52,8 +68,10 @@ func TestWrite(t *testing.T) {
 	msg := getExampleReq()
 
 	// get expected json struct
-	exp := &example2.ExampleReq{}
-	json.Unmarshal([]byte(msg), exp)
+	exp, err := makePBDynamicStruct(example2IDLPath, "test.ExampleReq")
+	test.Assert(t, err == nil)
+	err = exp.UnmarshalJSON([]byte(msg))
+	test.Assert(t, err == nil)
 
 	// marshal json string into protobuf wire format using Write
 	wm := NewWriteJSON(svc, &conv.Options{})
@@ -63,23 +81,24 @@ func TestWrite(t *testing.T) {
 	test.Assert(t, ok)
 
 	// read into struct using fastread
-	act := &example2.ExampleReq{}
-	err = gproto.Unmarshal(buf, act)
+	act, err := makePBDynamicStruct(example2IDLPath, "test.ExampleReq")
+	test.Assert(t, err == nil)
+	err = act.Unmarshal(buf)
 	test.Assert(t, err == nil)
 	// compare exp and act struct
-	test.Assert(t, deepEqual(exp, act))
+	test.Assert(t, deepEqual(t, exp, act))
 }
 
-func deepEqual(a, b interface{}) bool {
+func deepEqual(t *testing.T, a, b interface{}) bool {
 	ajs, err := json.Marshal(a)
 	if err != nil {
-		return false
+		t.Error(err)
 	}
 	bjs, err := json.Marshal(b)
 	if err != nil {
-		return false
+		t.Error(err)
 	}
-	return string(ajs) == string(bjs)
+	return bytes.Equal(ajs, bjs)
 }
 
 // Check NewReadJSON converting protobuf wire format to JSON
@@ -98,16 +117,17 @@ func TestRead(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	// get expected json struct
-	exp := &example2.ExampleReq{}
-	err = gproto.Unmarshal(in, exp)
+	exp, err := makePBDynamicStruct(example2IDLPath, "test.ExampleReq")
+	test.Assert(t, err == nil)
+	err = exp.Unmarshal(in)
 	test.Assert(t, err == nil)
 
-	act := &example2.ExampleReq{}
-	str, ok := out.(string)
-	test.Assert(t, ok)
-	json.Unmarshal([]byte(str), &act)
+	act, err := makePBDynamicStruct(example2IDLPath, "test.ExampleReq")
+	test.Assert(t, err == nil)
+	err = act.UnmarshalJSON([]byte(out.(string)))
+	test.Assert(t, err == nil)
 	// compare exp and act struct
-	test.Assert(t, deepEqual(exp, act))
+	test.Assert(t, deepEqual(t, exp, act))
 }
 
 // helper methods
