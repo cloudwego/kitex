@@ -1,31 +1,38 @@
-# Options for analysis running.
-run:
-  timeout: 3m
-
-linters: # https://golangci-lint.run/usage/linters/
-  disable-all: true
+version: "2"
+linters:
+  default: none
   enable:
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
-    - unused
     - unconvert
-    - goimports
+    - unused
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - kitex_gen
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
     - gofumpt
-
-# Refer to https://golangci-lint.run/usage/linters
-linters-settings:
-  gofumpt:
-    # Choose whether to use the extra rules.
-    # Default: false
-    extra-rules: true
-  goimports:
-    # Put imports beginning with prefix after 3rd-party packages.
-    # It's a comma-separated list of prefixes.
-    local-prefixes: github.com/cloudwego/kitex
-
-issues:
-  exclude-use-default: true
-  exclude-dirs:
-    - kitex_gen
+    - goimports
+  settings:
+    gofumpt:
+      extra-rules: true
+    goimports:
+      local-prefixes:
+        - github.com/cloudwego/kitex
+  exclusions:
+    generated: lax
+    paths:
+      - kitex_gen
+      - third_party$
+      - builtin$
+      - examples$

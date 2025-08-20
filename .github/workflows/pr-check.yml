@@ -31,7 +31,7 @@ jobs:
 
       - name: Golangci Lint
         # https://golangci-lint.run/
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           only-new-issues: true
