@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Package bthrift is byted thrift
+// Package bthrift is bytedance thrift
 package bthrift
 
 import (
