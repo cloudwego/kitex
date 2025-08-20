@@ -82,7 +82,7 @@ func (c *muxCliConn) OnRequest(ctx context.Context, connection netpoll.Connectio
 		iv.SetSeqID(0)
 		ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
 		ctl := NewControlFrame()
-		msg := remote.NewMessage(ctl, nil, ri, remote.Reply, remote.Client)
+		msg := remote.NewMessage(ctl, ri, remote.Reply, remote.Client)
 
 		bufReader := np.NewReaderByteBuffer(reader)
 		if err = defaultCodec.Decode(ctx, msg, bufReader); err != nil {

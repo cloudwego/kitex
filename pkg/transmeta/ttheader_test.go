@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
@@ -33,15 +32,19 @@ import (
 
 func TestIsTTHeader(t *testing.T) {
 	t.Run("with ttheader", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
-		msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
-		msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+		msg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
+		mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+		mcfg.SetTransportProtocol(transport.TTHeader)
+		mcfg.SetPayloadCodec(serviceinfo.Thrift)
 		test.Assert(t, isTTHeader(msg))
 	})
 	t.Run("with ttheader framed", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
-		msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
-		msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeaderFramed, serviceinfo.Thrift))
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+		msg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
+		mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+		mcfg.SetTransportProtocol(transport.TTHeaderFramed)
+		mcfg.SetPayloadCodec(serviceinfo.Thrift)
 		test.Assert(t, isTTHeader(msg))
 	})
 }
@@ -59,11 +62,12 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	fromInfo := rpcinfo.NewEndpointInfo("fromServiceName", "fromMethod", nil, nil)
 	toInfo := rpcinfo.NewEndpointInfo("toServiceName", "toMethod", nil, nil)
 	ri := rpcinfo.NewRPCInfo(fromInfo, toInfo, rpcinfo.NewInvocation("", ""), cfg, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
-	ri.Invocation().(rpcinfo.InvocationSetter).SetServiceName(msg.ServiceInfo().ServiceName)
+	msg := remote.NewMessage(nil, ri, remote.Call, remote.Client)
+	ri.Invocation().(rpcinfo.InvocationSetter).SetServiceName("toServiceName")
 
 	// pure payload, no effect
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Thrift))
+	cfgMutable.SetTransportProtocol(transport.PurePayload)
+	cfgMutable.SetPayloadCodec(serviceinfo.Thrift)
 	ctx, err := ClientTTHeaderHandler.WriteMeta(ctx, msg)
 	kvs := msg.TransInfo().TransIntInfo()
 	test.Assert(t, err == nil)
@@ -72,7 +76,8 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	test.Assert(t, len(strKvs) == 0)
 
 	// ttheader
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+	cfgMutable.SetTransportProtocol(transport.TTHeader)
+	cfgMutable.SetPayloadCodec(serviceinfo.Thrift)
 	_, err = ClientTTHeaderHandler.WriteMeta(ctx, msg)
 	test.Assert(t, err == nil)
 	kvs = msg.TransInfo().TransIntInfo()
@@ -87,14 +92,14 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	test.Assert(t, kvs[transmeta.ConnectTimeout] == "1000")
 	strKvs = msg.TransInfo().TransStrInfo()
 	test.Assert(t, len(strKvs) == 1)
-	test.Assert(t, strKvs[transmeta.HeaderIDLServiceName] == msg.ServiceInfo().ServiceName)
+	test.Assert(t, strKvs[transmeta.HeaderIDLServiceName] == "toServiceName")
 }
 
 func TestTTHeaderServerReadMetainfo(t *testing.T) {
 	ctx := context.Background()
 	ri := rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(), nil, rpcinfo.NewInvocation("", ""),
 		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
+	msg := remote.NewMessage(nil, ri, remote.Call, remote.Client)
 
 	hd := map[uint16]string{
 		transmeta.FromService: "fromService",
@@ -103,14 +108,17 @@ func TestTTHeaderServerReadMetainfo(t *testing.T) {
 	}
 	msg.TransInfo().PutTransIntInfo(hd)
 
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Thrift))
+	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	mcfg.SetTransportProtocol(transport.PurePayload)
+	mcfg.SetPayloadCodec(serviceinfo.Thrift)
 	_, err := ServerTTHeaderHandler.ReadMeta(ctx, msg)
 	test.Assert(t, err == nil)
 	fromEndPoint := msg.RPCInfo().From()
 	test.Assert(t, fromEndPoint.ServiceName() == "")
 	test.Assert(t, fromEndPoint.Method() == "")
 
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+	mcfg.SetTransportProtocol(transport.TTHeader)
+	mcfg.SetPayloadCodec(serviceinfo.Thrift)
 	_, err = ServerTTHeaderHandler.ReadMeta(ctx, msg)
 	test.Assert(t, err == nil)
 	test.Assert(t, msg.RPCInfo().From().ServiceName() == hd[transmeta.FromService])
@@ -122,15 +130,18 @@ func TestTTHeaderServerWriteMetainfo(t *testing.T) {
 	ctx := context.Background()
 	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil), rpcinfo.NewInvocation("", ""),
 		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
+	msg := remote.NewMessage(nil, ri, remote.Call, remote.Client)
 
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Thrift))
+	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	mcfg.SetTransportProtocol(transport.PurePayload)
+	mcfg.SetPayloadCodec(serviceinfo.Thrift)
 	_, err := ServerTTHeaderHandler.WriteMeta(ctx, msg)
 	test.Assert(t, err == nil)
 	kvs := msg.TransInfo().TransIntInfo()
 	test.Assert(t, len(kvs) == 0)
 
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+	mcfg.SetTransportProtocol(transport.TTHeader)
+	mcfg.SetPayloadCodec(serviceinfo.Thrift)
 	_, err = ServerTTHeaderHandler.WriteMeta(ctx, msg)
 	test.Assert(t, err == nil)
 	kvs = msg.TransInfo().TransIntInfo()

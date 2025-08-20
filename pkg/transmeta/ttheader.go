@@ -65,7 +65,7 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 		transmeta.ToMethod:    ri.To().Method(),
 		transmeta.MsgType:     strconv.Itoa(int(msg.MessageType())),
 	}
-	if msg.ProtocolInfo().TransProto&transport.Framed == transport.Framed {
+	if ri.Config().TransportProtocol()&transport.Framed == transport.Framed {
 		hd[transmeta.TransportType] = framedTransportType
 	} else {
 		hd[transmeta.TransportType] = unframedTransportType
@@ -79,7 +79,8 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 		hd[transmeta.ConnectTimeout] = strconv.Itoa(int(ri.Config().ConnectTimeout().Milliseconds()))
 	}
 	transInfo.PutTransIntInfo(hd)
-	if idlSvcName := getIDLSvcName(msg.ServiceInfo(), ri); idlSvcName != "" {
+	svcInfo, _ := ri.Invocation().Extra(rpcinfo.InvocationServiceInfoKey).(*serviceinfo.ServiceInfo)
+	if idlSvcName := getIDLSvcName(svcInfo, ri); idlSvcName != "" {
 		if strInfo := transInfo.TransStrInfo(); strInfo != nil {
 			strInfo[transmeta.HeaderIDLServiceName] = idlSvcName
 		} else {
@@ -203,6 +204,6 @@ func (sh *serverTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 }
 
 func isTTHeader(msg remote.Message) bool {
-	transProto := msg.ProtocolInfo().TransProto
+	transProto := msg.RPCInfo().Config().TransportProtocol()
 	return transProto&transport.TTHeader == transport.TTHeader
 }

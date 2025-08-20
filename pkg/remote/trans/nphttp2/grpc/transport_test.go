@@ -371,7 +371,7 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 		s.mu.Unlock()
 		switch ht {
 		case notifyCall:
-			go transport.HandleStreams(func(stream *Stream) {
+			transport.HandleStreams(func(stream *Stream) {
 				s.mu.Lock()
 				h.handleStreamAndNotify(stream)
 				s.mu.Unlock()
@@ -379,24 +379,24 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 				return ctx
 			})
 		case suspended:
-			go transport.HandleStreams(func(*Stream) {}, // Do nothing to handle the stream.
+			transport.HandleStreams(func(*Stream) {}, // Do nothing to handle the stream.
 				func(ctx context.Context, method string) context.Context {
 					return ctx
 				})
 		case misbehaved:
-			go transport.HandleStreams(func(s *Stream) {
+			transport.HandleStreams(func(s *Stream) {
 				go h.handleStreamMisbehave(t, s)
 			}, func(ctx context.Context, method string) context.Context {
 				return ctx
 			})
 		case encodingRequiredStatus:
-			go transport.HandleStreams(func(s *Stream) {
+			transport.HandleStreams(func(s *Stream) {
 				go h.handleStreamEncodingRequiredStatus(t, s)
 			}, func(ctx context.Context, method string) context.Context {
 				return ctx
 			})
 		case invalidHeaderField:
-			go transport.HandleStreams(func(s *Stream) {
+			transport.HandleStreams(func(s *Stream) {
 				go h.handleStreamInvalidHeaderField(t, s)
 			}, func(ctx context.Context, method string) context.Context {
 				return ctx
@@ -407,20 +407,20 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 			s.mu.Lock()
 			close(s.ready)
 			s.mu.Unlock()
-			go transport.HandleStreams(func(s *Stream) {
+			transport.HandleStreams(func(s *Stream) {
 				go h.handleStreamDelayRead(t, s)
 			}, func(ctx context.Context, method string) context.Context {
 				return ctx
 			})
 		case pingpong:
-			go transport.HandleStreams(func(s *Stream) {
+			transport.HandleStreams(func(s *Stream) {
 				go h.handleStreamPingPong(t, s)
 			}, func(ctx context.Context, method string) context.Context {
 				return ctx
 			})
 		case gracefulShutdown:
 			s.transWG.Add(1)
-			go func() {
+			func() {
 				defer s.transWG.Done()
 				transport.HandleStreams(func(stream *Stream) {
 					s.hdlWG.Add(1)
@@ -431,13 +431,13 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 				}, func(ctx context.Context, method string) context.Context { return ctx })
 			}()
 		case cancel:
-			go transport.HandleStreams(func(s *Stream) {
+			transport.HandleStreams(func(s *Stream) {
 				go h.handleStreamCancel(t, s)
 			}, func(ctx context.Context, method string) context.Context {
 				return ctx
 			})
 		default:
-			go func() {
+			func() {
 				transport.HandleStreams(func(s *Stream) {
 					go h.handleStream(t, s)
 				}, func(ctx context.Context, method string) context.Context {

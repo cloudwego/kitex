@@ -62,7 +62,14 @@ func TestMain(m *testing.M) {
 		Codec: &MockCodec{
 			EncodeFunc: nil,
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-				msg.SpecifyServiceInfo(mocks.MockServiceName, mocks.MockMethod)
+				setter := msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter)
+				setter.SetServiceName(mocks.MockServiceName)
+				setter.SetMethodName(mocks.MockMethod)
+				mi := svcInfo.MethodInfo(mocks.MockMethod)
+				if mi == nil {
+					return remote.NewTransErrorWithMsg(remote.UnknownMethod, "unknown method")
+				}
+				setter.SetMethodInfo(mi)
 				return nil
 			},
 		},

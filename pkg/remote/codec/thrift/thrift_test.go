@@ -92,9 +92,11 @@ func TestWithContext(t *testing.T) {
 				return nil
 			}}
 			ink := rpcinfo.NewInvocation("", "mock")
-			ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-			msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
-			msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, svcInfo.PayloadCodec))
+			ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
+			msg := remote.NewMessage(req, ri, remote.Call, remote.Client)
+			mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+			mcfg.SetTransportProtocol(transport.TTHeader)
+			mcfg.SetPayloadCodec(svcInfo.PayloadCodec)
 			bw, br := tb.NewBuffer()
 			bb := remote.NewByteBufferFromBufiox(bw, br)
 			err := payloadCodec.Marshal(ctx, msg, bb)
@@ -107,9 +109,11 @@ func TestWithContext(t *testing.T) {
 					return nil
 				}}
 				ink := rpcinfo.NewInvocation("", "mock")
-				ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-				msg := remote.NewMessage(resp, svcInfo, ri, remote.Call, remote.Client)
-				msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, svcInfo.PayloadCodec))
+				ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
+				msg := remote.NewMessage(resp, ri, remote.Call, remote.Client)
+				mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+				mcfg.SetTransportProtocol(transport.TTHeader)
+				mcfg.SetPayloadCodec(svcInfo.PayloadCodec)
 				msg.SetPayloadLen(wl)
 				err = payloadCodec.Unmarshal(ctx, msg, bb)
 				test.Assert(t, err == nil, err)
@@ -243,7 +247,7 @@ func TestException(t *testing.T) {
 		t.Run(tb.Name, func(t *testing.T) {
 			ctx := context.Background()
 			ink := rpcinfo.NewInvocation("", "mock")
-			ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
+			ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
 			errInfo := "mock exception"
 			transErr := remote.NewTransErrorWithMsg(remote.UnknownMethod, errInfo)
 			// encode server side
@@ -345,15 +349,17 @@ func TestSkipDecoder(t *testing.T) {
 
 func newMsg(data interface{}) remote.Message {
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-	return remote.NewMessage(data, svcInfo, ri, remote.Call, remote.Client)
+	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.EmptyEndpointInfo(), ink, rpcinfo.NewRPCConfig(), nil)
+	return remote.NewMessage(data, ri, remote.Call, remote.Client)
 }
 
 func initSendMsg(tp transport.Protocol) remote.Message {
 	var _args mt.MockTestArgs // fastcodec only, if basic is true -> apachecodec
 	_args.Req = prepareReq()
 	msg := newMsg(&_args)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
+	mcfg := rpcinfo.AsMutableRPCConfig(msg.RPCInfo().Config())
+	mcfg.SetTransportProtocol(tp)
+	mcfg.SetPayloadCodec(svcInfo.PayloadCodec)
 	return msg
 }
 
@@ -377,14 +383,16 @@ func compare(t *testing.T, sendMsg, recvMsg remote.Message) {
 }
 
 func initServerErrorMsg(tp transport.Protocol, ri rpcinfo.RPCInfo, transErr *remote.TransError) remote.Message {
-	errMsg := remote.NewMessage(transErr, svcInfo, ri, remote.Exception, remote.Server)
-	errMsg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
+	errMsg := remote.NewMessage(transErr, ri, remote.Exception, remote.Server)
+	mcfg := rpcinfo.AsMutableRPCConfig(errMsg.RPCInfo().Config())
+	mcfg.SetTransportProtocol(tp)
+	mcfg.SetPayloadCodec(svcInfo.PayloadCodec)
 	return errMsg
 }
 
 func initClientRecvMsg(ri rpcinfo.RPCInfo) remote.Message {
 	var resp interface{}
-	clientRecvMsg := remote.NewMessage(resp, svcInfo, ri, remote.Reply, remote.Client)
+	clientRecvMsg := remote.NewMessage(resp, ri, remote.Reply, remote.Client)
 	return clientRecvMsg
 }
 

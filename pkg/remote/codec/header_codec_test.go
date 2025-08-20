@@ -301,32 +301,40 @@ func BenchmarkTTHeaderCodecParallel(b *testing.B) {
 var (
 	mockServiceName = "mock service"
 	mockMethod      = "mock"
+)
 
-	mockCliRPCInfo = rpcinfo.NewRPCInfo(
+func mockCliRPCInfo() rpcinfo.RPCInfo {
+	return rpcinfo.NewRPCInfo(
 		rpcinfo.EmptyEndpointInfo(),
 		remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: mockServiceName}, mockMethod).ImmutableView(),
 		rpcinfo.NewInvocation("", mockMethod),
 		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+}
 
-	mockSvrRPCInfo = rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(),
+func mockSvrRPCInfo() rpcinfo.RPCInfo {
+	return rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(),
 		rpcinfo.FromBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: mockServiceName}),
 		rpcinfo.NewServerInvocation(),
 		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
-)
+}
 
 type mockMsg struct {
 	msg string
 }
 
 func initServerRecvMsgWithMockMsg() remote.Message {
+	svcSearcher := mocksremote.NewDefaultSvcSearcher()
+	ri := mockSvrRPCInfo()
+	remote.SetServiceSearcher(ri, svcSearcher)
 	req := &mockMsg{}
-	return remote.NewMessage(req, mocks.ServiceInfo(), mockSvrRPCInfo, remote.Call, remote.Server)
+	return remote.NewMessage(req, ri, remote.Call, remote.Server)
 }
 
 func initServerRecvMsg() remote.Message {
-	svcInfo := mocks.ServiceInfo()
 	svcSearcher := mocksremote.NewDefaultSvcSearcher()
-	msg := remote.NewMessageWithNewer(svcInfo, svcSearcher, mockSvrRPCInfo, remote.Call, remote.Server)
+	ri := mockSvrRPCInfo()
+	remote.SetServiceSearcher(ri, svcSearcher)
+	msg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
 	return msg
 }
 
@@ -337,10 +345,12 @@ func initClientSendMsg(tp transport.Protocol, payloadLen ...int) remote.Message 
 	}
 
 	svcInfo := mocks.ServiceInfo()
-	mi := svcInfo.MethodInfo(mockCliRPCInfo.Invocation().MethodName())
-	mi.NewArgs()
-	msg := remote.NewMessage(req, svcInfo, mockCliRPCInfo, remote.Call, remote.Client)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
+	ri := mockCliRPCInfo()
+	remote.SetServiceSearcher(ri, mocksremote.NewDefaultSvcSearcher())
+	msg := remote.NewMessage(req, ri, remote.Call, remote.Client)
+	mcfg := rpcinfo.AsMutableRPCConfig(msg.RPCInfo().Config())
+	mcfg.SetTransportProtocol(tp)
+	mcfg.SetPayloadCodec(svcInfo.PayloadCodec)
 	return msg
 }
 
@@ -349,15 +359,16 @@ func initServerSendMsg(tp transport.Protocol, payloadLen ...int) remote.Message 
 	if len(payloadLen) != 0 {
 		resp.msg = string(make([]byte, payloadLen[0]))
 	}
-	msg := remote.NewMessage(resp, mocks.ServiceInfo(), mockSvrRPCInfo, remote.Reply, remote.Server)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, mocks.ServiceInfo().PayloadCodec))
+	msg := remote.NewMessage(resp, mockSvrRPCInfo(), remote.Reply, remote.Server)
+	mcfg := rpcinfo.AsMutableRPCConfig(msg.RPCInfo().Config())
+	mcfg.SetTransportProtocol(tp)
+	mcfg.SetPayloadCodec(mocks.ServiceInfo().PayloadCodec)
 	return msg
 }
 
 func initClientRecvMsg() remote.Message {
 	resp := &mockMsg{}
-	svcInfo := mocks.ServiceInfo()
-	msg := remote.NewMessage(resp, svcInfo, mockCliRPCInfo, remote.Reply, remote.Client)
+	msg := remote.NewMessage(resp, mockCliRPCInfo(), remote.Reply, remote.Client)
 	return msg
 }
 
@@ -458,7 +469,7 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 	if headerInfo, err = out.Malloc(headerInfoSize); err != nil {
 		return perrors.NewProtocolError(err)
 	}
-	headerInfo[0] = byte(getProtocolID(message.ProtocolInfo()))
+	headerInfo[0] = byte(getProtocolID(message.RPCInfo().Config().PayloadCodec()))
 	headerInfo[1] = byte(len(transformIDs))
 	hdIdx := 2
 	for tid := range transformIDs {

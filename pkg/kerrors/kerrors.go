@@ -65,6 +65,11 @@ var (
 	ErrNoInstance           = ErrServiceDiscovery.WithCause(errors.New("no instance available"))
 )
 
+// ErrNonExistentMethod is used when the method is not found in a service info.
+func ErrNonExistentMethod(svcName, method string) error {
+	return ErrInternalException.WithCause(fmt.Errorf("non-existent method, service: %s, method: %s", svcName, method))
+}
+
 type basicError struct {
 	message string
 }
