@@ -211,12 +211,12 @@ func TestLimiterOnMessage(t *testing.T) {
 		rateLimiter := mockslimiter.NewMockRateLimiter(ctrl)
 		limitReporter := mockslimiter.NewMockLimitReporter(ctrl)
 		ctx := context.Background()
-		req := remote.NewMessage(nil, nil, nil, remote.Call, remote.Client)
+		req := remote.NewMessage(nil, nil, remote.Call, remote.Client)
 
 		rateLimiter.EXPECT().Acquire(ctx).Return(true).Times(1)
 
 		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter, true)
-		ctx, err := handler.OnMessage(ctx, req, remote.NewMessage(nil, nil, nil, remote.Reply, remote.Client))
+		ctx, err := handler.OnMessage(ctx, req, remote.NewMessage(nil, nil, remote.Reply, remote.Client))
 
 		test.Assert(t, ctx != nil)
 		test.Assert(t, err == nil)
@@ -229,12 +229,12 @@ func TestLimiterOnMessage(t *testing.T) {
 		concurrencyLimiter := mockslimiter.NewMockConcurrencyLimiter(ctrl)
 		rateLimiter := mockslimiter.NewMockRateLimiter(ctrl)
 		ctx := context.Background()
-		req := remote.NewMessage(nil, nil, nil, remote.Call, remote.Client)
+		req := remote.NewMessage(nil, nil, remote.Call, remote.Client)
 
 		rateLimiter.EXPECT().Acquire(ctx).Return(false).Times(1)
 
 		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, nil, true)
-		ctx, err := handler.OnMessage(ctx, req, remote.NewMessage(nil, nil, nil, remote.Reply, remote.Client))
+		ctx, err := handler.OnMessage(ctx, req, remote.NewMessage(nil, nil, remote.Reply, remote.Client))
 
 		test.Assert(t, ctx != nil)
 		test.Assert(t, errors.Is(err, kerrors.ErrQPSOverLimit))
@@ -248,13 +248,13 @@ func TestLimiterOnMessage(t *testing.T) {
 		rateLimiter := mockslimiter.NewMockRateLimiter(ctrl)
 		limitReporter := mockslimiter.NewMockLimitReporter(ctrl)
 		ctx := context.Background()
-		req := remote.NewMessage(nil, nil, nil, remote.Call, remote.Client)
+		req := remote.NewMessage(nil, nil, remote.Call, remote.Client)
 
 		rateLimiter.EXPECT().Acquire(ctx).Return(false).Times(1)
 		limitReporter.EXPECT().QPSOverloadReport().Times(1)
 
 		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter, true)
-		ctx, err := handler.OnMessage(ctx, req, remote.NewMessage(nil, nil, nil, remote.Reply, remote.Client))
+		ctx, err := handler.OnMessage(ctx, req, remote.NewMessage(nil, nil, remote.Reply, remote.Client))
 
 		test.Assert(t, ctx != nil)
 		test.Assert(t, err != nil)

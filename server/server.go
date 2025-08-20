@@ -380,8 +380,9 @@ func (s *server) unaryOrStreamEndpoint(ctx context.Context) endpoint.Endpoint {
 func (s *server) invokeHandleEndpoint() endpoint.UnaryEndpoint {
 	return func(ctx context.Context, args, resp interface{}) (err error) {
 		ri := rpcinfo.GetRPCInfo(ctx)
-		methodName := ri.Invocation().MethodName()
-		serviceName := ri.Invocation().ServiceName()
+		ink := ri.Invocation()
+		methodName := ink.MethodName()
+		serviceName := ink.ServiceName()
 		svc := s.svcs.svcMap[serviceName]
 		svcInfo := svc.svcInfo
 		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {
@@ -401,8 +402,7 @@ func (s *server) invokeHandleEndpoint() endpoint.UnaryEndpoint {
 			// clear session
 			backup.ClearCtx()
 		}()
-		minfo := svcInfo.MethodInfo(methodName)
-		implHandlerFunc := minfo.Handler()
+		implHandlerFunc := ink.MethodInfo().Handler()
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		// set session
 		backup.BackupCtx(ctx)
@@ -423,8 +423,9 @@ func (s *server) invokeHandleEndpoint() endpoint.UnaryEndpoint {
 func (s *server) streamHandleEndpoint() sep.StreamEndpoint {
 	return func(ctx context.Context, st streaming.ServerStream) (err error) {
 		ri := rpcinfo.GetRPCInfo(ctx)
-		methodName := ri.Invocation().MethodName()
-		serviceName := ri.Invocation().ServiceName()
+		ink := ri.Invocation()
+		methodName := ink.MethodName()
+		serviceName := ink.ServiceName()
 		svc := s.svcs.svcMap[serviceName]
 		svcInfo := svc.svcInfo
 		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {
@@ -444,7 +445,7 @@ func (s *server) streamHandleEndpoint() sep.StreamEndpoint {
 			// clear session
 			backup.ClearCtx()
 		}()
-		implHandlerFunc := svcInfo.MethodInfo(methodName).Handler()
+		implHandlerFunc := ink.MethodInfo().Handler()
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		// set session
 		backup.BackupCtx(ctx)

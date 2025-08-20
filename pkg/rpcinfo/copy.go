@@ -82,11 +82,16 @@ func copyInvocation(i Invocation) Invocation {
 	if i == nil {
 		return nil
 	}
+	ink := i.(*invocation)
 	return &invocation{
-		packageName: i.PackageName(),
-		serviceName: i.ServiceName(),
-		methodName:  i.MethodName(),
-		seqID:       i.SeqID(),
+		packageName:   ink.PackageName(),
+		serviceName:   ink.ServiceName(),
+		methodName:    ink.MethodName(),
+		methodInfo:    ink.MethodInfo(),
+		streamingMode: ink.StreamingMode(),
+		seqID:         ink.SeqID(),
+		bizErr:        ink.BizStatusErr(),
+		// ignore extra info to users
 	}
 }
 

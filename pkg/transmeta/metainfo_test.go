@@ -22,7 +22,6 @@ import (
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 
-	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/logid"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -36,7 +35,7 @@ import (
 func TestClientReadMetainfo(t *testing.T) {
 	ctx := context.Background()
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
+	msg := remote.NewMessage(nil, ri, remote.Call, remote.Client)
 	hd := map[string]string{
 		"hello": "world",
 	}
@@ -59,13 +58,15 @@ func TestClientReadMetainfo(t *testing.T) {
 }
 
 func TestClientWriteMetainfo(t *testing.T) {
-	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	ctx := context.Background()
 	ctx = metainfo.WithValue(ctx, "tk", "tv")
 	ctx = metainfo.WithPersistentValue(ctx, "pk", "pv")
-	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
+	msg := remote.NewMessage(nil, ri, remote.Call, remote.Client)
 
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Thrift))
+	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	mcfg.SetTransportProtocol(transport.PurePayload)
+	mcfg.SetPayloadCodec(serviceinfo.Thrift)
 	ctx, err := MetainfoClientHandler.WriteMeta(ctx, msg)
 	test.Assert(t, err == nil)
 
@@ -74,7 +75,7 @@ func TestClientWriteMetainfo(t *testing.T) {
 	test.Assert(t, kvs[metainfo.PrefixTransient+"tk"] == "tv")
 	test.Assert(t, kvs[metainfo.PrefixPersistent+"pk"] == "pv")
 
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+	mcfg.SetTransportProtocol(transport.TTHeader)
 	_, err = MetainfoClientHandler.WriteMeta(ctx, msg)
 	test.Assert(t, err == nil)
 
@@ -85,9 +86,9 @@ func TestClientWriteMetainfo(t *testing.T) {
 }
 
 func TestServerReadMetainfo(t *testing.T) {
-	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	ctx0 := context.Background()
-	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
+	msg := remote.NewMessage(nil, ri, remote.Call, remote.Client)
 
 	hd := map[string]string{
 		"hello":                          "world",
@@ -96,7 +97,9 @@ func TestServerReadMetainfo(t *testing.T) {
 	}
 	msg.TransInfo().PutTransStrInfo(hd)
 
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Thrift))
+	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	mcfg.SetTransportProtocol(transport.PurePayload)
+	mcfg.SetPayloadCodec(serviceinfo.Thrift)
 	ctx, err := MetainfoServerHandler.ReadMeta(ctx0, msg)
 	tvs := metainfo.GetAllValues(ctx)
 	pvs := metainfo.GetAllPersistentValues(ctx)
@@ -104,7 +107,7 @@ func TestServerReadMetainfo(t *testing.T) {
 	test.Assert(t, len(tvs) == 1 && tvs["tk"] == "tv", tvs)
 	test.Assert(t, len(pvs) == 1 && pvs["pk"] == "pv")
 
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+	mcfg.SetTransportProtocol(transport.TTHeader)
 	ctx, err = MetainfoServerHandler.ReadMeta(ctx0, msg)
 	ctx = metainfo.TransferForward(ctx)
 	tvs = metainfo.GetAllValues(ctx)
@@ -121,8 +124,8 @@ func TestServerReadMetainfo(t *testing.T) {
 }
 
 func TestServerWriteMetainfo(t *testing.T) {
-	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+	msg := remote.NewMessage(nil, ri, remote.Call, remote.Client)
 
 	ctx := context.Background()
 	ctx = metainfo.WithBackwardValuesToSend(ctx)
@@ -131,13 +134,15 @@ func TestServerWriteMetainfo(t *testing.T) {
 	ok := metainfo.SendBackwardValue(ctx, "bk", "bv")
 	test.Assert(t, ok)
 
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Thrift))
+	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	mcfg.SetTransportProtocol(transport.PurePayload)
+	mcfg.SetPayloadCodec(serviceinfo.Thrift)
 	ctx, err := MetainfoServerHandler.WriteMeta(ctx, msg)
 	test.Assert(t, err == nil)
 	kvs := msg.TransInfo().TransStrInfo()
 	test.Assert(t, len(kvs) == 1 && kvs["bk"] == "bv", kvs)
 
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+	mcfg.SetTransportProtocol(transport.TTHeader)
 	_, err = MetainfoServerHandler.WriteMeta(ctx, msg)
 	test.Assert(t, err == nil)
 	kvs = msg.TransInfo().TransStrInfo()

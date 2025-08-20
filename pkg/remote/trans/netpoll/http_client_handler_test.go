@@ -70,7 +70,7 @@ func TestHTTPWrite(t *testing.T) {
 	})
 	ri := rpcinfo.NewRPCInfo(nil, to, nil, cfg, rpcinfo.NewRPCStats())
 	ctx := context.Background()
-	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
+	msg := remote.NewMessage(nil, ri, remote.Reply, remote.Client)
 
 	// 2. test
 	ctx, err := httpCilTransHdlr.Write(ctx, conn, msg)
@@ -106,7 +106,7 @@ func TestHTTPRead(t *testing.T) {
 	rpcinfo.AsMutableRPCConfig(cfg).SetRPCTimeout(rwTimeout)
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, rpcinfo.NewRPCStats())
 	ctx := context.Background()
-	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
+	msg := remote.NewMessage(nil, ri, remote.Reply, remote.Client)
 
 	// 2. test
 	ctx, err := httpCilTransHdlr.Read(ctx, conn, msg)
@@ -127,8 +127,9 @@ func TestHTTPOnMessage(t *testing.T) {
 	svcSearcher := remotemocks.NewDefaultSvcSearcher()
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, method), nil, rpcinfo.NewRPCStats())
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-	recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server)
-	sendMsg := remote.NewMessage(svcInfo.MethodInfo(method).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
+	remote.SetServiceSearcher(ri, svcSearcher)
+	recvMsg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
+	sendMsg := remote.NewMessage(svcInfo.MethodInfo(method).NewResult(), ri, remote.Reply, remote.Server)
 
 	// 2. test
 	_, err := httpCilTransHdlr.OnMessage(ctx, recvMsg, sendMsg)
@@ -141,7 +142,7 @@ func TestAddMetaInfo(t *testing.T) {
 	cfg := rpcinfo.NewRPCConfig()
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, rpcinfo.NewRPCStats())
 	var req interface{}
-	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
+	msg := remote.NewMessage(req, ri, remote.Reply, remote.Client)
 	h := http.Header{}
 
 	// 2. test

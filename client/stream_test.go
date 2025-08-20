@@ -71,8 +71,24 @@ func TestStream(t *testing.T) {
 
 	_ = kc.init()
 
-	err = kc.Stream(ctx, "mock_method", req, resp)
+	err = kc.Stream(ctx, mocks.MockMethod, req, resp)
 	test.Assert(t, err == nil, err)
+}
+
+func TestStreamNoMethod(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	ctx := context.Background()
+	kc := &kClient{
+		opt:     client.NewOptions(newOpts(ctrl)),
+		svcInfo: svcInfo,
+	}
+	_ = kc.init()
+	_, err := kc.StreamX(ctx, "mock_method_not_found")
+	test.Assert(t, err.Error() == "internal exception: non-existent method, service: MockService, method: mock_method_not_found")
+
+	err = kc.Stream(ctx, "mock_method_not_found", req, resp)
+	test.Assert(t, err.Error() == "internal exception: non-existent method, service: MockService, method: mock_method_not_found")
 }
 
 func TestStreaming(t *testing.T) {
@@ -616,38 +632,6 @@ func Test_stream_DoFinish(t *testing.T) {
 		s.DoFinish(expectedErr)
 		test.Assert(t, finishCalled)
 		test.Assert(t, err == expectedErr)
-	})
-}
-
-func Test_kClient_getStreamingMode(t *testing.T) {
-	t.Run("no methodinfo", func(t *testing.T) {
-		kc := &kClient{
-			svcInfo: svcInfo,
-		}
-		ivk := rpcinfo.NewInvocation("service", "method")
-		ri := rpcinfo.NewRPCInfo(nil, nil, ivk, nil, nil)
-
-		mode := kc.getStreamingMode(ri)
-
-		test.Assert(t, mode == serviceinfo.StreamingNone)
-	})
-	t.Run("has methodinfo", func(t *testing.T) {
-		kc := &kClient{
-			svcInfo: &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(
-						nil, nil, nil, false,
-						serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
-					),
-				},
-			},
-		}
-		ivk := rpcinfo.NewInvocation("service", "method")
-		ri := rpcinfo.NewRPCInfo(nil, nil, ivk, nil, nil)
-
-		mode := kc.getStreamingMode(ri)
-
-		test.Assert(t, mode == serviceinfo.StreamingBidirectional)
 	})
 }
 

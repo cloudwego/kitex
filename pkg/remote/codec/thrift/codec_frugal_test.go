@@ -24,10 +24,12 @@ import (
 
 	"github.com/cloudwego/gopkg/bufiox"
 
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	mocks "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -44,9 +46,11 @@ type MockNoTagArgs struct {
 func initNoTagSendMsg(tp transport.Protocol) remote.Message {
 	var _args MockNoTagArgs
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-	msg := remote.NewMessage(&_args, svcInfo, ri, remote.Call, remote.Client)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
+	ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
+	msg := remote.NewMessage(&_args, ri, remote.Call, remote.Client)
+	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	mcfg.SetTransportProtocol(tp)
+	mcfg.SetPayloadCodec(svcInfo.PayloadCodec)
 	return msg
 }
 
@@ -62,17 +66,22 @@ func initFrugalTagSendMsg(tp transport.Protocol) remote.Message {
 		StrList: []string{"0", "1", "2"},
 	}
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-	msg := remote.NewMessage(&_args, svcInfo, ri, remote.Call, remote.Client)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
+	ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), nil)
+	msg := remote.NewMessage(&_args, ri, remote.Call, remote.Client)
+	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	mcfg.SetTransportProtocol(tp)
+	mcfg.SetPayloadCodec(svcInfo.PayloadCodec)
 	return msg
 }
 
 func initFrugalTagRecvMsg() remote.Message {
 	var _args MockFrugalTagArgs
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(&_args, svcInfo, ri, remote.Call, remote.Server)
+	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.EmptyEndpointInfo(), ink, nil, rpcinfo.NewRPCStats())
+	remote.SetServiceSearcher(ri, mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+		svcInfo.ServiceName: svcInfo,
+	}))
+	msg := remote.NewMessage(&_args, ri, remote.Call, remote.Server)
 	return msg
 }
 

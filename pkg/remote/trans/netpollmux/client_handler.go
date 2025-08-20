@@ -33,7 +33,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
@@ -98,11 +97,7 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	mc, _ := conn.(*muxCliConn)
 
 	// if oneway
-	var methodInfo serviceinfo.MethodInfo
-	if methodInfo, err = trans.GetMethodInfo(ri, sendMsg.ServiceInfo()); err != nil {
-		return ctx, err
-	}
-	if methodInfo.OneWay() {
+	if methodInfo := ri.Invocation().MethodInfo(); methodInfo != nil && methodInfo.OneWay() {
 		mc.Put(func() (_ netpoll.Writer, isNil bool) {
 			return buf, false
 		})

@@ -175,7 +175,7 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 	}()
 
 	ink := ri.Invocation().(rpcinfo.InvocationSetter)
-	sinfo := t.opt.SvcSearcher.SearchService(st.Service(), st.Method(), false)
+	sinfo := t.opt.SvcSearcher.SearchService(st.Service(), st.Method(), true)
 	if sinfo == nil {
 		err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", st.Service()))
 		return
@@ -187,6 +187,7 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 	}
 	ink.SetServiceName(sinfo.ServiceName)
 	ink.SetMethodName(st.Method())
+	ink.SetMethodInfo(minfo)
 	ink.SetStreamingMode(minfo.StreamingMode())
 	if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
 		_ = mutableTo.SetMethod(st.Method())

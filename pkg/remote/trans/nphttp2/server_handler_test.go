@@ -79,13 +79,14 @@ func TestServerHandler(t *testing.T) {
 				}, func() interface{} { return nil }, func() interface{} { return nil }, false),
 			},
 		},
-	}, nil)
+	})
 	msg := newMockNewMessage()
-	msg.ProtocolInfoFunc = func() remote.ProtocolInfo {
-		return remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Protobuf)
-	}
+	ri := newMockRPCInfo()
+	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	mcfg.SetTransportProtocol(transport.PurePayload)
+	mcfg.SetPayloadCodec(serviceinfo.Protobuf)
 	msg.RPCInfoFunc = func() rpcinfo.RPCInfo {
-		return newMockRPCInfo()
+		return ri
 	}
 	npConn := newMockNpConn(mockAddr0)
 	npConn.mockSettingFrame()

@@ -24,6 +24,8 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mockmessage "github.com/cloudwego/kitex/internal/mocks/message"
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -40,7 +42,7 @@ func TestBinaryThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	btc := &binaryThriftCodec{thriftCodec}
-	cliMsg := &mockMessage{
+	cliMsg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return newMockRPCInfo()
 		},
@@ -75,9 +77,10 @@ func TestBinaryThriftCodec(t *testing.T) {
 
 	// server side
 	arg := &Args{}
-	svrMsg := &mockMessage{
+	ri := newMockRPCInfo()
+	svrMsg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
-			return newMockRPCInfo()
+			return ri
 		},
 		RPCRoleFunc: func() remote.RPCRole {
 			return remote.Server
@@ -88,10 +91,10 @@ func TestBinaryThriftCodec(t *testing.T) {
 		PayloadLenFunc: func() int {
 			return wl
 		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return ServiceInfoWithGeneric(BinaryThriftGeneric())
-		},
 	}
+	remote.SetServiceSearcher(ri, mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+		"": ServiceInfoWithGeneric(BinaryThriftGeneric()),
+	}))
 	err = btc.Unmarshal(context.Background(), svrMsg, bb)
 	test.Assert(t, err == nil, err)
 	reqBuf := svrMsg.Data().(*Args).Request.(binaryReqType)
@@ -109,7 +112,7 @@ func TestBinaryThriftCodec(t *testing.T) {
 func TestBinaryThriftCodecExceptionError(t *testing.T) {
 	ctx := context.Background()
 	btc := &binaryThriftCodec{thriftCodec}
-	cliMsg := &mockMessage{
+	cliMsg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return newEmptyMethodRPCInfo()
 		},
@@ -172,140 +175,4 @@ func newEmptyMethodRPCInfo() rpcinfo.RPCInfo {
 	ink := rpcinfo.NewInvocation("", "")
 	ri := rpcinfo.NewRPCInfo(c, s, ink, nil, nil)
 	return ri
-}
-
-var _ remote.Message = &mockMessage{}
-
-type mockMessage struct {
-	RPCInfoFunc         func() rpcinfo.RPCInfo
-	ServiceInfoFunc     func() *serviceinfo.ServiceInfo
-	SetServiceInfoFunc  func(svcName, methodName string) (*serviceinfo.ServiceInfo, error)
-	DataFunc            func() interface{}
-	NewDataFunc         func(method string) (ok bool)
-	MessageTypeFunc     func() remote.MessageType
-	SetMessageTypeFunc  func(remote.MessageType)
-	RPCRoleFunc         func() remote.RPCRole
-	PayloadLenFunc      func() int
-	SetPayloadLenFunc   func(size int)
-	TransInfoFunc       func() remote.TransInfo
-	TagsFunc            func() map[string]interface{}
-	ProtocolInfoFunc    func() remote.ProtocolInfo
-	SetProtocolInfoFunc func(remote.ProtocolInfo)
-	PayloadCodecFunc    func() remote.PayloadCodec
-	SetPayloadCodecFunc func(pc remote.PayloadCodec)
-	RecycleFunc         func()
-}
-
-func (m *mockMessage) RPCInfo() rpcinfo.RPCInfo {
-	if m.RPCInfoFunc != nil {
-		return m.RPCInfoFunc()
-	}
-	return nil
-}
-
-func (m *mockMessage) ServiceInfo() (si *serviceinfo.ServiceInfo) {
-	if m.ServiceInfoFunc != nil {
-		return m.ServiceInfoFunc()
-	}
-	return
-}
-
-func (m *mockMessage) SpecifyServiceInfo(svcName, methodName string) (si *serviceinfo.ServiceInfo, err error) {
-	if m.SetServiceInfoFunc != nil {
-		return m.SetServiceInfoFunc(svcName, methodName)
-	}
-	return nil, nil
-}
-
-func (m *mockMessage) Data() interface{} {
-	if m.DataFunc != nil {
-		return m.DataFunc()
-	}
-	return nil
-}
-
-func (m *mockMessage) NewData(method string) (ok bool) {
-	if m.NewDataFunc != nil {
-		return m.NewDataFunc(method)
-	}
-	return false
-}
-
-func (m *mockMessage) MessageType() (mt remote.MessageType) {
-	if m.MessageTypeFunc != nil {
-		return m.MessageTypeFunc()
-	}
-	return
-}
-
-func (m *mockMessage) SetMessageType(mt remote.MessageType) {
-	if m.SetMessageTypeFunc != nil {
-		m.SetMessageTypeFunc(mt)
-	}
-}
-
-func (m *mockMessage) RPCRole() (r remote.RPCRole) {
-	if m.RPCRoleFunc != nil {
-		return m.RPCRoleFunc()
-	}
-	return
-}
-
-func (m *mockMessage) PayloadLen() int {
-	if m.PayloadLenFunc != nil {
-		return m.PayloadLenFunc()
-	}
-	return 0
-}
-
-func (m *mockMessage) SetPayloadLen(size int) {
-	if m.SetPayloadLenFunc != nil {
-		m.SetPayloadLenFunc(size)
-	}
-}
-
-func (m *mockMessage) TransInfo() remote.TransInfo {
-	if m.TransInfoFunc != nil {
-		return m.TransInfoFunc()
-	}
-	return nil
-}
-
-func (m *mockMessage) Tags() map[string]interface{} {
-	if m.TagsFunc != nil {
-		return m.TagsFunc()
-	}
-	return nil
-}
-
-func (m *mockMessage) ProtocolInfo() (pi remote.ProtocolInfo) {
-	if m.ProtocolInfoFunc != nil {
-		return m.ProtocolInfoFunc()
-	}
-	return
-}
-
-func (m *mockMessage) SetProtocolInfo(pi remote.ProtocolInfo) {
-	if m.SetProtocolInfoFunc != nil {
-		m.SetProtocolInfoFunc(pi)
-	}
-}
-
-func (m *mockMessage) PayloadCodec() remote.PayloadCodec {
-	if m.PayloadCodecFunc != nil {
-		return m.PayloadCodecFunc()
-	}
-	return nil
-}
-
-func (m *mockMessage) SetPayloadCodec(pc remote.PayloadCodec) {
-	if m.SetPayloadCodecFunc != nil {
-		m.SetPayloadCodecFunc(pc)
-	}
-}
-
-func (m *mockMessage) Recycle() {
-	if m.RecycleFunc != nil {
-		m.RecycleFunc()
-	}
 }

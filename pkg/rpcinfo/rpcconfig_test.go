@@ -31,7 +31,7 @@ func TestRPCConfig(t *testing.T) {
 	test.Assert(t, c.ConnectTimeout() != 0)
 	test.Assert(t, c.ReadWriteTimeout() != 0)
 	test.Assert(t, c.IOBufferSize() != 0)
-	test.Assert(t, c.TransportProtocol() == transport.Framed)
+	test.Assert(t, c.TransportProtocol() == transport.PurePayload)
 }
 
 func TestSetTransportProtocol(t *testing.T) {

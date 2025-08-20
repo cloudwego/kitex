@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mockmessage "github.com/cloudwego/kitex/internal/mocks/message"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/connpool"
@@ -61,7 +62,7 @@ func TestDefaultCliTransHandler(t *testing.T) {
 
 	ctx := context.Background()
 	conn := &mocks.Conn{}
-	msg := &MockMessage{
+	msg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return newMockRPCInfo()
 		},

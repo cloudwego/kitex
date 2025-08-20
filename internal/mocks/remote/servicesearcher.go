@@ -22,12 +22,26 @@ import (
 )
 
 type MockSvcSearcher struct {
-	svcMap       map[string]*serviceinfo.ServiceInfo
-	methodSvcMap map[string]*serviceinfo.ServiceInfo
+	svcMap        map[string]*serviceinfo.ServiceInfo
+	methodSvcMap  map[string]*serviceinfo.ServiceInfo
+	targetSvcInfo *serviceinfo.ServiceInfo
 }
 
-func NewMockSvcSearcher(svcMap, methodSvcMap map[string]*serviceinfo.ServiceInfo) *MockSvcSearcher {
-	return &MockSvcSearcher{svcMap: svcMap, methodSvcMap: methodSvcMap}
+func NewMockSvcSearcher(svcMap map[string]*serviceinfo.ServiceInfo) *MockSvcSearcher {
+	methodSvcMap := make(map[string]*serviceinfo.ServiceInfo)
+	for _, svc := range svcMap {
+		for method := range svc.Methods {
+			methodSvcMap[method] = svc
+		}
+	}
+	s := &MockSvcSearcher{svcMap: svcMap, methodSvcMap: methodSvcMap}
+	if len(svcMap) == 1 {
+		for _, svc := range svcMap {
+			s.targetSvcInfo = svc
+			break
+		}
+	}
+	return s
 }
 
 func NewDefaultSvcSearcher() *MockSvcSearcher {
@@ -42,7 +56,7 @@ func NewDefaultSvcSearcher() *MockSvcSearcher {
 		mocks.MockOnewayMethod:    svcInfo,
 		mocks.MockStreamingMethod: svcInfo,
 	}
-	return &MockSvcSearcher{svcMap: s, methodSvcMap: m}
+	return &MockSvcSearcher{svcMap: s, methodSvcMap: m, targetSvcInfo: svcInfo}
 }
 
 func (s *MockSvcSearcher) SearchService(svcName, methodName string, strict bool) *serviceinfo.ServiceInfo {
@@ -51,6 +65,9 @@ func (s *MockSvcSearcher) SearchService(svcName, methodName string, strict bool)
 			return svc
 		}
 		return nil
+	}
+	if s.targetSvcInfo != nil {
+		return s.targetSvcInfo
 	}
 	var svc *serviceinfo.ServiceInfo
 	if svcName == "" {

@@ -24,6 +24,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
+// InvocationServiceInfoKey is the extra key of invocation which stores the ServiceInfo of the rpc call.
+// The reason for adding the extra key is to shield ServiceInfo from users in the Invocation interface definition,
+// as it is a pointer type and may be modified insecurely if obtained by users.
+const InvocationServiceInfoKey = "service_info_key"
+
 var (
 	_              Invocation       = (*invocation)(nil)
 	_              InvocationSetter = (*invocation)(nil)
@@ -40,6 +45,7 @@ type InvocationSetter interface {
 	SetPackageName(name string)
 	SetServiceName(name string)
 	SetMethodName(name string)
+	SetMethodInfo(methodInfo serviceinfo.MethodInfo)
 	SetStreamingMode(mode serviceinfo.StreamingMode)
 	SetSeqID(seqID int32)
 	SetBizStatusErr(err kerrors.BizStatusErrorIface)
@@ -49,6 +55,7 @@ type InvocationSetter interface {
 type invocation struct {
 	packageName   string
 	serviceName   string
+	methodInfo    serviceinfo.MethodInfo
 	methodName    string
 	streamingMode serviceinfo.StreamingMode
 	seqID         int32
@@ -124,6 +131,16 @@ func (i *invocation) SetMethodName(name string) {
 	i.methodName = name
 }
 
+// MethodInfo implements the Invocation interface.
+func (i *invocation) MethodInfo() serviceinfo.MethodInfo {
+	return i.methodInfo
+}
+
+// SetMethodInfo implements the InvocationSetter interface.
+func (i *invocation) SetMethodInfo(methodInfo serviceinfo.MethodInfo) {
+	i.methodInfo = methodInfo
+}
+
 // StreamingMode implements the Invocation interface.
 func (i *invocation) StreamingMode() serviceinfo.StreamingMode {
 	return i.streamingMode
@@ -174,6 +191,7 @@ func (i *invocation) zero() {
 	i.packageName = ""
 	i.serviceName = ""
 	i.methodName = ""
+	i.methodInfo = nil
 	i.bizErr = nil
 	for key := range i.extra {
 		delete(i.extra, key)

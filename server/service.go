@@ -43,6 +43,9 @@ type services struct {
 	svcMap        map[string]*service   // key: service name
 	fallbackSvc   *service
 
+	// be compatible with binary thrift generic
+	targetSvcInfo *serviceinfo.ServiceInfo
+
 	refuseTrafficWithoutServiceName bool
 }
 
@@ -93,6 +96,12 @@ func (s *services) check(refuseTrafficWithoutServiceName bool) error {
 	if len(s.svcMap) == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
+	if len(s.svcMap) == 1 {
+		for _, svc := range s.svcMap {
+			s.targetSvcInfo = svc.svcInfo
+			break
+		}
+	}
 	if refuseTrafficWithoutServiceName {
 		s.refuseTrafficWithoutServiceName = true
 		return nil
@@ -106,7 +115,17 @@ func (s *services) check(refuseTrafficWithoutServiceName bool) error {
 }
 
 func (s *services) SearchService(svcName, methodName string, strict bool) *serviceinfo.ServiceInfo {
-	if strict || s.refuseTrafficWithoutServiceName {
+	if strict {
+		if svc := s.svcMap[svcName]; svc != nil {
+			return svc.svcInfo
+		}
+		return nil
+	}
+	// be compatible with binary thrift generic
+	if s.targetSvcInfo != nil {
+		return s.targetSvcInfo
+	}
+	if s.refuseTrafficWithoutServiceName {
 		if svc := s.svcMap[svcName]; svc != nil {
 			return svc.svcInfo
 		}

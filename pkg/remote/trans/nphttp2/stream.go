@@ -121,8 +121,7 @@ func (s *serverStream) SetTrailer(tl streaming.Trailer) error {
 func (s *serverStream) RecvMsg(ctx context.Context, m interface{}) error {
 	ri := s.rpcInfo
 
-	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), ri.Config().PayloadCodec()))
+	msg := remote.NewMessage(m, ri, remote.Stream, remote.Client)
 	defer msg.Recycle()
 
 	_, err := s.handler.Read(s.ctx, s.conn, msg)
@@ -134,8 +133,7 @@ func (s *serverStream) RecvMsg(ctx context.Context, m interface{}) error {
 func (s *serverStream) SendMsg(ctx context.Context, m interface{}) error {
 	ri := s.rpcInfo
 
-	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), ri.Config().PayloadCodec()))
+	msg := remote.NewMessage(m, ri, remote.Stream, remote.Client)
 	defer msg.Recycle()
 
 	_, err := s.handler.Write(s.ctx, s.conn, msg)
@@ -233,15 +231,10 @@ func (s *clientStream) Trailer() (streaming.Trailer, error) {
 func (s *clientStream) RecvMsg(ctx context.Context, m interface{}) error {
 	ri := s.rpcInfo
 
-	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
-	payloadCodec, err := s.getPayloadCodecFromContentType()
-	if err != nil {
-		return err
-	}
-	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), payloadCodec))
+	msg := remote.NewMessage(m, ri, remote.Stream, remote.Client)
 	defer msg.Recycle()
 
-	_, err = s.handler.Read(s.ctx, s.conn, msg)
+	_, err := s.handler.Read(s.ctx, s.conn, msg)
 	return err
 }
 
@@ -250,15 +243,10 @@ func (s *clientStream) RecvMsg(ctx context.Context, m interface{}) error {
 func (s *clientStream) SendMsg(ctx context.Context, m interface{}) error {
 	ri := s.rpcInfo
 
-	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
-	payloadCodec, err := s.getPayloadCodecFromContentType()
-	if err != nil {
-		return err
-	}
-	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), payloadCodec))
+	msg := remote.NewMessage(m, ri, remote.Stream, remote.Client)
 	defer msg.Recycle()
 
-	_, err = s.handler.Write(s.ctx, s.conn, msg)
+	_, err := s.handler.Write(s.ctx, s.conn, msg)
 	return err
 }
 
@@ -268,20 +256,6 @@ func (s *clientStream) CloseSend(ctx context.Context) error {
 
 func (s *clientStream) Context() context.Context {
 	return s.ctx
-}
-
-func (s *clientStream) getPayloadCodecFromContentType() (serviceinfo.PayloadCodec, error) {
-	var subType string
-	if s.conn != nil {
-		// actually it must be non nil, but for unit testing compatibility, we still need to check it
-		subType = s.conn.s.ContentSubtype()
-	}
-	switch subType {
-	case contentSubTypeThrift:
-		return serviceinfo.Thrift, nil
-	default:
-		return serviceinfo.Protobuf, nil
-	}
 }
 
 func streamingHeaderToHTTP2MD(header streaming.Header) metadata.MD {

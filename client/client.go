@@ -401,7 +401,9 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	// Add necessary keys to context for isolation between kitex client method calls
 	ctx = retry.PrepareRetryContext(ctx)
 
-	if kc.opt.UnaryOptions.RetryContainer == nil {
+	if m := ri.Invocation().MethodInfo(); m == nil {
+		err = kerrors.ErrNonExistentMethod(kc.svcInfo.ServiceName, method)
+	} else if kc.opt.UnaryOptions.RetryContainer == nil {
 		// call without retry policy
 		err = kc.eps(ctx, request, response)
 		if err == nil {
@@ -514,7 +516,6 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 			remote.RecycleMessage(recvMsg)
 		}()
 		ri := rpcinfo.GetRPCInfo(ctx)
-		methodName := ri.Invocation().MethodName()
 
 		cli, err := remotecli.NewClient(ctx, ri, transPipl, kc.opt.RemoteOpt)
 		if err != nil {
@@ -522,17 +523,12 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		}
 
 		defer cli.Recycle()
-		config := ri.Config()
-		m := kc.svcInfo.MethodInfo(methodName)
-		if m == nil {
-			return fmt.Errorf("method info is nil, methodName=%s, serviceInfo=%+v", methodName, kc.svcInfo)
-		} else if m.OneWay() {
-			sendMsg = remote.NewMessage(req, kc.svcInfo, ri, remote.Oneway, remote.Client)
+		m := ri.Invocation().MethodInfo()
+		if m.OneWay() {
+			sendMsg = remote.NewMessage(req, ri, remote.Oneway, remote.Client)
 		} else {
-			sendMsg = remote.NewMessage(req, kc.svcInfo, ri, remote.Call, remote.Client)
+			sendMsg = remote.NewMessage(req, ri, remote.Call, remote.Client)
 		}
-		protocolInfo := remote.NewProtocolInfo(config.TransportProtocol(), kc.svcInfo.PayloadCodec)
-		sendMsg.SetProtocolInfo(protocolInfo)
 
 		if err = cli.Send(ctx, ri, sendMsg); err != nil {
 			return
@@ -542,8 +538,7 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 			return nil
 		}
 
-		recvMsg = remote.NewMessage(resp, kc.opt.RemoteOpt.SvcInfo, ri, remote.Reply, remote.Client)
-		recvMsg.SetProtocolInfo(protocolInfo)
+		recvMsg = remote.NewMessage(resp, ri, remote.Reply, remote.Client)
 		err = cli.Recv(ctx, ri, recvMsg)
 		return err
 	}, nil
@@ -802,8 +797,12 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 		rpcStats.ImmutableView(),
 	)
 
+	inkSetter := ri.Invocation().(rpcinfo.InvocationSetter)
+	// set ServiceInfo to judge whether it's combine service in ttheader codec.
+	inkSetter.SetExtra(rpcinfo.InvocationServiceInfoKey, svcInfo)
 	if mi != nil {
-		ri.Invocation().(rpcinfo.InvocationSetter).SetStreamingMode(mi.StreamingMode())
+		inkSetter.SetStreamingMode(mi.StreamingMode())
+		inkSetter.SetMethodInfo(mi)
 	}
 	if streamCall {
 		cfg.SetInteractionMode(rpcinfo.Streaming)

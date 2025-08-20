@@ -180,6 +180,7 @@ func TestOnRead(t *testing.T) {
 				sid:    1,
 				method: mocks.MockStreamingMethod,
 				header: map[string]string{
+					ttheader.HeaderIDLServiceName:  mocks.MockServiceName,
 					ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
 				},
 			},

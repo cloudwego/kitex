@@ -24,13 +24,13 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	mockmessage "github.com/cloudwego/kitex/internal/mocks/message"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 func newTestRemoteClientOptionWithInStr(s string) *remote.ClientOption {
@@ -105,16 +105,9 @@ func TestCliTransHandler(t *testing.T) {
 	conn := newMuxCliConn(npconn)
 
 	ri := newMockRPCInfo()
-	msg := &MockMessage{
+	msg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return ri
-		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
-				},
-			}
 		},
 	}
 	ctx, err = handler.Write(ctx, conn, msg)
@@ -131,52 +124,6 @@ func TestCliTransHandler(t *testing.T) {
 	ctx, err = handler.Read(ctx, conn, msg)
 	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
-}
-
-// TestWriteNoMethod test client_handler write return unknown method err
-func TestWriteNoMethod(t *testing.T) {
-	// 1. prepare mock data
-	s := "hello world"
-	opt := newTestRemoteClientOptionWithInStr(s)
-
-	handler, err := NewCliTransHandlerFactory().NewTransHandler(opt)
-	test.Assert(t, err == nil)
-
-	ctx := context.Background()
-
-	var isWriteBufFlushed bool
-
-	buf := netpoll.NewLinkBuffer(1024)
-	npconn := &MockNetpollConn{
-		ReaderFunc: func() (r netpoll.Reader) {
-			return buf
-		},
-		WriterFunc: func() (r netpoll.Writer) {
-			isWriteBufFlushed = true
-			return buf
-		},
-	}
-	conn := newMuxCliConn(npconn)
-
-	ri := newMockRPCInfo()
-	msg := &MockMessage{
-		RPCInfoFunc: func() rpcinfo.RPCInfo {
-			return ri
-		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{}
-		},
-	}
-
-	// 2. test
-	ctx, err = handler.Write(ctx, conn, msg)
-	// check ctx/err not nil
-	test.Assert(t, ctx != nil, ctx)
-	test.Assert(t, err != nil, err)
-	tErr, ok := err.(*remote.TransError)
-	test.Assert(t, ok)
-	test.Assert(t, tErr.TypeID() == remote.UnknownMethod)
-	test.Assert(t, !isWriteBufFlushed)
 }
 
 // TestWriteOneWayMethod test client_handler write oneway method
@@ -206,16 +153,9 @@ func TestWriteOneWayMethod(t *testing.T) {
 	}
 	conn := newMuxCliConn(npconn)
 
-	oneWayMsg := &MockMessage{
+	oneWayMsg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return ri
-		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, true),
-				},
-			}
 		},
 	}
 	ctx, err = handler.Write(ctx, conn, oneWayMsg)
@@ -266,16 +206,9 @@ func TestReadTimeout(t *testing.T) {
 	c := rpcinfo.NewEndpointInfo("", method, nil, nil)
 	to := rpcinfo.NewEndpointInfo("", method, nil, nil)
 	ri := rpcinfo.NewRPCInfo(c, to, rpcinfo.NewInvocation("", method), cfg, rpcinfo.NewRPCStats())
-	msg := &MockMessage{
+	msg := &mockmessage.MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return ri
-		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
-				},
-			}
 		},
 	}
 

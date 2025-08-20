@@ -85,7 +85,7 @@ func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote
 	if totalLenField, err = ttheader.Encode(ctx, ttheader.EncodeParam{
 		Flags:      getFlags(message),
 		SeqID:      message.RPCInfo().Invocation().SeqID(),
-		ProtocolID: getProtocolID(message.ProtocolInfo()),
+		ProtocolID: getProtocolID(message.RPCInfo().Config().PayloadCodec()),
 		IntInfo:    tm.TransIntInfo(),
 		StrInfo:    tm.TransStrInfo(),
 	}, out); err != nil {
@@ -156,8 +156,8 @@ func setFlags(flags ttheader.HeaderFlags, message remote.Message) {
 }
 
 // protoID just for ttheader
-func getProtocolID(pi remote.ProtocolInfo) ttheader.ProtocolID {
-	switch pi.CodecType {
+func getProtocolID(ct serviceinfo.PayloadCodec) ProtocolID {
+	switch ct {
 	case serviceinfo.Protobuf:
 		// ProtocolIDKitexProtobuf is 0x03 at old version(<=v1.9.1) , but it conflicts with ThriftCompactV2.
 		// Change the ProtocolIDKitexProtobuf to 0x04 from v1.9.2. But notice! that it is an incompatible change of protocol.
