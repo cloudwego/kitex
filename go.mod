@@ -6,7 +6,7 @@ require (
 	github.com/bytedance/gopkg v0.1.2
 	github.com/bytedance/sonic v1.14.0
 	github.com/cloudwego/configmanager v0.2.3
-	github.com/cloudwego/dynamicgo v0.6.4
+	github.com/cloudwego/dynamicgo v0.7.0
 	github.com/cloudwego/fastpb v0.0.5
 	github.com/cloudwego/frugal v0.2.5
 	github.com/cloudwego/gopkg v0.1.5
@@ -31,7 +31,7 @@ require (
 
 require (
 	github.com/bytedance/sonic/loader v0.3.0 // indirect
-	github.com/cloudwego/base64x v0.1.5 // indirect
+	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dlclark/regexp2 v1.11.0 // indirect
