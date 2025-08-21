@@ -39,6 +39,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 
+	"github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
@@ -47,6 +48,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/peer"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -119,6 +121,8 @@ type http2Client struct {
 	onClose func()
 
 	bufferPool *bufferPool
+
+	eventHandler stream.StreamEventHandler
 }
 
 // newHTTP2Client constructs a connected ClientTransport to addr based on HTTP2
@@ -196,6 +200,7 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		onGoAway:              onGoAway,
 		onClose:               onClose,
 		bufferPool:            newBufferPool(),
+		eventHandler:          opts.StreamEventHandler,
 	}
 	t.controlBuf = newControlBuffer(t.ctx.Done())
 	if opts.InitialWindowSize >= defaultWindowSize {
@@ -584,6 +589,7 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 			return nil, ErrConnClosing
 		}
 	}
+	t.reportEvent(s, stats.StreamSendHeader)
 	return s, nil
 }
 
@@ -624,6 +630,11 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 		s.trailer = mdata
 	}
 	if err != nil {
+		if rst {
+			// report event before writing recvMsg to avoid event lost
+			// because tracer would finish when Recv/Send failed
+			t.reportEvent(s, stats.StreamSendRst)
+		}
 		// This will unblock reads eventually.
 		s.write(recvMsg{err: err})
 	}
@@ -753,7 +764,13 @@ func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
 			return s.getCloseStreamErr()
 		}
 	}
-	return t.controlBuf.put(df)
+	if err := t.controlBuf.put(df); err != nil {
+		return err
+	}
+	if opts.Last {
+		t.reportEvent(s, stats.StreamSendTrailer)
+	}
+	return nil
 }
 
 func (t *http2Client) getStream(f http2.Frame) *Stream {
@@ -899,6 +916,7 @@ func (t *http2Client) handleRSTStream(f *http2.RSTStreamFrame) {
 	} else {
 		msg = fmt.Sprintf("stream terminated by RST_STREAM with error code: %v", f.ErrCode)
 	}
+	t.reportEvent(s, stats.StreamRecvRst)
 	t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.New(statusCode, msg), nil, false)
 }
 
@@ -1115,9 +1133,13 @@ func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 		close(s.headerChan)
 	}
 
+	// Header
 	if !endStream {
+		t.reportEvent(s, stats.StreamRecvHeader)
 		return
 	}
+	// Trailer
+	t.reportEvent(s, stats.StreamRecvTrailer)
 
 	// if client received END_STREAM from server while stream was still active, send RST_STREAM
 	rst := s.getState() == streamActive

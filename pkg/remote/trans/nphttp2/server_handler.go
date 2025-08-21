@@ -133,8 +133,20 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	tr := svrTrans.tr
 	tr.HandleStreams(func(s *grpcTransport.Stream) {
 		atomic.AddInt32(&svrTrans.handlerNum, 1)
+		// we should handle ctx synchronously because this Stream would only become truly visible
+		// at the gRPC layer after the handleStream callback has finished
+		rCtx, ri, svcName, mtName, ok := t.handleCtx(svrTrans, s)
+		if !ok {
+			if rpcinfo.PoolEnabled() {
+				ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
+				svrTrans.pool.Put(ri)
+			}
+			return
+		}
+		// set ctx with tracing information so that gRPC layer could make use of it
+		s.SetContext(rCtx)
 		gofunc.GoFunc(ctx, func() {
-			t.handleFunc(s, svrTrans, conn)
+			t.handleFunc(rCtx, ri, svcName, mtName, s, svrTrans, conn)
 			atomic.AddInt32(&svrTrans.handlerNum, -1)
 		})
 	}, func(ctx context.Context, method string) context.Context {
@@ -143,10 +155,14 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	return nil
 }
 
-func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans, conn net.Conn) {
+func (t *svrTransHandler) handleFunc(
+	rCtx context.Context, ri rpcinfo.RPCInfo,
+	serviceName, methodName string,
+	s *grpcTransport.Stream, svrTrans *SvrTrans, conn net.Conn,
+) {
+	var err error
 	tr := svrTrans.tr
-	ri := svrTrans.pool.Get().(rpcinfo.RPCInfo)
-	rCtx := rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
+	ink := ri.Invocation().(rpcinfo.InvocationSetter)
 	defer func() {
 		// reset rpcinfo for performance (PR #584)
 		if rpcinfo.PoolEnabled() {
@@ -154,58 +170,6 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 			svrTrans.pool.Put(ri)
 		}
 	}()
-
-	ink := ri.Invocation().(rpcinfo.InvocationSetter)
-	sm := s.Method()
-	if sm != "" && sm[0] == '/' {
-		sm = sm[1:]
-	}
-	pos := strings.LastIndex(sm, "/")
-	if pos == -1 {
-		errDesc := fmt.Sprintf("malformed method name, method=%q", s.Method())
-		tr.WriteStatus(s, status.New(codes.Internal, errDesc))
-		return
-	}
-	methodName := sm[pos+1:]
-	ink.SetMethodName(methodName)
-
-	if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
-		if err := mutableTo.SetMethod(methodName); err != nil {
-			errDesc := fmt.Sprintf("setMethod failed in streaming, method=%s, error=%s", methodName, err.Error())
-			_ = tr.WriteStatus(s, status.New(codes.Internal, errDesc))
-			return
-		}
-		// this method name will be used as from method if a new RPC call is invoked in this handler.
-		// ping-pong relies on transMetaHandler.OnMessage to inject but streaming does not trigger.
-		//
-		//nolint:staticcheck // SA1029: consts.CtxKeyMethod has been used and we just follow it
-		rCtx = context.WithValue(rCtx, consts.CtxKeyMethod, methodName)
-	}
-
-	var serviceName string
-	idx := strings.LastIndex(sm[:pos], ".")
-	if idx == -1 {
-		ink.SetPackageName("")
-		serviceName = sm[0:pos]
-	} else {
-		ink.SetPackageName(sm[:idx])
-		serviceName = sm[idx+1 : pos]
-	}
-	ink.SetServiceName(serviceName)
-
-	// set grpc transport flag before execute metahandler
-	cfg := rpcinfo.AsMutableRPCConfig(ri.Config())
-	cfg.SetTransportProtocol(transport.GRPC)
-	cfg.SetPayloadCodec(getPayloadCodecFromContentType(s.ContentSubtype()))
-	var err error
-	for _, shdlr := range t.opt.StreamingMetaHandlers {
-		rCtx, err = shdlr.OnReadStream(rCtx)
-		if err != nil {
-			tr.WriteStatus(s, convertStatus(err))
-			return
-		}
-	}
-	rCtx = t.startTracer(rCtx, ri)
 	defer func() {
 		panicErr := recover()
 		if panicErr != nil {
@@ -285,6 +249,68 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 		return
 	}
 	tr.WriteStatus(s, status.New(codes.OK, ""))
+}
+
+// handleCtx initialize rpcinfo and tracing information to converge all ctx processing
+func (t *svrTransHandler) handleCtx(svrTrans *SvrTrans, s *grpcTransport.Stream) (
+	rCtx context.Context, ri rpcinfo.RPCInfo,
+	serviceName, methodName string,
+	res bool,
+) {
+	tr := svrTrans.tr
+	ri = svrTrans.pool.Get().(rpcinfo.RPCInfo)
+	rCtx = rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
+	ink := ri.Invocation().(rpcinfo.InvocationSetter)
+	sm := s.Method()
+	if sm != "" && sm[0] == '/' {
+		sm = sm[1:]
+	}
+	pos := strings.LastIndex(sm, "/")
+	if pos == -1 {
+		errDesc := fmt.Sprintf("malformed method name, method=%q", s.Method())
+		tr.WriteStatus(s, status.New(codes.Internal, errDesc))
+		return
+	}
+	methodName = sm[pos+1:]
+	ink.SetMethodName(methodName)
+
+	if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
+		if err := mutableTo.SetMethod(methodName); err != nil {
+			errDesc := fmt.Sprintf("setMethod failed in streaming, method=%s, error=%s", methodName, err.Error())
+			_ = tr.WriteStatus(s, status.New(codes.Internal, errDesc))
+			return
+		}
+		// this method name will be used as from method if a new RPC call is invoked in this handler.
+		// ping-pong relies on transMetaHandler.OnMessage to inject but streaming does not trigger.
+		//
+		//nolint:staticcheck // SA1029: consts.CtxKeyMethod has been used and we just follow it
+		rCtx = context.WithValue(rCtx, consts.CtxKeyMethod, methodName)
+	}
+
+	idx := strings.LastIndex(sm[:pos], ".")
+	if idx == -1 {
+		ink.SetPackageName("")
+		serviceName = sm[0:pos]
+	} else {
+		ink.SetPackageName(sm[:idx])
+		serviceName = sm[idx+1 : pos]
+	}
+	ink.SetServiceName(serviceName)
+
+	// set grpc transport flag before execute metahandler
+	cfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	cfg.SetTransportProtocol(transport.GRPC)
+	cfg.SetPayloadCodec(getPayloadCodecFromContentType(s.ContentSubtype()))
+	var err error
+	for _, shdlr := range t.opt.StreamingMetaHandlers {
+		rCtx, err = shdlr.OnReadStream(rCtx)
+		if err != nil {
+			tr.WriteStatus(s, convertStatus(err))
+			return
+		}
+	}
+	rCtx = t.startTracer(rCtx, ri)
+	return rCtx, ri, serviceName, methodName, true
 }
 
 // invokeStreamUnaryHandler allows unary APIs over HTTP2 to use the same server middleware as non-streaming APIs.
