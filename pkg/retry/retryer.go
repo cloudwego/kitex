@@ -31,7 +31,7 @@ import (
 )
 
 // RPCCallFunc is the definition with wrap rpc call
-type RPCCallFunc func(context.Context, Retryer) (rpcinfo rpcinfo.RPCInfo, resp interface{}, err error)
+type RPCCallFunc func(ctx context.Context, retryer Retryer, request, response interface{}) (rpcinfo rpcinfo.RPCInfo, err error)
 
 // GenRetryKeyFunc to generate retry key through rpcinfo.
 // You can customize the config key according to your config center.
@@ -46,7 +46,7 @@ type Retryer interface {
 	UpdatePolicy(policy Policy) error
 
 	// Retry policy execute func. recycleRI is to decide if the firstRI can be recycled.
-	Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, request interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error)
+	Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, request, response interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error)
 	AppendErrMsgIfNeeded(ctx context.Context, err error, ri rpcinfo.RPCInfo, msg string)
 
 	// Prepare to do something needed before retry call.
@@ -320,9 +320,6 @@ func (p *retryContext) Value(k any) any {
 	if k == CtxReqOp {
 		return &p.reqOp
 	}
-	if k == CtxRespOp {
-		return &p.respOp
-	}
 	return p.Context.Value(k)
 }
 
@@ -345,7 +342,7 @@ func PrepareRetryContext(ctx context.Context) context.Context {
 
 // WithRetryIfNeeded to check if there is a retryer can be used and if current call can retry.
 // When the retry condition is satisfied, use retryer to call
-func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy, rpcCall RPCCallFunc, ri rpcinfo.RPCInfo, request interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
+func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy, rpcCall RPCCallFunc, ri rpcinfo.RPCInfo, request, response interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
 	var retryer Retryer
 	if callOptRetry != nil && callOptRetry.Enable {
 		// build retryer for call level if retry policy is set up with callopt
@@ -358,7 +355,7 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy
 
 	// case 1(default, fast path): no retry policy
 	if retryer == nil {
-		if _, _, err = rpcCall(ctx, nil); err == nil {
+		if _, err = rpcCall(ctx, nil, request, response); err == nil {
 			return ri, true, nil
 		}
 		return ri, false, err
@@ -366,7 +363,7 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy
 
 	// case 2: setup retry policy, but not satisfy retry condition eg: circuit, retry times == 0, chain stop, ddl
 	if msg, ok := retryer.AllowRetry(ctx); !ok {
-		if _, _, err = rpcCall(ctx, retryer); err == nil {
+		if _, err = rpcCall(ctx, retryer, request, response); err == nil {
 			return ri, true, err
 		}
 		if msg != "" {
@@ -376,7 +373,7 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy
 	}
 
 	// case 3: do rpc call with retry policy
-	lastRI, recycleRI, err = retryer.Do(ctx, rpcCall, ri, request)
+	lastRI, recycleRI, err = retryer.Do(ctx, rpcCall, ri, request, response)
 	return
 }
 
