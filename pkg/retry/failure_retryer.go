@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/circuitbreak"
@@ -76,7 +75,7 @@ func (r *failureRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implement the Retryer interface.
-func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
+func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req, resp interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
 	r.RLock()
 	var maxDuration time.Duration
 	if r.policy.StopPolicy.MaxDurationMS > 0 {
@@ -95,8 +94,9 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 		}
 	}()
 	startTime := time.Now()
+	var curResp interface{}
+	newRespFunc := getNewRespFunc(firstRI.Invocation().MethodInfo())
 	for i := 0; i <= retryTimes; i++ {
-		var resp interface{}
 		var callStart time.Time
 		if i == 0 {
 			callStart = startTime
@@ -114,25 +114,24 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			}
 			callStart = time.Now()
 			callCosts.WriteByte(',')
-			if respOp, ok := ctx.Value(CtxRespOp).(*int32); ok {
-				atomic.StoreInt32(respOp, OpNo)
-			}
 		}
 		callTimes++
 		if r.cbContainer.enablePercentageLimit {
 			// record stat before call since requests may be slow, making the limiter more accurate
 			recordRetryStat(cbKey, r.cbContainer.cbPanel, callTimes)
 		}
-		cRI, resp, err = rpcCall(ctx, r)
+		curResp = newRespFunc()
+		cRI, err = rpcCall(ctx, r, req, curResp)
 		callCosts.WriteString(strconv.FormatInt(time.Since(callStart).Microseconds(), 10))
 
 		if !r.cbContainer.enablePercentageLimit && r.cbContainer.cbStat {
 			circuitbreak.RecordStat(ctx, req, nil, err, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 		}
-		if !r.isRetryResult(ctx, cRI, resp, err, r.policy) {
+		if !r.isRetryResult(ctx, cRI, curResp, err, r.policy) {
 			break
 		}
 	}
+	shallowCopyResults(curResp, resp)
 	recordRetryInfo(cRI, callTimes, callCosts.String())
 	if err == nil && callTimes == 1 {
 		return cRI, true, nil

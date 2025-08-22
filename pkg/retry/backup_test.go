@@ -62,15 +62,15 @@ func TestBackupPolicyCall(t *testing.T) {
 	firstRI := genRPCInfo()
 	secondRI := genRPCInfoWithRemoteTag(remoteTags)
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, firstRI)
-	ri, ok, err := rc.WithRetryIfNeeded(ctx, &Policy{}, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+	ri, ok, err := rc.WithRetryIfNeeded(ctx, &Policy{}, func(ctx context.Context, retryer Retryer, request, response interface{}) (rpcinfo rpcinfo.RPCInfo, err error) {
 		atomic.AddInt32(&callTimes, 1)
 		if atomic.LoadInt32(&callTimes) == 1 {
 			// mock timeout for the first request and get the response of the backup request.
 			time.Sleep(time.Millisecond * 50)
-			return firstRI, nil, nil
+			return firstRI, nil
 		}
-		return secondRI, nil, nil
-	}, firstRI, nil)
+		return secondRI, nil
+	}, firstRI, nil, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, atomic.LoadInt32(&callTimes) == 2)
 	test.Assert(t, !ok)
@@ -91,7 +91,7 @@ func TestBackupRetryWithRPCInfo(t *testing.T) {
 	// call with retry policy
 	var callTimes int32
 	policy := BuildBackupRequest(NewBackupPolicy(10))
-	ri, ok, err := rc.WithRetryIfNeeded(ctx, &policy, retryCall(&callTimes, ri, true), ri, nil)
+	ri, ok, err := rc.WithRetryIfNeeded(ctx, &policy, retryCall(&callTimes, ri, true), ri, nil, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, !ok)
 	test.Assert(t, ri.Stats().GetEvent(stats.RPCStart).Status() == stats.StatusInfo)

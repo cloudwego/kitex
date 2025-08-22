@@ -280,11 +280,12 @@ func Test_newStream(t *testing.T) {
 
 type mockTracer struct {
 	stats.Tracer
+	start  func(ctx context.Context) context.Context
 	finish func(ctx context.Context)
 }
 
 func (m *mockTracer) Start(ctx context.Context) context.Context {
-	return ctx
+	return m.start(ctx)
 }
 
 func (m *mockTracer) Finish(ctx context.Context) {
@@ -725,6 +726,9 @@ func TestStreamDoFinish(t *testing.T) {
 	// Create mock Tracer
 	finishCalled := false
 	tracer := &mockTracer{
+		start: func(ctx context.Context) context.Context {
+			return ctx
+		},
 		finish: func(ctx context.Context) {
 			finishCalled = true
 			fmt.Printf("finishCalled set to true\n")
@@ -765,6 +769,9 @@ func TestStreamXDoFinish(t *testing.T) {
 	// Create mock Tracer
 	finishCalled := false
 	tracer := &mockTracer{
+		start: func(ctx context.Context) context.Context {
+			return ctx
+		},
 		finish: func(ctx context.Context) {
 			finishCalled = true
 			fmt.Printf("finishCalled set to true\n")

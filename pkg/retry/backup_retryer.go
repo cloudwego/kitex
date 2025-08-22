@@ -87,7 +87,7 @@ func (r *backupRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implement the Retryer interface.
-func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
+func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req, resp interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
 	r.RLock()
 	retryTimes := r.policy.StopPolicy.MaxRetryTimes
 	retryDelay := r.retryDelay
@@ -98,9 +98,8 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 	callCosts.RawStringBuilder().Grow(32)
 	var recordCostDoing int32 = 0
 	var abort int32 = 0
-	finishedErrCount := 0
 	// notice: buff num of chan is very important here, it cannot less than call times, or the below chan receive will block
-	done := make(chan *resultWrapper, retryTimes+1)
+	done := make(chan resultWrapper, retryTimes+1)
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, req)
 	timer := time.NewTimer(retryDelay)
 	defer func() {
@@ -109,6 +108,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 		}
 		timer.Stop()
 	}()
+	newRespFunc := getNewRespFunc(firstRI.Invocation().MethodInfo())
 	// include first call, max loop is retryTimes + 1
 	doCall := true
 	for i := 0; ; {
@@ -120,14 +120,15 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 					return
 				}
 				var (
-					e   error
-					cRI rpcinfo.RPCInfo
+					e       error
+					cRI     rpcinfo.RPCInfo
+					curResp = newRespFunc()
 				)
 				defer func() {
 					if panicInfo := recover(); panicInfo != nil {
 						e = panicToErr(ctx, panicInfo, firstRI)
 					}
-					done <- &resultWrapper{ri: cRI, err: e}
+					done <- resultWrapper{ri: cRI, resp: curResp, err: e}
 				}()
 				ct := atomic.AddInt32(&callTimes, 1)
 				callStart := time.Now()
@@ -135,7 +136,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 					// record stat before call since requests may be slow, making the limiter more accurate
 					recordRetryStat(cbKey, r.cbContainer.cbPanel, ct)
 				}
-				cRI, _, e = rpcCall(ctx, r)
+				cRI, e = rpcCall(ctx, r, req, curResp)
 				recordCost(ct, callStart, &recordCostDoing, &callCosts, &abort, e)
 				if !r.cbContainer.enablePercentageLimit && r.cbContainer.cbStat {
 					circuitbreak.RecordStat(ctx, req, nil, e, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
@@ -149,16 +150,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				timer.Reset(retryDelay)
 			}
 		case res := <-done:
-			if res.err != nil && errors.Is(res.err, kerrors.ErrRPCFinish) {
-				// There will be only one request (goroutine) pass the `checkRPCState`, others will skip decoding
-				// and return `ErrRPCFinish`, to avoid concurrent write to response and save the cost of decoding.
-				// We can safely ignore this error and wait for the response of the passed goroutine.
-				if finishedErrCount++; finishedErrCount >= retryTimes+1 {
-					// But if all requests return this error, it must be a bug, preventive panic to avoid dead loop
-					panic(errUnexpectedFinish)
-				}
-				continue
-			}
+			shallowCopyResults(res.resp, resp)
 			atomic.StoreInt32(&abort, 1)
 			recordRetryInfo(res.ri, atomic.LoadInt32(&callTimes), callCosts.String())
 			return res.ri, false, res.err
@@ -238,11 +230,6 @@ func recordCost(ct int32, start time.Time, recordCostDoing *int32, sb *utils.Str
 		b.WriteString(strconv.Itoa(int(ct)))
 		b.WriteByte('-')
 		b.WriteString(strconv.FormatInt(time.Since(start).Microseconds(), 10))
-		if err != nil && errors.Is(err, kerrors.ErrRPCFinish) {
-			// ErrRPCFinish means previous call returns first but is decoding.
-			// Add ignore to distinguish.
-			b.WriteString("(ignore)")
-		}
 		return nil
 	})
 	atomic.StoreInt32(recordCostDoing, 0)

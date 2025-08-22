@@ -34,6 +34,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
@@ -488,7 +489,7 @@ func TestDifferentMethodConfig(t *testing.T) {
 	var callTimes int32
 	methodRetryer := make(map[string]Retryer)
 	var lock sync.Mutex
-	rpcCall := func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+	rpcCall := func(ctx context.Context, r Retryer, request, response interface{}) (rpcinfo.RPCInfo, error) {
 		atomic.AddInt32(&callTimes, 1)
 		ri := rpcinfo.GetRPCInfo(ctx)
 		if ri.To().Method() == method {
@@ -497,7 +498,7 @@ func TestDifferentMethodConfig(t *testing.T) {
 			lock.Unlock()
 			// specified method mock return error and do error retry
 			if atomic.LoadInt32(&callTimes) == 1 {
-				return genRPCInfo(), nil, remote.NewTransErrorWithMsg(1000, "mock")
+				return genRPCInfo(), remote.NewTransErrorWithMsg(1000, "mock")
 			}
 		} else {
 			lock.Lock()
@@ -506,10 +507,10 @@ func TestDifferentMethodConfig(t *testing.T) {
 			if atomic.LoadInt32(&callTimes) == 1 {
 				// other method do backup request
 				time.Sleep(20 * time.Millisecond)
-				return genRPCInfo(), nil, kerrors.ErrRPCTimeout
+				return genRPCInfo(), kerrors.ErrRPCTimeout
 			}
 		}
-		return genRPCInfo(), nil, nil
+		return genRPCInfo(), nil
 	}
 	rc := NewRetryContainer()
 	shouldResultRetry := &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
@@ -529,7 +530,7 @@ func TestDifferentMethodConfig(t *testing.T) {
 	// case1: test method do error retry
 	ri := genRPCInfo()
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-	_, ok, err := rc.WithRetryIfNeeded(ctx, &Policy{}, rpcCall, ri, nil)
+	_, ok, err := rc.WithRetryIfNeeded(ctx, &Policy{}, rpcCall, ri, nil, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, !ok)
 	lock.Lock()
@@ -541,8 +542,12 @@ func TestDifferentMethodConfig(t *testing.T) {
 	method2 := "method2"
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{Method: method2}, method2).ImmutableView()
 	ri = rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method2), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+	setter := ri.Invocation().(rpcinfo.InvocationSetter)
+	setter.SetMethodInfo(serviceinfo.NewMethodInfo(nil, nil, func() interface{} {
+		return nil
+	}, false))
 	ctx = rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-	_, ok, err = rc.WithRetryIfNeeded(ctx, &Policy{}, rpcCall, ri, nil)
+	_, ok, err = rc.WithRetryIfNeeded(ctx, &Policy{}, rpcCall, ri, nil, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, !ok)
 	lock.Lock()
@@ -561,10 +566,10 @@ func TestPolicyNoRetryCall(t *testing.T) {
 	var callTimes int32
 	ri := genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	_, ok, err := rc.WithRetryIfNeeded(ctx, &Policy{}, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+	_, ok, err := rc.WithRetryIfNeeded(ctx, &Policy{}, func(ctx context.Context, r Retryer, request, response interface{}) (rpcinfo.RPCInfo, error) {
 		atomic.AddInt32(&callTimes, 1)
-		return ri, nil, nil
-	}, ri, nil)
+		return ri, nil
+	}, ri, nil, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, atomic.LoadInt32(&callTimes) == 1)
 	test.Assert(t, ok)
@@ -573,13 +578,13 @@ func TestPolicyNoRetryCall(t *testing.T) {
 	atomic.StoreInt32(&callTimes, 0)
 	ri = genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	_, ok, err = rc.WithRetryIfNeeded(ctx, &Policy{}, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+	_, ok, err = rc.WithRetryIfNeeded(ctx, &Policy{}, func(ctx context.Context, r Retryer, request, response interface{}) (rpcinfo.RPCInfo, error) {
 		atomic.AddInt32(&callTimes, 1)
 		if atomic.LoadInt32(&callTimes) == 1 {
-			return ri, nil, kerrors.ErrRPCTimeout
+			return ri, kerrors.ErrRPCTimeout
 		}
-		return ri, nil, nil
-	}, ri, nil)
+		return ri, nil
+	}, ri, nil, nil)
 	test.Assert(t, kerrors.IsTimeoutError(err), err)
 	test.Assert(t, atomic.LoadInt32(&callTimes) == 1)
 	test.Assert(t, !ok)
@@ -600,13 +605,13 @@ func TestPolicyNoRetryCall(t *testing.T) {
 	atomic.StoreInt32(&callTimes, 0)
 	ri = genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	_, ok, err = rc.WithRetryIfNeeded(ctx, &Policy{}, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+	_, ok, err = rc.WithRetryIfNeeded(ctx, &Policy{}, func(ctx context.Context, r Retryer, request, response interface{}) (rpcinfo.RPCInfo, error) {
 		atomic.AddInt32(&callTimes, 1)
 		if atomic.LoadInt32(&callTimes) == 1 {
-			return ri, nil, kerrors.ErrRPCTimeout
+			return ri, kerrors.ErrRPCTimeout
 		}
-		return ri, nil, nil
-	}, ri, nil)
+		return ri, nil
+	}, ri, nil, nil)
 	test.Assert(t, kerrors.IsTimeoutError(err), err)
 	test.Assert(t, atomic.LoadInt32(&callTimes) == 1)
 	test.Assert(t, !ok)
@@ -623,11 +628,11 @@ func TestPolicyNoRetryCall(t *testing.T) {
 	atomic.StoreInt32(&callTimes, 0)
 	ri = genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	_, ok, err = rc.WithRetryIfNeeded(ctx, &Policy{}, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+	_, ok, err = rc.WithRetryIfNeeded(ctx, &Policy{}, func(ctx context.Context, r Retryer, request, response interface{}) (rpcinfo.RPCInfo, error) {
 		atomic.AddInt32(&callTimes, 1)
 		time.Sleep(time.Millisecond * 100)
-		return ri, nil, nil
-	}, ri, nil)
+		return ri, nil
+	}, ri, nil, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, atomic.LoadInt32(&callTimes) == 1)
 	test.Assert(t, ok)
@@ -636,7 +641,7 @@ func TestPolicyNoRetryCall(t *testing.T) {
 func retryCall(callTimes *int32, firstRI rpcinfo.RPCInfo, backup bool) RPCCallFunc {
 	// prevRI represents a value of rpcinfo.RPCInfo type.
 	var prevRI atomic.Value
-	return func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+	return func(ctx context.Context, r Retryer, request, response interface{}) (rpcinfo.RPCInfo, error) {
 		currCallTimes := int(atomic.AddInt32(callTimes, 1))
 		cRI := firstRI
 		if currCallTimes > 1 {
@@ -649,13 +654,13 @@ func retryCall(callTimes *int32, firstRI rpcinfo.RPCInfo, backup bool) RPCCallFu
 			}
 			r.Prepare(ctx, prevRI.Load().(rpcinfo.RPCInfo), cRI)
 			prevRI.Store(cRI)
-			return cRI, nil, nil
+			return cRI, nil
 		} else {
 			if backup {
 				time.Sleep(20 * time.Millisecond)
-				return cRI, nil, nil
+				return cRI, nil
 			} else {
-				return cRI, nil, kerrors.ErrRPCTimeout
+				return cRI, kerrors.ErrRPCTimeout
 			}
 		}
 	}
@@ -664,7 +669,6 @@ func retryCall(callTimes *int32, firstRI rpcinfo.RPCInfo, backup bool) RPCCallFu
 type mockResult struct {
 	result    mockResp
 	callTimes int32
-	sync.RWMutex
 }
 
 type mockResp struct {
@@ -673,26 +677,18 @@ type mockResp struct {
 }
 
 func (r *mockResult) getResult() interface{} {
-	r.RLock()
-	defer r.RUnlock()
 	return r.result
 }
 
 func (r *mockResult) setResult(ret mockResp) {
-	r.Lock()
-	defer r.Unlock()
 	r.result = ret
 }
 
 func (r *mockResult) setCallTimes(ct int32) {
-	r.Lock()
-	defer r.Unlock()
 	r.callTimes = ct
 }
 
 func (r *mockResult) getCallTimes() int32 {
-	r.RLock()
-	defer r.RUnlock()
 	return r.callTimes
 }
 
@@ -799,12 +795,9 @@ func TestPrepareRetryContext(t *testing.T) {
 	ctx := PrepareRetryContext(context.Background())
 
 	test.Assert(t, *ctx.Value(CtxReqOp).(*int32) == OpNo)
-	test.Assert(t, *ctx.Value(CtxRespOp).(*int32) == OpNo)
 	*ctx.Value(CtxReqOp).(*int32) = OpDone
-	*ctx.Value(CtxRespOp).(*int32) = OpDone
 
 	test.Assert(t, *ctx.Value(CtxReqOp).(*int32) == OpDone)
-	test.Assert(t, *ctx.Value(CtxRespOp).(*int32) == OpDone)
 }
 
 var gctx context.Context // make sure the return value of PrepareRetryContext escapes
@@ -814,7 +807,6 @@ func BenchmarkPrepareRetryContext(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		ctx = PrepareRetryContext(context.Background())
 		_ = ctx.Value(CtxReqOp)
-		_ = ctx.Value(CtxRespOp)
 	}
 	gctx = ctx
 }
