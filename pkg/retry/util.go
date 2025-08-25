@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"runtime/debug"
 	"strconv"
 
@@ -29,6 +30,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 type ctxKey string
@@ -40,9 +43,6 @@ const (
 
 	// CtxReqOp is used to ignore RPC Request concurrent write
 	CtxReqOp ctxKey = "K_REQ_OP"
-
-	// CtxRespOp is used to ignore RPC Response concurrent write/read.
-	CtxRespOp ctxKey = "K_RESP_OP"
 
 	// Wildcard stands for 'any method' when associated with a retryer.
 	Wildcard = "*"
@@ -179,4 +179,32 @@ func IsLocalRetryRequest(ctx context.Context) bool {
 func IsRemoteRetryRequest(ctx context.Context) bool {
 	_, isRetry := metainfo.GetPersistentValue(ctx, TransitKey)
 	return isRetry
+}
+
+func getNewRespFunc(mi serviceinfo.MethodInfo) func() interface{} {
+	return func() interface{} {
+		if mi.OneWay() {
+			return nil
+		}
+		return mi.NewResult()
+	}
+}
+
+// shallowCopyResults copies the response inside src to dst.
+// NOTE: src and dst must be non nil pointers to the same type of struct, which usually implement utils.KitexResult.
+// It might panic.
+func shallowCopyResults(src, dst interface{}) {
+	if src == nil || dst == nil {
+		return
+	}
+	if srcRes, ok1 := src.(utils.KitexResult); ok1 {
+		if dstRes, ok2 := dst.(utils.KitexResult); ok2 {
+			// fast path
+			dstRes.SetSuccess(srcRes.GetResult())
+			return
+		}
+	}
+	// slow path, try reflect
+	dstrv, srcrv := reflect.ValueOf(dst), reflect.ValueOf(src)
+	dstrv.Elem().Set(srcrv.Elem())
 }

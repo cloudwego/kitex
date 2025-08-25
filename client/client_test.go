@@ -595,7 +595,7 @@ func TestRetry(t *testing.T) {
 		WithTimeoutProvider(tp),
 		WithMiddleware(mockTimeoutMW))
 	mtd := mocks.MockMethod
-	req, res := new(MockTStruct), new(MockTStruct)
+	req, res := mocks.NewMockArgs(), mocks.NewMockResult()
 	err := cli.Call(context.Background(), mtd, req, res)
 	test.Assert(t, errors.Is(err, kerrors.ErrRPCTimeout))
 	test.Assert(t, count == 1, count)
@@ -673,7 +673,7 @@ func TestRetryWithDifferentTimeout(t *testing.T) {
 			RetrySameNode: true,
 		}))
 	mtd := mocks.MockMethod
-	req, res := new(MockTStruct), new(MockTStruct)
+	req, res := mocks.NewMockArgs(), mocks.NewMockResult()
 	err := cli.Call(context.Background(), mtd, req, res)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, count == 2, count)
@@ -726,7 +726,7 @@ func TestRetryWithResultRetry(t *testing.T) {
 			ShouldResultRetry: &retry.ShouldResultRetry{ErrorRetry: errRetryFunc},
 		}))
 	mtd := mocks.MockMethod
-	req, res := new(MockTStruct), new(MockTStruct)
+	req, res := mocks.NewMockArgs(), mocks.NewMockResult()
 	err := cli.Call(context.Background(), mtd, req, res)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, retryWithMockErr)
