@@ -168,10 +168,6 @@ func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 			mws = append(mws, mw)
 		}
 	}
-	// register services middlewares
-	if mw := s.buildServiceMiddleware(); mw != nil {
-		mws = append(mws, mw)
-	}
 	// register core middleware,
 	// core middleware MUST be the last middleware
 	mws = append(mws, s.buildCoreMiddleware())
@@ -235,7 +231,6 @@ func (s *server) Run() (err error) {
 		}
 	}
 
-	s.fillMoreServiceInfo(s.opt.RemoteOpt.Address)
 	s.richRemoteOption()
 	transHdlr, err := s.newSvrTransHandler()
 	if err != nil {
@@ -310,30 +305,6 @@ func (s *server) Stop() (err error) {
 		}
 	})
 	return
-}
-
-func (s *server) buildServiceMiddleware() endpoint.Middleware {
-	hasServiceMW := false
-	for _, svc := range s.svcs.svcMap {
-		if svc.MW != nil {
-			hasServiceMW = true
-			break
-		}
-	}
-	if !hasServiceMW {
-		return nil
-	}
-	return func(next endpoint.Endpoint) endpoint.Endpoint {
-		return func(ctx context.Context, req, resp interface{}) (err error) {
-			ri := rpcinfo.GetRPCInfo(ctx)
-			serviceName := ri.Invocation().ServiceName()
-			svc := s.svcs.svcMap[serviceName]
-			if svc != nil && svc.MW != nil {
-				next = svc.MW(next)
-			}
-			return next(ctx, req, resp)
-		}
-	}
 }
 
 // buildCoreMiddleware build the core middleware that include some default framework logic like error handler and ACL.
@@ -638,21 +609,6 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 	}
 	if info.Tags == nil {
 		info.Tags = s.opt.Svr.Tags
-	}
-}
-
-func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
-	for _, svc := range s.svcs.svcMap {
-		ni := *svc.svcInfo
-		si := &ni
-		extra := make(map[string]interface{}, len(si.Extra)+2)
-		for k, v := range si.Extra {
-			extra[k] = v
-		}
-		extra["address"] = lAddr
-		extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
-		si.Extra = extra
-		svc.svcInfo = si
 	}
 }
 

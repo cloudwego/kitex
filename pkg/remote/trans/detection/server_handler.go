@@ -50,10 +50,6 @@ type svrTransHandlerFactory struct {
 	detectableHandlerFactory []remote.ServerTransHandlerFactory
 }
 
-func (f *svrTransHandlerFactory) MuxEnabled() bool {
-	return false
-}
-
 func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
 	t := &svrTransHandler{}
 	var err error

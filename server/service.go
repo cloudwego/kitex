@@ -20,22 +20,16 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
-
-type serviceMiddlewares struct {
-	MW endpoint.Middleware
-}
 
 type service struct {
 	svcInfo *serviceinfo.ServiceInfo
 	handler interface{}
-	serviceMiddlewares
 }
 
-func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, smw serviceMiddlewares) *service {
-	return &service{svcInfo: svcInfo, handler: handler, serviceMiddlewares: smw}
+func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) *service {
+	return &service{svcInfo: svcInfo, handler: handler}
 }
 
 type services struct {
@@ -57,13 +51,7 @@ func newServices() *services {
 }
 
 func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, registerOpts *RegisterOptions) error {
-	// prepare serviceMiddlewares
-	var serviceMWs serviceMiddlewares
-	if len(registerOpts.Middlewares) > 0 {
-		serviceMWs.MW = endpoint.Chain(registerOpts.Middlewares...)
-	}
-
-	svc := newService(svcInfo, handler, serviceMWs)
+	svc := newService(svcInfo, handler)
 	if registerOpts.IsFallbackService {
 		if s.fallbackSvc != nil {
 			return fmt.Errorf("multiple fallback services cannot be registered. [%s] is already registered as a fallback service", s.fallbackSvc.svcInfo.ServiceName)

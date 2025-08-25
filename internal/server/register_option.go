@@ -16,10 +16,6 @@
 
 package server
 
-import (
-	"github.com/cloudwego/kitex/pkg/endpoint"
-)
-
 // RegisterOption is the only way to config service registration.
 type RegisterOption struct {
 	F func(o *RegisterOptions)
@@ -28,7 +24,6 @@ type RegisterOption struct {
 // RegisterOptions is used to config service registration.
 type RegisterOptions struct {
 	IsFallbackService bool
-	Middlewares       []endpoint.Middleware
 }
 
 // NewRegisterOptions creates a register options.
