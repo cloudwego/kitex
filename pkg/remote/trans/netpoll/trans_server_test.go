@@ -73,9 +73,8 @@ func TestMain(m *testing.M) {
 				return nil
 			},
 		},
-		SvcSearcher:   mocksremote.NewDefaultSvcSearcher(),
-		TargetSvcInfo: svcInfo,
-		TracerCtl:     &rpcinfo.TraceController{},
+		SvcSearcher: mocksremote.NewDefaultSvcSearcher(),
+		TracerCtl:   &rpcinfo.TraceController{},
 	}
 	svrTransHdlr, _ = newSvrTransHandler(svrOpt)
 	transSvr = NewTransServerFactory().NewTransServer(svrOpt, svrTransHdlr).(*transServer)

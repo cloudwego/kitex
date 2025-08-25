@@ -63,11 +63,10 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 	svrHdlr := &svrTransHandler{
-		opt:           opt,
-		codec:         opt.Codec,
-		svcSearcher:   opt.SvcSearcher,
-		targetSvcInfo: opt.TargetSvcInfo,
-		ext:           np.NewNetpollConnExtension(),
+		opt:         opt,
+		codec:       opt.Codec,
+		svcSearcher: opt.SvcSearcher,
+		ext:         np.NewNetpollConnExtension(),
 	}
 	if svrHdlr.opt.TracerCtl == nil {
 		// init TraceCtl when it is nil, or it will lead some unit tests panic
@@ -83,16 +82,15 @@ func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 var _ remote.ServerTransHandler = &svrTransHandler{}
 
 type svrTransHandler struct {
-	opt           *remote.ServerOption
-	svcSearcher   remote.ServiceSearcher
-	targetSvcInfo *serviceinfo.ServiceInfo
-	inkHdlFunc    endpoint.Endpoint
-	codec         remote.Codec
-	transPipe     *remote.TransPipeline
-	ext           trans.Extension
-	funcPool      sync.Pool
-	conns         sync.Map
-	tasks         sync.WaitGroup
+	opt         *remote.ServerOption
+	svcSearcher remote.ServiceSearcher
+	inkHdlFunc  endpoint.Endpoint
+	codec       remote.Codec
+	transPipe   *remote.TransPipeline
+	ext         trans.Extension
+	funcPool    sync.Pool
+	conns       sync.Map
+	tasks       sync.WaitGroup
 }
 
 // Write implements the remote.ServerTransHandler interface.
