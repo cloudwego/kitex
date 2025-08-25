@@ -25,6 +25,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func TestPipeline(t *testing.T) {
@@ -98,6 +100,47 @@ func TestPipelineWriteCloseAndRead(t *testing.T) {
 		runtime.Gosched()
 	}
 	pipe.Close()
+	readWG.Wait()
+}
+
+func TestPipelineCancelCallback(t *testing.T) {
+	pipeWrapper := struct{ pipe *Pipe[int] }{}
+	finalNum := 100
+	firstNum := 1
+	pipe := NewPipe[int](WithCtxDoneCallback(
+		func(ctx context.Context) {
+			_ = pipeWrapper.pipe.Write(context.Background(), finalNum)
+			pipeWrapper.pipe.Close()
+		},
+	))
+	pipeWrapper.pipe = pipe
+	var readWG sync.WaitGroup
+	readWG.Add(1)
+	go func() {
+		defer readWG.Done()
+		var canceled bool
+		readBuf := make([]int, 1)
+		rCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		for {
+			n, rErr := pipe.Read(rCtx, readBuf)
+			if canceled {
+				if rErr != nil {
+					test.Assert(t, rErr == io.EOF, rErr)
+					return
+				}
+				test.Assert(t, n == 1, n)
+				test.Assert(t, readBuf[0] == finalNum, readBuf[0])
+				continue
+			}
+			test.Assert(t, n == 1, n)
+			test.Assert(t, readBuf[0] == firstNum, readBuf[0])
+			cancel()
+			canceled = true
+		}
+	}()
+	wErr := pipe.Write(context.Background(), firstNum)
+	test.Assert(t, wErr == nil, wErr)
 	readWG.Wait()
 }
 
