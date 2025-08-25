@@ -19,8 +19,6 @@ package server
 // Invoker is for calling handler function wrapped by Kitex suites without connection.
 
 import (
-	"errors"
-
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/bound"
@@ -59,8 +57,8 @@ func NewInvoker(opts ...Option) Invoker {
 
 // Init does initialization job for invoker.
 func (s *tInvoker) Init() (err error) {
-	if len(s.server.svcs.svcMap) == 0 {
-		return errors.New("run: no service. Use RegisterService to set one")
+	if err = s.check(); err != nil {
+		return err
 	}
 	s.initBasicRemoteOption()
 	// for server trans info handler

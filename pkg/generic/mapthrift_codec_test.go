@@ -34,12 +34,12 @@ func TestMapThriftCodec(t *testing.T) {
 	defer mtc.Close()
 	test.Assert(t, mtc.Name() == "MapThrift")
 
-	method, err := mtc.getMethod(nil, "Test")
+	method, err := mtc.getMethod("Test")
 	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "Test")
 	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
-	test.Assert(t, mtc.svcName == "Mock")
-	test.Assert(t, mtc.extra[CombineServiceKey] == "false")
+	test.Assert(t, mtc.svcName.Load().(string) == "Mock")
+	isCombineService, _ := mtc.combineService.Load().(bool)
+	test.Assert(t, !isCombineService)
 
 	rw := mtc.getMessageReaderWriter()
 
@@ -69,11 +69,10 @@ func TestMapThriftCodecSelfRef(t *testing.T) {
 	defer mtc.Close()
 	test.Assert(t, mtc.Name() == "MapThrift")
 
-	method, err := mtc.getMethod(nil, "Test")
+	method, err := mtc.getMethod("Test")
 	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "Test")
 	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
-	test.Assert(t, mtc.svcName == "Mock")
+	test.Assert(t, mtc.svcName.Load().(string) == "Mock")
 
 	rw := mtc.getMessageReaderWriter()
 	_, ok := rw.(*thrift.StructReaderWriter)
@@ -87,11 +86,10 @@ func TestMapThriftCodecForJSON(t *testing.T) {
 	defer mtc.Close()
 	test.Assert(t, mtc.Name() == "MapThrift")
 
-	method, err := mtc.getMethod(nil, "Test")
+	method, err := mtc.getMethod("Test")
 	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "Test")
 	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
-	test.Assert(t, mtc.svcName == "Mock")
+	test.Assert(t, mtc.svcName.Load().(string) == "Mock")
 
 	rw := mtc.getMessageReaderWriter()
 

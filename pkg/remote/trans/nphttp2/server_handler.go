@@ -31,6 +31,7 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	igeneric "github.com/cloudwego/kitex/internal/generic"
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
@@ -48,6 +49,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/transport"
 )
+
+var streamingBidirectionalCtx = igeneric.WithGenericStreamingMode(context.Background(), serviceinfo.StreamingBidirectional)
 
 type svrTransHandlerFactory struct{}
 
@@ -223,10 +226,11 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 	// set send grpc compressor at server to encode reply pack
 	remote.SetSendCompressor(ri, s.SendCompress())
 
-	svcInfo := t.svcSearcher.SearchService(serviceName, methodName, true)
+	svcInfo := t.svcSearcher.SearchService(serviceName, methodName, true, ri.Config().PayloadCodec())
 	var methodInfo serviceinfo.MethodInfo
 	if svcInfo != nil {
-		methodInfo = svcInfo.MethodInfo(methodName)
+		// TODO: pass-through grpc streaming mode.
+		methodInfo = svcInfo.MethodInfo(streamingBidirectionalCtx, methodName)
 	}
 
 	rawStream := newServerStream(rCtx, svcInfo, newServerConn(tr, s), t)

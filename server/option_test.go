@@ -342,7 +342,7 @@ func TestPayloadCodecOption(t *testing.T) {
 
 	t.Run("SetNonPreRegisteredCodec", func(t *testing.T) {
 		// generic.BinaryThriftGeneric().PayloadCodec() is not the pre registered codec, RemoteOpt.PayloadCodec won't be nil
-		binaryThriftCodec := generic.BinaryThriftGeneric().PayloadCodec()
+		binaryThriftCodec := generic.BinaryThriftGeneric().GetExtra(generic.BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec)
 		svr, _ := NewTestServer(WithPayloadCodec(binaryThriftCodec))
 		err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 		test.Assert(t, err == nil, err)

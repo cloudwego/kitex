@@ -123,7 +123,7 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 				mink := msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter)
 				mink.SetServiceName(mocks.MockServiceName)
 				mink.SetMethodName(mocks.MockMethod)
-				mink.SetMethodInfo(svcInfo.MethodInfo(mocks.MockMethod))
+				mink.SetMethodInfo(svcInfo.MethodInfo(context.Background(), mocks.MockMethod))
 				return nil
 			},
 		},

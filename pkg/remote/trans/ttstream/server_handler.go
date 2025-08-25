@@ -31,6 +31,7 @@ import (
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
 
+	igeneric "github.com/cloudwego/kitex/internal/generic"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -38,9 +39,12 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
+
+var streamingBidirectionalCtx = igeneric.WithGenericStreamingMode(context.Background(), serviceinfo.StreamingBidirectional)
 
 type (
 	serverTransCtxKey        struct{}
@@ -175,12 +179,14 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 	}()
 
 	ink := ri.Invocation().(rpcinfo.InvocationSetter)
-	sinfo := t.opt.SvcSearcher.SearchService(st.Service(), st.Method(), true)
+	// TODO: support protobuf codec, and make `strict` true when combine service is not supported.
+	sinfo := t.opt.SvcSearcher.SearchService(st.Service(), st.Method(), false, serviceinfo.Thrift)
 	if sinfo == nil {
 		err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", st.Service()))
 		return
 	}
-	minfo := sinfo.MethodInfo(st.Method())
+	// TODO: pass-through grpc streaming mode.
+	minfo := sinfo.MethodInfo(streamingBidirectionalCtx, st.Method())
 	if minfo == nil {
 		err = remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", st.Method()))
 		return

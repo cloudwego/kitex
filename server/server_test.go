@@ -573,8 +573,8 @@ func TestGRPCServerMultipleServices(t *testing.T) {
 	err = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
-	test.DeepEqual(t, svr.(*server).svcs.SearchService("", mocks.MockMethod, false), mocks.ServiceInfo())
-	test.DeepEqual(t, svr.(*server).svcs.SearchService("", mocks.Mock2Method, false), mocks.Service2Info())
+	test.DeepEqual(t, svr.(*server).svcs.SearchService("", mocks.MockMethod, false, serviceinfo.Thrift), mocks.ServiceInfo())
+	test.DeepEqual(t, svr.(*server).svcs.SearchService("", mocks.Mock2Method, false, serviceinfo.Thrift), mocks.Service2Info())
 	goWaitAndStop(t, svr)
 	err = svr.Run()
 	test.Assert(t, err == nil, err)
@@ -782,10 +782,10 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 				inkSetter := ri.Invocation().(rpcinfo.InvocationSetter)
-				inkSetter.SetMethodInfo(svcInfo.MethodInfo(callMethod))
+				inkSetter.SetMethodInfo(svcInfo.MethodInfo(context.Background(), callMethod))
 				recvMsg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
-				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), ri, remote.Reply, remote.Server)
+				sendMsg := remote.NewMessage(svcInfo.MethodInfo(context.Background(), callMethod).NewResult(), ri, remote.Reply, remote.Server)
 
 				// inject kvs here
 				ctx = metainfo.WithPersistentValue(ctx, "a", "b")
@@ -871,10 +871,10 @@ func TestInvokeHandlerExec(t *testing.T) {
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 				inkSetter := ri.Invocation().(rpcinfo.InvocationSetter)
-				inkSetter.SetMethodInfo(svcInfo.MethodInfo(callMethod))
+				inkSetter.SetMethodInfo(svcInfo.MethodInfo(context.Background(), callMethod))
 				recvMsg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
-				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), ri, remote.Reply, remote.Server)
+				sendMsg := remote.NewMessage(svcInfo.MethodInfo(context.Background(), callMethod).NewResult(), ri, remote.Reply, remote.Server)
 
 				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
 				test.Assert(t, err == nil, err)
@@ -936,10 +936,10 @@ func TestInvokeHandlerPanic(t *testing.T) {
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 				inkSetter := ri.Invocation().(rpcinfo.InvocationSetter)
-				inkSetter.SetMethodInfo(svcInfo.MethodInfo(callMethod))
+				inkSetter.SetMethodInfo(svcInfo.MethodInfo(context.Background(), callMethod))
 				recvMsg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
-				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), ri, remote.Reply, remote.Server)
+				sendMsg := remote.NewMessage(svcInfo.MethodInfo(context.Background(), callMethod).NewResult(), ri, remote.Reply, remote.Server)
 
 				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
 				test.Assert(t, strings.Contains(err.Error(), "happened in biz handler"))
@@ -1029,7 +1029,7 @@ func TestRegisterService(t *testing.T) {
 			_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 		}, func(err interface{}) bool {
 			if errMsg, ok := err.(string); ok {
-				return strings.Contains(errMsg, "Service[MockService] is already defined")
+				return strings.Contains(errMsg, "service [MockService] has already been registered")
 			}
 			return true
 		})
@@ -1196,15 +1196,10 @@ func newStreamingServer(svcInfo *serviceinfo.ServiceInfo, mws []endpoint.Middlew
 		opts = append(opts, WithMiddleware(mw))
 	}
 	svr := &server{
-		svcs: &services{
-			svcMap: map[string]*service{
-				svcInfo.ServiceName: {
-					svcInfo: svcInfo,
-				},
-			},
-		},
-		opt: internal_server.NewOptions(opts),
+		svcs: newServices(),
+		opt:  internal_server.NewOptions(opts),
 	}
+	svr.svcs.addService(svcInfo, nil, &RegisterOptions{})
 	return svr
 }
 
@@ -1275,7 +1270,7 @@ func TestStreamCtxDiverge(t *testing.T) {
 			test.Assert(t, ok)
 			ink.SetServiceName(testService)
 			ink.SetMethodName(tc.methodName)
-			ink.SetMethodInfo(svcInfo.MethodInfo(tc.methodName))
+			ink.SetMethodInfo(svcInfo.MethodInfo(context.Background(), tc.methodName))
 			ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 			mock := &mockStream{}
 			err := svr.eps(ctx, &streaming.Args{ServerStream: mock}, nil)

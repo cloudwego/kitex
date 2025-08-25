@@ -17,7 +17,6 @@
 package generic
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -25,26 +24,20 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/jhump/protoreflect/desc"
-
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var _ Closer = &httpPbThriftCodec{}
 
 type httpPbThriftCodec struct {
-	svcDsc       atomic.Value // *idl
-	pbSvcDsc     atomic.Value // *pbIdl
-	provider     DescriptorProvider
-	pbProvider   PbDescriptorProvider
-	svcName      string
-	extra        map[string]string
-	readerWriter atomic.Value // *thrift.HTTPPbReaderWriter
+	svcDsc         atomic.Value // *idl
+	pbSvcDsc       atomic.Value // *pbIdl
+	provider       DescriptorProvider
+	pbProvider     PbDescriptorProvider
+	svcName        atomic.Value // string
+	combineService atomic.Value // bool
+	readerWriter   atomic.Value // *thrift.HTTPPbReaderWriter
 }
 
 func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider) *httpPbThriftCodec {
@@ -53,10 +46,9 @@ func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider) *httpP
 	c := &httpPbThriftCodec{
 		provider:   p,
 		pbProvider: pbp,
-		svcName:    svc.Name,
-		extra:      make(map[string]string),
 	}
-	c.setCombinedServices(svc.IsCombinedServices)
+	c.svcName.Store(svc.Name)
+	c.combineService.Store(svc.IsCombinedServices)
 	c.svcDsc.Store(svc)
 	c.pbSvcDsc.Store(pbSvc)
 	c.readerWriter.Store(thrift.NewHTTPPbReaderWriter(svc, pbSvc))
@@ -76,36 +68,40 @@ func (c *httpPbThriftCodec) update() {
 			return
 		}
 
-		c.svcName = svc.Name
-		c.setCombinedServices(svc.IsCombinedServices)
+		c.svcName.Store(svc.Name)
+		c.combineService.Store(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
 		c.pbSvcDsc.Store(pbSvc)
 		c.readerWriter.Store(thrift.NewHTTPPbReaderWriter(svc, pbSvc))
 	}
 }
 
-func (c *httpPbThriftCodec) setCombinedServices(isCombinedServices bool) {
-	if isCombinedServices {
-		c.extra[CombineServiceKey] = "true"
-	} else {
-		c.extra[CombineServiceKey] = "false"
-	}
-}
-
-func (c *httpPbThriftCodec) getMethod(req interface{}) (*Method, error) {
+func (c *httpPbThriftCodec) getMethodByReq(req interface{}) (methodName string, err error) {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
-		return nil, errors.New("get method name failed, no ServiceDescriptor")
+		return "", errors.New("get method name failed, no ServiceDescriptor")
 	}
 	r, ok := req.(*HTTPRequest)
 	if !ok {
-		return nil, errors.New("req is invalid, need descriptor.HTTPRequest")
+		return "", errors.New("req is invalid, need descriptor.HTTPRequest")
 	}
 	function, err := svcDsc.Router.Lookup(r)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return &Method{function.Name, function.Oneway, function.StreamingMode}, nil
+	return function.Name, nil
+}
+
+func (c *httpPbThriftCodec) getMethod(name string) (Method, error) {
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return Method{}, errors.New("get method name failed, no ServiceDescriptor")
+	}
+	fnSvc, err := svcDsc.LookupFunctionByMethod(name)
+	if err != nil {
+		return Method{}, err
+	}
+	return Method{Oneway: fnSvc.Oneway, StreamingMode: fnSvc.StreamingMode}, nil
 }
 
 func (c *httpPbThriftCodec) getMessageReaderWriter() interface{} {
@@ -135,41 +131,6 @@ func (c *httpPbThriftCodec) Close() error {
 	} else {
 		return errors.New(strings.Join(errs, ";"))
 	}
-}
-
-// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
-func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser ServiceDescriptor failed")
-	}
-	pbSvcDsc, ok := c.pbSvcDsc.Load().(*desc.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser PbServiceDescriptor failed")
-	}
-
-	inner := thrift.NewWriteHTTPPbRequest(svcDsc, pbSvcDsc)
-	msg.Data().(WithCodec).SetCodec(inner)
-	return thriftCodec.Marshal(ctx, msg, out)
-}
-
-// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
-func (c *httpPbThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
-		return err
-	}
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser ServiceDescriptor failed")
-	}
-	pbSvcDsc, ok := c.pbSvcDsc.Load().(proto.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser PbServiceDescriptor failed")
-	}
-
-	inner := thrift.NewReadHTTPPbResponse(svcDsc, pbSvcDsc)
-	msg.Data().(WithCodec).SetCodec(inner)
-	return thriftCodec.Unmarshal(ctx, msg, in)
 }
 
 // FromHTTPPbRequest parse  HTTPRequest from http.Request

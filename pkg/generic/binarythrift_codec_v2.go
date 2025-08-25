@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 CloudWeGo Authors
+ * Copyright 2025 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,14 +14,28 @@
  * limitations under the License.
  */
 
-package genericclient
+package generic
 
 import (
-	"github.com/cloudwego/kitex/pkg/generic"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
-// Deprecated, use generic.ServiceInfoWithGeneric instead
-func StreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
-	return generic.ServiceInfoWithGeneric(g)
+type binaryThriftCodecV2 struct {
+	svcName      string
+	readerWriter *thrift.RawReaderWriter
+}
+
+func newBinaryThriftCodecV2(svcName string) *binaryThriftCodecV2 {
+	return &binaryThriftCodecV2{
+		svcName:      svcName,
+		readerWriter: thrift.NewRawReaderWriter(),
+	}
+}
+
+func (c *binaryThriftCodecV2) Name() string {
+	return "BinaryThriftV2"
+}
+
+func (c *binaryThriftCodecV2) getMessageReaderWriter() interface{} {
+	return c.readerWriter
 }

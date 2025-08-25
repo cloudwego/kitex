@@ -40,7 +40,7 @@ func TestBinaryPbFields(t *testing.T) {
 	codec := newBinaryPbCodec("service", "package")
 	test.Assert(t, codec.Name() == "BinaryPb")
 	test.Assert(t, codec.svcName == "service")
-	test.Assert(t, codec.extra[packageNameKey] == "package")
+	test.Assert(t, codec.packageName == "package")
 }
 
 func TestBinaryPbCodecReaderWriter(t *testing.T) {

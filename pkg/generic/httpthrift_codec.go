@@ -17,7 +17,6 @@
 package generic
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -28,9 +27,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var _ Closer = &httpThriftCodec{}
@@ -49,8 +45,8 @@ type httpThriftCodec struct {
 	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
 	dynamicgoEnabled       bool
 	useRawBodyForHTTPResp  bool
-	svcName                string
-	extra                  map[string]string
+	svcName                atomic.Value // string
+	combineService         atomic.Value // bool
 	readerWriter           atomic.Value // *thrift.HTTPReaderWriter
 }
 
@@ -61,9 +57,9 @@ func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
 		binaryWithBase64:      false,
 		dynamicgoEnabled:      false,
 		useRawBodyForHTTPResp: opts.useRawBodyForHTTPResp,
-		svcName:               svc.Name,
-		extra:                 make(map[string]string),
 	}
+	c.svcName.Store(svc.Name)
+	c.combineService.Store(svc.IsCombinedServices)
 	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoEnabled {
 		c.dynamicgoEnabled = true
 
@@ -73,7 +69,6 @@ func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
 		convOpts.EnableThriftBase = true
 		c.convOptsWithThriftBase = convOpts
 	}
-	c.setCombinedServices(svc.IsCombinedServices)
 	c.svcDsc.Store(svc)
 	c.configureMessageReaderWriter(svc)
 	go c.update()
@@ -86,8 +81,8 @@ func (c *httpThriftCodec) update() {
 		if !ok {
 			return
 		}
-		c.svcName = svc.Name
-		c.setCombinedServices(svc.IsCombinedServices)
+		c.svcName.Store(svc.Name)
+		c.combineService.Store(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
 		c.configureMessageReaderWriter(svc)
 	}
@@ -107,14 +102,6 @@ func (c *httpThriftCodec) configureMessageReaderWriter(svc *descriptor.ServiceDe
 	c.configureHTTPRequestWriter(rw.WriteHTTPRequest)
 	c.configureHTTPResponseReader(rw.ReadHTTPResponse)
 	c.readerWriter.Store(rw)
-}
-
-func (c *httpThriftCodec) setCombinedServices(isCombinedServices bool) {
-	if isCombinedServices {
-		c.extra[CombineServiceKey] = "true"
-	} else {
-		c.extra[CombineServiceKey] = "false"
-	}
 }
 
 func (c *httpThriftCodec) getMessageReaderWriter() interface{} {
@@ -141,20 +128,32 @@ func (c *httpThriftCodec) configureHTTPResponseReader(reader *thrift.ReadHTTPRes
 	}
 }
 
-func (c *httpThriftCodec) getMethod(req interface{}) (*Method, error) {
+func (c *httpThriftCodec) getMethodByReq(req interface{}) (methodName string, err error) {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
-		return nil, errors.New("get method name failed, no ServiceDescriptor")
+		return "", errors.New("get method name failed, no ServiceDescriptor")
 	}
 	r, ok := req.(*HTTPRequest)
 	if !ok {
-		return nil, errors.New("req is invalid, need descriptor.HTTPRequest")
+		return "", errors.New("req is invalid, need descriptor.HTTPRequest")
 	}
 	function, err := svcDsc.Router.Lookup(r)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return &Method{function.Name, function.Oneway, function.StreamingMode}, nil
+	return function.Name, nil
+}
+
+func (c *httpThriftCodec) getMethod(name string) (Method, error) {
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return Method{}, errors.New("get method name failed, no ServiceDescriptor")
+	}
+	fnSvc, err := svcDsc.LookupFunctionByMethod(name)
+	if err != nil {
+		return Method{}, err
+	}
+	return Method{Oneway: fnSvc.Oneway, StreamingMode: fnSvc.StreamingMode}, nil
 }
 
 func (c *httpThriftCodec) Name() string {
@@ -163,44 +162,6 @@ func (c *httpThriftCodec) Name() string {
 
 func (c *httpThriftCodec) Close() error {
 	return c.provider.Close()
-}
-
-// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
-func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser ServiceDescriptor failed")
-	}
-
-	inner := thrift.NewWriteHTTPRequest(svcDsc)
-	inner.SetBinaryWithBase64(c.binaryWithBase64)
-	if c.dynamicgoEnabled {
-		inner.SetDynamicGo(&c.convOpts, &c.convOptsWithThriftBase)
-	}
-
-	msg.Data().(WithCodec).SetCodec(inner)
-	return thriftCodec.Marshal(ctx, msg, out)
-}
-
-// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
-func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
-		return err
-	}
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser ServiceDescriptor failed")
-	}
-
-	inner := thrift.NewReadHTTPResponse(svcDsc)
-	inner.SetBase64Binary(c.binaryWithBase64)
-	inner.SetUseRawBodyForHTTPResp(c.useRawBodyForHTTPResp)
-	if c.dynamicgoEnabled && c.useRawBodyForHTTPResp && msg.PayloadLen() != 0 {
-		inner.SetDynamicGo(&c.convOpts)
-	}
-
-	msg.Data().(WithCodec).SetCodec(inner)
-	return thriftCodec.Unmarshal(ctx, msg, in)
 }
 
 // FromHTTPRequest parse HTTPRequest from http.Request

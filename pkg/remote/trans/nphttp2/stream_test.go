@@ -49,7 +49,6 @@ func TestStream(t *testing.T) {
 		PayloadCodec:    0,
 		KiteXGenVersion: "",
 		Extra:           nil,
-		GenericMethod:   nil,
 	}, serverConn, handler)
 
 	// test Context()

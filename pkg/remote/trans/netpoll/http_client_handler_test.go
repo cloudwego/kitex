@@ -129,7 +129,7 @@ func TestHTTPOnMessage(t *testing.T) {
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	remote.SetServiceSearcher(ri, svcSearcher)
 	recvMsg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
-	sendMsg := remote.NewMessage(svcInfo.MethodInfo(method).NewResult(), ri, remote.Reply, remote.Server)
+	sendMsg := remote.NewMessage(svcInfo.MethodInfo(context.Background(), method).NewResult(), ri, remote.Reply, remote.Server)
 
 	// 2. test
 	_, err := httpCilTransHdlr.OnMessage(ctx, recvMsg, sendMsg)

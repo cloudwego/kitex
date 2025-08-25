@@ -240,7 +240,7 @@ func initMockReqArgsRecvMsg() remote.Message {
 
 func initRecvMsg(m any) remote.Message {
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.EmptyEndpointInfo(), ink, nil, nil)
+	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.EmptyEndpointInfo(), ink, rpcinfo.NewRPCConfig(), nil)
 	remote.SetServiceSearcher(ri, mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
 		svcInfo.ServiceName: svcInfo,
 	}))

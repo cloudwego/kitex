@@ -59,13 +59,16 @@ func TestHttpThriftCodec(t *testing.T) {
 	req := &HTTPRequest{Request: getStdHttpRequest()}
 	// wrong
 	method, err := htc.getMethod("test")
-	test.Assert(t, err.Error() == "req is invalid, need descriptor.HTTPRequest" && method == nil)
+	test.Assert(t, err.Error() == "missing method: test in service: ExampleService")
 	// right
-	method, err = htc.getMethod(req)
-	test.Assert(t, err == nil && method.Name == "BinaryEcho")
-	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
-	test.Assert(t, htc.svcName == "ExampleService")
-	test.Assert(t, htc.extra[CombineServiceKey] == "false")
+	methodName, err := htc.getMethodByReq(req)
+	test.Assert(t, err == nil && methodName == "BinaryEcho")
+	method, err = htc.getMethod(methodName)
+	test.Assert(t, err == nil && method.StreamingMode == serviceinfo.StreamingNone)
+	svcName, _ := htc.svcName.Load().(string)
+	test.Assert(t, svcName == "ExampleService")
+	isCombineService, _ := htc.combineService.Load().(bool)
+	test.Assert(t, !isCombineService)
 
 	rw := htc.getMessageReaderWriter()
 	_, ok := rw.(error)
@@ -94,13 +97,16 @@ func TestHttpThriftCodecWithDynamicGo(t *testing.T) {
 	req := &HTTPRequest{Request: getStdHttpRequest()}
 	// wrong
 	method, err := htc.getMethod("test")
-	test.Assert(t, err.Error() == "req is invalid, need descriptor.HTTPRequest" && method == nil)
+	test.Assert(t, err.Error() == "missing method: test in service: ExampleService")
 	// right
-	method, err = htc.getMethod(req)
-	test.Assert(t, err == nil && method.Name == "BinaryEcho")
-	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
-	test.Assert(t, htc.svcName == "ExampleService")
-	test.Assert(t, htc.extra[CombineServiceKey] == "false")
+	methodName, err := htc.getMethodByReq(req)
+	test.Assert(t, err == nil && methodName == "BinaryEcho")
+	method, err = htc.getMethod(methodName)
+	test.Assert(t, err == nil && method.StreamingMode == serviceinfo.StreamingNone)
+	svcName, _ := htc.svcName.Load().(string)
+	test.Assert(t, svcName == "ExampleService")
+	isCombineService, _ := htc.combineService.Load().(bool)
+	test.Assert(t, !isCombineService)
 
 	rw := htc.getMessageReaderWriter()
 	_, ok := rw.(*thrift.HTTPReaderWriter)

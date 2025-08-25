@@ -220,7 +220,7 @@ func (r *rpcStats) Level() stats.Level {
 }
 
 // CopyForRetry implements the RPCStats interface, it copies a RPCStats from the origin one
-// to pass through info of the first request to retrying requests.
+// to pass-through info of the first request to retrying requests.
 func (r *rpcStats) CopyForRetry() RPCStats {
 	// Copied rpc stats is for request retrying and cannot be reused, so no need to get from pool.
 	nr := newRPCStats()

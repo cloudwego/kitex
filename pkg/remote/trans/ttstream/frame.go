@@ -202,6 +202,20 @@ func EncodePayload(ctx context.Context, msg any) ([]byte, error) {
 		}
 		w.Flush()
 		return buf, nil
+	case *generic.Result:
+		ri := rpcinfo.GetRPCInfo(ctx)
+		if ri == nil {
+			return nil, errNoRPCInfo
+		}
+		methodName := ri.Invocation().MethodName()
+		var buf []byte
+		w := bufiox.NewBytesWriter(&buf)
+		err := t.Write(ctx, methodName, w)
+		if err != nil {
+			return nil, err
+		}
+		w.Flush()
+		return buf, nil
 	default:
 		return nil, errInvalidMessage
 	}
@@ -211,6 +225,14 @@ func DecodePayload(ctx context.Context, payload []byte, msg any) error {
 	switch t := msg.(type) {
 	case gopkgthrift.FastCodec:
 		return gopkgthrift.FastUnmarshal(payload, msg.(gopkgthrift.FastCodec))
+	case *generic.Args:
+		ri := rpcinfo.GetRPCInfo(ctx)
+		if ri == nil {
+			return errNoRPCInfo
+		}
+		methodName := ri.Invocation().MethodName()
+		r := bufiox.NewBytesReader(payload)
+		return t.Read(ctx, methodName, len(payload), r)
 	case *generic.Result:
 		ri := rpcinfo.GetRPCInfo(ctx)
 		if ri == nil {

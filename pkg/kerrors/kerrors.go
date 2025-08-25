@@ -70,6 +70,16 @@ func ErrNonExistentMethod(svcName, method string) error {
 	return ErrInternalException.WithCause(fmt.Errorf("non-existent method, service: %s, method: %s", svcName, method))
 }
 
+// ErrNotStreamingMethod is used when the method is not a streaming method in a service info.
+func ErrNotStreamingMethod(svcName, method string) error {
+	return ErrInternalException.WithCause(fmt.Errorf("not a streaming method, service: %s, method: %s", svcName, method))
+}
+
+// ErrNotUnaryMethod is used when the method is not a unary method in a service info.
+func ErrNotUnaryMethod(svcName, method string) error {
+	return ErrInternalException.WithCause(fmt.Errorf("not a unary method, service: %s, method: %s", svcName, method))
+}
+
 type basicError struct {
 	message string
 }

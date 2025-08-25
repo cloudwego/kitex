@@ -116,7 +116,7 @@ func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
 		return errIllegalOperation.WithCause(errors.New("stream is closed send"))
 	}
 	// encode payload
-	payload, err := EncodePayload(s.ctx, msg)
+	payload, err := EncodePayload(ctx, msg)
 	if err != nil {
 		return err
 	}

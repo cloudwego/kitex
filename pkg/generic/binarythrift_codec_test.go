@@ -165,7 +165,7 @@ func newMockRPCInfo() rpcinfo.RPCInfo {
 	c := rpcinfo.NewEndpointInfo("", "", nil, nil)
 	s := rpcinfo.NewEndpointInfo("", "", nil, nil)
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(c, s, ink, nil, rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(c, s, ink, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	return ri
 }
 
