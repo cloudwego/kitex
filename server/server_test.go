@@ -1061,100 +1061,6 @@ func TestRegisterService(t *testing.T) {
 	}
 }
 
-func TestRegisterServiceWithMiddleware(t *testing.T) {
-	callMethod := "mock"
-	var opts []Option
-	opts = append(opts, WithCodec(&mockCodec{}))
-	transHdlrFact := &mockSvrTransHandlerFactory{}
-	exitCh := make(chan bool)
-	var ln net.Listener
-	transSvr := &mocks.MockTransServer{
-		BootstrapServerFunc: func(net.Listener) error {
-			{
-				// mock server call
-				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
-				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-				inkSetter := ri.Invocation().(rpcinfo.InvocationSetter)
-				inkSetter.SetMethodInfo(svcInfo.MethodInfo(callMethod))
-				recvMsg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
-				recvMsg.NewData(callMethod)
-				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), ri, remote.Reply, remote.Server)
-
-				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
-				test.Assert(t, err == nil)
-			}
-			<-exitCh
-			return nil
-		},
-		ShutdownFunc: func() error {
-			ln.Close()
-			exitCh <- true
-			return nil
-		},
-		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
-			var err error
-			ln, err = net.Listen("tcp", "localhost:0")
-			return ln, err
-		},
-	}
-	serverMW := 0
-	serviceMW1 := 0
-	serviceMW2 := 0
-	serviceHandler := 0
-	opts = append(opts, WithTransServerFactory(mocks.NewMockTransServerFactory(transSvr)))
-	opts = append(opts, WithTransHandlerFactory(transHdlrFact))
-	// server middleware
-	opts = append(opts, WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
-		return func(ctx context.Context, req, resp interface{}) (err error) {
-			test.Assert(t, serverMW == 0 && serviceMW1 == 0 && serviceMW2 == 0 && serviceHandler == 0)
-			serverMW++
-			err = next(ctx, req, resp)
-			test.Assert(t, serverMW == 1 && serviceMW1 == 2 && serviceMW2 == 2 && serviceHandler == 2)
-			serverMW++
-			return err
-		}
-	}))
-	svr := NewServer(opts...)
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr.Stop()
-		test.Assert(t, err == nil, err)
-	})
-	err := svr.RegisterService(
-		mocks.ServiceInfo(),
-		mocks.MockFuncHandler(func(ctx context.Context, req *mocks.MyRequest) (r *mocks.MyResponse, err error) {
-			test.Assert(t, serverMW == 1 && serviceMW1 == 1 && serviceMW2 == 1 && serviceHandler == 0)
-			serviceHandler += 2
-			return &mocks.MyResponse{}, nil
-		}),
-		// service middleware 1
-		WithServiceMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
-			return func(ctx context.Context, req, resp interface{}) (err error) {
-				test.Assert(t, serverMW == 1 && serviceMW1 == 0 && serviceMW2 == 0 && serviceHandler == 0)
-				serviceMW1++
-				err = next(ctx, req, resp)
-				test.Assert(t, serverMW == 1 && serviceMW1 == 1 && serviceMW2 == 2 && serviceHandler == 2)
-				serviceMW1++
-				return err
-			}
-		}),
-		// service middleware 2
-		WithServiceMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
-			return func(ctx context.Context, req, resp interface{}) (err error) {
-				test.Assert(t, serverMW == 1 && serviceMW1 == 1 && serviceMW2 == 0 && serviceHandler == 0)
-				serviceMW2++
-				err = next(ctx, req, resp)
-				test.Assert(t, serverMW == 1 && serviceMW1 == 1 && serviceMW2 == 1 && serviceHandler == 2)
-				serviceMW2++
-				return err
-			}
-		}),
-	)
-	test.Assert(t, err == nil)
-	err = svr.Run()
-	test.Assert(t, err == nil, err)
-	test.Assert(t, serverMW == 2 && serviceMW1 == 2 && serviceMW2 == 2 && serviceHandler == 2)
-}
-
 type noopMetahandler struct{}
 
 func (noopMetahandler) WriteMeta(ctx context.Context, msg remote.Message) (context.Context, error) {
@@ -1285,16 +1191,19 @@ type streamingMethodArg struct {
 }
 
 func newStreamingServer(svcInfo *serviceinfo.ServiceInfo, mws []endpoint.Middleware) *server {
+	var opts []Option
+	for _, mw := range mws {
+		opts = append(opts, WithMiddleware(mw))
+	}
 	svr := &server{
 		svcs: &services{
 			svcMap: map[string]*service{
 				svcInfo.ServiceName: {
-					svcInfo:            svcInfo,
-					serviceMiddlewares: serviceMiddlewares{MW: endpoint.Chain(mws...)},
+					svcInfo: svcInfo,
 				},
 			},
 		},
-		opt: internal_server.NewOptions(nil),
+		opt: internal_server.NewOptions(opts),
 	}
 	return svr
 }
