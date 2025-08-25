@@ -19,7 +19,7 @@ jobs:
         run: |
           cd ..
           rm -rf kitex-tests
-          git clone --depth=1 https://github.com/cloudwego/kitex-tests.git
+          git clone -b feat/streaming_binary --depth=1 https://github.com/cloudwego/kitex-tests.git
           cd kitex-tests 
           KITEX_TOOL_USE_PROTOC=0 ./run.sh ${{github.workspace}}
           cd ${{github.workspace}}

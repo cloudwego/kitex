@@ -125,7 +125,9 @@ func WithLimitReporter(r limiter.LimitReporter) Option {
 	}}
 }
 
-// WithGeneric set Generic type for generic call
+// WithGeneric set Generic type for generic call.
+// Deprecated, it only takes effect on binary thrift generic v1,
+// please use generic.BinaryThriftGenericV2 instead.
 func WithGeneric(g generic.Generic) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		o.Once.OnceOrPanic()
@@ -134,7 +136,7 @@ func WithGeneric(g generic.Generic) Option {
 		if g == nil {
 			panic("invalid Generic: nil")
 		}
-		o.RemoteOpt.PayloadCodec = g.PayloadCodec()
+		o.RemoteOpt.PayloadCodec, _ = g.GetExtra(generic.BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec)
 	}}
 }
 

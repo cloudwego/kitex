@@ -22,17 +22,16 @@ import (
 
 type binaryPbCodec struct {
 	svcName      string
-	extra        map[string]string
+	packageName  string
 	readerWriter *proto.RawReaderWriter
 }
 
 func newBinaryPbCodec(svcName, packageName string) *binaryPbCodec {
 	bpc := &binaryPbCodec{
 		svcName:      svcName,
-		extra:        make(map[string]string),
+		packageName:  packageName,
 		readerWriter: proto.NewRawReaderWriter(),
 	}
-	bpc.setPackageName(packageName)
 	return bpc
 }
 
@@ -42,8 +41,4 @@ func (c *binaryPbCodec) getMessageReaderWriter() interface{} {
 
 func (c *binaryPbCodec) Name() string {
 	return "BinaryPb"
-}
-
-func (c *binaryPbCodec) setPackageName(pkg string) {
-	c.extra[packageNameKey] = pkg
 }

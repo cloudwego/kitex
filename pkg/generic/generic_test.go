@@ -26,8 +26,8 @@ import (
 	dproto "github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -35,16 +35,10 @@ func TestBinaryThriftGeneric(t *testing.T) {
 	g := BinaryThriftGeneric()
 	defer g.Close()
 
-	test.Assert(t, g.Framed() == true)
-	test.Assert(t, g.PayloadCodec().Name() == "RawThriftBinary")
+	test.Assert(t, g.GetExtra(BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec).Name() == "RawThriftBinary")
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
-	test.Assert(t, g.MessageReaderWriter() == nil)
-	_, ok := g.(ExtraProvider)
-	test.Assert(t, !ok)
 
-	method, err := g.GetMethod(nil, "Test")
-	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "Test")
+	test.Assert(t, g.GenericMethod()(context.Background(), "Test") != nil)
 }
 
 func TestMapThriftGeneric(t *testing.T) {
@@ -59,16 +53,14 @@ func TestMapThriftGeneric(t *testing.T) {
 	mg, ok := g.(*mapThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "Mock")
-	extra, ok := g.(ExtraProvider)
-	test.Assert(t, ok)
-	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
+
+	isCombineService, _ := g.GetExtra(serviceinfo.CombineServiceKey).(bool)
+	test.Assert(t, !isCombineService)
 
 	err = SetBinaryWithBase64(g, true)
 	test.Assert(t, err == nil)
 	test.Assert(t, mg.codec.binaryWithBase64)
-	test.Assert(t, g.Framed() == false)
 
 	err = SetBinaryWithByteSlice(g, true)
 	test.Assert(t, err == nil)
@@ -76,9 +68,7 @@ func TestMapThriftGeneric(t *testing.T) {
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
 
-	method, err := g.GetMethod(nil, "Test")
-	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "Test")
+	test.Assert(t, g.GenericMethod()(context.Background(), "Test") != nil)
 }
 
 func TestMapThriftGenericForJSON(t *testing.T) {
@@ -93,22 +83,18 @@ func TestMapThriftGenericForJSON(t *testing.T) {
 	mg, ok := g.(*mapThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "Mock")
-	extra, ok := g.(ExtraProvider)
-	test.Assert(t, ok)
-	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
+
+	isCombineService, _ := g.GetExtra(serviceinfo.CombineServiceKey).(bool)
+	test.Assert(t, !isCombineService)
 
 	err = SetBinaryWithBase64(g, true)
 	test.Assert(t, err == nil)
 	test.Assert(t, mg.codec.binaryWithBase64)
-	test.Assert(t, g.Framed() == false)
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
 
-	method, err := g.GetMethod(nil, "Test")
-	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "Test")
+	test.Assert(t, g.GenericMethod()(context.Background(), "Test") != nil)
 }
 
 func TestHTTPThriftGeneric(t *testing.T) {
@@ -124,11 +110,10 @@ func TestHTTPThriftGeneric(t *testing.T) {
 	hg, ok := g.(*httpThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "ExampleService")
-	extra, ok := g.(ExtraProvider)
-	test.Assert(t, ok)
-	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
+
+	isCombineService, _ := g.GetExtra(serviceinfo.CombineServiceKey).(bool)
+	test.Assert(t, !isCombineService)
 
 	test.Assert(t, !hg.codec.dynamicgoEnabled)
 	test.Assert(t, hg.codec.useRawBodyForHTTPResp)
@@ -142,8 +127,6 @@ func TestHTTPThriftGeneric(t *testing.T) {
 	test.Assert(t, !hg.codec.convOpts.NoBase64Binary)
 	test.Assert(t, !hg.codec.convOptsWithThriftBase.NoBase64Binary)
 
-	test.Assert(t, g.Framed() == false)
-
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
 
 	url := "https://example.com/BinaryEcho"
@@ -158,9 +141,10 @@ func TestHTTPThriftGeneric(t *testing.T) {
 	customReq, err := FromHTTPRequest(req)
 	test.Assert(t, err == nil)
 
-	method, err := g.GetMethod(customReq, "Test")
-	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "BinaryEcho")
+	method, _ := g.GetExtra(GetMethodNameByRequestFuncKey).(GetMethodNameByRequestFunc)(customReq)
+	test.Assert(t, method == "BinaryEcho")
+
+	test.Assert(t, g.GenericMethod()(context.Background(), method) != nil)
 }
 
 func TestHTTPThriftGenericWithDynamicGo(t *testing.T) {
@@ -174,11 +158,10 @@ func TestHTTPThriftGenericWithDynamicGo(t *testing.T) {
 	hg, ok := g.(*httpThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "ExampleService")
-	extra, ok := g.(ExtraProvider)
-	test.Assert(t, ok)
-	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
+
+	isCombineService, _ := g.GetExtra(serviceinfo.CombineServiceKey).(bool)
+	test.Assert(t, !isCombineService)
 
 	test.Assert(t, hg.codec.dynamicgoEnabled)
 	test.Assert(t, !hg.codec.useRawBodyForHTTPResp)
@@ -191,8 +174,6 @@ func TestHTTPThriftGenericWithDynamicGo(t *testing.T) {
 	test.Assert(t, hg.codec.binaryWithBase64)
 	test.Assert(t, !hg.codec.convOpts.NoBase64Binary)
 	test.Assert(t, !hg.codec.convOptsWithThriftBase.NoBase64Binary)
-
-	test.Assert(t, g.Framed() == true)
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
 
@@ -208,9 +189,10 @@ func TestHTTPThriftGenericWithDynamicGo(t *testing.T) {
 	customReq, err := FromHTTPRequest(req)
 	test.Assert(t, err == nil)
 
-	method, err := g.GetMethod(customReq, "Test")
-	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "BinaryEcho")
+	method, _ := g.GetExtra(GetMethodNameByRequestFuncKey).(GetMethodNameByRequestFunc)(customReq)
+	test.Assert(t, method == "BinaryEcho")
+
+	test.Assert(t, g.GenericMethod()(context.Background(), method) != nil)
 }
 
 func TestJSONThriftGeneric(t *testing.T) {
@@ -224,11 +206,10 @@ func TestJSONThriftGeneric(t *testing.T) {
 	jg, ok := g.(*jsonThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "Mock")
-	extra, ok := g.(ExtraProvider)
-	test.Assert(t, ok)
-	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
+
+	isCombineService, _ := g.GetExtra(serviceinfo.CombineServiceKey).(bool)
+	test.Assert(t, !isCombineService)
 
 	test.Assert(t, !jg.codec.dynamicgoEnabled)
 	test.Assert(t, jg.codec.binaryWithBase64)
@@ -241,13 +222,9 @@ func TestJSONThriftGeneric(t *testing.T) {
 	test.Assert(t, !jg.codec.convOpts.NoBase64Binary)
 	test.Assert(t, !jg.codec.convOptsWithThriftBase.NoBase64Binary)
 
-	test.Assert(t, g.Framed() == false)
-
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
 
-	method, err := g.GetMethod(nil, "Test")
-	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "Test")
+	test.Assert(t, g.GenericMethod()(context.Background(), "Test") != nil)
 }
 
 func TestJSONThriftGenericWithDynamicGo(t *testing.T) {
@@ -261,11 +238,10 @@ func TestJSONThriftGenericWithDynamicGo(t *testing.T) {
 	jg, ok := g.(*jsonThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "Mock")
-	extra, ok := g.(ExtraProvider)
-	test.Assert(t, ok)
-	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
+
+	isCombineService, _ := g.GetExtra(serviceinfo.CombineServiceKey).(bool)
+	test.Assert(t, !isCombineService)
 
 	test.Assert(t, jg.codec.dynamicgoEnabled)
 	test.Assert(t, jg.codec.binaryWithBase64)
@@ -278,13 +254,9 @@ func TestJSONThriftGenericWithDynamicGo(t *testing.T) {
 	test.Assert(t, jg.codec.convOpts.NoBase64Binary)
 	test.Assert(t, jg.codec.convOptsWithThriftBase.NoBase64Binary)
 
-	test.Assert(t, g.Framed() == true)
-
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
 
-	method, err := g.GetMethod(nil, "Test")
-	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "Test")
+	test.Assert(t, g.GenericMethod()(context.Background(), "Test") != nil)
 }
 
 func TestJSONPbGeneric(t *testing.T) {
@@ -301,11 +273,10 @@ func TestJSONPbGeneric(t *testing.T) {
 	test.Assert(t, err == nil)
 	defer g.Close()
 
-	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.IDLServiceName() == "Echo")
-	extra, ok := g.(ExtraProvider)
-	test.Assert(t, ok)
-	test.Assert(t, extra.GetExtra(CombineServiceKey) == "false")
+
+	isCombineService, _ := g.GetExtra(serviceinfo.CombineServiceKey).(bool)
+	test.Assert(t, !isCombineService)
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Protobuf)
 
@@ -317,9 +288,7 @@ func TestJSONPbGeneric(t *testing.T) {
 
 	test.Assert(t, err == nil)
 
-	method, err := g.GetMethod(nil, "Echo")
-	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "Echo")
+	test.Assert(t, g.GenericMethod()(context.Background(), "Echo") != nil)
 }
 
 func TestIsCombinedServices(t *testing.T) {
@@ -334,9 +303,8 @@ func TestIsCombinedServices(t *testing.T) {
 	test.Assert(t, err == nil)
 	g.Close()
 
-	extra, ok := g.(ExtraProvider)
-	test.Assert(t, ok)
-	test.Assert(t, extra.GetExtra(CombineServiceKey) == "true")
+	isCombineService, _ := g.GetExtra(serviceinfo.CombineServiceKey).(bool)
+	test.Assert(t, isCombineService)
 
 	// thrift with dynamicgo
 	p, err = NewThriftFileProviderWithDynamicgoWithOption(path, opts)
@@ -346,9 +314,8 @@ func TestIsCombinedServices(t *testing.T) {
 	test.Assert(t, err == nil)
 	g.Close()
 
-	extra, ok = g.(ExtraProvider)
-	test.Assert(t, ok)
-	test.Assert(t, extra.GetExtra(CombineServiceKey) == "true")
+	isCombineService, _ = g.GetExtra(serviceinfo.CombineServiceKey).(bool)
+	test.Assert(t, isCombineService)
 
 	// pb with dynamicgo
 	pbp, err := NewPbFileProviderWithDynamicGo(
@@ -362,9 +329,8 @@ func TestIsCombinedServices(t *testing.T) {
 	test.Assert(t, err == nil)
 	g.Close()
 
-	extra, ok = g.(ExtraProvider)
-	test.Assert(t, ok)
-	test.Assert(t, extra.GetExtra(CombineServiceKey) == "true")
+	isCombineService, _ = g.GetExtra(serviceinfo.CombineServiceKey).(bool)
+	test.Assert(t, isCombineService)
 
 	// TODO: test pb after supporting parse mode
 }
@@ -375,22 +341,22 @@ func TestBinaryPbGeneric(t *testing.T) {
 	g := BinaryPbGeneric(svcName, packageName)
 	defer g.Close()
 
-	test.Assert(t, g.Framed() == false)
-	test.Assert(t, g.PayloadCodec() == nil)
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Protobuf)
-	test.Assert(t, g.MessageReaderWriter() != nil)
 	test.Assert(t, g.IDLServiceName() == svcName)
 
-	extra, ok := g.(ExtraProvider)
-	test.Assert(t, ok)
-	test.Assert(t, extra.GetExtra(packageNameKey) == packageName)
+	_packageName, _ := g.GetExtra(serviceinfo.PackageName).(string)
+	test.Assert(t, _packageName == packageName)
 
-	method, err := g.GetMethod(nil, "Test")
-	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "Test")
-	test.Assert(t, method.Oneway == false)
+	test.Assert(t, g.GenericMethod()(context.Background(), "Test") != nil)
+}
 
-	rw := g.MessageReaderWriter()
-	_, ok = rw.(*proto.RawReaderWriter)
-	test.Assert(t, ok)
+func TestBinaryThriftGenericV2(t *testing.T) {
+	svcName := "TestService"
+	g := BinaryThriftGenericV2(svcName)
+	defer g.Close()
+
+	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
+	test.Assert(t, g.IDLServiceName() == svcName)
+
+	test.Assert(t, g.GenericMethod()(context.Background(), "Test") != nil)
 }

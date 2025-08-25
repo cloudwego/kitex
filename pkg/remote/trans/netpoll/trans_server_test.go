@@ -65,7 +65,7 @@ func TestMain(m *testing.M) {
 				setter := msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter)
 				setter.SetServiceName(mocks.MockServiceName)
 				setter.SetMethodName(mocks.MockMethod)
-				mi := svcInfo.MethodInfo(mocks.MockMethod)
+				mi := svcInfo.MethodInfo(context.Background(), mocks.MockMethod)
 				if mi == nil {
 					return remote.NewTransErrorWithMsg(remote.UnknownMethod, "unknown method")
 				}

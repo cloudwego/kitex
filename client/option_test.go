@@ -44,6 +44,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/http"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/proxy"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -599,8 +600,9 @@ func TestWithRetryContainer(t *testing.T) {
 }
 
 func TestWithGeneric(t *testing.T) {
-	opts := client.NewOptions([]client.Option{WithGeneric(generic.BinaryThriftGeneric())})
-	test.DeepEqual(t, opts.RemoteOpt.PayloadCodec, generic.BinaryThriftGeneric().PayloadCodec())
+	g := generic.BinaryThriftGeneric()
+	opts := client.NewOptions([]client.Option{WithGeneric(g)})
+	test.DeepEqual(t, opts.RemoteOpt.PayloadCodec, g.GetExtra(generic.BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec))
 }
 
 func TestWithCloseCallbacks(t *testing.T) {

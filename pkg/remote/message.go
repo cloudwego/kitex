@@ -65,7 +65,7 @@ const (
 // ServiceSearcher is used to search the service info by service name and method name,
 // strict equals to true means the service name must match the registered service name.
 type ServiceSearcher interface {
-	SearchService(svcName, methodName string, strict bool) *serviceinfo.ServiceInfo
+	SearchService(svcName, methodName string, strict bool, codecType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo
 }
 
 const keyServiceSearcher = "rpc_info_service_searcher"

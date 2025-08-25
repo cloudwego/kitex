@@ -37,7 +37,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/cloudwego/kitex/transport"
 )
 
 // WithHTTPConnection specifies client use RPC over http.
@@ -166,7 +165,9 @@ func WithRetryContainer(rc *retry.Container) Option {
 	}}
 }
 
-// WithGeneric set Generic type for generic call
+// WithGeneric set Generic type for generic call.
+// Deprecated, it only takes effect on binary thrift generic v1,
+// please use generic.BinaryThriftGenericV2 instead.
 func WithGeneric(g generic.Generic) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		o.Once.OnceOrPanic()
@@ -175,10 +176,7 @@ func WithGeneric(g generic.Generic) Option {
 		if g == nil {
 			panic("invalid Generic: nil")
 		}
-		if g.Framed() {
-			rpcinfo.AsMutableRPCConfig(o.Configs).SetTransportProtocol(transport.Framed)
-		}
-		o.RemoteOpt.PayloadCodec = g.PayloadCodec()
+		o.RemoteOpt.PayloadCodec, _ = g.GetExtra(generic.BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec)
 	}}
 }
 

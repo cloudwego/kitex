@@ -41,3 +41,25 @@ func NewServerWithServiceInfo(handler generic.Service, g generic.Generic, svcInf
 	}
 	return svr
 }
+
+// NewServerV2 creates a generic server with the given handler, generic and options.
+// Note: NOT support generic.BinaryThriftGeneric, please use generic.BinaryThriftGenericV2 instead.
+func NewServerV2(handler *generic.ServiceV2, g generic.Generic, opts ...server.Option) server.Server {
+	svcInfo := generic.ServiceInfoWithGeneric(g)
+	return NewServerWithServiceInfoV2(handler, svcInfo, opts...)
+}
+
+// NewServerWithServiceInfoV2 creates a generic server with the given handler, serviceInfo and options.
+// Note: NOT support generic.BinaryThriftGeneric, please use generic.BinaryThriftGenericV2 instead.
+func NewServerWithServiceInfoV2(handler *generic.ServiceV2, svcInfo *serviceinfo.ServiceInfo, opts ...server.Option) server.Server {
+	svr := server.NewServer(opts...)
+	if err := svr.RegisterService(svcInfo, handler); err != nil {
+		panic(err)
+	}
+	return svr
+}
+
+// RegisterService registers a generic service with the given server.
+func RegisterService(svr server.Server, handler *generic.ServiceV2, g generic.Generic, opts ...server.RegisterOption) error {
+	return svr.RegisterService(generic.ServiceInfoWithGeneric(g), handler, opts...)
+}

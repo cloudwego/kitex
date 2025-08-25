@@ -17,6 +17,7 @@
 package codec
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -55,11 +56,11 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 	if svcSearcher == nil {
 		return errors.New("RPCInfo doesn't contains a service searcher")
 	}
-	svcInfo = svcSearcher.SearchService(ink.ServiceName(), methodName, false)
+	svcInfo = svcSearcher.SearchService(ink.ServiceName(), methodName, false, ri.Config().PayloadCodec())
 	if svcInfo == nil {
 		return remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s, method %s", ink.ServiceName(), methodName))
 	}
-	if methodInfo = svcInfo.MethodInfo(methodName); methodInfo == nil {
+	if methodInfo = svcInfo.MethodInfo(context.Background(), methodName); methodInfo == nil {
 		return remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s (service %s)", methodName, ink.ServiceName()))
 	}
 	inkSetter.SetPackageName(svcInfo.GetPackageName())
