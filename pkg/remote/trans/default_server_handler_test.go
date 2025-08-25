@@ -65,8 +65,7 @@ func TestDefaultSvrTransHandler(t *testing.T) {
 				return nil
 			},
 		},
-		SvcSearcher:   svcSearcher,
-		TargetSvcInfo: svcInfo,
+		SvcSearcher: svcSearcher,
 	}
 
 	handler, err := NewDefaultSvrTransHandler(opt, ext)
@@ -128,9 +127,8 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 				return nil
 			},
 		},
-		SvcSearcher:   svcSearcher,
-		TargetSvcInfo: svcInfo,
-		TracerCtl:     tracerCtl,
+		SvcSearcher: svcSearcher,
+		TracerCtl:   tracerCtl,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
 			return ri
@@ -186,9 +184,8 @@ func TestSvrTransHandlerReadErr(t *testing.T) {
 				return mockErr
 			},
 		},
-		SvcSearcher:   svcSearcher,
-		TargetSvcInfo: svcInfo,
-		TracerCtl:     tracerCtl,
+		SvcSearcher: svcSearcher,
+		TracerCtl:   tracerCtl,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
 			return ri
@@ -239,9 +236,8 @@ func TestSvrTransHandlerReadPanic(t *testing.T) {
 				panic("mock")
 			},
 		},
-		SvcSearcher:   svcSearcher,
-		TargetSvcInfo: svcInfo,
-		TracerCtl:     tracerCtl,
+		SvcSearcher: svcSearcher,
+		TracerCtl:   tracerCtl,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
 			return ri
@@ -296,9 +292,8 @@ func TestSvrTransHandlerOnReadHeartbeat(t *testing.T) {
 				return nil
 			},
 		},
-		SvcSearcher:   svcSearcher,
-		TargetSvcInfo: svcInfo,
-		TracerCtl:     tracerCtl,
+		SvcSearcher: svcSearcher,
+		TracerCtl:   tracerCtl,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
 			return ri

@@ -57,7 +57,6 @@ func (m *MockGonetConn) Do() bool {
 }
 
 func TestMain(m *testing.M) {
-	svcInfo := mocks.ServiceInfo()
 	svrOpt = &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
@@ -78,9 +77,8 @@ func TestMain(m *testing.M) {
 				return codec.SetOrCheckMethodName(mocks.MockMethod, msg)
 			},
 		},
-		SvcSearcher:   mocksremote.NewDefaultSvcSearcher(),
-		TargetSvcInfo: svcInfo,
-		TracerCtl:     &rpcinfo.TraceController{},
+		SvcSearcher: mocksremote.NewDefaultSvcSearcher(),
+		TracerCtl:   &rpcinfo.TraceController{},
 	}
 	svrTransHdlr, _ = newSvrTransHandler(svrOpt)
 	transSvr = NewTransServerFactory().NewTransServer(svrOpt, remote.NewTransPipeline(svrTransHdlr)).(*transServer)

@@ -88,7 +88,6 @@ func init() {
 			},
 		},
 		SvcSearcher:      svcSearcher,
-		TargetSvcInfo:    svcInfo,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
@@ -454,7 +453,6 @@ func TestInvokeError(t *testing.T) {
 			},
 		},
 		SvcSearcher:      svcSearcher,
-		TargetSvcInfo:    svcInfo,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
@@ -576,7 +574,30 @@ func TestInvokeNoMethod(t *testing.T) {
 		},
 	}
 
-	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
+	body := "hello world"
+	svrOpt := &remote.ServerOption{
+		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+			return rpcInfo
+		},
+		Codec: &MockCodec{
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), body)
+				_, err := out.WriteBinary(r.Bytes())
+				return err
+			},
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				in.Skip(3 * codec.Size32)
+				_, err := in.ReadString(len(body))
+				if err != nil {
+					return err
+				}
+				return remote.NewTransError(remote.UnknownMethod, errors.New("unknown method"))
+			},
+		},
+		SvcSearcher: svcSearcher,
+		TracerCtl:   &rpcinfo.TraceController{},
+	}
+	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(svrOpt)
 
 	pool := &sync.Pool{}
 	muxSvrCon := newMuxSvrConn(npconn, pool)
@@ -604,9 +625,6 @@ func TestInvokeNoMethod(t *testing.T) {
 
 	pl := remote.NewTransPipeline(svrTransHdlr)
 	svrTransHdlr.SetPipeline(pl)
-
-	svcInfo = opt.TargetSvcInfo
-	delete(svcInfo.Methods, method)
 
 	if setter, ok := svrTransHdlr.(remote.InvokeHandleFuncSetter); ok {
 		setter.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
@@ -680,7 +698,6 @@ func TestMuxSvrOnReadHeartbeat(t *testing.T) {
 			},
 		},
 		SvcSearcher:      svcSearcher,
-		TargetSvcInfo:    svcInfo,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}

@@ -59,9 +59,8 @@ type Server interface {
 }
 
 type server struct {
-	opt           *internal_server.Options
-	svcs          *services
-	targetSvcInfo *serviceinfo.ServiceInfo
+	opt  *internal_server.Options
+	svcs *services
 
 	// actual rpc service implement of biz
 	eps     endpoint.Endpoint
@@ -217,7 +216,6 @@ func (s *server) Run() (err error) {
 	if err = s.check(); err != nil {
 		return err
 	}
-	s.findAndSetDefaultService()
 	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfosKey, diagnosis.WrapAsProbeFunc(s.svcs.getSvcInfoMap()))
 	if s.svcs.fallbackSvc != nil {
 		diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.FallbackServiceKey, diagnosis.WrapAsProbeFunc(s.svcs.fallbackSvc.svcInfo.ServiceName))
@@ -448,7 +446,6 @@ func (s *server) streamHandleEndpoint() sep.StreamEndpoint {
 
 func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
-	remoteOpt.TargetSvcInfo = s.targetSvcInfo
 	remoteOpt.SvcSearcher = s.svcs
 	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
@@ -631,12 +628,6 @@ func (s *server) waitExit(errCh chan error) error {
 			}
 			s.Unlock()
 		}
-	}
-}
-
-func (s *server) findAndSetDefaultService() {
-	if len(s.svcs.svcMap) == 1 {
-		s.targetSvcInfo = getDefaultSvcInfo(s.svcs)
 	}
 }
 

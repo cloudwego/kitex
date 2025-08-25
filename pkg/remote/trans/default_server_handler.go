@@ -29,18 +29,16 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
 // NewDefaultSvrTransHandler to provide default impl of svrTransHandler, it can be reused in netpoll, shm-ipc, framework-sdk extensions
 func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.ServerTransHandler, error) {
 	svrHdlr := &svrTransHandler{
-		opt:           opt,
-		codec:         opt.Codec,
-		svcSearcher:   opt.SvcSearcher,
-		targetSvcInfo: opt.TargetSvcInfo,
-		ext:           ext,
+		opt:         opt,
+		codec:       opt.Codec,
+		svcSearcher: opt.SvcSearcher,
+		ext:         ext,
 	}
 	if svrHdlr.opt.TracerCtl == nil {
 		// init TraceCtl when it is nil, or it will lead some unit tests panic
@@ -52,7 +50,6 @@ func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.
 type svrTransHandler struct {
 	opt                *remote.ServerOption
 	svcSearcher        remote.ServiceSearcher
-	targetSvcInfo      *serviceinfo.ServiceInfo
 	inkHdlFunc         endpoint.Endpoint
 	codec              remote.Codec
 	transPipe          *remote.TransPipeline

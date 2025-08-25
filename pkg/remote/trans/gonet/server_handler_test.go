@@ -23,8 +23,10 @@ import (
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 // TestOnActive test server_handler OnActive success
@@ -152,10 +154,27 @@ func TestNoMethodInfo(t *testing.T) {
 		return true
 	}
 
-	remote.NewTransPipeline(svrTransHdlr)
+	svrOpt := &remote.ServerOption{
+		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+			fromInfo := rpcinfo.EmptyEndpointInfo()
+			toInfo := rpcinfo.EmptyEndpointInfo()
+			rpcCfg := rpcinfo.NewRPCConfig()
+			ink := rpcinfo.NewInvocation("", method)
+			rpcStat := rpcinfo.NewRPCStats()
+			return rpcinfo.NewRPCInfo(fromInfo, toInfo, ink, rpcCfg, rpcStat)
+		},
+		Codec: &MockCodec{
+			EncodeFunc: nil,
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				return remote.NewTransError(remote.UnknownMethod, errors.New("unknown method"))
+			},
+		},
+		SvcSearcher: mocksremote.NewDefaultSvcSearcher(),
+		TracerCtl:   &rpcinfo.TraceController{},
+	}
+	svrTransHdlr, _ := newSvrTransHandler(svrOpt)
 
-	svcInfo := svrOpt.TargetSvcInfo
-	delete(svcInfo.Methods, method)
+	remote.NewTransPipeline(svrTransHdlr)
 
 	// 2. test
 	ctx := context.Background()
