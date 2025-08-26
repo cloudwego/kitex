@@ -34,6 +34,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"golang.org/x/net/http2"
+
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
@@ -521,6 +523,11 @@ func (s *Stream) getCloseStreamErr() error {
 		return rawErr.(error)
 	}
 	return errStatusStreamDone
+}
+
+func (s *Stream) ctxDoneCallback(ctx context.Context) {
+	sErr := ContextErr(ctx.Err())
+	s.ct.closeStream(s, sErr, true, http2.ErrCodeCancel, status.Convert(sErr), nil, false)
 }
 
 // StreamWrite only used for unit test

@@ -47,7 +47,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/testutils"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 type server struct {
@@ -2249,8 +2248,6 @@ func Test_isIgnorable(t *testing.T) {
 }
 
 func Test_closeStreamTask(t *testing.T) {
-	// replace ticker to reduce test time
-	ticker = utils.NewSyncSharedTicker(10 * time.Millisecond)
 	server, ct := setUp(t, 0, math.MaxUint32, cancel)
 	callHdr := &CallHdr{
 		Host:   "localhost",
