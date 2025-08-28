@@ -19,6 +19,7 @@ package genericserver
 
 import (
 	"github.com/cloudwego/kitex/pkg/generic"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/server"
 )
@@ -45,22 +46,18 @@ func NewServerWithServiceInfo(handler generic.Service, g generic.Generic, svcInf
 // NewServerV2 creates a generic server with the given handler, generic and options.
 // Note: NOT support generic.BinaryThriftGeneric, please use generic.BinaryThriftGenericV2 instead.
 func NewServerV2(handler *generic.ServiceV2, g generic.Generic, opts ...server.Option) server.Server {
-	svcInfo := generic.ServiceInfoWithGeneric(g)
-	return NewServerWithServiceInfoV2(handler, svcInfo, opts...)
-}
-
-// NewServerWithServiceInfoV2 creates a generic server with the given handler, serviceInfo and options.
-// The svcInfo MUST be created by generic.ServiceInfoWithGeneric.
-// Note: NOT support generic.BinaryThriftGeneric, please use generic.BinaryThriftGenericV2 instead.
-func NewServerWithServiceInfoV2(handler *generic.ServiceV2, svcInfo *serviceinfo.ServiceInfo, opts ...server.Option) server.Server {
 	svr := server.NewServer(opts...)
-	if err := svr.RegisterService(svcInfo, handler); err != nil {
+	if err := RegisterService(svr, handler, g); err != nil {
 		panic(err)
 	}
 	return svr
 }
 
 // RegisterService registers a generic service with the given server.
+// Note: NOT support generic.BinaryThriftGeneric, please use generic.BinaryThriftGenericV2 instead.
 func RegisterService(svr server.Server, handler *generic.ServiceV2, g generic.Generic, opts ...server.RegisterOption) error {
+	if _, ok := g.GetExtra(generic.BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec); ok {
+		panic("KITEX: not support generic.BinaryThriftGeneric, please use generic.BinaryThriftGenericV2 instead")
+	}
 	return svr.RegisterService(generic.ServiceInfoWithGeneric(g), handler, opts...)
 }
