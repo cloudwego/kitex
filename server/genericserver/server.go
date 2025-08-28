@@ -50,6 +50,7 @@ func NewServerV2(handler *generic.ServiceV2, g generic.Generic, opts ...server.O
 }
 
 // NewServerWithServiceInfoV2 creates a generic server with the given handler, serviceInfo and options.
+// The svcInfo MUST be created by generic.ServiceInfoWithGeneric.
 // Note: NOT support generic.BinaryThriftGeneric, please use generic.BinaryThriftGenericV2 instead.
 func NewServerWithServiceInfoV2(handler *generic.ServiceV2, svcInfo *serviceinfo.ServiceInfo, opts ...server.Option) server.Server {
 	svr := server.NewServer(opts...)
