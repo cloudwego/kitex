@@ -38,7 +38,6 @@ func NewObjectPool(idleTimeout time.Duration) *ObjectPool {
 	s := new(ObjectPool)
 	s.idleTimeout = idleTimeout
 	s.objects = make(map[string]*Stack[objectItem])
-	gofunc.RecoverGoFuncWithInfo(context.Background(), s.cleaning, gofunc.NewBasicInfo("", ""))
 	return s
 }
 
@@ -47,9 +46,13 @@ type ObjectPool struct {
 	objects     map[string]*Stack[objectItem]
 	idleTimeout time.Duration
 	closed      int32
+	once        sync.Once // control the background cleaning goroutine, lazy init until ObjectPool.Push is invoked
 }
 
 func (s *ObjectPool) Push(key string, o Object) {
+	s.once.Do(func() {
+		gofunc.RecoverGoFuncWithInfo(context.Background(), s.cleaning, gofunc.NewBasicInfo("", ""))
+	})
 	s.L.Lock()
 	stk := s.objects[key]
 	if stk == nil {
