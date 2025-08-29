@@ -343,12 +343,6 @@ func (p *Patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		}
 		content := buf.String()
 
-		// if kutils is not used, remove the dependency.
-		// OPT: use UseStdLib tmpl func
-		if !strings.Contains(content, "kutils.StringDeepCopy") {
-			delete(p.libs, "github.com/cloudwego/kitex/pkg/utils")
-		}
-
 		imps, err := scope.ResolveImports()
 		if err != nil {
 			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
