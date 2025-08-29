@@ -1638,9 +1638,11 @@ func TestGetClientStat(t *testing.T) {
 	test.Assert(t, md != nil)
 	test.Assert(t, ok)
 	test.Assert(t, s.getHeaderValid())
-	// send quota
-	w := cli.getOutFlowWindow()
+	// send quota and max concurrent streams
+	w, m := cli.getOutFlowWindowAndMaxConcurrentStreams()
 	test.Assert(t, uint32(w) == cli.loopy.sendQuota)
+	// there is no limit on the number of streams by default
+	test.Assert(t, m == math.MaxUint32)
 
 	// Dump
 	d := cli.Dump()
@@ -1649,7 +1651,8 @@ func TestGetClientStat(t *testing.T) {
 	test.Assert(t, td.State == reachable)
 	cli.mu.Lock()
 	remoteAddr := cli.remoteAddr.String()
-	test.Assert(t, len(td.ActiveStreams) == len(cli.activeStreams))
+	// When the Dump ends, it's possible streams that were active at that moment have already ended
+	test.Assert(t, len(td.ActiveStreams) >= len(cli.activeStreams))
 	cli.mu.Unlock()
 
 	if len(td.ActiveStreams) != 0 {
