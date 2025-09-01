@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
@@ -480,11 +481,19 @@ func TestPolicyNotRetryForTimeout(t *testing.T) {
 	test.Assert(t, !fp.isRetryForTimeout())
 }
 
-func genRPCInfo() rpcinfo.RPCInfo {
+func genRPCInfo(newResultFunc ...func() interface{}) rpcinfo.RPCInfo {
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{Method: method}, method).ImmutableView()
 	riStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 	riStats.SetLevel(stats.LevelDetailed)
 	ri := rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method), rpcinfo.NewRPCConfig(), riStats.ImmutableView())
+	setter := ri.Invocation().(rpcinfo.InvocationSetter)
+	if len(newResultFunc) > 0 {
+		setter.SetMethodInfo(serviceinfo.NewMethodInfo(nil, nil, newResultFunc[0], false))
+	} else {
+		setter.SetMethodInfo(serviceinfo.NewMethodInfo(nil, nil, func() interface{} {
+			return nil
+		}, false))
+	}
 	return ri
 }
 

@@ -90,8 +90,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.UnaryMiddleware {
 	return func(next endpoint.UnaryEndpoint) endpoint.UnaryEndpoint {
 		backgroundEP := func(ctx context.Context, request, response interface{}) error {
 			err := next(ctx, request, response)
-			if err != nil && ctx.Err() != nil &&
-				!kerrors.IsTimeoutError(err) && !errors.Is(err, kerrors.ErrRPCFinish) {
+			if err != nil && ctx.Err() != nil && !kerrors.IsTimeoutError(err) {
 				ri := rpcinfo.GetRPCInfo(ctx)
 				// error occurs after the wait goroutine returns(RPCTimeout happens),
 				// we should log this error for troubleshooting, or it will be discarded.
