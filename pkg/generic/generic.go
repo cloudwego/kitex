@@ -30,15 +30,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-const (
-	// BinaryThriftGenericV1PayloadCodecKey is used to be compatible with old binary thrift generic to get the payload codec.
-	BinaryThriftGenericV1PayloadCodecKey = "binary_thrift_generic_v1_payload_codec"
-	// GetMethodNameByRequestFuncKey is used to get method name by request for http generic.
-	GetMethodNameByRequestFuncKey = "get_method_name_by_request_func"
-	// IsBinaryGeneric is used to judge whether it is binary generic, except BinaryThriftGeneric.
-	IsBinaryGeneric = "is_binary_generic"
-)
-
 // Generic ...
 type Generic interface {
 	Closer
@@ -347,7 +338,7 @@ func (g *binaryThriftGeneric) GenericMethod() serviceinfo.GenericMethodFunc {
 // GetExtra returns binary thrift PayloadCodec to replace the original one, called in WithGeneric.
 func (g *binaryThriftGeneric) GetExtra(key string) interface{} {
 	switch key {
-	case BinaryThriftGenericV1PayloadCodecKey:
+	case igeneric.BinaryThriftGenericV1PayloadCodecKey:
 		return g.PayloadCodec()
 	}
 	return nil
@@ -382,7 +373,7 @@ func (b *binaryThriftGenericV2) GenericMethod() serviceinfo.GenericMethodFunc {
 
 func (b *binaryThriftGenericV2) GetExtra(key string) interface{} {
 	switch key {
-	case IsBinaryGeneric:
+	case igeneric.IsBinaryGeneric:
 		return true
 	}
 	return nil
@@ -417,7 +408,7 @@ func (g *binaryPbGeneric) IDLServiceName() string {
 
 func (g *binaryPbGeneric) GetExtra(key string) interface{} {
 	switch key {
-	case IsBinaryGeneric:
+	case igeneric.IsBinaryGeneric:
 		return true
 	case serviceinfo.PackageName:
 		return g.codec.packageName
@@ -567,7 +558,7 @@ func (g *httpThriftGeneric) IDLServiceName() string {
 
 func (g *httpThriftGeneric) GetExtra(key string) interface{} {
 	switch key {
-	case GetMethodNameByRequestFuncKey:
+	case igeneric.GetMethodNameByRequestFuncKey:
 		return GetMethodNameByRequestFunc(func(req interface{}) (string, error) {
 			return g.codec.getMethodByReq(req)
 		})
@@ -607,7 +598,7 @@ func (g *httpPbThriftGeneric) IDLServiceName() string {
 
 func (g *httpPbThriftGeneric) GetExtra(key string) interface{} {
 	switch key {
-	case GetMethodNameByRequestFuncKey:
+	case igeneric.GetMethodNameByRequestFuncKey:
 		return GetMethodNameByRequestFunc(func(req interface{}) (string, error) {
 			return g.codec.getMethodByReq(req)
 		})

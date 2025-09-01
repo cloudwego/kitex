@@ -305,7 +305,7 @@ func (s *services) getTargetSvcInfo() *serviceinfo.ServiceInfo {
 
 // registerBinaryGenericMethodFunc register binary generic method func to the given service info.
 func registerBinaryGenericMethodFunc(svcInfo *serviceinfo.ServiceInfo) *serviceinfo.ServiceInfo {
-	if isBinaryGeneric, _ := svcInfo.Extra[generic.IsBinaryGeneric].(bool); isBinaryGeneric {
+	if isBinaryGeneric, _ := svcInfo.Extra[igeneric.IsBinaryGeneric].(bool); isBinaryGeneric {
 		// already binary generic, no need to register
 		return nil
 	}

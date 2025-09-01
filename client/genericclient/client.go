@@ -58,8 +58,8 @@ func NewClientWithServiceInfo(destService string, g generic.Generic, svcInfo *se
 		sClient: kc.(client.Streaming),
 		g:       g,
 	}
-	cli.isBinaryGeneric, _ = g.GetExtra(generic.IsBinaryGeneric).(bool)
-	cli.getMethodFunc, _ = g.GetExtra(generic.GetMethodNameByRequestFuncKey).(generic.GetMethodNameByRequestFunc)
+	cli.isBinaryGeneric, _ = g.GetExtra(igeneric.IsBinaryGeneric).(bool)
+	cli.getMethodFunc, _ = g.GetExtra(igeneric.GetMethodNameByRequestFuncKey).(generic.GetMethodNameByRequestFunc)
 
 	runtime.SetFinalizer(cli, (*genericServiceClient).Close)
 	return cli, nil

@@ -28,6 +28,7 @@ import (
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/client"
+	igeneric "github.com/cloudwego/kitex/internal/generic"
 	"github.com/cloudwego/kitex/internal/mocks"
 	mocksloadbalance "github.com/cloudwego/kitex/internal/mocks/loadbalance"
 	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
@@ -602,7 +603,7 @@ func TestWithRetryContainer(t *testing.T) {
 func TestWithGeneric(t *testing.T) {
 	g := generic.BinaryThriftGeneric()
 	opts := client.NewOptions([]client.Option{WithGeneric(g)})
-	test.DeepEqual(t, opts.RemoteOpt.PayloadCodec, g.GetExtra(generic.BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec))
+	test.DeepEqual(t, opts.RemoteOpt.PayloadCodec, g.GetExtra(igeneric.BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec))
 }
 
 func TestWithCloseCallbacks(t *testing.T) {

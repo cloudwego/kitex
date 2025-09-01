@@ -88,8 +88,8 @@ func ServiceInfoWithGeneric(g Generic) *serviceinfo.ServiceInfo {
 	if pkg, _ := g.GetExtra(serviceinfo.PackageName).(string); pkg != "" {
 		svcInfo.Extra[serviceinfo.PackageName] = pkg
 	}
-	if isBinaryGeneric, _ := g.GetExtra(IsBinaryGeneric).(bool); isBinaryGeneric {
-		svcInfo.Extra[IsBinaryGeneric] = true
+	if isBinaryGeneric, _ := g.GetExtra(igeneric.IsBinaryGeneric).(bool); isBinaryGeneric {
+		svcInfo.Extra[igeneric.IsBinaryGeneric] = true
 	}
 	return svcInfo
 }

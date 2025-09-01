@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/dynamicgo/meta"
 	dproto "github.com/cloudwego/dynamicgo/proto"
 
+	igeneric "github.com/cloudwego/kitex/internal/generic"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -35,7 +36,7 @@ func TestBinaryThriftGeneric(t *testing.T) {
 	g := BinaryThriftGeneric()
 	defer g.Close()
 
-	test.Assert(t, g.GetExtra(BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec).Name() == "RawThriftBinary")
+	test.Assert(t, g.GetExtra(igeneric.BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec).Name() == "RawThriftBinary")
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
 
 	test.Assert(t, g.GenericMethod()(context.Background(), "Test") != nil)
@@ -141,7 +142,7 @@ func TestHTTPThriftGeneric(t *testing.T) {
 	customReq, err := FromHTTPRequest(req)
 	test.Assert(t, err == nil)
 
-	method, _ := g.GetExtra(GetMethodNameByRequestFuncKey).(GetMethodNameByRequestFunc)(customReq)
+	method, _ := g.GetExtra(igeneric.GetMethodNameByRequestFuncKey).(GetMethodNameByRequestFunc)(customReq)
 	test.Assert(t, method == "BinaryEcho")
 
 	test.Assert(t, g.GenericMethod()(context.Background(), method) != nil)
@@ -189,7 +190,7 @@ func TestHTTPThriftGenericWithDynamicGo(t *testing.T) {
 	customReq, err := FromHTTPRequest(req)
 	test.Assert(t, err == nil)
 
-	method, _ := g.GetExtra(GetMethodNameByRequestFuncKey).(GetMethodNameByRequestFunc)(customReq)
+	method, _ := g.GetExtra(igeneric.GetMethodNameByRequestFuncKey).(GetMethodNameByRequestFunc)(customReq)
 	test.Assert(t, method == "BinaryEcho")
 
 	test.Assert(t, g.GenericMethod()(context.Background(), method) != nil)

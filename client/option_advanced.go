@@ -26,6 +26,7 @@ import (
 	"reflect"
 
 	"github.com/cloudwego/kitex/internal/client"
+	igeneric "github.com/cloudwego/kitex/internal/generic"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/generic"
@@ -176,7 +177,7 @@ func WithGeneric(g generic.Generic) Option {
 		if g == nil {
 			panic("invalid Generic: nil")
 		}
-		o.RemoteOpt.PayloadCodec, _ = g.GetExtra(generic.BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec)
+		o.RemoteOpt.PayloadCodec, _ = g.GetExtra(igeneric.BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec)
 	}}
 }
 
