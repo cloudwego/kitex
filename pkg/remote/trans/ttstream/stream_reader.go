@@ -43,6 +43,12 @@ func newStreamReader() *streamReader {
 	return sio
 }
 
+func newStreamReaderWithCtxDoneCallback(callback container.CtxDoneCallback) *streamReader {
+	sio := new(streamReader)
+	sio.pipe = container.NewPipe[streamMsg](container.WithCtxDoneCallback(callback))
+	return sio
+}
+
 func (s *streamReader) input(ctx context.Context, payload []byte) {
 	err := s.pipe.Write(ctx, streamMsg{payload: payload})
 	if err != nil {
@@ -50,6 +56,10 @@ func (s *streamReader) input(ctx context.Context, payload []byte) {
 	}
 }
 
+// output would return err in the following scenarios:
+// - pipe finished: container.ErrPipeEOF, container.ErrPipeCanceled
+// - ctx Done() triggered: ctx.Err()
+// - trailer frame contains err: streamMsg.exception
 func (s *streamReader) output(ctx context.Context) (payload []byte, err error) {
 	if s.exception != nil {
 		return nil, s.exception
@@ -73,10 +83,6 @@ func (s *streamReader) output(ctx context.Context) (payload []byte, err error) {
 		return nil, s.exception
 	}
 	return msg.payload, nil
-}
-
-func (s *streamReader) cancel() {
-	s.pipe.Cancel()
 }
 
 func (s *streamReader) close(exception error) {

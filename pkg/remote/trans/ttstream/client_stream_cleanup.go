@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 CloudWeGo Authors
+ * Copyright 2025 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,28 +14,20 @@
  * limitations under the License.
  */
 
-package ktx
+package ttstream
 
-import (
-	"context"
-	"testing"
-)
-
-func TestKtx(t *testing.T) {
-	ctx := context.Background()
-
-	// server start
-	ctx, cancelFunc := WithCancel(ctx)
-
-	// client call
-	var clientCanceled int32
-	RegisterCancelCallback(ctx, func() {
-		clientCanceled++
+func (t *clientTransport) Tick() {
+	var toCloseStreams []*clientStream
+	t.streams.Range(func(key, value any) bool {
+		s := value.(*clientStream)
+		select {
+		case <-s.ctx.Done():
+			toCloseStreams = append(toCloseStreams, s)
+		default:
+		}
+		return true
 	})
-
-	// server recv exception
-	cancelFunc()
-	if clientCanceled != 1 {
-		t.Fatal()
+	for _, s := range toCloseStreams {
+		s.ctxDoneCallback(s.ctx)
 	}
 }
