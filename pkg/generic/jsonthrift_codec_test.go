@@ -17,9 +17,12 @@
 package generic
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/dynamicgo/conv"
+	"github.com/cloudwego/gopkg/bufiox"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
@@ -38,12 +41,12 @@ func TestJsonThriftCodec(t *testing.T) {
 	defer jtc.Close()
 	test.Assert(t, jtc.Name() == "JSONThrift")
 
-	method, err := jtc.getMethod(nil, "Test")
+	method, err := jtc.getMethod("Test")
 	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "Test")
 	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
-	test.Assert(t, jtc.svcName == "Mock")
-	test.Assert(t, jtc.extra[CombineServiceKey] == "false")
+	test.Assert(t, jtc.svcName.Load().(string) == "Mock")
+	isCombineService, _ := jtc.combineService.Load().(bool)
+	test.Assert(t, !isCombineService)
 
 	rw := jtc.getMessageReaderWriter()
 	_, ok := rw.(*thrift.JSONReaderWriter)
@@ -67,11 +70,11 @@ func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
 	defer jtc.Close()
 	test.Assert(t, jtc.Name() == "JSONThrift")
 
-	method, err := jtc.getMethod(nil, "Test")
+	method, err := jtc.getMethod("Test")
 	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "Test")
 	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
-	test.Assert(t, jtc.extra[CombineServiceKey] == "false")
+	isCombineService, _ := jtc.combineService.Load().(bool)
+	test.Assert(t, !isCombineService)
 
 	rw := jtc.getMessageReaderWriter()
 	_, ok := rw.(*thrift.JSONReaderWriter)
@@ -105,9 +108,8 @@ func TestJsonThriftCodec_SelfRef(t *testing.T) {
 		defer jtc.Close()
 		test.Assert(t, jtc.Name() == "JSONThrift")
 
-		method, err := jtc.getMethod(nil, "Test")
+		method, err := jtc.getMethod("Test")
 		test.Assert(t, err == nil)
-		test.Assert(t, method.Name == "Test")
 		test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 
 		rw := jtc.getMessageReaderWriter()
@@ -125,11 +127,10 @@ func TestJsonThriftCodec_SelfRef(t *testing.T) {
 		defer jtc.Close()
 		test.Assert(t, jtc.Name() == "JSONThrift")
 
-		method, err := jtc.getMethod(nil, "Test")
+		method, err := jtc.getMethod("Test")
 		test.Assert(t, err == nil)
-		test.Assert(t, method.Name == "Test")
 		test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
-		test.Assert(t, jtc.svcName == "Mock")
+		test.Assert(t, jtc.svcName.Load().(string) == "Mock")
 
 		rw := jtc.getMessageReaderWriter()
 		_, ok := rw.(thrift.MessageWriter)
@@ -137,4 +138,113 @@ func TestJsonThriftCodec_SelfRef(t *testing.T) {
 		_, ok = rw.(thrift.MessageReader)
 		test.Assert(t, ok)
 	})
+}
+
+func TestJsonThriftGenericUpdateMethods(t *testing.T) {
+	content := `
+	namespace go kitex.test.server
+
+	service InboxService {
+		string InBox(string msg)
+	}`
+	newContent := `
+	namespace go kitex.test.server
+	
+	service UpdateService {
+		string Update(string msg)
+	}`
+	p, err := NewThriftContentWithAbsIncludePathProvider("main.thrift", map[string]string{"main.thrift": content})
+	test.Assert(t, err == nil)
+	g, err := JSONThriftGeneric(p)
+	test.Assert(t, err == nil)
+	genericMethod := g.GenericMethod()
+	mi := genericMethod(context.Background(), "InBox")
+	test.Assert(t, mi != nil)
+
+	// update idl
+	err = p.UpdateIDL("main.thrift", map[string]string{"main.thrift": newContent})
+	test.Assert(t, err == nil)
+
+	time.Sleep(100 * time.Millisecond)
+
+	// test new method
+	mi = genericMethod(context.Background(), "InBox")
+	test.Assert(t, mi == nil)
+	mi = genericMethod(context.Background(), "Update")
+	test.Assert(t, mi != nil)
+}
+
+func TestJsonThriftGenericUpdateStructs(t *testing.T) {
+	content := `
+	namespace go kitex.test.server
+
+	struct Test {
+		1: optional string aaa
+	}
+
+	service InboxService {
+		Test InBox(Test msg)
+	}`
+	newContent := `
+	namespace go kitex.test.server
+
+	struct Test {
+		1: optional string aaa
+		2: optional i64 bbb
+	}
+
+	service InboxService {
+		Test InBox(Test msg)
+	}`
+	p, err := NewThriftContentWithAbsIncludePathProvider("main.thrift", map[string]string{"main.thrift": content})
+	test.Assert(t, err == nil)
+	g, err := JSONThriftGeneric(p)
+	test.Assert(t, err == nil)
+	genericMethod := g.GenericMethod()
+	mi := genericMethod(context.Background(), "InBox")
+	test.Assert(t, mi != nil)
+
+	jsonStr := `{"aaa":"123","bbb":123}`
+	reversedJsonStr := `{"bbb":123,"aaa":"123"}`
+	shortJsonStr := `{"aaa":"123"}`
+
+	{
+		var writeBuf []byte
+		arg := mi.NewArgs().(*Args)
+		arg.Request = jsonStr
+		wbuf := bufiox.NewBytesWriter(&writeBuf)
+		err = arg.Write(context.Background(), "InBox", wbuf)
+		test.Assert(t, err == nil)
+		err = wbuf.Flush()
+		test.Assert(t, err == nil)
+
+		arg = mi.NewArgs().(*Args)
+		rbuf := bufiox.NewBytesReader(writeBuf)
+		err = arg.Read(context.Background(), "InBox", len(writeBuf), rbuf)
+		test.Assert(t, err == nil)
+		test.Assert(t, arg.Request.(string) == shortJsonStr)
+	}
+
+	// update idl
+	err = p.UpdateIDL("main.thrift", map[string]string{"main.thrift": newContent})
+	test.Assert(t, err == nil)
+
+	time.Sleep(100 * time.Millisecond)
+
+	{
+		var writeBuf []byte
+		arg := mi.NewArgs().(*Args)
+		arg.Request = jsonStr
+		wbuf := bufiox.NewBytesWriter(&writeBuf)
+		err = arg.Write(context.Background(), "InBox", wbuf)
+		test.Assert(t, err == nil)
+		err = wbuf.Flush()
+		test.Assert(t, err == nil)
+
+		arg = mi.NewArgs().(*Args)
+		rbuf := bufiox.NewBytesReader(writeBuf)
+		err = arg.Read(context.Background(), "InBox", len(writeBuf), rbuf)
+		test.Assert(t, err == nil)
+		test.Assert(t, arg.Request.(string) == jsonStr || arg.Request.(string) == reversedJsonStr)
+	}
 }

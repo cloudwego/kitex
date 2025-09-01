@@ -175,7 +175,7 @@ func Test_invocationContainsPackage(t *testing.T) {
 			ri := rpcinfo.GetRPCInfo(ctx)
 			// make sure the package name has been injected into Invocation
 			test.Assert(t, ri.Invocation().PackageName() == "pbapi", ri.Invocation())
-			resp.(*streaming.Result).ClientStream = mockClientStream{}
+			resp.(*streaming.Result).ClientStream = mockClientStream{ctx: ctx}
 			return nil
 		}
 	}))
@@ -184,13 +184,23 @@ func Test_invocationContainsPackage(t *testing.T) {
 }
 
 type mockClientStream struct {
+	ctx context.Context
 	streaming.ClientStream
 }
 
+func (m mockClientStream) GetGRPCStream() streaming.Stream {
+	return &mockGRPCStream{ctx: m.ctx}
+}
+
+func (m mockClientStream) Context() context.Context {
+	return m.ctx
+}
+
 type mockGRPCStream struct {
+	ctx context.Context
 	streaming.Stream
 }
 
-func (m mockClientStream) GetGRPCStream() streaming.Stream {
-	return &mockGRPCStream{}
+func (m mockGRPCStream) Context() context.Context {
+	return m.ctx
 }

@@ -28,6 +28,15 @@ import (
 	codecProto "github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 )
 
+const (
+	// BinaryThriftGenericV1PayloadCodecKey is used to be compatible with old binary thrift generic to get the payload codec.
+	BinaryThriftGenericV1PayloadCodecKey = "binary_thrift_generic_v1_payload_codec"
+	// GetMethodNameByRequestFuncKey is used to get method name by request for http generic.
+	GetMethodNameByRequestFuncKey = "get_method_name_by_request_func"
+	// IsBinaryGeneric is used to judge whether it is binary generic, except BinaryThriftGeneric.
+	IsBinaryGeneric = "is_binary_generic"
+)
+
 // Args generic request
 type Args struct {
 	Request interface{}

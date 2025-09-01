@@ -71,8 +71,15 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 		}
 	}()
 
-	if m := ri.Invocation().MethodInfo(); m == nil {
+	mi := ri.Invocation().MethodInfo()
+	if mi == nil {
 		err = kerrors.ErrNonExistentMethod(kc.svcInfo.ServiceName, method)
+		reportErr = err
+		return err
+	}
+	sm := mi.StreamingMode()
+	if sm == serviceinfo.StreamingNone || sm == serviceinfo.StreamingUnary {
+		err = kerrors.ErrNotStreamingMethod(kc.svcInfo.ServiceName, method)
 		reportErr = err
 		return err
 	}
@@ -128,8 +135,15 @@ func (kc *kClient) StreamX(ctx context.Context, method string) (streaming.Client
 		}
 	}()
 
-	if m := ri.Invocation().MethodInfo(); m == nil {
+	mi := ri.Invocation().MethodInfo()
+	if mi == nil {
 		err = kerrors.ErrNonExistentMethod(kc.svcInfo.ServiceName, method)
+		reportErr = err
+		return nil, err
+	}
+	sm := mi.StreamingMode()
+	if sm == serviceinfo.StreamingNone || sm == serviceinfo.StreamingUnary {
+		err = kerrors.ErrNotStreamingMethod(kc.svcInfo.ServiceName, method)
 		reportErr = err
 		return nil, err
 	}

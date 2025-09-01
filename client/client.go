@@ -401,8 +401,10 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	// Add necessary keys to context for isolation between kitex client method calls
 	ctx = retry.PrepareRetryContext(ctx)
 
-	if m := ri.Invocation().MethodInfo(); m == nil {
+	if mi := ri.Invocation().MethodInfo(); mi == nil {
 		err = kerrors.ErrNonExistentMethod(kc.svcInfo.ServiceName, method)
+	} else if mi.StreamingMode() != serviceinfo.StreamingNone && mi.StreamingMode() != serviceinfo.StreamingUnary {
+		err = kerrors.ErrNotUnaryMethod(kc.svcInfo.ServiceName, method)
 	} else if kc.opt.UnaryOptions.RetryContainer == nil {
 		// call without retry policy
 		err = kc.eps(ctx, request, response)
@@ -779,7 +781,7 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 		rpcStats.SetLevel(*opt.StatsLevel)
 	}
 
-	mi := svcInfo.MethodInfo(method)
+	mi := svcInfo.MethodInfo(ctx, method)
 	if mi != nil && mi.OneWay() {
 		cfg.SetInteractionMode(rpcinfo.Oneway)
 	}

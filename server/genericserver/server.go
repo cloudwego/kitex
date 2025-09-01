@@ -18,7 +18,9 @@
 package genericserver
 
 import (
+	igeneric "github.com/cloudwego/kitex/internal/generic"
 	"github.com/cloudwego/kitex/pkg/generic"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/server"
 )
@@ -40,4 +42,23 @@ func NewServerWithServiceInfo(handler generic.Service, g generic.Generic, svcInf
 		panic(err)
 	}
 	return svr
+}
+
+// NewServerV2 creates a generic server with the given handler, generic and options.
+// Note: NOT support generic.BinaryThriftGeneric, please use generic.BinaryThriftGenericV2 instead.
+func NewServerV2(handler *generic.ServiceV2, g generic.Generic, opts ...server.Option) server.Server {
+	svr := server.NewServer(opts...)
+	if err := RegisterService(svr, handler, g); err != nil {
+		panic(err)
+	}
+	return svr
+}
+
+// RegisterService registers a generic service with the given server.
+// Note: NOT support generic.BinaryThriftGeneric, please use generic.BinaryThriftGenericV2 instead.
+func RegisterService(svr server.Server, handler *generic.ServiceV2, g generic.Generic, opts ...server.RegisterOption) error {
+	if _, ok := g.GetExtra(igeneric.BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec); ok {
+		panic("KITEX: not support generic.BinaryThriftGeneric, please use generic.BinaryThriftGenericV2 instead")
+	}
+	return svr.RegisterService(generic.ServiceInfoWithGeneric(g), handler, opts...)
 }

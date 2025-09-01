@@ -45,6 +45,7 @@ const (
 	ChangeEventsKey    ProbeName = "events"
 	ServiceInfosKey    ProbeName = "service_infos"
 	FallbackServiceKey ProbeName = "fallback_service"
+	UnknownServiceKey  ProbeName = "unknown_service"
 	OptionsKey         ProbeName = "options"
 
 	// Client

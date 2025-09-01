@@ -71,8 +71,17 @@ func TestStream(t *testing.T) {
 
 	_ = kc.init()
 
-	err = kc.Stream(ctx, mocks.MockMethod, req, resp)
+	err = kc.Stream(ctx, mocks.MockStreamingMethod, req, resp)
 	test.Assert(t, err == nil, err)
+
+	err = kc.Stream(ctx, mocks.MockMethod, req, resp)
+	test.Assert(t, err.Error() == "internal exception: not a streaming method, service: MockService, method: mock")
+
+	_, err = kc.StreamX(ctx, mocks.MockStreamingMethod)
+	test.Assert(t, err == nil, err)
+
+	_, err = kc.StreamX(ctx, mocks.MockMethod)
+	test.Assert(t, err.Error() == "internal exception: not a streaming method, service: MockService, method: mock")
 }
 
 func TestStreamNoMethod(t *testing.T) {
@@ -272,6 +281,10 @@ func Test_newStream(t *testing.T) {
 type mockTracer struct {
 	stats.Tracer
 	finish func(ctx context.Context)
+}
+
+func (m *mockTracer) Start(ctx context.Context) context.Context {
+	return ctx
 }
 
 func (m *mockTracer) Finish(ctx context.Context) {

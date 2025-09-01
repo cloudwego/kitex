@@ -28,6 +28,7 @@ import (
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/client"
+	igeneric "github.com/cloudwego/kitex/internal/generic"
 	"github.com/cloudwego/kitex/internal/mocks"
 	mocksloadbalance "github.com/cloudwego/kitex/internal/mocks/loadbalance"
 	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
@@ -44,6 +45,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/http"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/proxy"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -599,8 +601,9 @@ func TestWithRetryContainer(t *testing.T) {
 }
 
 func TestWithGeneric(t *testing.T) {
-	opts := client.NewOptions([]client.Option{WithGeneric(generic.BinaryThriftGeneric())})
-	test.DeepEqual(t, opts.RemoteOpt.PayloadCodec, generic.BinaryThriftGeneric().PayloadCodec())
+	g := generic.BinaryThriftGeneric()
+	opts := client.NewOptions([]client.Option{WithGeneric(g)})
+	test.DeepEqual(t, opts.RemoteOpt.PayloadCodec, g.GetExtra(igeneric.BinaryThriftGenericV1PayloadCodecKey).(remote.PayloadCodec))
 }
 
 func TestWithCloseCallbacks(t *testing.T) {

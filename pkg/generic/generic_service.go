@@ -18,156 +18,109 @@ package generic
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
-	"github.com/cloudwego/kitex/internal/generic"
+	igeneric "github.com/cloudwego/kitex/internal/generic"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
-// Service generic service interface
+var (
+	errGenericCallNotImplemented     = errors.New("generic.ServiceV2 GenericCall not implemented")
+	errClientStreamingNotImplemented = errors.New("generic.ServiceV2 ClientStreaming not implemented")
+	errServerStreamingNotImplemented = errors.New("generic.ServiceV2 ServerStreaming not implemented")
+	errBidiStreamingNotImplemented   = errors.New("generic.ServiceV2 BidiStreaming not implemented")
+)
+
+// Service is the v1 generic service interface.
 type Service interface {
 	// GenericCall handle the generic call
 	GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error)
 }
 
-// ServiceInfoWithGeneric create a generic ServiceInfo
+// ServiceV2 is the new generic service interface, provides methods to handle streaming requests
+// and it also supports multi services. All methods are optional.
+type ServiceV2 struct {
+	// GenericCall handles pingpong/unary requests.
+	//
+	// NOTE: If the generic type is BinaryThriftGenericV2, GRPC unary requests won't be handled by this method.
+	// Instead, they will be handled by BidiStreaming.
+	GenericCall func(ctx context.Context, service, method string, request interface{}) (response interface{}, err error)
+
+	// ClientStreaming handles client streaming call.
+	//
+	// NOTE: If the generic type is BinaryThriftGenericV2, Client streaming requests won't be handled by this method.
+	// Instead, they will be handled by BidiStreaming.
+	ClientStreaming func(ctx context.Context, service, method string, stream ClientStreamingServer) (err error)
+
+	// ServerStreaming handles server streaming call.
+	//
+	// NOTE: If the generic type is BinaryThriftGenericV2, Server streaming requests won't be handled by this method.
+	// Instead, they will be handled by BidiStreaming.
+	ServerStreaming func(ctx context.Context, service, method string, request interface{}, stream ServerStreamingServer) (err error)
+
+	// BidiStreaming handles the bidi streaming call.
+	//
+	// NOTE: If the generic type is BinaryThriftGenericV2, all streaming requests (including GRPC unary) will be handled
+	// by this method. Since we cannot determine the stream mode without IDL info, we can only treat the requests
+	// as bidi streaming by default.
+	BidiStreaming func(ctx context.Context, service, method string, stream BidiStreamingServer) (err error)
+}
+
+// ServiceInfoWithGeneric create a generic ServiceInfo from Generic.
 func ServiceInfoWithGeneric(g Generic) *serviceinfo.ServiceInfo {
 	handlerType := (*Service)(nil)
 
-	methods, svcName := getMethodInfo(g, g.IDLServiceName())
-
 	svcInfo := &serviceinfo.ServiceInfo{
-		ServiceName:  svcName,
-		HandlerType:  handlerType,
-		Methods:      methods,
-		PayloadCodec: g.PayloadCodecType(),
-		Extra:        make(map[string]interface{}),
+		ServiceName:   g.IDLServiceName(),
+		HandlerType:   handlerType,
+		Methods:       make(map[string]serviceinfo.MethodInfo),
+		PayloadCodec:  g.PayloadCodecType(),
+		Extra:         make(map[string]interface{}),
+		GenericMethod: g.GenericMethod(),
 	}
 	svcInfo.Extra["generic"] = true
-	if extra, ok := g.(ExtraProvider); ok {
-		if extra.GetExtra(CombineServiceKey) == "true" {
-			svcInfo.Extra[CombineServiceKey] = true
-		}
-		if pkg := extra.GetExtra(packageNameKey); pkg != "" {
-			svcInfo.Extra[packageNameKey] = pkg
-		}
+	if combineService, _ := g.GetExtra(serviceinfo.CombineServiceKey).(bool); combineService {
+		svcInfo.Extra[serviceinfo.CombineServiceKey] = true
+	}
+	if pkg, _ := g.GetExtra(serviceinfo.PackageName).(string); pkg != "" {
+		svcInfo.Extra[serviceinfo.PackageName] = pkg
+	}
+	if isBinaryGeneric, _ := g.GetExtra(igeneric.IsBinaryGeneric).(bool); isBinaryGeneric {
+		svcInfo.Extra[igeneric.IsBinaryGeneric] = true
 	}
 	return svcInfo
-}
-
-func getMethodInfo(g Generic, serviceName string) (methods map[string]serviceinfo.MethodInfo, svcName string) {
-	if g.PayloadCodec() != nil {
-		// note: binary generic cannot be used with multi-service feature
-		svcName = serviceinfo.GenericService
-		methods = map[string]serviceinfo.MethodInfo{
-			serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(callHandler, newGenericServiceCallArgs, newGenericServiceCallResult, false),
-		}
-	} else {
-		svcName = serviceName
-		methods = map[string]serviceinfo.MethodInfo{
-			serviceinfo.GenericClientStreamingMethod: serviceinfo.NewMethodInfo(
-				nil,
-				func() interface{} {
-					args := &Args{}
-					args.SetCodec(g.MessageReaderWriter())
-					return args
-				},
-				func() interface{} {
-					result := &Result{}
-					result.SetCodec(g.MessageReaderWriter())
-					return result
-				},
-				false,
-				serviceinfo.WithStreamingMode(serviceinfo.StreamingClient),
-			),
-			serviceinfo.GenericServerStreamingMethod: serviceinfo.NewMethodInfo(
-				nil,
-				func() interface{} {
-					args := &Args{}
-					args.SetCodec(g.MessageReaderWriter())
-					return args
-				},
-				func() interface{} {
-					result := &Result{}
-					result.SetCodec(g.MessageReaderWriter())
-					return result
-				},
-				false,
-				serviceinfo.WithStreamingMode(serviceinfo.StreamingServer),
-			),
-			serviceinfo.GenericBidirectionalStreamingMethod: serviceinfo.NewMethodInfo(
-				nil,
-				func() interface{} {
-					args := &Args{}
-					args.SetCodec(g.MessageReaderWriter())
-					return args
-				},
-				func() interface{} {
-					result := &Result{}
-					result.SetCodec(g.MessageReaderWriter())
-					return result
-				},
-				false,
-				serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
-			),
-			serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(
-				callHandler,
-				func() interface{} {
-					args := &Args{}
-					args.SetCodec(g.MessageReaderWriter())
-					return args
-				},
-				func() interface{} {
-					result := &Result{}
-					result.SetCodec(g.MessageReaderWriter())
-					return result
-				},
-				false,
-			),
-		}
-	}
-	return
-}
-
-// GetMethodInfo is only used in kitex, please DON'T USE IT.
-// DEPRECATED: this method is no longer used. This method will be removed in the future
-func GetMethodInfo(messageReaderWriter interface{}, serviceName string) (methods map[string]serviceinfo.MethodInfo, svcName string) {
-	if messageReaderWriter == nil {
-		// note: binary generic cannot be used with multi-service feature
-		svcName = serviceinfo.GenericService
-		methods = map[string]serviceinfo.MethodInfo{
-			serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(callHandler, newGenericServiceCallArgs, newGenericServiceCallResult, false),
-		}
-	} else {
-		svcName = serviceName
-		methods = map[string]serviceinfo.MethodInfo{
-			serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(
-				callHandler,
-				func() interface{} {
-					args := &Args{}
-					args.SetCodec(messageReaderWriter)
-					return args
-				},
-				func() interface{} {
-					result := &Result{}
-					result.SetCodec(messageReaderWriter)
-					return result
-				},
-				false,
-			),
-		}
-	}
-	return
 }
 
 func callHandler(ctx context.Context, handler, arg, result interface{}) error {
 	realArg := arg.(*Args)
 	realResult := result.(*Result)
-	success, err := handler.(Service).GenericCall(ctx, realArg.Method, realArg.Request)
-	if err != nil {
-		return err
+	switch svc := handler.(type) {
+	case *ServiceV2:
+		ri := rpcinfo.GetRPCInfo(ctx)
+		methodName := ri.Invocation().MethodName()
+		serviceName := ri.Invocation().ServiceName()
+		if svc.GenericCall == nil {
+			return errGenericCallNotImplemented
+		}
+		success, err := svc.GenericCall(ctx, serviceName, methodName, realArg.Request)
+		if err != nil {
+			return err
+		}
+		realResult.Success = success
+		return nil
+	case Service:
+		success, err := handler.(Service).GenericCall(ctx, realArg.Method, realArg.Request)
+		if err != nil {
+			return err
+		}
+		realResult.Success = success
+		return nil
+	default:
+		return fmt.Errorf("CallHandler: unknown handler type %T", handler)
 	}
-	realResult.Success = success
-	return nil
 }
 
 func newGenericServiceCallArgs() interface{} {
@@ -178,16 +131,87 @@ func newGenericServiceCallResult() interface{} {
 	return &Result{}
 }
 
+func clientStreamingHandlerGetter(mi serviceinfo.MethodInfo) serviceinfo.MethodHandler {
+	return func(ctx context.Context, handler, arg, result interface{}) error {
+		st, err := streaming.GetServerStreamFromArg(arg)
+		if err != nil {
+			return err
+		}
+		gst := &clientStreamingServer{
+			methodInfo: mi,
+			streaming:  st,
+		}
+		ri := rpcinfo.GetRPCInfo(ctx)
+		methodName := ri.Invocation().MethodName()
+		serviceName := ri.Invocation().ServiceName()
+		svcv2 := handler.(*ServiceV2)
+		if svcv2.ClientStreaming == nil {
+			return errClientStreamingNotImplemented
+		}
+		return svcv2.ClientStreaming(ctx, serviceName, methodName, gst)
+	}
+}
+
+func serverStreamingHandlerGetter(mi serviceinfo.MethodInfo) serviceinfo.MethodHandler {
+	return func(ctx context.Context, handler, arg, result interface{}) error {
+		st, err := streaming.GetServerStreamFromArg(arg)
+		if err != nil {
+			return err
+		}
+		gst := &serverStreamingServer{
+			methodInfo: mi,
+			streaming:  st,
+		}
+		args := mi.NewArgs().(*Args)
+		if err = st.RecvMsg(ctx, args); err != nil {
+			return err
+		}
+		ri := rpcinfo.GetRPCInfo(ctx)
+		methodName := ri.Invocation().MethodName()
+		serviceName := ri.Invocation().ServiceName()
+		svcv2 := handler.(*ServiceV2)
+		if svcv2.ServerStreaming == nil {
+			return errServerStreamingNotImplemented
+		}
+		return svcv2.ServerStreaming(ctx, serviceName, methodName, args.Request, gst)
+	}
+}
+
+func bidiStreamingHandlerGetter(mi serviceinfo.MethodInfo) serviceinfo.MethodHandler {
+	return func(ctx context.Context, handler, arg, result interface{}) error {
+		st, err := streaming.GetServerStreamFromArg(arg)
+		if err != nil {
+			return err
+		}
+		gst := &bidiStreamingServer{
+			methodInfo: mi,
+			streaming:  st,
+		}
+		ri := rpcinfo.GetRPCInfo(ctx)
+		methodName := ri.Invocation().MethodName()
+		serviceName := ri.Invocation().ServiceName()
+		switch svc := handler.(type) {
+		case *ServiceV2:
+			if svc.BidiStreaming == nil {
+				return errBidiStreamingNotImplemented
+			}
+			return svc.BidiStreaming(ctx, serviceName, methodName, gst)
+		default:
+			return fmt.Errorf("BidiStreamingHandler: unknown handler type %T", handler)
+		}
+	}
+}
+
 // WithCodec set codec instance for Args or Result
 type WithCodec interface {
 	SetCodec(codec interface{})
 }
 
 // Args generic request
-type Args = generic.Args
+type Args = igeneric.Args
 
 // Result generic response
-type Result = generic.Result
+type Result = igeneric.Result
 
 var (
 	_ WithCodec = (*Args)(nil)

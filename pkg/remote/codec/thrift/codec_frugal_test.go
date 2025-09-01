@@ -77,7 +77,7 @@ func initFrugalTagSendMsg(tp transport.Protocol) remote.Message {
 func initFrugalTagRecvMsg() remote.Message {
 	var _args MockFrugalTagArgs
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.EmptyEndpointInfo(), ink, nil, rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.EmptyEndpointInfo(), ink, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	remote.SetServiceSearcher(ri, mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
 		svcInfo.ServiceName: svcInfo,
 	}))
