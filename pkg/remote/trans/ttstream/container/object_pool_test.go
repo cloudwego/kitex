@@ -17,6 +17,8 @@
 package container
 
 import (
+	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -67,4 +69,42 @@ func TestObjectPool(t *testing.T) {
 	test.Assert(t, atomic.LoadInt32(&deleted) == 0)
 	test.Assert(t, op.objects[key].Size() == count)
 	op.Close()
+}
+
+func TestObjectPool_cleaningLazyInit(t *testing.T) {
+	// wait for all cleaning goroutines created by other tests finished
+	for cleaningGoroutineExist() {
+		time.Sleep(10 * time.Microsecond)
+	}
+	op := NewObjectPool(10 * time.Microsecond)
+	defer op.Close()
+	if cleaningGoroutineExist() {
+		t.Fatal("cleaning goroutine should not be started when ObjectPool.Push is not invoked")
+	}
+	op.Push("test", new(testObject))
+	ticker := time.NewTicker(10 * time.Microsecond)
+	timer := time.NewTimer(time.Millisecond)
+	defer ticker.Stop()
+	defer timer.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if cleaningGoroutineExist() {
+				return
+			}
+		case <-timer.C:
+			t.Fatal("cleaning goroutine should be started when ObjectPool.Push is invoked")
+		}
+	}
+}
+
+func cleaningGoroutineExist() bool {
+	buf := make([]byte, 2<<20)
+	buf = buf[:runtime.Stack(buf, true)]
+	for _, g := range strings.Split(string(buf), "\n\n") {
+		if strings.Contains(g, "(*ObjectPool).cleaning") {
+			return true
+		}
+	}
+	return false
 }
