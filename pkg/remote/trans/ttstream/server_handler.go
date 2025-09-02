@@ -89,6 +89,7 @@ type svrTransHandler struct {
 	opt           *remote.ServerOption
 	inkHdlFunc    endpoint.Endpoint
 	headerHandler HeaderFrameReadHandler
+	traceCtl      *rpcinfo.TraceController
 }
 
 func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {
@@ -117,7 +118,7 @@ type onDisConnectSetter interface {
 // OnActive will be called when a connection accepted
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	nconn := conn.(netpoll.Connection)
-	trans := newTransport(serverTransport, nconn, nil)
+	trans := newServerTransport(nconn, t.traceCtl)
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
 		// server only close transport when peer connection closed
 		_ = trans.Close(nil)
@@ -217,6 +218,7 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 	ctx = context.WithValue(ctx, serverStreamCancelCtxKey{}, cancelFunc)
 
 	ctx = t.startTracer(ctx, ri)
+	st.setTraceContext(ctx)
 	defer func() {
 		panicErr := recover()
 		if panicErr != nil {
@@ -226,6 +228,7 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 				klog.CtxErrorf(ctx, "KITEX: ttstream panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
 			}
 		}
+		st.finishTrace()
 		t.finishTracer(ctx, ri, err, panicErr)
 	}()
 	args := &streaming.Args{

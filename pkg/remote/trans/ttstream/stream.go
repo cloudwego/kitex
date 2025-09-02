@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	ktransport "github.com/cloudwego/kitex/transport"
@@ -90,6 +92,12 @@ type stream struct {
 	recvTimeout      time.Duration
 	metaFrameHandler MetaFrameHandler
 	closeCallback    []func(error)
+	traceCtl         *rpcinfo.TraceController
+
+	traceMu       sync.Mutex      // protects traceCtx, pendingEvents and traceFinished
+	traceCtx      context.Context // stores the ctx containing rpcinfo and trace span related information
+	pendingEvents []rpcinfo.Event
+	traceFinished bool
 }
 
 func (s *stream) Service() string {
@@ -267,6 +275,7 @@ func (s *stream) sendHeader() (err error) {
 		return fmt.Errorf("stream header already sent")
 	}
 	err = s.writeFrame(headerFrameType, wheader, nil, nil)
+	s.reportEvent(stats.StreamSendHeader)
 	return err
 }
 
@@ -299,6 +308,7 @@ func (s *stream) sendTrailer(exception error) (err error) {
 		}
 	}
 	err = s.writeFrame(trailerFrameType, nil, wtrailer, payload)
+	s.reportEvent(stats.StreamSendTrailer)
 	return err
 }
 
@@ -321,6 +331,7 @@ func (s *stream) onReadHeaderFrame(fr *Frame) (err error) {
 	default:
 		return errUnexpectedHeader.WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
 	}
+	s.reportEvent(stats.StreamRecvHeader)
 	klog.Debugf("stream[%s] read header: %v", s.method, fr.header)
 	return nil
 }
@@ -360,6 +371,7 @@ func (s *stream) onReadTrailerFrame(fr *Frame, kind int32) (err error) {
 	default:
 	}
 
+	s.reportEvent(stats.StreamRecvTrailer)
 	klog.Debugf("stream[%d] recv trailer: %v, exception: %v", s.sid, s.trailer, exception)
 	// if client recv trailer, server handler must be return,
 	// so we don't need to send data anymore

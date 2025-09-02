@@ -36,6 +36,8 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/stats"
 
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
@@ -137,6 +139,8 @@ type http2Server struct {
 	idle time.Time
 
 	bufferPool *bufferPool
+
+	traceCtl *rpcinfo.TraceController
 }
 
 // newHTTP2Server constructs a ServerTransport based on HTTP2. ConnectionError is
@@ -240,6 +244,7 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		idle:              time.Now(),
 		initialWindowSize: int32(iwz),
 		bufferPool:        newBufferPool(),
+		traceCtl:          config.TraceController,
 	}
 	t.controlBuf = newControlBuffer(t.done)
 	if dynamicWindow {
@@ -407,6 +412,7 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 		wq:       s.wq,
 	})
 	handle(s)
+	t.reportEvent(s, stats.StreamRecvHeader)
 	return nil
 }
 
@@ -436,6 +442,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 						rstCode:  se.Code,
 						onWrite:  func() {},
 					})
+					t.reportEvent(s, stats.StreamSendRst)
 				}
 				continue
 			}
@@ -593,6 +600,7 @@ func (t *http2Server) handleData(f *grpcframe.DataFrame) {
 	if f.Header().Flags.Has(http2.FlagDataEndStream) {
 		// Received the end of stream from the client.
 		s.compareAndSwapState(streamActive, streamReadDone)
+		t.reportEvent(s, stats.StreamRecvTrailer)
 		s.write(recvMsg{err: io.EOF})
 	}
 }
@@ -605,6 +613,7 @@ func (t *http2Server) handleRSTStream(f *http2.RSTStreamFrame) {
 		} else {
 			t.closeStream(s, status.Errorf(codes.Canceled, "transport: RSTStream Frame received with error code: %v [triggered by %s]", f.ErrCode, s.sourceService), false, 0, false)
 		}
+		t.reportEvent(s, stats.StreamRecvRst)
 		return
 	}
 	// If the stream is already deleted from the active streams map, then put a cleanupStream item into controlbuf to delete the stream from loopy writer's established streams map.
@@ -792,6 +801,7 @@ func (t *http2Server) writeHeaderLocked(s *Stream) error {
 		t.closeStream(s, errStatusHeaderListSizeLimitViolation, true, http2.ErrCodeInternal, false)
 		return errStatusHeaderListSizeLimitViolation
 	}
+	t.reportEvent(s, stats.StreamSendHeader)
 	return nil
 }
 
@@ -1048,6 +1058,7 @@ func (t *http2Server) rstActiveStreams(streams map[uint32]*Stream, cancelErr err
 				finishCh <- struct{}{}
 			},
 		})
+		t.reportEvent(s, stats.StreamSendRst)
 	}
 	return activeStreams
 }
@@ -1104,6 +1115,11 @@ func (t *http2Server) finishStream(s *Stream, rst bool, rstCode http2.ErrCode, h
 		},
 	}
 	t.controlBuf.put(hdr)
+	// report SendTrailer in advance because underlying loopyWriter sending Rst first, then followed by Trailer
+	t.reportEvent(s, stats.StreamSendTrailer)
+	if rst {
+		t.reportEvent(s, stats.StreamSendRst)
+	}
 }
 
 // closeStream clears the footprint of a stream when the stream is not needed any more.
@@ -1121,6 +1137,9 @@ func (t *http2Server) closeStream(s *Stream, err error, rst bool, rstCode http2.
 		rstCode:  rstCode,
 		onWrite:  func() {},
 	})
+	if rst {
+		t.reportEvent(s, stats.StreamSendRst)
+	}
 }
 
 func (t *http2Server) RemoteAddr() net.Addr {
