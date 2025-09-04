@@ -462,6 +462,7 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 	output := util.JoinPath(g.OutputPath, util.CombineOutputPath(g.GenPath, pkg.Namespace))
 	svcPkg := strings.ToLower(pkg.ServiceName)
 	output = util.JoinPath(output, svcPkg)
+	g.ServiceName = pkg.Namespace
 	ext := g.tmplExt
 	if ext == nil {
 		ext = new(TemplateExtension)
