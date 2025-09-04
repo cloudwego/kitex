@@ -175,7 +175,7 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 		return nil, err
 	}
 	for _, tpl := range t {
-		if tpl.LoopService && g.CombineService {
+		if g.CombineService {
 			svrInfo, cs := pkg.ServiceInfo, pkg.CombineServices
 
 			for i := range cs {
