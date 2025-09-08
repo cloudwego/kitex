@@ -16,6 +16,10 @@
 
 package ttstream
 
+import (
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+)
+
 // ServerHandlerOption define server provider options
 type ServerHandlerOption func(pc *svrTransHandler)
 
@@ -26,5 +30,12 @@ type ServerProviderOption = ServerHandlerOption
 func WithServerHeaderFrameHandler(handler HeaderFrameReadHandler) ServerHandlerOption {
 	return func(sp *svrTransHandler) {
 		sp.headerHandler = handler
+	}
+}
+
+// WithServerTraceController configures trace related controller
+func WithServerTraceController(ctl *rpcinfo.TraceController) ServerHandlerOption {
+	return func(sp *svrTransHandler) {
+		sp.traceCtl = ctl
 	}
 }

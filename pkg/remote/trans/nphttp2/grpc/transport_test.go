@@ -99,6 +99,7 @@ const (
 	invalidHeaderField
 	delayRead
 	pingpong
+	fullStreamingMode
 
 	gracefulShutdown
 	cancel
@@ -168,12 +169,7 @@ func (h *testStreamHandler) handleStreamPingPong(t *testing.T, s *Stream) {
 }
 
 func (h *testStreamHandler) handleStreamMisbehave(t *testing.T, s *Stream) {
-	conn, ok := s.st.(*http2Server)
-	if !ok {
-		t.Errorf("Failed to convert %v to *http2Server", s.st)
-		h.t.WriteStatus(s, status.New(codes.Internal, ""))
-		return
-	}
+	conn := s.st
 	var sent int
 	p := make([]byte, http2MaxFrameLen)
 	for sent < int(initialWindowSize) {
@@ -304,7 +300,7 @@ func (h *testStreamHandler) handleStreamDelayRead(t *testing.T, s *Stream) {
 
 func (h *testStreamHandler) gracefulShutdown(t *testing.T, s *Stream) {
 	t.Log("run graceful shutdown")
-	close(h.srv.srvReady)
+	h.srv.srvReady <- struct{}{}
 	msg := make([]byte, 5)
 	num, err := s.Read(msg)
 	test.Assert(t, err == nil, err)
@@ -321,14 +317,98 @@ func (h *testStreamHandler) gracefulShutdown(t *testing.T, s *Stream) {
 }
 
 func (h *testStreamHandler) handleStreamCancel(t *testing.T, s *Stream) {
-	header := make([]byte, 5)
-	_, err := s.Read(header)
+	s.SetTraceContext(context.Background())
+	defer s.FinishTrace()
+	switch s.Method() {
+	case cancelServerRecvHeaderRst:
+		msg := make([]byte, 5)
+		_, err := s.Read(msg)
+		verifyCancelError(t, err)
+		h.srv.srvReady <- struct{}{}
+	case cancelServerRecvHeaderDataRst:
+		msg := make([]byte, 5)
+		_, err := s.Read(msg)
+		test.Assert(t, err == nil, err)
+		_, err = s.Read(msg)
+		verifyCancelError(t, err)
+		h.srv.srvReady <- struct{}{}
+	case cancelServerRecvHeaderDataTrailerRst:
+		msg := make([]byte, 5)
+		_, err := s.Read(msg)
+		test.Assert(t, err == nil, err)
+		_, err = s.Read(msg)
+		test.Assert(t, err == io.EOF, err)
+		<-s.ctxDone
+		verifyCancelError(t, s.ctx.Err())
+		h.srv.srvReady <- struct{}{}
+	}
+}
+
+func verifyCancelError(t *testing.T, err error) {
 	test.Assert(t, err != nil, err)
 	st, ok := status.FromError(err)
 	test.Assert(t, ok)
 	test.Assert(t, st.Code() == codes.Canceled, st.Code())
 	test.Assert(t, strings.Contains(st.Message(), "transport: RSTStream Frame received with error code"), st.Message())
-	close(h.srv.srvReady)
+}
+
+func (h *testStreamHandler) handleFullStreamingMode(t *testing.T, s *Stream) {
+	s.SetTraceContext(context.Background())
+	defer s.FinishTrace()
+	switch s.Method() {
+	case normalUnaryMethod:
+		msg := make([]byte, 5)
+		n, err := s.Read(msg)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, n == 5, n)
+		err = h.t.Write(s, nil, msg, &Options{})
+		test.Assert(t, err == nil, err)
+		err = h.t.WriteStatus(s, status.New(codes.OK, ""))
+		test.Assert(t, err == nil)
+		h.srv.srvReady <- struct{}{}
+	case normalClientStreamingMethod:
+		for {
+			msg := make([]byte, 5)
+			_, err := s.Read(msg)
+			if err == nil {
+				continue
+			}
+			test.Assert(t, err == io.EOF, err)
+			break
+		}
+		err := h.t.Write(s, nil, []byte("hello"), &Options{})
+		test.Assert(t, err == nil, err)
+		err = h.t.WriteStatus(s, status.New(codes.OK, ""))
+		test.Assert(t, err == nil, err)
+		h.srv.srvReady <- struct{}{}
+	case normalServerStreamingMethod:
+		msg := make([]byte, 5)
+		_, err := s.Read(msg)
+		test.Assert(t, err == nil, err)
+		_, err = s.Read(msg)
+		test.Assert(t, err == io.EOF, err)
+		for i := 0; i < 10; i++ {
+			err = h.t.Write(s, nil, msg, &Options{})
+			test.Assert(t, err == nil, err)
+		}
+		err = h.t.WriteStatus(s, status.New(codes.OK, ""))
+		test.Assert(t, err == nil, err)
+		h.srv.srvReady <- struct{}{}
+	case normalBidiStreamingMethod:
+		for {
+			msg := make([]byte, 5)
+			_, err := s.Read(msg)
+			if err != nil {
+				test.Assert(t, err == io.EOF, err)
+				break
+			}
+			err = h.t.Write(s, nil, msg, &Options{})
+			test.Assert(t, err == nil, err)
+		}
+		err := h.t.WriteStatus(s, status.New(codes.OK, ""))
+		test.Assert(t, err == nil, err)
+		h.srv.srvReady <- struct{}{}
+	}
 }
 
 // start starts server. Other goroutines should block on s.readyChan for further operations.
@@ -407,7 +487,7 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 			s.mu.Lock()
 			close(s.ready)
 			s.mu.Unlock()
-			transport.HandleStreams(func(s *Stream) {
+			go transport.HandleStreams(func(s *Stream) {
 				go h.handleStreamDelayRead(t, s)
 			}, func(ctx context.Context, method string) context.Context {
 				return ctx
@@ -420,30 +500,32 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 			})
 		case gracefulShutdown:
 			s.transWG.Add(1)
-			func() {
-				defer s.transWG.Done()
-				transport.HandleStreams(func(stream *Stream) {
-					s.hdlWG.Add(1)
-					go func() {
-						defer s.hdlWG.Done()
-						h.gracefulShutdown(t, stream)
-					}()
-				}, func(ctx context.Context, method string) context.Context { return ctx })
-			}()
+			defer s.transWG.Done()
+			transport.HandleStreams(func(stream *Stream) {
+				s.hdlWG.Add(1)
+				go func() {
+					defer s.hdlWG.Done()
+					h.gracefulShutdown(t, stream)
+				}()
+			}, func(ctx context.Context, method string) context.Context { return ctx })
 		case cancel:
 			transport.HandleStreams(func(s *Stream) {
 				go h.handleStreamCancel(t, s)
 			}, func(ctx context.Context, method string) context.Context {
 				return ctx
 			})
+		case fullStreamingMode:
+			transport.HandleStreams(func(s *Stream) {
+				go h.handleFullStreamingMode(t, s)
+			}, func(ctx context.Context, s string) context.Context {
+				return ctx
+			})
 		default:
-			func() {
-				transport.HandleStreams(func(s *Stream) {
-					go h.handleStream(t, s)
-				}, func(ctx context.Context, method string) context.Context {
-					return ctx
-				})
-			}()
+			transport.HandleStreams(func(s *Stream) {
+				go h.handleStream(t, s)
+			}, func(ctx context.Context, method string) context.Context {
+				return ctx
+			})
 		}
 		return ctx
 	}
@@ -612,6 +694,12 @@ func setUpWithOnGoAway(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 		t.Fatalf("failed to create transport: %v", connErr)
 	}
 	return server, ct.(*http2Client)
+}
+
+func TestMain(m *testing.M) {
+	// set the ticker to make tests running fast
+	ticker = utils.NewSyncSharedTicker(10 * time.Millisecond)
+	m.Run()
 }
 
 // TestInflightStreamClosing ensures that closing in-flight stream
@@ -2252,12 +2340,10 @@ func Test_isIgnorable(t *testing.T) {
 }
 
 func Test_closeStreamTask(t *testing.T) {
-	// replace ticker to reduce test time
-	ticker = utils.NewSyncSharedTicker(10 * time.Millisecond)
 	server, ct := setUp(t, 0, math.MaxUint32, cancel)
 	callHdr := &CallHdr{
 		Host:   "localhost",
-		Method: "foo.Small",
+		Method: cancelServerRecvHeaderRst,
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := ct.NewStream(ctx, callHdr)

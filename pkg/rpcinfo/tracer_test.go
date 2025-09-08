@@ -173,6 +173,44 @@ func TestTraceController_ReportStreamEvent(t *testing.T) {
 	})
 }
 
+func TestTraceController_ReportStreamRawEvent(t *testing.T) {
+	t.Run("reporter", func(t *testing.T) {
+		called := false
+		e := NewEvent(stats.StreamRecvHeader, stats.StatusInfo, "")
+		handler := func(ctx context.Context, ri RPCInfo, event Event) {
+			called = true
+			test.Assert(t, event.Event() == stats.StreamRecvHeader)
+			test.Assert(t, event.Status() == stats.StatusInfo)
+			test.Assert(t, event.Info() == "")
+		}
+		ctl := &TraceController{}
+
+		ctl.Append(&mockStreamReporter{reportStreamEvent: handler})
+		ctl.ReportStreamRawEvent(context.Background(), e)
+
+		test.Assert(t, ctl.HasTracer())
+		test.Assert(t, ctl.HasStreamEventReporter())
+		test.Assert(t, ctl.GetStreamEventHandler() != nil)
+		test.Assert(t, called)
+	})
+	t.Run("reporter panic recovered", func(t *testing.T) {
+		recvErr := errors.New("XXX")
+		called := false
+		handler := func(ctx context.Context, ri RPCInfo, event Event) {
+			called = true
+			panic(recvErr)
+		}
+		e := NewEvent(stats.StreamRecvHeader, stats.StatusInfo, "")
+		ctl := &TraceController{}
+		ctl.Append(&mockStreamReporter{reportStreamEvent: handler})
+		ctl.ReportStreamRawEvent(context.Background(), e)
+		test.Assert(t, ctl.HasTracer())
+		test.Assert(t, ctl.HasStreamEventReporter())
+		test.Assert(t, ctl.GetStreamEventHandler() != nil)
+		test.Assert(t, called)
+	})
+}
+
 func Test_buildStreamingEvent(t *testing.T) {
 	t.Run("no-error", func(t *testing.T) {
 		evt := buildStreamingEvent(stats.StreamSend, nil)
