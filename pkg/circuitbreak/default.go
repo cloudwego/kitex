@@ -29,7 +29,6 @@ var ignoreErrTypes = map[error]ErrorType{
 	kerrors.ErrServiceDiscovery:  TypeIgnorable,
 	kerrors.ErrACL:               TypeIgnorable,
 	kerrors.ErrLoadbalance:       TypeIgnorable,
-	kerrors.ErrRPCFinish:         TypeIgnorable,
 }
 
 // ErrorTypeOnServiceLevel determines the error type with a service level criteria.

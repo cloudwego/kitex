@@ -413,7 +413,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 		}
 	} else {
 		var lastRI rpcinfo.RPCInfo
-		lastRI, recycleRI, err = kc.opt.UnaryOptions.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
+		lastRI, recycleRI, err = kc.opt.UnaryOptions.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method), ri, request, response)
 		if ri != lastRI {
 			// reset ri of ctx to lastRI
 			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, lastRI)
@@ -426,12 +426,12 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	return err
 }
 
-func (kc *kClient) rpcCallWithRetry(ri rpcinfo.RPCInfo, method string, request, response interface{}) retry.RPCCallFunc {
+func (kc *kClient) rpcCallWithRetry(ri rpcinfo.RPCInfo, method string) retry.RPCCallFunc {
 	// call with retry policy
 	var callTimes int32
 	// prevRI represents a value of rpcinfo.RPCInfo type.
 	var prevRI atomic.Value
-	return func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+	return func(ctx context.Context, r retry.Retryer, request, response interface{}) (rpcinfo.RPCInfo, error) {
 		currCallTimes := int(atomic.AddInt32(&callTimes, 1))
 		cRI := ri
 		if currCallTimes > 1 {
@@ -444,7 +444,7 @@ func (kc *kClient) rpcCallWithRetry(ri rpcinfo.RPCInfo, method string, request, 
 			prevRI.Store(cRI)
 		}
 		callErr := kc.eps(ctx, request, response)
-		return cRI, response, callErr
+		return cRI, callErr
 	}
 }
 
