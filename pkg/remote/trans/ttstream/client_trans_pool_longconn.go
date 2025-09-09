@@ -45,13 +45,13 @@ type longConnTransPool struct {
 	config    LongConnConfig
 }
 
-func (c *longConnTransPool) Get(network, addr string) (trans *transport, err error) {
+func (c *longConnTransPool) Get(network, addr string) (trans *clientTransport, err error) {
 	for {
 		o := c.transPool.Pop(addr)
 		if o == nil {
 			break
 		}
-		trans = o.(*transport)
+		trans = o.(*clientTransport)
 		if trans.IsActive() {
 			return trans, nil
 		}
@@ -62,12 +62,12 @@ func (c *longConnTransPool) Get(network, addr string) (trans *transport, err err
 	if err != nil {
 		return nil, err
 	}
-	trans = newTransport(clientTransport, conn, c)
+	trans = newClientTransport(conn, c)
 	// create new transport
 	return trans, nil
 }
 
-func (c *longConnTransPool) Put(trans *transport) {
+func (c *longConnTransPool) Put(trans *clientTransport) {
 	addr := trans.conn.RemoteAddr().String()
 	c.transPool.Push(addr, trans)
 }

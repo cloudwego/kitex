@@ -37,7 +37,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/ktx"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
@@ -47,8 +46,7 @@ import (
 var streamingBidirectionalCtx = igeneric.WithGenericStreamingMode(context.Background(), serviceinfo.StreamingBidirectional)
 
 type (
-	serverTransCtxKey        struct{}
-	serverStreamCancelCtxKey struct{}
+	serverTransCtxKey struct{}
 )
 
 /*  trans_server.go only use the following interface in remote.ServerTransHandler:
@@ -117,7 +115,7 @@ type onDisConnectSetter interface {
 // OnActive will be called when a connection accepted
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	nconn := conn.(netpoll.Connection)
-	trans := newTransport(serverTransport, nconn, nil)
+	trans := newServerTransport(nconn)
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
 		// server only close transport when peer connection closed
 		_ = trans.Close(nil)
@@ -131,7 +129,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	var wg sync.WaitGroup
 	defer func() {
 		wg.Wait()
-		trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
+		trans, _ := ctx.Value(serverTransCtxKey{}).(*serverTransport)
 		if trans != nil {
 			trans.WaitClosed()
 		}
@@ -141,12 +139,12 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	}()
 	// connection level goroutine
 	for {
-		trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
+		trans, _ := ctx.Value(serverTransCtxKey{}).(*serverTransport)
 		if trans == nil {
 			err = fmt.Errorf("server transport is nil")
 			return
 		}
-		var st *stream
+		var st *serverStream
 		// ReadStream will block until a stream coming or conn return error
 		st, err = trans.ReadStream(ctx)
 		if err != nil {
@@ -168,9 +166,10 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 // - create  server stream
 // - process server stream
 // - close   server stream
-func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *stream) (err error) {
+// igrore the ctx passed in and make use of st.ctx instead
+func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *serverStream) (err error) {
 	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
-	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
+	stCtx := rpcinfo.NewCtxWithRPCInfo(st.ctx, ri)
 	defer func() {
 		if rpcinfo.PoolEnabled() {
 			ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
@@ -203,46 +202,45 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 	// headerHandler return a new stream level ctx
 	// it contains rpcinfo modified by HeaderHandler
 	if t.headerHandler != nil {
-		ctx, err = t.headerHandler.OnReadStream(ctx, st.meta, st.header)
+		stCtx, err = t.headerHandler.OnReadStream(stCtx, st.meta, st.header)
 		if err != nil {
 			return
 		}
 	}
 	// register metainfo into ctx
-	ctx = metainfo.SetMetaInfoFromMap(ctx, st.header)
-	ss := newServerStream(st)
+	stCtx = metainfo.SetMetaInfoFromMap(stCtx, st.header)
 
-	// cancel ctx when OnStreamFinish
-	ctx, cancelFunc := ktx.WithCancel(ctx)
-	ctx = context.WithValue(ctx, serverStreamCancelCtxKey{}, cancelFunc)
-
-	ctx = t.startTracer(ctx, ri)
+	stCtx = t.startTracer(stCtx, ri)
 	defer func() {
 		panicErr := recover()
 		if panicErr != nil {
 			if conn != nil {
-				klog.CtxErrorf(ctx, "KITEX: ttstream panic happened, close conn, remoteAddress=%s, error=%s\nstack=%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
+				klog.CtxErrorf(stCtx, "KITEX: ttstream panic happened, close conn, remoteAddress=%s, error=%s\nstack=%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
 			} else {
-				klog.CtxErrorf(ctx, "KITEX: ttstream panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
+				klog.CtxErrorf(stCtx, "KITEX: ttstream panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
 			}
 		}
-		t.finishTracer(ctx, ri, err, panicErr)
+		t.finishTracer(stCtx, ri, err, panicErr)
 	}()
+	// set processed ctx and rpcinfo
+	st.ctx = stCtx
+	st.rpcInfo = ri
+
 	args := &streaming.Args{
-		ServerStream: ss,
+		ServerStream: st,
 	}
-	if err = t.inkHdlFunc(ctx, args, nil); err != nil {
+	if err = t.inkHdlFunc(stCtx, args, nil); err != nil {
 		// treat err thrown by invoking handler as the final err, ignore the err returned by OnStreamFinish
-		_, _ = t.OnStreamFinish(ctx, ss, err)
+		_, _ = t.OnStreamFinish(stCtx, st, err)
 		return
 	}
 	if bizErr := ri.Invocation().BizStatusErr(); bizErr != nil {
 		// when biz err thrown, treat the err returned by OnStreamFinish as the final err
-		ctx, err = t.OnStreamFinish(ctx, ss, bizErr)
+		stCtx, err = t.OnStreamFinish(stCtx, st, bizErr)
 		return
 	}
 	// there is no invoking handler err or biz err, treat the err returned by OnStreamFinish as the final err
-	ctx, err = t.OnStreamFinish(ctx, ss, nil)
+	stCtx, err = t.OnStreamFinish(stCtx, st, nil)
 	return
 }
 
@@ -293,7 +291,7 @@ func (t *svrTransHandler) OnStreamFinish(ctx context.Context, ss streaming.Serve
 			exception = nil
 		case *thrift.ApplicationException:
 			exception = terr
-		case tException:
+		case *Exception:
 			exception = thrift.NewApplicationException(terr.TypeId(), terr.Error())
 		default:
 			exception = thrift.NewApplicationException(remote.InternalError, terr.Error())
@@ -302,11 +300,6 @@ func (t *svrTransHandler) OnStreamFinish(ctx context.Context, ss streaming.Serve
 	// server stream CloseSend will send the trailer with payload
 	if err = sst.CloseSend(exception); err != nil {
 		return nil, err
-	}
-
-	cancelFunc, _ := ctx.Value(serverStreamCancelCtxKey{}).(context.CancelFunc)
-	if cancelFunc != nil {
-		cancelFunc()
 	}
 
 	return ctx, nil
