@@ -1,10 +1,24 @@
+/*
+ * Copyright 2025 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package utils
 
 import (
 	"reflect"
 	"sync"
-
-	"github.com/bytedance/gopkg/util/gopool"
 )
 
 const (
@@ -49,13 +63,14 @@ func (ss *singleSelector) run() {
 		if chosen != n {
 			c := cases[chosen].Chan.Interface().(<-chan struct{})
 			ss.mu.Lock()
-			// run
-			if val, exist := ss.chMap[c]; exist {
-				gopool.Go(val.callback)
-			}
+			val, exist := ss.chMap[c]
 			// delete
 			ss.delete(c)
 			ss.mu.Unlock()
+			// run
+			if exist {
+				go val.callback()
+			}
 		}
 	}
 }
@@ -151,11 +166,14 @@ func (ds *CtxDoneSelector) delete(done <-chan struct{}) {
 	delete(ds.chMap, done)
 	lastSelector.cases = lastSelector.cases[:len(lastSelector.cases)-1]
 	if len(lastSelector.cases) == 0 {
+		ds.selectors[len(ds.selectors)-1] = nil
 		ds.selectors = ds.selectors[:len(ds.selectors)-1]
 	}
 	// signal selectors
 	curSelector.signal()
-	lastSelector.signal()
+	if curSelector != lastSelector {
+		lastSelector.signal()
+	}
 }
 
 // Close gracefully shuts down the selector.

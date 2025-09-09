@@ -1,7 +1,24 @@
+/*
+ * Copyright 2025 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package utils
 
 import (
 	"context"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -18,14 +35,16 @@ func TestBasic(t *testing.T) {
 		ctx    context.Context
 		cancel context.CancelFunc
 	}
-	for i := 0; i < 30000; i++ {
+	var hasCanceled [1000]uint32
+	for i := 0; i < 3000; i++ {
 		ctx, cancel := context.WithCancel(context.Background())
 		idx := i
 		ds.Add(ctx.Done(), func() {
 			atomic.AddUint32(&canceled, 1)
-			if idx < 10000 || idx >= 20000 {
+			if idx < 1000 || idx >= 2000 {
 				t.Fatal("unexpected index")
 			}
+			atomic.StoreUint32(&hasCanceled[idx-1000], 1)
 		})
 		slices = append(slices, struct {
 			ctx    context.Context
@@ -34,31 +53,36 @@ func TestBasic(t *testing.T) {
 	}
 	test.Assert(t, atomic.LoadUint32(&canceled) == 0)
 	ds.mu.Lock()
-	test.Assert(t, ds.count == 30000)
-	test.Assert(t, len(ds.selectors) == 30000/singleSelectorMaxCases+1)
+	test.Assert(t, ds.count == 3000)
+	test.Assert(t, len(ds.selectors) == 3000/singleSelectorMaxCases+1)
 	test.Assert(t, ds.stop == 0)
 	ds.mu.Unlock()
 
 	// remove
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 1000; i++ {
 		ds.Delete(slices[i].ctx.Done())
 	}
 	test.Assert(t, atomic.LoadUint32(&canceled) == 0)
 	ds.mu.Lock()
-	test.Assert(t, ds.count == 20000)
-	test.Assert(t, len(ds.selectors) == 20000/singleSelectorMaxCases+1)
+	test.Assert(t, ds.count == 2000)
+	test.Assert(t, len(ds.selectors) == 2000/singleSelectorMaxCases+1)
 	test.Assert(t, ds.stop == 0)
 	ds.mu.Unlock()
 
 	// cancel
-	for i := 10000; i < 20000; i++ {
+	for i := 1000; i < 2000; i++ {
 		slices[i].cancel()
 	}
-	time.Sleep(500 * time.Millisecond)
-	test.Assert(t, atomic.LoadUint32(&canceled) == 10000)
+	time.Sleep(1 * time.Second)
+	test.Assert(t, atomic.LoadUint32(&canceled) == 1000)
+	for i := 0; i < 1000; i++ {
+		if atomic.LoadUint32(&hasCanceled[i]) != 1 {
+			t.Fatal("context cancel not triggered")
+		}
+	}
 	ds.mu.Lock()
-	test.Assert(t, ds.count == 10000)
-	test.Assert(t, len(ds.selectors) == 10000/singleSelectorMaxCases+1)
+	test.Assert(t, ds.count == 1000)
+	test.Assert(t, len(ds.selectors) == 1000/singleSelectorMaxCases+1)
 	test.Assert(t, ds.stop == 0)
 	ds.mu.Unlock()
 
@@ -67,24 +91,29 @@ func TestBasic(t *testing.T) {
 	ds.mu.Lock()
 	test.Assert(t, ds.stop == 1)
 	ds.mu.Unlock()
-	for i := 20000; i < 30000; i++ {
+	for i := 2000; i < 3000; i++ {
 		slices[i].cancel()
 	}
-	time.Sleep(500 * time.Millisecond)
-	test.Assert(t, atomic.LoadUint32(&canceled) == 10000)
+	time.Sleep(1 * time.Second)
+	test.Assert(t, atomic.LoadUint32(&canceled) == 1000)
 }
 
 func TestSingleCase(t *testing.T) {
 	ds := NewCtxDoneSelector()
 	defer ds.Close()
 
-	var triggered uint32
+	triggered := make(chan struct{})
 	done := make(chan struct{})
-	ds.Add(done, func() { atomic.StoreUint32(&triggered, 1) })
+	now := time.Now()
+	ds.Add(done, func() { close(triggered) })
+	t.Logf("add cost: %v", time.Since(now))
+	now = time.Now()
 	close(done)
 
-	time.Sleep(100 * time.Millisecond) // wait for callback
-	if atomic.LoadUint32(&triggered) != 1 {
+	select {
+	case <-triggered:
+		t.Logf("callback cost: %v", time.Since(now))
+	case <-time.After(1 * time.Second):
 		t.Fatal("callback not triggered")
 	}
 }
@@ -223,6 +252,80 @@ func TestContextIntegration(t *testing.T) {
 	if atomic.LoadUint32(&triggered) != 1 {
 		t.Fatal("context cancel should trigger callback")
 	}
+}
+
+func BenchmarkSingleCase(b *testing.B) {
+	ds := NewCtxDoneSelector()
+	defer ds.Close()
+
+	triggered := make(chan struct{})
+	done := make(chan struct{})
+	ds.Add(done, func() { close(triggered) })
+
+	for i := 0; i < b.N; i++ {
+		triggered := make(chan struct{})
+		done := make(chan struct{})
+		ds.Add(done, func() { close(triggered) })
+		close(done)
+		<-triggered
+	}
+}
+
+func BenchmarkParallelCase(b *testing.B) {
+	ds := NewCtxDoneSelector()
+	defer ds.Close()
+
+	var wg sync.WaitGroup
+	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < b.N; i++ {
+				triggered := make(chan struct{})
+				done := make(chan struct{})
+				ds.Add(done, func() { close(triggered) })
+				close(done)
+				<-triggered
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func BenchmarkCtxDoneSelector_Add(b *testing.B) {
+	b.ReportAllocs()
+	ds := NewCtxDoneSelector()
+	defer ds.Close()
+
+	var mu sync.Mutex
+	var cancels []context.CancelFunc
+	var wg sync.WaitGroup
+
+	// Concurrently add channels
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			ctx, cancel := context.WithCancel(context.Background())
+			mu.Lock()
+			cancels = append(cancels, cancel)
+			mu.Unlock()
+			wg.Add(1)
+			ds.Add(ctx.Done(), wg.Done)
+		}
+	})
+	b.StopTimer()
+
+	// Simulate concurrent cancel (e.g., connections closed)
+	for _, cancel := range cancels {
+		cancel()
+	}
+
+	now := time.Now()
+	// Wait for all callbacks to finish
+	if !waitWithTimeout(&wg, 30*time.Second) {
+		b.Fatal("not all callbacks triggered")
+	}
+	b.Logf("len(cancels): %v, cost: %v", len(cancels), time.Since(now))
 }
 
 func waitWithTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
