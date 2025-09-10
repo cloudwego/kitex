@@ -3,18 +3,18 @@ module github.com/cloudwego/kitex
 go 1.19
 
 require (
-	github.com/bytedance/gopkg v0.1.2
-	github.com/bytedance/sonic v1.14.0
+	github.com/bytedance/gopkg v0.1.3
+	github.com/bytedance/sonic v1.14.1
 	github.com/cloudwego/configmanager v0.2.3
 	github.com/cloudwego/dynamicgo v0.7.0
 	github.com/cloudwego/fastpb v0.0.5
-	github.com/cloudwego/frugal v0.2.5
-	github.com/cloudwego/gopkg v0.1.6-0.20250901093815-6edcf270d3a6
+	github.com/cloudwego/frugal v0.3.0
+	github.com/cloudwego/gopkg v0.1.6-0.20250910033736-5c11ae16affb
 	github.com/cloudwego/localsession v0.1.2
-	github.com/cloudwego/netpoll v0.7.1
-	github.com/cloudwego/prutal v0.1.2
+	github.com/cloudwego/netpoll v0.7.1-0.20250617063936-b0bf57dc0a80
+	github.com/cloudwego/prutal v0.1.3-0.20250909122240-80978f05b05c
 	github.com/cloudwego/runtimex v0.1.1
-	github.com/cloudwego/thriftgo v0.4.2
+	github.com/cloudwego/thriftgo v0.4.3-0.20250820083741-7a5fb5641154
 	github.com/golang/mock v1.6.0
 	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8
 	github.com/jhump/protoreflect v1.8.2
@@ -32,7 +32,6 @@ require (
 require (
 	github.com/bytedance/sonic/loader v0.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
-	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dlclark/regexp2 v1.11.0 // indirect
 	github.com/fatih/structtag v1.2.0 // indirect
@@ -42,7 +41,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
+	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
