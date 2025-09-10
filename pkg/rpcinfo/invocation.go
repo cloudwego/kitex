@@ -53,14 +53,17 @@ type InvocationSetter interface {
 	Reset()
 }
 type invocation struct {
+	sync.Mutex
 	packageName   string
 	serviceName   string
 	methodInfo    serviceinfo.MethodInfo
 	methodName    string
 	streamingMode serviceinfo.StreamingMode
 	seqID         int32
-	bizErr        kerrors.BizStatusErrorIface
-	extra         map[string]interface{}
+	// bizErr and extra should be protected by lock, because they might be read by the tracer,
+	// but at the same time, written by the real rpc goroutine which is started by timeout middleware.
+	bizErr kerrors.BizStatusErrorIface
+	extra  map[string]interface{}
 }
 
 // NewInvocation creates a new Invocation with the given service, method and optional package.
@@ -153,15 +156,21 @@ func (i *invocation) SetStreamingMode(mode serviceinfo.StreamingMode) {
 
 // BizStatusErr implements the Invocation interface.
 func (i *invocation) BizStatusErr() kerrors.BizStatusErrorIface {
+	i.Lock()
+	defer i.Unlock()
 	return i.bizErr
 }
 
 // SetBizStatusErr implements the InvocationSetter interface.
 func (i *invocation) SetBizStatusErr(err kerrors.BizStatusErrorIface) {
+	i.Lock()
+	defer i.Unlock()
 	i.bizErr = err
 }
 
 func (i *invocation) SetExtra(key string, value interface{}) {
+	i.Lock()
+	defer i.Unlock()
 	if i.extra == nil {
 		i.extra = map[string]interface{}{}
 	}
@@ -169,6 +178,8 @@ func (i *invocation) SetExtra(key string, value interface{}) {
 }
 
 func (i *invocation) Extra(key string) interface{} {
+	i.Lock()
+	defer i.Unlock()
 	if i.extra == nil {
 		return nil
 	}
@@ -192,6 +203,8 @@ func (i *invocation) zero() {
 	i.serviceName = ""
 	i.methodName = ""
 	i.methodInfo = nil
+	i.Lock()
+	defer i.Unlock()
 	i.bizErr = nil
 	for key := range i.extra {
 		delete(i.extra, key)
