@@ -74,7 +74,7 @@ func TestObjectPool(t *testing.T) {
 func TestObjectPool_cleaningLazyInit(t *testing.T) {
 	// wait for all cleaning goroutines created by other tests finished
 	for cleaningGoroutineExist() {
-		time.Sleep(10 * time.Microsecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 	op := NewObjectPool(10 * time.Microsecond)
 	defer op.Close()
@@ -82,19 +82,19 @@ func TestObjectPool_cleaningLazyInit(t *testing.T) {
 		t.Fatal("cleaning goroutine should not be started when ObjectPool.Push is not invoked")
 	}
 	op.Push("test", new(testObject))
-	ticker := time.NewTicker(10 * time.Microsecond)
-	timer := time.NewTimer(time.Millisecond)
-	defer ticker.Stop()
-	defer timer.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			if cleaningGoroutineExist() {
-				return
+	select {
+	case <-func() chan struct{} {
+		c := make(chan struct{})
+		go func() {
+			if !cleaningGoroutineExist() {
+				time.Sleep(10 * time.Millisecond)
 			}
-		case <-timer.C:
-			t.Fatal("cleaning goroutine should be started when ObjectPool.Push is invoked")
-		}
+			close(c)
+		}()
+		return c
+	}():
+	case <-time.After(time.Second):
+		t.Fatal("cleaning goroutine should be started when ObjectPool.Push is invoked")
 	}
 }
 

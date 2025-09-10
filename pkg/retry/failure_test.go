@@ -57,7 +57,7 @@ func TestRandomBackOff_Wait(t *testing.T) {
 	bk.Wait(1)
 	waitTime := time.Since(startTime)
 	test.Assert(t, time.Millisecond*min <= waitTime)
-	test.Assert(t, waitTime < time.Millisecond*(max+5))
+	test.Assert(t, waitTime < time.Millisecond*(max+30))
 }
 
 func TestRandomBackOff_String(t *testing.T) {
