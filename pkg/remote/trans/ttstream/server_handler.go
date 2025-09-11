@@ -27,6 +27,7 @@ import (
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 
+	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -169,6 +170,11 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *strea
 	ink.SetStreamingMode(minfo.StreamingMode())
 	if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
 		_ = mutableTo.SetMethod(st.Method())
+		// this method name will be used as from method if a new RPC call is invoked in this handler.
+		// ping-pong relies on transMetaHandler.OnMessage to inject but streaming does not trigger.
+		//
+		//nolint:staticcheck // SA1029: consts.CtxKeyMethod has been used and we just follow it
+		ctx = context.WithValue(ctx, consts.CtxKeyMethod, st.Method())
 	}
 	rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(st.TransportProtocol())
 
