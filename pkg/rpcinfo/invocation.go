@@ -19,6 +19,7 @@ package rpcinfo
 import (
 	"sync"
 	"sync/atomic"
+	"unsafe"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -53,14 +54,17 @@ type InvocationSetter interface {
 	Reset()
 }
 type invocation struct {
+	sync.Mutex
 	packageName   string
 	serviceName   string
 	methodInfo    serviceinfo.MethodInfo
 	methodName    string
 	streamingMode serviceinfo.StreamingMode
 	seqID         int32
-	bizErr        kerrors.BizStatusErrorIface
-	extra         map[string]interface{}
+	// bizErr and extra should be protected by lock or atomic operation, because they might be read by the client calling goroutine,
+	// but at the same time, written by the real rpc goroutine which is started by timeout middleware.
+	bizErr unsafe.Pointer // of type *kerrors.BizStatusErrorIface
+	extra  map[string]interface{}
 }
 
 // NewInvocation creates a new Invocation with the given service, method and optional package.
@@ -153,15 +157,25 @@ func (i *invocation) SetStreamingMode(mode serviceinfo.StreamingMode) {
 
 // BizStatusErr implements the Invocation interface.
 func (i *invocation) BizStatusErr() kerrors.BizStatusErrorIface {
-	return i.bizErr
+	bizErr := (*kerrors.BizStatusErrorIface)(atomic.LoadPointer(&i.bizErr))
+	if bizErr == nil {
+		return nil
+	}
+	return *bizErr
 }
 
 // SetBizStatusErr implements the InvocationSetter interface.
 func (i *invocation) SetBizStatusErr(err kerrors.BizStatusErrorIface) {
-	i.bizErr = err
+	if err == nil {
+		atomic.StorePointer(&i.bizErr, nil)
+		return
+	}
+	atomic.StorePointer(&i.bizErr, unsafe.Pointer(&err))
 }
 
 func (i *invocation) SetExtra(key string, value interface{}) {
+	i.Lock()
+	defer i.Unlock()
 	if i.extra == nil {
 		i.extra = map[string]interface{}{}
 	}
@@ -169,6 +183,8 @@ func (i *invocation) SetExtra(key string, value interface{}) {
 }
 
 func (i *invocation) Extra(key string) interface{} {
+	i.Lock()
+	defer i.Unlock()
 	if i.extra == nil {
 		return nil
 	}
@@ -192,7 +208,9 @@ func (i *invocation) zero() {
 	i.serviceName = ""
 	i.methodName = ""
 	i.methodInfo = nil
-	i.bizErr = nil
+	atomic.StorePointer(&i.bizErr, nil)
+	i.Lock()
+	defer i.Unlock()
 	for key := range i.extra {
 		delete(i.extra, key)
 	}

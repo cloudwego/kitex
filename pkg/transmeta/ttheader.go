@@ -79,8 +79,7 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 		hd[transmeta.ConnectTimeout] = strconv.Itoa(int(ri.Config().ConnectTimeout().Milliseconds()))
 	}
 	transInfo.PutTransIntInfo(hd)
-	svcInfo, _ := ri.Invocation().Extra(rpcinfo.InvocationServiceInfoKey).(*serviceinfo.ServiceInfo)
-	if idlSvcName := getIDLSvcName(svcInfo, ri); idlSvcName != "" {
+	if idlSvcName := getIDLSvcName(ri); idlSvcName != "" {
 		if strInfo := transInfo.TransStrInfo(); strInfo != nil {
 			strInfo[transmeta.HeaderIDLServiceName] = idlSvcName
 		} else {
@@ -90,7 +89,8 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 	return ctx, nil
 }
 
-func getIDLSvcName(svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.RPCInfo) string {
+func getIDLSvcName(ri rpcinfo.RPCInfo) string {
+	svcInfo, _ := ri.Invocation().Extra(rpcinfo.InvocationServiceInfoKey).(*serviceinfo.ServiceInfo)
 	idlSvcName := ri.Invocation().ServiceName()
 	// for combine service, idlSvcName may not be the same as server's service name
 	var isCombineService bool

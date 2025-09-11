@@ -83,16 +83,17 @@ func copyInvocation(i Invocation) Invocation {
 		return nil
 	}
 	ink := i.(*invocation)
-	return &invocation{
+	nink := &invocation{
 		packageName:   ink.PackageName(),
 		serviceName:   ink.ServiceName(),
 		methodName:    ink.MethodName(),
 		methodInfo:    ink.MethodInfo(),
 		streamingMode: ink.StreamingMode(),
 		seqID:         ink.SeqID(),
-		bizErr:        ink.BizStatusErr(),
 		// ignore extra info to users
 	}
+	nink.SetBizStatusErr(ink.BizStatusErr())
+	return nink
 }
 
 func copyRPCConfig(cfg RPCConfig) RPCConfig {
