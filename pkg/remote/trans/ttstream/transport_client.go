@@ -234,7 +234,7 @@ func (t *clientTransport) loopWrite() error {
 			recycleFrame(fr)
 		}
 		if err = writer.Flush(); err != nil {
-			return err
+			return errTransport.newBuilder().withCause(err)
 		}
 	}
 }
