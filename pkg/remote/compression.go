@@ -30,12 +30,17 @@ const (
 	GZip
 )
 
+var (
+	recvCompressorKey = rpcinfo.RegisterInvocationExtraKey("recv-compressor", false)
+	sendCompressorKey = rpcinfo.RegisterInvocationExtraKey("send-compressor", false)
+)
+
 func SetRecvCompressor(ri rpcinfo.RPCInfo, compressorName string) {
 	if ri == nil || compressorName == "" {
 		return
 	}
 	if v, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
-		v.SetExtra("recv-compressor", compressorName)
+		v.SetExtraInfo(recvCompressorKey, compressorName)
 	}
 }
 
@@ -44,7 +49,7 @@ func SetSendCompressor(ri rpcinfo.RPCInfo, compressorName string) {
 		return
 	}
 	if v, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
-		v.SetExtra("send-compressor", compressorName)
+		v.SetExtraInfo(sendCompressorKey, compressorName)
 	}
 }
 
@@ -52,7 +57,7 @@ func GetSendCompressor(ri rpcinfo.RPCInfo) string {
 	if ri == nil {
 		return ""
 	}
-	v := ri.Invocation().Extra("send-compressor")
+	v := ri.Invocation().ExtraInfo(sendCompressorKey)
 	if name, ok := v.(string); ok {
 		return name
 	}
@@ -63,7 +68,7 @@ func GetRecvCompressor(ri rpcinfo.RPCInfo) string {
 	if ri == nil {
 		return ""
 	}
-	v := ri.Invocation().Extra("recv-compressor")
+	v := ri.Invocation().ExtraInfo(recvCompressorKey)
 	if name, ok := v.(string); ok {
 		return name
 	}

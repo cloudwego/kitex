@@ -90,7 +90,7 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 }
 
 func getIDLSvcName(ri rpcinfo.RPCInfo) string {
-	svcInfo, _ := ri.Invocation().Extra(rpcinfo.InvocationServiceInfoKey).(*serviceinfo.ServiceInfo)
+	svcInfo, _ := ri.Invocation().ExtraInfo(rpcinfo.InvocationServiceInfoKey).(*serviceinfo.ServiceInfo)
 	idlSvcName := ri.Invocation().ServiceName()
 	// for combine service, idlSvcName may not be the same as server's service name
 	var isCombineService bool

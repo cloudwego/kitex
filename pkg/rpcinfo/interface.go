@@ -96,6 +96,10 @@ type Invocation interface {
 	StreamingMode() serviceinfo.StreamingMode
 	SeqID() int32
 	BizStatusErr() kerrors.BizStatusErrorIface
+	ExtraInfo(key *InvocationExtraIndex) interface{}
+
+	// Deprecated, use ExtraInfo instead
+	// TODO: delete it if service inline does not depend on it.
 	Extra(key string) interface{}
 }
 

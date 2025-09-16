@@ -17,18 +17,20 @@
 package rpcinfo
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
-	"unsafe"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-// InvocationServiceInfoKey is the extra key of invocation which stores the ServiceInfo of the rpc call.
-// The reason for adding the extra key is to shield ServiceInfo from users in the Invocation interface definition,
-// as it is a pointer type and may be modified insecurely if obtained by users.
-const InvocationServiceInfoKey = "service_info_key"
+var (
+	// InvocationServiceInfoKey is the extraInfo key of invocation which stores the ServiceInfo of the rpc call.
+	// The reason for adding the extraInfo key is to shield ServiceInfo from users in the Invocation interface definition,
+	// as it is a pointer type and may be modified insecurely if obtained by users.
+	InvocationServiceInfoKey = RegisterInvocationExtraKey("service_info", false)
+)
 
 var (
 	_              Invocation       = (*invocation)(nil)
@@ -50,21 +52,28 @@ type InvocationSetter interface {
 	SetStreamingMode(mode serviceinfo.StreamingMode)
 	SetSeqID(seqID int32)
 	SetBizStatusErr(err kerrors.BizStatusErrorIface)
-	SetExtra(key string, value interface{})
+	SetExtraInfo(key *InvocationExtraIndex, value interface{})
 	Reset()
+
+	// Deprecated, use SetExtraInfo instead
+	SetExtra(key string, value interface{})
 }
+
 type invocation struct {
-	sync.Mutex
 	packageName   string
 	serviceName   string
 	methodInfo    serviceinfo.MethodInfo
 	methodName    string
 	streamingMode serviceinfo.StreamingMode
 	seqID         int32
-	// bizErr and extra should be protected by lock or atomic operation, because they might be read by the client calling goroutine,
+	// bizErr and extra should be protected by atomic operation, because they might be read by the client calling goroutine,
 	// but at the same time, written by the real rpc goroutine which is started by timeout middleware.
-	bizErr unsafe.Pointer // of type *kerrors.BizStatusErrorIface
-	extra  map[string]interface{}
+	bizErr          atomic.Pointer[kerrors.BizStatusErrorIface]
+	extraInfo       []interface{}
+	atomicExtraInfo []atomic.Pointer[interface{}] // of type *interface{}
+
+	// deprecated
+	extra map[string]interface{}
 }
 
 // NewInvocation creates a new Invocation with the given service, method and optional package.
@@ -157,7 +166,7 @@ func (i *invocation) SetStreamingMode(mode serviceinfo.StreamingMode) {
 
 // BizStatusErr implements the Invocation interface.
 func (i *invocation) BizStatusErr() kerrors.BizStatusErrorIface {
-	bizErr := (*kerrors.BizStatusErrorIface)(atomic.LoadPointer(&i.bizErr))
+	bizErr := i.bizErr.Load()
 	if bizErr == nil {
 		return nil
 	}
@@ -167,15 +176,39 @@ func (i *invocation) BizStatusErr() kerrors.BizStatusErrorIface {
 // SetBizStatusErr implements the InvocationSetter interface.
 func (i *invocation) SetBizStatusErr(err kerrors.BizStatusErrorIface) {
 	if err == nil {
-		atomic.StorePointer(&i.bizErr, nil)
+		i.bizErr.Store(nil)
 		return
 	}
-	atomic.StorePointer(&i.bizErr, unsafe.Pointer(&err))
+	i.bizErr.Store(&err)
+}
+
+func (i *invocation) SetExtraInfo(key *InvocationExtraIndex, value interface{}) {
+	if key.Atomic() {
+		if i.atomicExtraInfo == nil {
+			i.atomicExtraInfo = make([]atomic.Pointer[interface{}], len(indexedAtomicExtraKeys))
+		}
+		i.atomicExtraInfo[key.Index()].Store(&value)
+	} else {
+		if i.extraInfo == nil {
+			i.extraInfo = make([]interface{}, len(indexedExtraKeys))
+		}
+		i.extraInfo[key.Index()] = value
+	}
+}
+
+func (i *invocation) ExtraInfo(key *InvocationExtraIndex) interface{} {
+	if key.Atomic() {
+		val := i.atomicExtraInfo[key.Index()].Load()
+		if val == nil {
+			return nil
+		}
+		return *val
+	} else {
+		return i.extraInfo[key.Index()]
+	}
 }
 
 func (i *invocation) SetExtra(key string, value interface{}) {
-	i.Lock()
-	defer i.Unlock()
 	if i.extra == nil {
 		i.extra = map[string]interface{}{}
 	}
@@ -183,8 +216,6 @@ func (i *invocation) SetExtra(key string, value interface{}) {
 }
 
 func (i *invocation) Extra(key string) interface{} {
-	i.Lock()
-	defer i.Unlock()
 	if i.extra == nil {
 		return nil
 	}
@@ -208,10 +239,69 @@ func (i *invocation) zero() {
 	i.serviceName = ""
 	i.methodName = ""
 	i.methodInfo = nil
-	atomic.StorePointer(&i.bizErr, nil)
-	i.Lock()
-	defer i.Unlock()
-	for key := range i.extra {
-		delete(i.extra, key)
+	i.bizErr.Store(nil)
+	for idx := range i.extraInfo {
+		i.extraInfo[idx] = nil
 	}
+	for idx := range i.atomicExtraInfo {
+		i.atomicExtraInfo[idx].Store(nil)
+	}
+	if i.extra != nil {
+		for k := range i.extra {
+			delete(i.extra, k)
+		}
+	}
+}
+
+var (
+	invocationExtraMu      sync.Mutex
+	extraKeysMap           = make(map[string]*InvocationExtraIndex, 32)
+	indexedExtraKeys       = make([]*InvocationExtraIndex, 0, 32)
+	indexedAtomicExtraKeys = make([]*InvocationExtraIndex, 0, 32)
+)
+
+// RegisterInvocationExtraKey register a new extraInfo key of invocation.
+// The name of the extraInfo key must be unique, and the atomic parameter indicates whether the extraInfo key is atomic.
+// Note: MUST be called in init function.
+func RegisterInvocationExtraKey(name string, atomic bool) *InvocationExtraIndex {
+	invocationExtraMu.Lock()
+	defer invocationExtraMu.Unlock()
+	if _, ok := extraKeysMap[name]; ok {
+		panic(fmt.Sprintf("duplicate extraInfo key name: %s", name))
+	}
+	var index *InvocationExtraIndex
+	if atomic {
+		index = &InvocationExtraIndex{
+			name:   name,
+			atomic: true,
+			index:  uint32(len(indexedAtomicExtraKeys)),
+		}
+		indexedAtomicExtraKeys = append(indexedAtomicExtraKeys, index)
+	} else {
+		index = &InvocationExtraIndex{
+			name:  name,
+			index: uint32(len(indexedExtraKeys)),
+		}
+		indexedExtraKeys = append(indexedExtraKeys, index)
+	}
+	extraKeysMap[name] = index
+	return index
+}
+
+type InvocationExtraIndex struct {
+	name   string
+	index  uint32
+	atomic bool
+}
+
+func (i *InvocationExtraIndex) String() string {
+	return i.name
+}
+
+func (i *InvocationExtraIndex) Index() uint32 {
+	return i.index
+}
+
+func (i *InvocationExtraIndex) Atomic() bool {
+	return i.atomic
 }
