@@ -53,7 +53,7 @@ func TestNormal(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// decode server side
-	recvMsg := initMockReqArgsRecvMsg()
+	ctx, recvMsg := initMockReqArgsRecvMsg(ctx)
 	buf, err := out.Bytes()
 	recvMsg.SetPayloadLen(len(buf))
 	test.Assert(t, err == nil, err)
@@ -131,7 +131,7 @@ func TestFastCodec(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	req1 := &mockFastCodecReq{}
-	recv := initRecvMsg(req1)
+	ctx, recv := initRecvMsg(ctx, req1)
 	recv.SetPayloadLen(len(b))
 	err = payloadCodec.Unmarshal(ctx, recv, buf)
 	test.Assert(t, err == nil, err)
@@ -193,7 +193,7 @@ func BenchmarkNormalParallel(b *testing.B) {
 			test.Assert(b, err == nil, err)
 
 			// decode server side
-			recvMsg := initMockReqArgsRecvMsg()
+			ctx, recvMsg := initMockReqArgsRecvMsg(ctx)
 			buf, err := out.Bytes()
 			recvMsg.SetPayloadLen(len(buf))
 			test.Assert(b, err == nil, err)
@@ -233,19 +233,19 @@ func initSendMsg(tp transport.Protocol, m any) remote.Message {
 	return msg
 }
 
-func initMockReqArgsRecvMsg() remote.Message {
+func initMockReqArgsRecvMsg(ctx context.Context) (context.Context, remote.Message) {
 	m := &MockReqArgs{}
-	return initRecvMsg(m)
+	return initRecvMsg(ctx, m)
 }
 
-func initRecvMsg(m any) remote.Message {
+func initRecvMsg(ctx context.Context, m any) (context.Context, remote.Message) {
 	ink := rpcinfo.NewInvocation("", "mock")
 	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.EmptyEndpointInfo(), ink, rpcinfo.NewRPCConfig(), nil)
-	remote.SetServiceSearcher(ri, mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+	ctx = remote.WithServiceSearcher(ctx, mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
 		svcInfo.ServiceName: svcInfo,
 	}))
 	msg := remote.NewMessage(m, ri, remote.Call, remote.Server)
-	return msg
+	return ctx, msg
 }
 
 func initServerErrorMsg(tp transport.Protocol, ri rpcinfo.RPCInfo, transErr *remote.TransError) remote.Message {

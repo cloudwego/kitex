@@ -92,10 +92,10 @@ func TestBinaryThriftCodec(t *testing.T) {
 			return wl
 		},
 	}
-	remote.SetServiceSearcher(ri, mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+	ctx := remote.WithServiceSearcher(context.Background(), mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
 		"": ServiceInfoWithGeneric(BinaryThriftGeneric()),
 	}))
-	err = btc.Unmarshal(context.Background(), svrMsg, bb)
+	err = btc.Unmarshal(ctx, svrMsg, bb)
 	test.Assert(t, err == nil, err)
 	reqBuf := svrMsg.Data().(*Args).Request.(binaryReqType)
 	seqID, err = GetSeqID(reqBuf)

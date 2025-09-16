@@ -95,7 +95,7 @@ func (c *binaryThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, i
 	if err != nil {
 		return err
 	}
-	if err := readBinaryMethod(transBuff, msg); err != nil {
+	if err := readBinaryMethod(ctx, transBuff, msg); err != nil {
 		return err
 	}
 
@@ -174,7 +174,7 @@ func getSeqID4Bytes(transBuff []byte) ([]byte, error) {
 	return transBuff[idx : idx+4], nil
 }
 
-func readBinaryMethod(buff []byte, msg remote.Message) error {
+func readBinaryMethod(ctx context.Context, buff []byte, msg remote.Message) error {
 	bufLen := len(buff)
 	if bufLen < codec.Size32*2 {
 		return perrors.NewProtocolErrorWithMsg(
@@ -185,7 +185,7 @@ func readBinaryMethod(buff []byte, msg remote.Message) error {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("method len[%d] invalid in binaryThriftCodec Unmarshal", methodLen))
 	}
 	method := string(buff[8:(8 + methodLen)])
-	if err := codec.SetOrCheckMethodName(method, msg); err != nil {
+	if err := codec.SetOrCheckMethodName(ctx, method, msg); err != nil {
 		return perrors.NewProtocolError(err)
 	}
 	return nil

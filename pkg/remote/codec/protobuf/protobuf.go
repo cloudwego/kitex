@@ -151,7 +151,7 @@ func (c protobufCodec) Unmarshal(ctx context.Context, message remote.Message, in
 	if err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("protobuf unmarshal, read method name failed: %s", err.Error()))
 	}
-	if err = codec.SetOrCheckMethodName(methodName, message); err != nil && msgType != uint32(remote.Exception) {
+	if err = codec.SetOrCheckMethodName(ctx, methodName, message); err != nil && msgType != uint32(remote.Exception) {
 		return err
 	}
 	seqID, err := codec.ReadUint32(in)
