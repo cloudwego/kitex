@@ -218,7 +218,7 @@ func TestDefaultCodec_Encode_Decode(t *testing.T) {
 			buf.Flush()
 
 			// decode
-			recvMsg := initServerRecvMsg()
+			ctx, recvMsg := initServerRecvMsg(ctx)
 			test.Assert(t, err == nil, err)
 			err = dc.Decode(ctx, recvMsg, buf)
 			test.Assert(t, err == nil, err)
@@ -257,7 +257,7 @@ func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 			largeBuf.Flush()
 
 			// decode
-			recvMsg := initServerRecvMsg()
+			ctx, recvMsg := initServerRecvMsg(ctx)
 			err = smallDc.Decode(ctx, recvMsg, largeBuf)
 			test.Assert(t, err != nil, err)
 			err = largeDc.Decode(ctx, recvMsg, largeBuf)
@@ -290,7 +290,7 @@ func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// decode, succeed
-	recvMsg := initServerRecvMsg()
+	ctx, recvMsg := initServerRecvMsg(ctx)
 	buf, err := getWrittenBytes(writer)
 	test.Assert(t, err == nil, err)
 	in := remote.NewReaderBuffer(buf)
@@ -346,7 +346,7 @@ func TestDefaultCodecWithCustomizedValidator(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// decode, succeed
-	recvMsg := initServerRecvMsg()
+	ctx, recvMsg := initServerRecvMsg(ctx)
 	buf, err := getWrittenBytes(writer)
 	test.Assert(t, err == nil, err)
 	in := remote.NewReaderBuffer(buf)
@@ -424,7 +424,7 @@ func BenchmarkDefaultEncodeDecode(b *testing.B) {
 						test.Assert(b, err == nil, err)
 
 						// decode
-						recvMsg := initServerRecvMsgWithMockMsg()
+						ctx, recvMsg := initServerRecvMsgWithMockMsg(ctx)
 						buf, err := getWrittenBytes(writer)
 						test.Assert(b, err == nil, err)
 						in := remote.NewReaderBuffer(buf)
@@ -483,7 +483,7 @@ func (m mockPayloadCodec) Unmarshal(ctx context.Context, message remote.Message,
 	if err != nil {
 		return err
 	}
-	if err = SetOrCheckMethodName(methodName, message); err != nil && msgType != uint32(remote.Exception) {
+	if err = SetOrCheckMethodName(remote.GetServiceSearcher(ctx), methodName, message); err != nil && msgType != uint32(remote.Exception) {
 		return err
 	}
 	seqID, err := ReadUint32(in)

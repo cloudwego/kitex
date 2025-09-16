@@ -197,7 +197,6 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	// it's recycled in defer.
 	muxSvrConn, _ := muxSvrConnCtx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
 	rpcInfo := muxSvrConn.pool.Get().(rpcinfo.RPCInfo)
-	remote.SetServiceSearcher(rpcInfo, t.svcSearcher)
 	rpcInfoCtx := rpcinfo.NewCtxWithRPCInfo(muxSvrConnCtx, rpcInfo)
 
 	// This is the request-level, one-shot ctx.
@@ -301,7 +300,8 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	}
 	muxConn := newMuxSvrConn(connection, pool)
 	t.conns.Store(conn, muxConn)
-	return context.WithValue(context.Background(), ctxKeyMuxSvrConn{}, muxConn), nil
+	ctx = context.WithValue(context.Background(), ctxKeyMuxSvrConn{}, muxConn)
+	return remote.WithServiceSearcher(ctx, t.svcSearcher), nil
 }
 
 // OnInactive implements the remote.ServerTransHandler interface.

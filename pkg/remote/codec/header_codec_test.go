@@ -54,7 +54,7 @@ func TestTTHeaderCodec(t *testing.T) {
 			buf.Flush()
 
 			// decode
-			recvMsg := initServerRecvMsg()
+			ctx, recvMsg := initServerRecvMsg(ctx)
 			test.Assert(t, err == nil, err)
 			err = ttHeaderCodec.decode(ctx, recvMsg, buf)
 			test.Assert(t, err == nil, err)
@@ -82,7 +82,7 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 			buf.Flush()
 
 			// decode
-			recvMsg := initServerRecvMsg()
+			ctx, recvMsg := initServerRecvMsg(ctx)
 			err = ttHeaderCodec.decode(ctx, recvMsg, buf)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, recvMsg.PayloadLen() == mockPayloadLen, recvMsg.PayloadLen())
@@ -117,7 +117,7 @@ func TestTTHeaderCodecWithTransInfoWithGDPRToken(t *testing.T) {
 			buf.Flush()
 
 			// decode
-			recvMsg := initServerRecvMsg()
+			ctx, recvMsg := initServerRecvMsg(ctx)
 			err = ttHeaderCodec.decode(ctx, recvMsg, buf)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, recvMsg.PayloadLen() == mockPayloadLen, recvMsg.PayloadLen())
@@ -153,7 +153,7 @@ func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
 			buf.Flush()
 
 			// decode
-			recvMsg := initServerRecvMsg()
+			ctx, recvMsg := initServerRecvMsg(ctx)
 			err = ttHeaderCodec.decode(ctx, recvMsg, buf)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, recvMsg.PayloadLen() == mockPayloadLen, recvMsg.PayloadLen())
@@ -184,7 +184,7 @@ func TestFillBasicInfoOfTTHeader(t *testing.T) {
 		test.Assert(t, err == nil, err)
 		buf.Flush()
 		// decode
-		recvMsg := initServerRecvMsg()
+		ctx, recvMsg := initServerRecvMsg(ctx)
 		err = ttHeaderCodec.decode(ctx, recvMsg, buf)
 		test.Assert(t, err == nil, err)
 		test.Assert(t, recvMsg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr] == mockAddr)
@@ -224,7 +224,7 @@ func BenchmarkTTHeaderCodec(b *testing.B) {
 		test.Assert(b, err == nil, err)
 
 		// decode
-		recvMsg := initServerRecvMsg()
+		ctx, recvMsg := initServerRecvMsg(ctx)
 		buf, err := out.Bytes()
 		test.Assert(b, err == nil, err)
 		in := remote.NewReaderBuffer(buf)
@@ -254,7 +254,7 @@ func BenchmarkTTHeaderWithTransInfoParallel(b *testing.B) {
 			test.Assert(b, err == nil, err)
 
 			// decode
-			recvMsg := initServerRecvMsg()
+			ctx, recvMsg := initServerRecvMsg(ctx)
 			buf, err := out.Bytes()
 			test.Assert(b, err == nil, err)
 			in := remote.NewReaderBuffer(buf)
@@ -287,7 +287,7 @@ func BenchmarkTTHeaderCodecParallel(b *testing.B) {
 			test.Assert(b, err == nil, err)
 
 			// decode
-			recvMsg := initServerRecvMsg()
+			ctx, recvMsg := initServerRecvMsg(ctx)
 			buf, err := out.Bytes()
 			test.Assert(b, err == nil, err)
 			in := remote.NewReaderBuffer(buf)
@@ -322,20 +322,20 @@ type mockMsg struct {
 	msg string
 }
 
-func initServerRecvMsgWithMockMsg() remote.Message {
+func initServerRecvMsgWithMockMsg(ctx context.Context) (context.Context, remote.Message) {
 	svcSearcher := mocksremote.NewDefaultSvcSearcher()
 	ri := mockSvrRPCInfo()
-	remote.SetServiceSearcher(ri, svcSearcher)
+	ctx = remote.WithServiceSearcher(ctx, svcSearcher)
 	req := &mockMsg{}
-	return remote.NewMessage(req, ri, remote.Call, remote.Server)
+	return ctx, remote.NewMessage(req, ri, remote.Call, remote.Server)
 }
 
-func initServerRecvMsg() remote.Message {
+func initServerRecvMsg(ctx context.Context) (context.Context, remote.Message) {
 	svcSearcher := mocksremote.NewDefaultSvcSearcher()
 	ri := mockSvrRPCInfo()
-	remote.SetServiceSearcher(ri, svcSearcher)
+	ctx = remote.WithServiceSearcher(ctx, svcSearcher)
 	msg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
-	return msg
+	return ctx, msg
 }
 
 func initClientSendMsg(tp transport.Protocol, payloadLen ...int) remote.Message {
@@ -346,7 +346,6 @@ func initClientSendMsg(tp transport.Protocol, payloadLen ...int) remote.Message 
 
 	svcInfo := mocks.ServiceInfo()
 	ri := mockCliRPCInfo()
-	remote.SetServiceSearcher(ri, mocksremote.NewDefaultSvcSearcher())
 	msg := remote.NewMessage(req, ri, remote.Call, remote.Client)
 	mcfg := rpcinfo.AsMutableRPCConfig(msg.RPCInfo().Config())
 	mcfg.SetTransportProtocol(tp)

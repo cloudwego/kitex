@@ -194,7 +194,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 		return unmarshalThriftException(in)
 	}
 
-	if err = validateMessageBeforeDecode(message, seqID, methodName); err != nil {
+	if err = validateMessageBeforeDecode(ctx, message, seqID, methodName); err != nil {
 		return err
 	}
 
@@ -225,14 +225,14 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 }
 
 // validateMessageBeforeDecode validate message before decode
-func validateMessageBeforeDecode(message remote.Message, seqID int32, methodName string) (err error) {
+func validateMessageBeforeDecode(ctx context.Context, message remote.Message, seqID int32, methodName string) (err error) {
 	// For server side, the following error can be sent back and 'SetSeqID' should be executed first to ensure the seqID
 	// is right when return Exception back.
 	if err = codec.SetOrCheckSeqID(seqID, message); err != nil {
 		return err
 	}
 
-	if err = codec.SetOrCheckMethodName(methodName, message); err != nil {
+	if err = codec.SetOrCheckMethodName(remote.GetServiceSearcher(ctx), methodName, message); err != nil {
 		return err
 	}
 

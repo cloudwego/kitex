@@ -17,6 +17,7 @@
 package remote
 
 import (
+	"context"
 	"sync"
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -68,18 +69,17 @@ type ServiceSearcher interface {
 	SearchService(svcName, methodName string, strict bool, codecType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo
 }
 
-const keyServiceSearcher = "rpc_info_service_searcher"
+type keyServiceSearcher struct{}
 
-// GetServiceSearcher returns the service searcher from rpcinfo.RPCInfo.
-func GetServiceSearcher(ri rpcinfo.RPCInfo) ServiceSearcher {
-	svcInfo, _ := ri.Invocation().Extra(keyServiceSearcher).(ServiceSearcher)
-	return svcInfo
+// GetServiceSearcher returns the service searcher from context.
+func GetServiceSearcher(ctx context.Context) ServiceSearcher {
+	svcSearcher, _ := ctx.Value(keyServiceSearcher{}).(ServiceSearcher)
+	return svcSearcher
 }
 
-// SetServiceSearcher sets the service searcher to rpcinfo.RPCInfo.
-func SetServiceSearcher(ri rpcinfo.RPCInfo, svcSearcher ServiceSearcher) {
-	setter := ri.Invocation().(rpcinfo.InvocationSetter)
-	setter.SetExtra(keyServiceSearcher, svcSearcher)
+// WithServiceSearcher sets the service searcher to context.
+func WithServiceSearcher(ctx context.Context, svcSearcher ServiceSearcher) context.Context {
+	return context.WithValue(ctx, keyServiceSearcher{}, svcSearcher)
 }
 
 // Message is the core abstraction for Kitex message.

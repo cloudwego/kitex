@@ -84,7 +84,7 @@ func init() {
 					return err
 				}
 				msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter).SetServiceName(mocks.MockServiceName)
-				return codec.SetOrCheckMethodName(mocks.MockMethod, msg)
+				return codec.SetOrCheckMethodName(remote.GetServiceSearcher(ctx), mocks.MockMethod, msg)
 			},
 		},
 		SvcSearcher:      svcSearcher,
@@ -449,7 +449,7 @@ func TestInvokeError(t *testing.T) {
 					return err
 				}
 				msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter).SetServiceName(mocks.MockServiceName)
-				return codec.SetOrCheckMethodName(mocks.MockMethod, msg)
+				return codec.SetOrCheckMethodName(remote.GetServiceSearcher(ctx), mocks.MockMethod, msg)
 			},
 		},
 		SvcSearcher:      svcSearcher,

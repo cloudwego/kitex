@@ -74,7 +74,7 @@ func TestMain(m *testing.M) {
 			EncodeFunc: nil,
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 				msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter).SetServiceName(mocks.MockServiceName)
-				return codec.SetOrCheckMethodName(mocks.MockMethod, msg)
+				return codec.SetOrCheckMethodName(remote.GetServiceSearcher(ctx), mocks.MockMethod, msg)
 			},
 		},
 		SvcSearcher: mocksremote.NewDefaultSvcSearcher(),

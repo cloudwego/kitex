@@ -32,7 +32,7 @@ const (
 )
 
 // SetOrCheckMethodName is used to set method name to invocation.
-func SetOrCheckMethodName(methodName string, message remote.Message) error {
+func SetOrCheckMethodName(svcSearcher remote.ServiceSearcher, methodName string, message remote.Message) error {
 	ri := message.RPCInfo()
 	ink := ri.Invocation()
 	callMethodName := ink.MethodName()
@@ -52,10 +52,6 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 	var svcInfo *serviceinfo.ServiceInfo
 	var methodInfo serviceinfo.MethodInfo
 	// for ping pong server, svc info is nil until the request decoded
-	svcSearcher := remote.GetServiceSearcher(ri)
-	if svcSearcher == nil {
-		return errors.New("RPCInfo doesn't contains a service searcher")
-	}
 	svcInfo = svcSearcher.SearchService(ink.ServiceName(), methodName, false, ri.Config().PayloadCodec())
 	if svcInfo == nil {
 		return remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s, method %s", ink.ServiceName(), methodName))
