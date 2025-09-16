@@ -6,7 +6,7 @@ jobs:
   unit-scenario-test:
     strategy:
       matrix:
-        go: [ "1.18", "1.25" ]
+        go: [ "1.19", "1.25" ]
     runs-on: [ Linux, X64 ]
     steps:
       - uses: actions/checkout@v4

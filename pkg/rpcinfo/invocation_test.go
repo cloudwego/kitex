@@ -17,6 +17,9 @@
 package rpcinfo
 
 import (
+	"fmt"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -52,4 +55,72 @@ func TestInvocation(t *testing.T) {
 
 	sIvk := NewServerInvocation()
 	test.Assert(t, sIvk.SeqID() == 0)
+}
+
+func TestInvocation_Extra(t *testing.T) {
+	keyNonAtomic1 := RegisterInvocationExtraKey("non_atomic_1", false)
+	keyAtomic1 := RegisterInvocationExtraKey("atomic_1", true)
+	keyNonAtomic2 := RegisterInvocationExtraKey("non_atomic_2", false)
+	keyAtomic2 := RegisterInvocationExtraKey("atomic_2", true)
+	keyConcurrent := RegisterInvocationExtraKey("concurrent_key", true)
+
+	inv := invocationPool.Get().(*invocation)
+	defer invocationPool.Put(inv)
+	inv.Reset()
+
+	valStr := "hello world"
+	inv.SetExtraInfo(keyNonAtomic1, valStr)
+	res1 := inv.ExtraInfo(keyNonAtomic1)
+	test.Assert(t, res1 == valStr)
+
+	valInt := 12345
+	inv.SetExtraInfo(keyAtomic1, valInt)
+	res2 := inv.ExtraInfo(keyAtomic1)
+	test.Assert(t, res2 == valInt)
+
+	res3 := inv.ExtraInfo(keyNonAtomic2)
+	test.Assert(t, res3 == nil)
+	res4 := inv.ExtraInfo(keyAtomic2)
+	test.Assert(t, res4 == nil)
+
+	newValStr := "new hello"
+	inv.SetExtraInfo(keyNonAtomic1, newValStr)
+	res5 := inv.ExtraInfo(keyNonAtomic1)
+	test.Assert(t, res5 == newValStr)
+	newValInt := 54321
+	inv.SetExtraInfo(keyAtomic1, newValInt)
+	res6 := inv.ExtraInfo(keyAtomic1)
+	test.Assert(t, res6 == newValInt)
+
+	inv.Reset()
+	res7 := inv.ExtraInfo(keyNonAtomic1)
+	test.Assert(t, res7 == nil)
+	res8 := inv.ExtraInfo(keyAtomic1)
+	test.Assert(t, res8 == nil)
+
+	var wg sync.WaitGroup
+	numGoroutines := 20
+
+	wg.Add(numGoroutines)
+	for i := 0; i < numGoroutines; i++ {
+		go func(v int) {
+			defer wg.Done()
+			inv.SetExtraInfo(keyConcurrent, fmt.Sprintf("value-%d", v))
+		}(i)
+	}
+	wg.Wait()
+
+	finalValue, ok := inv.ExtraInfo(keyConcurrent).(string)
+	test.Assert(t, ok)
+	test.Assert(t, strings.HasPrefix(finalValue, "value-"))
+
+	wg.Add(numGoroutines)
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			readVal := inv.ExtraInfo(keyConcurrent)
+			test.Assert(t, readVal == finalValue)
+		}()
+	}
+	wg.Wait()
 }

@@ -801,7 +801,7 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 
 	inkSetter := ri.Invocation().(rpcinfo.InvocationSetter)
 	// set ServiceInfo to judge whether it's combine service in ttheader codec.
-	inkSetter.SetExtra(rpcinfo.InvocationServiceInfoKey, svcInfo)
+	inkSetter.SetExtraInfo(rpcinfo.InvocationServiceInfoKey, svcInfo)
 	if mi != nil {
 		inkSetter.SetStreamingMode(mi.StreamingMode())
 		inkSetter.SetMethodInfo(mi)
