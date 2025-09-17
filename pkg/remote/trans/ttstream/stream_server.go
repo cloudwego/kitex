@@ -171,7 +171,6 @@ func (s *serverStream) onReadTrailerFrame(fr *Frame) (err error) {
 	}
 	s.trailer = fr.trailer
 
-	klog.Debugf("stream[%d] recv trailer: %v, exception: %v", s.sid, s.trailer, exception)
 	// server-side stream recv trailer, we only need to close recv but still can send data
 	return s.closeRecv(exception)
 }

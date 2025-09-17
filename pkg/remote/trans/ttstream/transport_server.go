@@ -101,7 +101,7 @@ func (t *serverTransport) Close(exception error) (err error) {
 	if !atomic.CompareAndSwapInt32(&t.closedFlag, 0, 1) {
 		return nil
 	}
-	klog.Debugf("transport[%s] is closing", t.Addr())
+	klog.Debugf("server transport[%s] is closing", t.Addr())
 	// close streams first
 	t.streams.Range(func(key, value any) bool {
 		s := value.(*serverStream)
@@ -125,7 +125,6 @@ func (t *serverTransport) IsActive() bool {
 }
 
 func (t *serverTransport) storeStream(s *serverStream) {
-	klog.Debugf("transport[%s] store stream: sid=%d", t.Addr(), s.sid)
 	t.streams.Store(s.sid, s)
 }
 
@@ -139,7 +138,6 @@ func (t *serverTransport) loadStream(sid int32) (s *serverStream, ok bool) {
 }
 
 func (t *serverTransport) deleteStream(sid int32) {
-	klog.Debugf("transport[%s] delete stream: sid=%d", t.Addr(), sid)
 	// remove stream from transport
 	t.streams.Delete(sid)
 }
@@ -150,7 +148,6 @@ func (t *serverTransport) readFrame(reader bufiox.Reader) error {
 		return err
 	}
 	defer recycleFrame(fr)
-	klog.Debugf("transport[%s] DecodeFrame: frame=%s", t.Addr(), fr)
 
 	var s *serverStream
 	if fr.typ == headerFrameType {
@@ -218,7 +215,6 @@ func (t *serverTransport) loopWrite() error {
 		}
 		for i := 0; i < n; i++ {
 			fr := fcache[i]
-			klog.Debugf("transport[%s] EncodeFrame: frame=%s", t.Addr(), fr)
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
 				return err
 			}
