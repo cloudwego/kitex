@@ -25,7 +25,6 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	ktransport "github.com/cloudwego/kitex/transport"
@@ -182,7 +181,6 @@ func (s *stream) sendTrailer(exception error) (err error) {
 	if wtrailer == nil {
 		return fmt.Errorf("stream trailer already sent")
 	}
-	klog.Debugf("stream[%d] send trailer: err=%v", s.sid, exception)
 
 	var payload []byte
 	if exception != nil {
@@ -196,7 +194,6 @@ func (s *stream) sendTrailer(exception error) (err error) {
 }
 
 func (s *stream) sendRst(exception error, cancelPath string) (err error) {
-	klog.Debugf("stream[%d] send rst: err=%v", s.sid, exception)
 	var payload []byte
 	if exception != nil {
 		payload, err = EncodeException(context.Background(), s.method, s.sid, exception)

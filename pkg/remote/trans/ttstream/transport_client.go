@@ -143,7 +143,6 @@ func (t *clientTransport) IsActive() bool {
 }
 
 func (t *clientTransport) storeStream(s *clientStream) {
-	klog.Debugf("client transport[%s] store stream: sid=%d", t.Addr(), s.sid)
 	t.streams.Store(s.sid, s)
 }
 
@@ -157,7 +156,6 @@ func (t *clientTransport) loadStream(sid int32) (s *clientStream, ok bool) {
 }
 
 func (t *clientTransport) deleteStream(sid int32) {
-	klog.Debugf("client transport[%s] delete stream: sid=%d", t.Addr(), sid)
 	// remove stream from transport
 	t.streams.Delete(sid)
 }
@@ -168,7 +166,6 @@ func (t *clientTransport) readFrame(reader bufiox.Reader) error {
 		return err
 	}
 	defer recycleFrame(fr)
-	klog.Debugf("client transport[%s] DecodeFrame: frame=%s", t.Addr(), fr)
 
 	var s *clientStream
 	// load exist stream
@@ -231,7 +228,6 @@ func (t *clientTransport) loopWrite() error {
 		}
 		for i := 0; i < n; i++ {
 			fr := fcache[i]
-			klog.Debugf("transport[%s] EncodeFrame: frame=%s", t.Addr(), fr)
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
 				return err
 			}

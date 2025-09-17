@@ -223,7 +223,6 @@ func (s *clientStream) onReadHeaderFrame(fr *Frame) error {
 	default:
 		return errUnexpectedHeader.newBuilder().withSide(clientSide).withCause(fmt.Errorf("stream[%d] already set header", s.sid))
 	}
-	klog.Debugf("stream[%s] read header: %v", s.method, fr.header)
 	return nil
 }
 
