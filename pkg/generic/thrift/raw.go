@@ -24,6 +24,8 @@ import (
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
+
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 type RawReaderWriter struct {
@@ -74,5 +76,9 @@ func (m *RawReader) Read(ctx context.Context, method string, isClient bool, data
 	}
 	d := thrift.NewSkipDecoder(in)
 	defer d.Release()
-	return d.Next(thrift.STRUCT)
+	rbuf, err := d.Next(thrift.STRUCT)
+	if err != nil {
+		return nil, err
+	}
+	return utils.StringToSliceByte(string(rbuf)), nil
 }
