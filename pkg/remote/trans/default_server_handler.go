@@ -139,7 +139,6 @@ func (t *svrTransHandler) newCtxWithRPCInfo(ctx context.Context, conn net.Conn) 
 // The connection should be closed after returning error.
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
 	ctx, ri := t.newCtxWithRPCInfo(ctx, conn)
-	remote.SetServiceSearcher(ri, t.svcSearcher)
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	var recvMsg remote.Message
 	var sendMsg remote.Message
@@ -230,6 +229,7 @@ func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Mes
 
 // OnActive implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
+	ctx = remote.WithServiceSearcher(ctx, t.svcSearcher)
 	// init rpcinfo
 	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
 	return rpcinfo.NewCtxWithRPCInfo(ctx, ri), nil

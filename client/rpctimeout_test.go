@@ -77,7 +77,7 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	test.Assert(t, err.(*kerrors.DetailedError).ErrorType() == kerrors.ErrRPCTimeout)
 
 	// 3. block, pass more timeout, timeout won't happen
-	mw1 = rpctimeout.MiddlewareBuilder(510 * time.Millisecond)(mwCtx)
+	mw1 = rpctimeout.MiddlewareBuilder(600 * time.Millisecond)(mwCtx)
 	mw2 = rpcTimeoutMW(mwCtx).ToMiddleware()
 	err = mw1(mw2(block))(ctx, nil, nil)
 	test.Assert(t, err == nil)

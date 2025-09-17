@@ -17,6 +17,7 @@
 package codec
 
 import (
+	"context"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -28,12 +29,12 @@ import (
 
 func TestSetOrCheckMethodName(t *testing.T) {
 	svcSearcher := mocksremote.NewDefaultSvcSearcher()
+	ctx := remote.WithServiceSearcher(context.Background(), svcSearcher)
 
 	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil),
 		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
-	remote.SetServiceSearcher(ri, svcSearcher)
 	msg := remote.NewMessage(nil, ri, remote.Call, remote.Server)
-	err := SetOrCheckMethodName("mock", msg)
+	err := SetOrCheckMethodName(ctx, "mock", msg)
 	test.Assert(t, err == nil)
 	ri = msg.RPCInfo()
 	test.Assert(t, ri.Invocation().ServiceName() == mocks.MockServiceName)
@@ -44,17 +45,15 @@ func TestSetOrCheckMethodName(t *testing.T) {
 	ri = rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil),
 		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	ri.Invocation().(rpcinfo.InvocationSetter).SetServiceName(mocks.MockServiceName)
-	remote.SetServiceSearcher(ri, svcSearcher)
 	msg = remote.NewMessage(nil, ri, remote.Call, remote.Server)
-	err = SetOrCheckMethodName("dummy", msg)
+	err = SetOrCheckMethodName(ctx, "dummy", msg)
 	test.Assert(t, err != nil)
 	test.Assert(t, err.Error() == "unknown method dummy (service MockService)")
 
 	ri = rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil),
 		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
-	remote.SetServiceSearcher(ri, svcSearcher)
 	msg = remote.NewMessage(nil, ri, remote.Call, remote.Server)
-	err = SetOrCheckMethodName("dummy", msg)
+	err = SetOrCheckMethodName(ctx, "dummy", msg)
 	test.Assert(t, err != nil)
 	test.Assert(t, err.Error() == "unknown method dummy (service )")
 }

@@ -74,15 +74,15 @@ func initFrugalTagSendMsg(tp transport.Protocol) remote.Message {
 	return msg
 }
 
-func initFrugalTagRecvMsg() remote.Message {
+func initFrugalTagRecvMsg(ctx context.Context) (context.Context, remote.Message) {
 	var _args MockFrugalTagArgs
 	ink := rpcinfo.NewInvocation("", "mock")
 	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.EmptyEndpointInfo(), ink, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
-	remote.SetServiceSearcher(ri, mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+	ctx = remote.WithServiceSearcher(ctx, mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
 		svcInfo.ServiceName: svcInfo,
 	}))
 	msg := remote.NewMessage(&_args, ri, remote.Call, remote.Server)
-	return msg
+	return ctx, msg
 }
 
 func TestFrugalCodec(t *testing.T) {
@@ -147,7 +147,7 @@ func testFrugalDataConversion(t *testing.T, ctx context.Context, codec remote.Pa
 			bw.Flush()
 
 			// decode server side
-			recvMsg := initFrugalTagRecvMsg()
+			ctx, recvMsg := initFrugalTagRecvMsg(ctx)
 			if protocol != transport.PurePayload {
 				recvMsg.SetPayloadLen(wl)
 			}
