@@ -227,12 +227,6 @@ func (t *timeoutTask) Run() {
 	}
 }
 
-var poolTimer = sync.Pool{
-	New: func() any {
-		return time.NewTimer(time.Second)
-	},
-}
-
 // Wait waits Run finishes and returns result
 func (t *timeoutTask) Wait() (context.Context, error) {
 	defer t.wg.Done()
@@ -245,15 +239,8 @@ func (t *timeoutTask) Wait() (context.Context, error) {
 		t.Cancel(context.DeadlineExceeded)
 		return t.ctx, t.ctx.Err()
 	}
-	tm := poolTimer.Get().(*time.Timer)
-	if !tm.Stop() {
-		select { // it may be expired or stopped
-		case <-tm.C:
-		default:
-		}
-	}
-	defer poolTimer.Put(tm)
-	tm.Reset(d)
+	tm := time.NewTimer(d)
+	defer tm.Stop()
 	select {
 	case <-t.ctx.Done(): // finished before timeout
 		v := t.err.Load()
