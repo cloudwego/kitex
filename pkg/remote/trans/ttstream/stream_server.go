@@ -50,7 +50,7 @@ func newServerStream(ctx context.Context, writer streamWriter, smeta streamFrame
 type serverStream struct {
 	*stream
 	state      int32
-	cancelFunc cancelWithReason
+	cancelFunc cancelWithReason // use serverStream.cancel to prevent atomic.Value panic caused by passing different error types
 }
 
 func (s *serverStream) SetHeader(hd streaming.Header) error {
@@ -121,7 +121,7 @@ func (s *serverStream) SendMsg(ctx context.Context, res any) error {
 // CloseSend by serverStream will be called after server handler returned
 // after CloseSend stream cannot be access again
 func (s *serverStream) CloseSend(exception error) error {
-	return s.close(exception, true)
+	return s.finish(exception)
 }
 
 // closeRecv called only when server receiving Trailer Frame
@@ -132,11 +132,13 @@ func (s *serverStream) closeRecv(exception error) error {
 	return nil
 }
 
-func (s *serverStream) close(exception error, sendTrailer bool) error {
-	// support cascading cancel
-	// we must cancel the ctx first before changing the state
-	// otherwise Recv/Send will not get the expected exception
-	s.cancelFunc(exception)
+// cancel ensures the ex passed in cancelFunc is of type *Exception
+func (s *serverStream) cancel(ex *Exception) {
+	s.cancelFunc(ex)
+}
+
+func (s *serverStream) finish(exception error) error {
+	s.cancel(errBizHandlerReturnCancel)
 	if atomic.SwapInt32(&s.state, streamStateInactive) == streamStateInactive {
 		return nil
 	}
@@ -144,9 +146,21 @@ func (s *serverStream) close(exception error, sendTrailer bool) error {
 	s.reader.close(exception)
 	s.runCloseCallback(exception)
 
-	if sendTrailer {
-		return s.sendTrailer(exception)
+	return s.sendTrailer(exception)
+}
+
+func (s *serverStream) close(exception *Exception) error {
+	// support cascading cancel
+	// we must cancel the ctx first before changing the state
+	// otherwise Recv/Send will not get the expected exception
+	s.cancel(exception)
+	if atomic.SwapInt32(&s.state, streamStateInactive) == streamStateInactive {
+		return nil
 	}
+
+	s.reader.close(exception)
+	s.runCloseCallback(exception)
+
 	return nil
 }
 
@@ -210,7 +224,7 @@ func (s *serverStream) onReadRstFrame(fr *Frame) (err error) {
 	}
 
 	// when receiving rst frame, we should close stream and there is no need to send rst frame
-	return s.close(rstEx, false)
+	return s.close(rstEx)
 }
 
 // closeTest is only used in unit tests for mocking Proxy Egress/Ingress send Rst Frame to downstream and upstream
@@ -218,7 +232,7 @@ func (s *serverStream) closeTest(exception error, cancelPath string) error {
 	// support cascading cancel
 	// we must cancel the ctx first before changing the state
 	// otherwise Recv/Send will not get the expected exception
-	s.cancelFunc(exception)
+	s.cancel(errInternalCancel.newBuilder().withCause(exception))
 	if atomic.SwapInt32(&s.state, streamStateInactive) == streamStateInactive {
 		return nil
 	}

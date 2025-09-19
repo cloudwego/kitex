@@ -34,10 +34,12 @@ var (
 
 	errBizCancel = newException("user code invoking stream RPC with context processed by context.WithCancel or context.WithTimeout, then invoking cancel() actively",
 		kerrors.ErrStreamingCanceled, 12007)
-	errBizCancelWithCause = newException("user code canceled with cancelCause(error)", kerrors.ErrStreamingCanceled, 12008)
-	errDownstreamCancel   = newException("canceled by downstream", kerrors.ErrStreamingCanceled, 12009)
-	errUpstreamCancel     = newException("canceled by upstream", kerrors.ErrStreamingCanceled, 12010)
-	errInternalCancel     = newException("internal canceled", kerrors.ErrStreamingCanceled, 12011)
+	errBizCancelWithCause     = newException("user code canceled with cancelCause(error)", kerrors.ErrStreamingCanceled, 12008)
+	errDownstreamCancel       = newException("canceled by downstream", kerrors.ErrStreamingCanceled, 12009)
+	errUpstreamCancel         = newException("canceled by upstream", kerrors.ErrStreamingCanceled, 12010)
+	errInternalCancel         = newException("internal canceled", kerrors.ErrStreamingCanceled, 12011)
+	errBizHandlerReturnCancel = newException("canceled by business handler returning", kerrors.ErrStreamingCanceled, 12012)
+	errConnectionClosedCancel = newException("canceled by connection closed", kerrors.ErrStreamingCanceled, 12013)
 )
 
 const (
@@ -93,7 +95,7 @@ func (e *Exception) Error() string {
 		strBuilder.WriteString("] ")
 	}
 
-	if e.isCauseSet() {
+	if e.isCauseSet() && e.cause != nil {
 		strBuilder.WriteString(e.cause.Error())
 	} else {
 		strBuilder.WriteString(e.message)
@@ -140,6 +142,9 @@ func (e *Exception) isCancelPathSet() bool {
 }
 
 func (e *Exception) Is(target error) bool {
+	if e == nil {
+		return false
+	}
 	if rawEx, ok := target.(*Exception); ok {
 		return rawEx.message == e.message
 	}
