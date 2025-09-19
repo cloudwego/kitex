@@ -103,9 +103,13 @@ func (t *serverTransport) Close(exception error) (err error) {
 	}
 	klog.Debugf("server transport[%s] is closing", t.Addr())
 	// close streams first
+	var ex *Exception
+	if exception != nil {
+		ex = errConnectionClosedCancel.newBuilder().withCause(exception)
+	}
 	t.streams.Range(func(key, value any) bool {
 		s := value.(*serverStream)
-		_ = s.close(exception, false)
+		_ = s.close(ex)
 		return true
 	})
 	// then close stream and frame pipes
