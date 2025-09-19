@@ -39,6 +39,10 @@ func TestErrors(t *testing.T) {
 	test.Assert(t, errors.Is(appErr, errApplicationException), appErr)
 	test.Assert(t, !errors.Is(appErr, kerrors.ErrStreamingProtocol), appErr)
 	test.Assert(t, strings.Contains(appErr.Error(), causeErr.Error()))
+
+	newExWithNilErr := errIllegalFrame.newBuilder().withCause(nil)
+	test.Assert(t, !newExWithNilErr.isCauseSet(), newExWithNilErr)
+	test.Assert(t, newExWithNilErr.cause == nil, newExWithNilErr)
 }
 
 func TestCommonParentKerror(t *testing.T) {
