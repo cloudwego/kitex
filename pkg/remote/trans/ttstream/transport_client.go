@@ -172,7 +172,7 @@ func (t *clientTransport) readFrame(reader bufiox.Reader) error {
 	var ok bool
 	s, ok = t.loadStream(fr.sid)
 	if !ok {
-		klog.Errorf("transport[%s] read a unknown stream: frame[%s]", t.Addr(), fr)
+		klog.Debugf("transport[%s] read a unknown stream: frame[%s]", t.Addr(), fr)
 		// ignore unknown stream error
 		err = nil
 	} else {

@@ -103,9 +103,10 @@ func (t *serverTransport) Close(exception error) (err error) {
 	}
 	klog.Debugf("server transport[%s] is closing", t.Addr())
 	// close streams first
+	ex := errConnectionClosedCancel.newBuilder().withCause(exception)
 	t.streams.Range(func(key, value any) bool {
 		s := value.(*serverStream)
-		_ = s.close(exception, false)
+		_ = s.close(ex)
 		return true
 	})
 	// then close stream and frame pipes
@@ -163,7 +164,9 @@ func (t *serverTransport) readFrame(reader bufiox.Reader) error {
 		var ok bool
 		s, ok = t.loadStream(fr.sid)
 		if !ok {
-			klog.Errorf("transport[%s] read a unknown stream: frame[%s]", t.Addr(), fr.String())
+			// there is a race condition that server handler returns and client sends rst frame concurrently.
+			// then serverTransport would not find the target stream when receiving the rst frame.
+			klog.Debugf("transport[%s] read a unknown stream: frame[%s]", t.Addr(), fr.String())
 			// ignore unknown stream error
 			err = nil
 		} else {

@@ -39,8 +39,8 @@ func newTestServerStream() *serverStream {
 func Test_serverStreamStateChange(t *testing.T) {
 	t.Run("serverStream close, then RecvMsg/SendMsg returning exception", func(t *testing.T) {
 		srvSt := newTestServerStream()
-		testException := errors.New("test")
-		err := srvSt.close(testException, false)
+		testException := errInternalCancel.newBuilder().withCause(errors.New("test"))
+		err := srvSt.close(testException)
 		test.Assert(t, err == nil, err)
 		rErr := srvSt.RecvMsg(srvSt.ctx, nil)
 		test.Assert(t, rErr == testException, rErr)
@@ -49,11 +49,11 @@ func Test_serverStreamStateChange(t *testing.T) {
 	})
 	t.Run("serverStream close twice with different exception, RecvMsg/SendMsg returning the first time exception", func(t *testing.T) {
 		srvSt := newTestServerStream()
-		testException1 := errors.New("test1")
-		err := srvSt.close(testException1, false)
+		testException1 := errInternalCancel.newBuilder().withCause(errors.New("test1"))
+		err := srvSt.close(testException1)
 		test.Assert(t, err == nil, err)
-		testException2 := errors.New("test2")
-		err = srvSt.close(testException2, false)
+		testException2 := errInternalCancel.newBuilder().withCause(errors.New("test2"))
+		err = srvSt.close(testException2)
 		test.Assert(t, err == nil, err)
 
 		rErr := srvSt.RecvMsg(srvSt.ctx, nil)
@@ -65,10 +65,10 @@ func Test_serverStreamStateChange(t *testing.T) {
 		srvSt := newTestServerStream()
 		var wg sync.WaitGroup
 		wg.Add(2)
-		testException := errors.New("test")
+		testException := errInternalCancel.newBuilder().withCause(errors.New("test1"))
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			err := srvSt.close(testException, false)
+			err := srvSt.close(testException)
 			test.Assert(t, err == nil, err)
 		}()
 		go func() {
