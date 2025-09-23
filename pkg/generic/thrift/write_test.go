@@ -108,6 +108,21 @@ func Test_nextWriter(t *testing.T) {
 			false,
 		},
 		{
+			"nextWriteri64 Success",
+			args{
+				val: int64(-1),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I64,
+					Struct: &descriptor.StructDescriptor{},
+				},
+				opt: &writerOption{
+					requestBase:      &base.Base{},
+					binaryWithBase64: false,
+				},
+			},
+			false,
+		},
+		{
 			"nextWriterbool Success",
 			args{
 				val: true,
@@ -430,6 +445,17 @@ func Test_writeInt16(t *testing.T) {
 			false,
 		},
 		{
+			"writeInt16toInt8 Negative Success",
+			args{
+				val: int16(-1),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I08,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			false,
+		},
+		{
 			"writeInt16toInt8 Failed",
 			args{
 				val: int16(10000),
@@ -530,6 +556,17 @@ func Test_writeInt32(t *testing.T) {
 			false,
 		},
 		{
+			"writeInt32ToInt8 Negative Success",
+			args{
+				val: int32(-1),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I08,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			false,
+		},
+		{
 			"writeInt32ToInt8 Failed",
 			args{
 				val: int32(100000),
@@ -544,6 +581,17 @@ func Test_writeInt32(t *testing.T) {
 			"writeInt32ToInt16 success",
 			args{
 				val: int32(1),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I16,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			false,
+		},
+		{
+			"writeInt32ToInt16 Negative success",
+			args{
+				val: int32(-1),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I16,
 					Struct: &descriptor.StructDescriptor{},
@@ -629,6 +677,17 @@ func Test_writeInt64(t *testing.T) {
 			false,
 		},
 		{
+			"writeInt64ToInt8 Negative Success",
+			args{
+				val: int64(-1),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I08,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			false,
+		},
+		{
 			"writeInt64ToInt8 failed",
 			args{
 				val: int64(1000),
@@ -651,6 +710,17 @@ func Test_writeInt64(t *testing.T) {
 			false,
 		},
 		{
+			"writeInt64ToInt16 Negative Success",
+			args{
+				val: int64(-1),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I16,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			false,
+		},
+		{
 			"writeInt64ToInt16 failed",
 			args{
 				val: int64(100000000000),
@@ -665,6 +735,17 @@ func Test_writeInt64(t *testing.T) {
 			"writeInt64ToInt32 Success",
 			args{
 				val: int64(1),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I32,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			false,
+		},
+		{
+			"writeInt64ToInt32 Negative Success",
+			args{
+				val: int64(-1),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I32,
 					Struct: &descriptor.StructDescriptor{},

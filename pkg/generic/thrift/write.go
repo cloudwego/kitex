@@ -21,6 +21,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
@@ -339,7 +340,7 @@ func writeInt16(ctx context.Context, val interface{}, out *thrift.BufferWriter, 
 	i := val.(int16)
 	switch t.Type {
 	case descriptor.I08:
-		if i&0xff != i {
+		if i < math.MinInt8 || i > math.MaxInt8 {
 			return fmt.Errorf("value is beyond range of i8: %v", i)
 		}
 		return out.WriteByte(int8(i))
@@ -358,12 +359,12 @@ func writeInt32(ctx context.Context, val interface{}, out *thrift.BufferWriter, 
 	i := val.(int32)
 	switch t.Type {
 	case descriptor.I08:
-		if i&0xff != i {
+		if i < math.MinInt8 || i > math.MaxInt8 {
 			return fmt.Errorf("value is beyond range of i8: %v", i)
 		}
 		return out.WriteByte(int8(i))
 	case descriptor.I16:
-		if i&0xffff != i {
+		if i < math.MinInt16 || i > math.MaxInt16 {
 			return fmt.Errorf("value is beyond range of i16: %v", i)
 		}
 		return out.WriteI16(int16(i))
@@ -380,17 +381,17 @@ func writeInt64(ctx context.Context, val interface{}, out *thrift.BufferWriter, 
 	i := val.(int64)
 	switch t.Type {
 	case descriptor.I08:
-		if i&0xff != i {
+		if i < math.MinInt8 || i > math.MaxInt8 {
 			return fmt.Errorf("value is beyond range of i8: %v", i)
 		}
 		return out.WriteByte(int8(i))
 	case descriptor.I16:
-		if i&0xffff != i {
+		if i < math.MinInt16 || i > math.MaxInt16 {
 			return fmt.Errorf("value is beyond range of i16: %v", i)
 		}
 		return out.WriteI16(int16(i))
 	case descriptor.I32:
-		if i&0xffffffff != i {
+		if i < math.MinInt32 || i > math.MaxInt32 {
 			return fmt.Errorf("value is beyond range of i32: %v", i)
 		}
 		return out.WriteI32(int32(i))
