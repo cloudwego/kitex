@@ -23,6 +23,8 @@ import (
 
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func TestRawReader_Read(t *testing.T) {
@@ -45,4 +47,25 @@ func TestRawReader_Read(t *testing.T) {
 	if !reflect.DeepEqual(data, nb[:off]) {
 		t.Fatalf("expect %v, got %v", nb[:off], data)
 	}
+}
+
+func TestRawWriter_Write(t *testing.T) {
+	w := NewRawWriter()
+	var buf []byte
+	out := bufiox.NewBytesWriter(&buf)
+	// nil message
+	err := w.Write(context.Background(), out, nil, "method", true, nil)
+	test.Assert(t, err == nil)
+	err = out.Flush()
+	test.Assert(t, err == nil)
+	test.Assert(t, len(buf) == 1) // field stop
+	test.Assert(t, buf[0] == byte(thrift.STOP))
+
+	// normal message
+	buf = buf[:0]
+	err = w.Write(context.Background(), out, []byte("hello world"), "method", true, nil)
+	test.Assert(t, err == nil)
+	err = out.Flush()
+	test.Assert(t, err == nil)
+	test.Assert(t, len(buf) == len("hello world"))
 }

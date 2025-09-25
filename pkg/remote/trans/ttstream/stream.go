@@ -125,16 +125,17 @@ func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
 }
 
 func (s *stream) RecvMsg(ctx context.Context, data any) error {
+	nctx := s.ctx
 	if s.recvTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, s.recvTimeout)
+		nctx, cancel = context.WithTimeout(nctx, s.recvTimeout)
 		defer cancel()
 	}
-	payload, err := s.reader.output(ctx)
+	payload, err := s.reader.output(nctx)
 	if err != nil {
 		return err
 	}
-	err = DecodePayload(ctx, payload, data)
+	err = DecodePayload(nctx, payload, data)
 	// payload will not be access after decode
 	mcache.Free(payload)
 
