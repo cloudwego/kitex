@@ -49,6 +49,14 @@ var _ MessageWriter = (*RawWriter)(nil)
 
 // Write returns the copy of data
 func (m *RawWriter) Write(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+	if msg == nil {
+		bw := thrift.NewBufferWriter(out)
+		defer bw.Recycle()
+		if err := bw.WriteFieldStop(); err != nil {
+			return err
+		}
+		return nil
+	}
 	buf, ok := msg.([]byte)
 	if !ok {
 		return fmt.Errorf("thrift binary generic msg is not []byte, method=%v", method)
