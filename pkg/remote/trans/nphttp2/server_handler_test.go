@@ -88,6 +88,9 @@ func TestServerHandler(t *testing.T) {
 	msg.RPCInfoFunc = func() rpcinfo.RPCInfo {
 		return ri
 	}
+	msg.RPCRoleFunc = func() remote.RPCRole {
+		return remote.Server
+	}
 	npConn := newMockNpConn(mockAddr0)
 	npConn.mockSettingFrame()
 	tr, err := newMockServerTransport(npConn)

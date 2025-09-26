@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/cloudwego/fastpb"
 
@@ -39,7 +40,10 @@ import (
 
 const dataFrameHeaderLen = 5
 
-var ErrInvalidPayload = errors.New("grpc invalid payload")
+var (
+	ErrInvalidPayload          = errors.New("grpc invalid payload")
+	errWrongGRPCImplementation = errors.New("KITEX: grpc client streaming protocol violation: get <nil>, want <EOF>")
+)
 
 // gogoproto generate
 type marshaler interface {
@@ -204,6 +208,23 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 	if err != nil {
 		return err
 	}
+	// For ClientStreaming and Unary, server may return an err(e.g. status) as trailer frame.
+	// We need to receive this trailer frame.
+	if message.RPCRole() == remote.Client && isNonServerStreaming(message.RPCInfo().Invocation().StreamingMode()) {
+		// Receive trailer frame
+		// If err == nil, wrong gRPC protocol implementation.
+		// If err == io.EOF, it means server returns nil, just ignore io.EOF.
+		// If err != io.EOF, it means server returns status err or BizStatusErr, or other gRPC transport error came out,
+		// we need to throw it to users.
+		_, err = decodeGRPCFrame(ctx, in)
+		if err == nil {
+			return errWrongGRPCImplementation
+		}
+		if err != io.EOF {
+			return err
+		}
+		// ignore io.EOF
+	}
 	message.SetPayloadLen(len(d))
 	data := message.Data()
 	switch message.RPCInfo().Config().PayloadCodec() {
@@ -254,4 +275,12 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 
 func (c *grpcCodec) Name() string {
 	return "grpc"
+}
+
+func isNonServerStreaming(mode serviceinfo.StreamingMode) bool {
+	if mode == serviceinfo.StreamingClient || mode == serviceinfo.StreamingUnary || mode == serviceinfo.StreamingNone {
+		return true
+	}
+	// BidiStreaming has the ability of ServerStreaming, is also considered as ServerStreaming
+	return false
 }

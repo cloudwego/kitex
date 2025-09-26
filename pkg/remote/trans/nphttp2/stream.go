@@ -121,7 +121,7 @@ func (s *serverStream) SetTrailer(tl streaming.Trailer) error {
 func (s *serverStream) RecvMsg(ctx context.Context, m interface{}) error {
 	ri := s.rpcInfo
 
-	msg := remote.NewMessage(m, ri, remote.Stream, remote.Client)
+	msg := remote.NewMessage(m, ri, remote.Stream, remote.Server)
 	defer msg.Recycle()
 
 	_, err := s.handler.Read(s.ctx, s.conn, msg)
@@ -133,7 +133,7 @@ func (s *serverStream) RecvMsg(ctx context.Context, m interface{}) error {
 func (s *serverStream) SendMsg(ctx context.Context, m interface{}) error {
 	ri := s.rpcInfo
 
-	msg := remote.NewMessage(m, ri, remote.Stream, remote.Client)
+	msg := remote.NewMessage(m, ri, remote.Stream, remote.Server)
 	defer msg.Recycle()
 
 	_, err := s.handler.Write(s.ctx, s.conn, msg)
