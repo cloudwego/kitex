@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"runtime/debug"
+	"time"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -82,7 +83,11 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	if err != nil {
 		return ctx, err
 	}
-	return ctx, bufWriter.Flush()
+	before := time.Now()
+	err = bufWriter.Flush()
+	duration := time.Now().Sub(before).Milliseconds()
+	klog.CtxInfof(ctx, "[Debug Flush] size=%d, duration=%d\n", sendMsg.PayloadLen(), duration)
+	return ctx, err
 }
 
 // Read implements the remote.ServerTransHandler interface.
