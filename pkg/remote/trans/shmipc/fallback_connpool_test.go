@@ -18,7 +18,7 @@ func TestFallbackConnpool(t *testing.T) {
 	defer testLock.Unlock()
 
 	shmUDS, _ := net.ResolveUnixAddr("unix", "fakeshmipc.sock")
-	fbpool := NewFallbackShmIPCPool("test", shmUDS, uds, nil)
+	fbpool := NewFallbackShmIPCPool(NewDefaultOptions(), shmUDS, uds, "test", nil)
 
 	conn, err := fbpool.Get(context.Background(), "", "", remote.ConnOption{
 		Dialer: netpoll.NewDialer(),
@@ -32,7 +32,7 @@ func TestNonFallbackConnpool(t *testing.T) {
 	testLock.Lock()
 	defer testLock.Unlock()
 
-	fbpool := NewFallbackShmIPCPool("test", shmUDS, uds, nil)
+	fbpool := NewFallbackShmIPCPool(NewDefaultOptions(), shmUDS, uds, "test", nil)
 
 	conn, err := fbpool.Get(context.Background(), "", "", remote.ConnOption{
 		Dialer: netpoll.NewDialer(),

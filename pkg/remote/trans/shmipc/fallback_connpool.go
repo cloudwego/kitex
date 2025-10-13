@@ -20,13 +20,17 @@ type fallbackShmipcPool struct {
 
 // NewFallbackShmIPCPool create a connection pool which use shmipc stream, and also provides fallback function to
 // use uds connection rather than shmipc when shmipc is not available.
-func NewFallbackShmIPCPool(psm string, shmipcAddr, fallbackAddr net.Addr, fCP remote.ConnPool) remote.ConnPool {
+func NewFallbackShmIPCPool(opts *Options, shmipcAddr, fallbackAddr net.Addr, toService string, fCP remote.ConnPool) remote.ConnPool {
+	if opts == nil {
+		opts = NewDefaultOptions()
+	}
+
 	sCP := NewShmIPCPool(&Config{
 		UnixPathBuilder: func(network, address string) string {
 			return shmipcAddr.String()
 		},
 		SMConfigBuilder: func(network, address string) *shmipc.SessionManagerConfig {
-			return DefaultShmipcConfig(psm, shmipcAddr)
+			return DefaultShmipcConfigWithOptions(opts, toService, shmipcAddr)
 		},
 	})
 	if fCP == nil {
@@ -35,7 +39,7 @@ func NewFallbackShmIPCPool(psm string, shmipcAddr, fallbackAddr net.Addr, fCP re
 			MaxIdleGlobal:     10000,
 			MaxIdleTimeout:    5 * time.Second,
 		}
-		fCP = connpool.NewLongPool(psm, idleCfg)
+		fCP = connpool.NewLongPool(toService, idleCfg)
 	}
 	return &fallbackShmipcPool{
 		shmipcConnPool:   sCP,

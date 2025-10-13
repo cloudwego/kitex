@@ -23,32 +23,33 @@ type Config struct {
 	SMConfigBuilder func(network, address string) *shmipc.SessionManagerConfig
 }
 
-func DefaultShmipcConfig(psm string, shmipcAddr net.Addr) *shmipc.SessionManagerConfig {
+// DefaultShmipcConfigWithOptions creates a shmipc configuration using provided options
+func DefaultShmipcConfigWithOptions(opts *Options, psm string, shmipcAddr net.Addr) *shmipc.SessionManagerConfig {
 	c := shmipc.DefaultConfig()
-	c.ShareMemoryBufferCap = uint32(ShmIPCBufferCapacity())
-	if shmipc.MemMapType(ShmMemoryType()) == shmipc.MemMapTypeMemFd {
+	c.ShareMemoryBufferCap = uint32(opts.BufferCapacity)
+	if shmipc.MemMapType(opts.MemoryType) == shmipc.MemMapTypeMemFd {
 		c.MemMapType = shmipc.MemMapTypeMemFd
 	}
 	sCfg := &shmipc.SessionManagerConfig{
 		UnixPath:          shmipcAddr.String(),
-		MaxStreamNum:      10000,
-		StreamMaxIdleTime: 5 * time.Second,
+		MaxStreamNum:      opts.MaxStreamNum,
+		StreamMaxIdleTime: opts.StreamMaxIdleTime,
 		Config:            c,
-		SessionNum:        ShmIPCConcurrency(),
+		SessionNum:        opts.Concurrency,
 	}
 
 	fmtShmPath := func(prefix string) string {
 		return fmt.Sprintf("%s_%s_%d_client", prefix, psm, uint64(time.Now().UnixNano())+rand.Uint64())
 	}
 
-	if len(ShmIPCPathPrefix()) > 0 {
-		sCfg.ShareMemoryPathPrefix = fmtShmPath(ShmIPCPathPrefix())
+	if len(opts.PathPrefix) > 0 {
+		sCfg.ShareMemoryPathPrefix = fmtShmPath(opts.PathPrefix)
 	} else {
 		sCfg.ShareMemoryPathPrefix = fmtShmPath("/dev/shm/shmipc/")
 	}
-	if len(ShmIPCSliceSpec()) > 0 {
+	if len(opts.SliceSpec) > 0 {
 		var pairs []*shmipc.SizePercentPair
-		if err := json.Unmarshal([]byte(ShmIPCSliceSpec()), &pairs); err == nil {
+		if err := json.Unmarshal([]byte(opts.SliceSpec), &pairs); err == nil {
 			sCfg.BufferSliceSizes = pairs
 		}
 	}

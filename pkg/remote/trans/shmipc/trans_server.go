@@ -23,20 +23,25 @@ const (
 	udsNetwork = "unix"
 )
 
-// NewTransServerFactory ...
-func NewTransServerFactory(shmUDSAddr net.Addr) remote.TransServerFactory {
-	return &shmIPCTransServerFactory{shmAddr: shmUDSAddr}
+// NewTransServerFactory creates a transport server factory for SHMIPC with given options
+func NewTransServerFactory(opts *Options, shmUDSAddr net.Addr) remote.TransServerFactory {
+	if opts == nil {
+		opts = NewDefaultOptions()
+	}
+	return &shmIPCTransServerFactory{opts: opts, shmAddr: shmUDSAddr}
 }
 
 type shmIPCTransServerFactory struct {
+	opts    *Options
 	shmAddr net.Addr
 }
 
 func (f *shmIPCTransServerFactory) NewTransServer(opt *remote.ServerOption, transHdlr remote.ServerTransHandler) remote.TransServer {
-	return &transServer{opt: opt, transHdlr: transHdlr, shmAddr: f.shmAddr}
+	return &transServer{opts: f.opts, opt: opt, transHdlr: transHdlr, shmAddr: f.shmAddr}
 }
 
 type transServer struct {
+	opts      *Options
 	opt       *remote.ServerOption
 	transHdlr remote.ServerTransHandler
 

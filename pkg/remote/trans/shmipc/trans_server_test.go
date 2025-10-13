@@ -36,7 +36,7 @@ func initUDSServer() (transSvr remote.TransServer, errCh chan error) {
 func initShmIPCServer() (transSvr remote.TransServer, errCh chan error) {
 	errCh = make(chan error, 1)
 	shmUDS, _ := net.ResolveUnixAddr("unix", shmUDSAddrStr)
-	tf := NewTransServerFactory(shmUDS)
+	tf := NewTransServerFactory(NewDefaultOptions(), shmUDS)
 
 	opt := initServerOption()
 	hdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
