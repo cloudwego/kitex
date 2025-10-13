@@ -174,6 +174,7 @@ func (s *clientStream) close(exception error, sendRst bool, cancelPath string) {
 		// stream has been closed before
 		return
 	}
+
 	select {
 	case s.headerSig <- streamSigInactive:
 	default:
