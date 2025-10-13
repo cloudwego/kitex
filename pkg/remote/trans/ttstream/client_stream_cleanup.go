@@ -17,17 +17,13 @@
 package ttstream
 
 func (t *clientTransport) Tick() {
-	var toCloseStreams []*clientStream
-	t.streams.Range(func(key, value any) bool {
-		s := value.(*clientStream)
-		select {
-		case <-s.ctx.Done():
-			toCloseStreams = append(toCloseStreams, s)
-		default:
-		}
-		return true
-	})
-	for _, s := range toCloseStreams {
+	s := t.stream.Load()
+	if s == nil {
+		return
+	}
+	select {
+	case <-s.ctx.Done():
 		s.ctxDoneCallback(s.ctx)
+	default:
 	}
 }

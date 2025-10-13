@@ -19,6 +19,7 @@ package ttstream
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -34,12 +35,14 @@ import (
 
 // transport is used to read/write frames and disturbed frames to different streams
 type serverTransport struct {
-	conn netpoll.Connection
+	conn   netpoll.Connection
+	stream atomic.Pointer[serverStream]
+	// mu protects writer
+	mu     sync.Mutex
+	writer *writerBuffer
 	// transport should operate directly on stream
-	streams       sync.Map                       // key=streamID val=stream
 	scache        []*serverStream                // size is streamCacheSize
 	spipe         *container.Pipe[*serverStream] // in-coming stream pipe
-	fpipe         *container.Pipe[*Frame]        // out-coming frame pipe
 	closedFlag    int32
 	closedTrigger chan struct{}
 }
@@ -49,10 +52,9 @@ func newServerTransport(conn netpoll.Connection) *serverTransport {
 	_ = conn.SetReadTimeout(0)
 	t := &serverTransport{
 		conn:          conn,
-		streams:       sync.Map{},
+		writer:        newWriterBuffer(conn.Writer()),
 		spipe:         container.NewPipe[*serverStream](),
 		scache:        make([]*serverStream, 0, streamCacheSize),
-		fpipe:         container.NewPipe[*Frame](),
 		closedTrigger: make(chan struct{}, 2),
 	}
 	addr := ""
@@ -74,19 +76,6 @@ func newServerTransport(conn netpoll.Connection) *serverTransport {
 		}()
 		err = t.loopRead()
 	}, gofunc.NewBasicInfo("", addr))
-	gofunc.RecoverGoFuncWithInfo(context.Background(), func() {
-		var err error
-		defer func() {
-			if err != nil {
-				if !isIgnoreError(err) {
-					klog.Warnf("transport[%s] loop write err: %v", t.Addr(), err)
-				}
-				_ = t.Close(err)
-			}
-			t.closedTrigger <- struct{}{}
-		}()
-		err = t.loopWrite()
-	}, gofunc.NewBasicInfo("", addr))
 	return t
 }
 
@@ -104,20 +93,16 @@ func (t *serverTransport) Close(exception error) (err error) {
 	klog.Debugf("server transport[%s] is closing", t.Addr())
 	// close streams first
 	ex := errConnectionClosedCancel.newBuilder().withCause(exception)
-	t.streams.Range(func(key, value any) bool {
-		s := value.(*serverStream)
-		_ = s.close(ex)
-		return true
-	})
+	if s := t.stream.Load(); s != nil {
+		s.close(ex)
+	}
 	// then close stream and frame pipes
 	t.spipe.Close()
-	t.fpipe.Close()
 	return err
 }
 
 // WaitClosed waits for send loop and recv loop closed
 func (t *serverTransport) WaitClosed() {
-	<-t.closedTrigger
 	<-t.closedTrigger
 }
 
@@ -126,21 +111,26 @@ func (t *serverTransport) IsActive() bool {
 }
 
 func (t *serverTransport) storeStream(s *serverStream) {
-	t.streams.Store(s.sid, s)
+	old := t.stream.Swap(s)
+	if old != nil && old.sid != s.sid {
+		old.close(errUnexpectedHeader.newBuilder().withCause(fmt.Errorf("new stream[%d] created before old stream[%d] closed", s.sid, old.sid)))
+	}
 }
 
 func (t *serverTransport) loadStream(sid int32) (s *serverStream, ok bool) {
-	val, ok := t.streams.Load(sid)
-	if !ok {
-		return s, false
+	s = t.stream.Load()
+	if s == nil {
+		return nil, false
 	}
-	s = val.(*serverStream)
-	return s, true
+	if s.sid == sid {
+		return s, true
+	}
+	return nil, false
 }
 
 func (t *serverTransport) deleteStream(sid int32) {
 	// remove stream from transport
-	t.streams.Delete(sid)
+	t.stream.Store(nil)
 }
 
 func (t *serverTransport) readFrame(reader bufiox.Reader) error {
@@ -199,39 +189,21 @@ func (t *serverTransport) loopRead() error {
 	}
 }
 
-func (t *serverTransport) loopWrite() error {
-	defer func() {
-		// loop write should help to close connection
-		_ = t.conn.Close()
-	}()
-	writer := newWriterBuffer(t.conn.Writer())
-	fcache := make([]*Frame, frameCacheSize)
-	// Important note:
-	// loopWrite may cannot find stream by sid since it may send trailer and delete sid from streams
-	for {
-		n, err := t.fpipe.Read(context.Background(), fcache)
-		if err != nil {
-			return err
-		}
-		if n == 0 {
-			return io.EOF
-		}
-		for i := 0; i < n; i++ {
-			fr := fcache[i]
-			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
-				return err
-			}
-			recycleFrame(fr)
-		}
-		if err = writer.Flush(); err != nil {
-			return err
-		}
-	}
-}
-
 // WriteFrame is concurrent safe
 func (t *serverTransport) WriteFrame(fr *Frame) (err error) {
-	return t.fpipe.Write(context.Background(), fr)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if err = EncodeFrame(context.Background(), t.writer, fr); err != nil {
+		t.Close(err)
+		return err
+	}
+	recycleFrame(fr)
+	if err = t.writer.Flush(); err != nil {
+		err = errTransport.newBuilder().withCause(err)
+		t.Close(err)
+		return err
+	}
+	return nil
 }
 
 func (t *serverTransport) CloseStream(sid int32) (err error) {
