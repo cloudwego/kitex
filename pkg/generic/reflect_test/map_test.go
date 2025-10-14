@@ -121,10 +121,10 @@ func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service)
 	return svr
 }
 
-type exampeServerImpl struct{}
+type exampleServerImpl struct{}
 
 // GenericCall ...
-func (g *exampeServerImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+func (g *exampleServerImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
 	buf := request.(map[string]interface{})
 
 	required_field := ""

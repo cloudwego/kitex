@@ -52,7 +52,7 @@ func TestMain(m *testing.M) {
 	cli = initClient(addr)
 
 	mAddr := test.GetLocalAddress()
-	msvr := initThriftMapServer(mAddr, "./idl/example.thrift", new(exampeServerImpl))
+	msvr := initThriftMapServer(mAddr, "./idl/example.thrift", new(exampleServerImpl))
 	mcli = initThriftMapClient(mAddr, "./idl/example.thrift")
 
 	ret := m.Run()
