@@ -276,13 +276,8 @@ func (s *services) SearchService(svcName, methodName string, strict bool, codecT
 			if svc := s.knownSvcMap[svcName]; svc != nil {
 				return svc.svcInfo
 			}
-			if svcName == serviceinfo.GenericService || svcName == serviceinfo.CombineServiceName {
-				// Maybe combine or generic service name,
-				// because Kitex client will write these two service name if the version is between v0.9.0-v0.9.1
-				// TODO: remove this logic if this version range is converged
-				if svcInfo := s.searchByMethodName(methodName); svcInfo != nil {
-					return svcInfo
-				}
+			if svcInfo := s.searchUniqueByMethodName(methodName); svcInfo != nil {
+				return svcInfo
 			}
 		}
 	}
@@ -290,6 +285,28 @@ func (s *services) SearchService(svcName, methodName string, strict bool, codecT
 		return s.unknownSvc.getOrStoreSvc(svcName, codecType).svcInfo
 	}
 	return nil
+}
+
+// SearchUniqueByMethodName searches for a unique service by method name.
+// It returns nil if there are multiple services with the same method name.
+func (s *services) searchUniqueByMethodName(methodName string) (unique *serviceinfo.ServiceInfo) {
+	if s.fallbackSvc != nil {
+		// check whether fallback service has the method
+		if mi := s.fallbackSvc.svcInfo.MethodInfo(notAllowBinaryGenericCtx, methodName); mi != nil {
+			unique = s.fallbackSvc.svcInfo
+		}
+	}
+	// match other services
+	for _, svc := range s.nonFallbackSvcs {
+		if mi := svc.svcInfo.MethodInfo(notAllowBinaryGenericCtx, methodName); mi != nil {
+			if unique == nil {
+				unique = svc.svcInfo
+			} else {
+				return nil
+			}
+		}
+	}
+	return unique
 }
 
 // getTargetSvcInfo returns the service info if there is only one service registered.

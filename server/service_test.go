@@ -156,7 +156,7 @@ func TestSearchService(t *testing.T) {
 			},
 			serviceName:   serviceinfo.GenericService,
 			methodName:    mocks.MockMethod,
-			expectSvcInfo: mocks.ServiceInfo(),
+			expectSvcInfo: nil,
 		},
 		{
 			svcs: []svc{
@@ -170,7 +170,7 @@ func TestSearchService(t *testing.T) {
 			},
 			serviceName:   "xxxxxx",
 			methodName:    mocks.MockExceptionMethod,
-			expectSvcInfo: nil,
+			expectSvcInfo: mocks.ServiceInfo(),
 		},
 		{
 			svcs: []svc{
