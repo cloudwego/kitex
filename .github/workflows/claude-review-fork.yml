@@ -1,0 +1,62 @@
+name: Claude Review Fork PR
+
+# Manual workflow to review PRs from forks
+# Usage: Go to Actions tab > Claude Review Fork PR > Run workflow
+# Enter the PR number to review
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to review'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  review-fork-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get PR Information
+        id: pr-info
+        run: |
+          PR_DATA=$(gh pr view ${{ github.event.inputs.pr_number }} --repo ${{ github.repository }} --json headRefName,headRepository,headRepositoryOwner,number,title)
+          echo "PR Data: $PR_DATA"
+          echo "pr_head_ref=$(echo $PR_DATA | jq -r '.headRefName')" >> $GITHUB_OUTPUT
+          echo "pr_head_repo=$(echo $PR_DATA | jq -r '.headRepository.name')" >> $GITHUB_OUTPUT
+          echo "pr_head_owner=$(echo $PR_DATA | jq -r '.headRepositoryOwner.login')" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pr-info.outputs.pr_head_owner }}/${{ steps.pr-info.outputs.pr_head_repo }}
+          ref: ${{ steps.pr-info.outputs.pr_head_ref }}
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.inputs.pr_number }}
+
+            Please review pull request #${{ github.event.inputs.pr_number }} and provide feedback on:
+            - Code quality and best practices
+            - Potential bugs or issues
+            - Performance considerations
+            - Security concerns
+            - Test coverage
+
+            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+
+            Use `gh pr comment ${{ github.event.inputs.pr_number }}` with your Bash tool to leave your review as a comment on the PR.
+
+          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
