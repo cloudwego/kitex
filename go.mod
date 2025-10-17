@@ -14,6 +14,7 @@ require (
 	github.com/cloudwego/netpoll v0.7.2
 	github.com/cloudwego/prutal v0.1.3
 	github.com/cloudwego/runtimex v0.1.1
+	github.com/cloudwego/shmipc-go v0.2.0
 	github.com/cloudwego/thriftgo v0.4.3
 	github.com/golang/mock v1.6.0
 	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8
@@ -32,7 +33,6 @@ require (
 require (
 	github.com/bytedance/sonic/loader v0.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
-	github.com/cloudwego/shmipc-go v0.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dlclark/regexp2 v1.11.0 // indirect
 	github.com/fatih/structtag v1.2.0 // indirect
