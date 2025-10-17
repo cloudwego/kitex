@@ -519,10 +519,15 @@ func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content
 	if err != nil {
 		return err
 	}
-	dOpts := dthrift.Options{EnableThriftBase: true, ParseServiceMode: dParseMode, UseDefaultValue: true, SetOptionalBitmap: true, ServiceName: serviceName}
+	var dOpts dthrift.Options
 	if dopts != nil {
 		dOpts = *dopts
 	}
+	dOpts.EnableThriftBase = true
+	dOpts.ParseServiceMode = dParseMode
+	dOpts.UseDefaultValue = true
+	dOpts.SetOptionalBitmap = true
+	dOpts.ServiceName = serviceName
 	dsvc, err := dOpts.NewDescritorFromContent(context.Background(), path, content, includes, isAbsIncludePath)
 	if err != nil {
 		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
