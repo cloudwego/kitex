@@ -18,6 +18,7 @@ package generic
 
 import (
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
+
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
@@ -37,6 +38,6 @@ type ProviderOption struct {
 	// DynamicGoEnabled is if dynamicgo is enabled or not
 	DynamicGoEnabled bool
 	// DynamicGoOptions is the options for dynamicgo parsing IDL
-	// NOTICE: If not empty, it will override all the default options for dynamicgo
+	// NOTICE: it WON'T override some default options for dynamicgo
 	DynamicGoOptions *dthrift.Options
 }
