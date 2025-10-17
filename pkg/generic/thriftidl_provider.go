@@ -267,7 +267,7 @@ func (p *ThriftContentProvider) Option() ProviderOption {
 }
 
 func (p *ThriftContentProvider) newDynamicGoDsc(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, parseMode thrift.ParseMode, goTag *goTagOption, serviceName string) {
-	if err := newDynamicGoDscFromContent(svc, path, content, includes, false, parseMode, goTag, serviceName); err != nil {
+	if err := newDynamicGoDscFromContent(svc, path, content, includes, false, parseMode, goTag, serviceName, p.opts.DynamicGoOptions); err != nil {
 		p.opts.DynamicGoEnabled = false
 	}
 }
@@ -467,7 +467,7 @@ func (p *ThriftContentWithAbsIncludePathProvider) Option() ProviderOption {
 }
 
 func (p *ThriftContentWithAbsIncludePathProvider) newDynamicGoDsc(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, parseMode thrift.ParseMode, goTag *goTagOption, serviceName string) {
-	if err := newDynamicGoDscFromContent(svc, path, content, includes, true, parseMode, goTag, serviceName); err != nil {
+	if err := newDynamicGoDscFromContent(svc, path, content, includes, true, parseMode, goTag, serviceName, p.opts.DynamicGoOptions); err != nil {
 		p.opts.DynamicGoEnabled = false
 	}
 }
@@ -512,7 +512,7 @@ func newServiceDescriptorFromContent(path, content string, includes map[string]s
 	return svc, nil
 }
 
-func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, isAbsIncludePath bool, parseMode thrift.ParseMode, goTag *goTagOption, serviceName string) error {
+func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, isAbsIncludePath bool, parseMode thrift.ParseMode, goTag *goTagOption, serviceName string, dopts *dthrift.Options) error {
 	handleGoTagForDynamicGo(goTag)
 	// ServiceDescriptor of dynamicgo
 	dParseMode, err := getDynamicGoParseMode(parseMode)
@@ -520,6 +520,9 @@ func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content
 		return err
 	}
 	dOpts := dthrift.Options{EnableThriftBase: true, ParseServiceMode: dParseMode, UseDefaultValue: true, SetOptionalBitmap: true, ServiceName: serviceName}
+	if dopts != nil {
+		dOpts = *dopts
+	}
 	dsvc, err := dOpts.NewDescritorFromContent(context.Background(), path, content, includes, isAbsIncludePath)
 	if err != nil {
 		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
