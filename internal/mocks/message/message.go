@@ -107,6 +107,14 @@ func (m *MockMessage) Tags() map[string]interface{} {
 	return nil
 }
 
+func (m *MockMessage) ProtocolInfo() remote.ProtocolInfo {
+	cfg := m.RPCInfo().Config()
+	return remote.ProtocolInfo{
+		TransProto: cfg.TransportProtocol(),
+		CodecType:  cfg.PayloadCodec(),
+	}
+}
+
 func (m *MockMessage) PayloadCodec() remote.PayloadCodec {
 	if m.PayloadCodecFunc != nil {
 		return m.PayloadCodecFunc()

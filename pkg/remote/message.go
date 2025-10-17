@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/transport"
 )
 
 var (
@@ -63,6 +64,12 @@ const (
 	MeshHeader string = "mHeader"
 )
 
+// ProtocolInfo is used to indicate the transport protocol and payload codec information.
+type ProtocolInfo struct {
+	TransProto transport.Protocol
+	CodecType  serviceinfo.PayloadCodec
+}
+
 // ServiceSearcher is used to search the service info by service name and method name,
 // strict equals to true means the service name must match the registered service name.
 type ServiceSearcher interface {
@@ -97,6 +104,9 @@ type Message interface {
 	PayloadCodec() PayloadCodec
 	SetPayloadCodec(pc PayloadCodec)
 	Recycle()
+
+	// Deprecated: use rpcinfo.Config().TransportProtocol() or rpcinfo.Config().PayloadCodec() instead
+	ProtocolInfo() ProtocolInfo
 }
 
 // NewMessage creates a new Message using the given info.
@@ -196,6 +206,15 @@ func (m *message) TransInfo() TransInfo {
 // Tags implements the Message interface.
 func (m *message) Tags() map[string]interface{} {
 	return m.tags
+}
+
+// ProtocolInfo implements the Message interface.
+func (m *message) ProtocolInfo() ProtocolInfo {
+	cfg := m.rpcInfo.Config()
+	return ProtocolInfo{
+		TransProto: cfg.TransportProtocol(),
+		CodecType:  cfg.PayloadCodec(),
+	}
 }
 
 // PayloadLen implements the Message interface.
