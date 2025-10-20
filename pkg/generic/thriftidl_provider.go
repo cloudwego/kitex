@@ -78,6 +78,10 @@ func NewThriftFileProviderWithDynamicgoWithOption(path string, opts []ThriftIDLP
 	}
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
+	if tOpts.dynamicGoOpt != nil {
+		p.opts.DynamicGoOptions = tOpts.dynamicGoOpt
+	}
+
 	parseMode := getParseMode(tOpts)
 	svc, err := newServiceDescriptorFromPath(path, parseMode, tOpts.goTag, tOpts.serviceName, includeDirs...)
 	if err != nil {
@@ -200,6 +204,10 @@ func NewThriftContentProviderWithDynamicGo(mainIDLContent string, includes map[s
 		parseMode:   parseMode,
 		goTagOpt:    tOpts.goTag,
 		serviceName: tOpts.serviceName,
+	}
+
+	if tOpts.dynamicGoOpt != nil {
+		p.opts.DynamicGoOptions = tOpts.dynamicGoOpt
 	}
 
 	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, mainIDLContent, includes, false, parseMode, tOpts.goTag, tOpts.serviceName)

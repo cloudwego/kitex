@@ -22,6 +22,8 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
+
+	dthrift "github.com/cloudwego/dynamicgo/thrift"
 )
 
 var testServiceContent = `
@@ -679,4 +681,46 @@ func TestParseWithIDLServiceName(t *testing.T) {
 	test.Assert(t, err != nil)
 	test.Assert(t, err.Error() == "the idl service name Service3 is not in the idl. Please check your idl")
 	ap.Close()
+}
+
+func TestDynamicGoOptions(t *testing.T) {
+	// file provider
+	path := "json_test/idl/example_multi_service.thrift"
+	opts := []ThriftIDLProviderOption{WithDynamicGoOptions(&dthrift.Options{
+		ParseEnumAsInt64: true,
+	}), WithIDLServiceName("ExampleService")}
+	p, err := NewThriftFileProviderWithDynamicgoWithOption(path, opts)
+	test.Assert(t, err == nil)
+	tree := <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicGoDsc != nil)
+
+	test.Assert(t, tree.DynamicGoDsc.Name() == "ExampleService")
+	test.Assert(t, p.(*thriftFileProvider).opts.DynamicGoOptions.ParseEnumAsInt64)
+	p.Close()
+
+	// content provider
+	content := `
+	namespace go thrift
+	
+	struct Request {
+		1: required string message,
+	}
+	
+	struct Response {
+		1: required string message,
+	}
+	
+	service ExampleService {
+		Response Test(1: Request req)
+	}
+	`
+	cp, err := NewThriftContentProviderWithDynamicGo(content, nil, opts...)
+	test.Assert(t, err == nil)
+	tree = <-cp.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicGoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc.Name() == "ExampleService")
+	test.Assert(t, p.(*thriftFileProvider).opts.DynamicGoOptions.ParseEnumAsInt64)
+	cp.Close()
 }
