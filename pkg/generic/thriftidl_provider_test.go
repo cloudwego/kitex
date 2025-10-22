@@ -687,7 +687,8 @@ func TestDynamicGoOptions(t *testing.T) {
 	// file provider
 	path := "json_test/idl/example_multi_service.thrift"
 	opts := []ThriftIDLProviderOption{WithDynamicGoOptions(&dthrift.Options{
-		ParseEnumAsInt64: true,
+		ParseEnumAsInt64:           true,
+		ForceHashMapAsFieldNameMap: true,
 	}), WithIDLServiceName("ExampleService")}
 	p, err := NewThriftFileProviderWithDynamicgoWithOption(path, opts)
 	test.Assert(t, err == nil)
@@ -715,7 +716,7 @@ func TestDynamicGoOptions(t *testing.T) {
 		Response Test(1: Request req)
 	}
 	`
-	cp, err := NewThriftContentProviderWithDynamicGo(content, nil, opts...)
+	cp, err := NewThriftContentWithAbsIncludePathProviderWithDynamicGo("main.thrift", map[string]string{"main.thrift": content}, opts...)
 	test.Assert(t, err == nil)
 	tree = <-cp.Provide()
 	test.Assert(t, tree != nil)
