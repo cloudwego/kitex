@@ -237,8 +237,8 @@ func TestMixedRetry(t *testing.T) {
 		test.Assert(t, v == remoteTagValue)
 	})
 
-	// case5: all error retry and trigger circuit breaker
-	t.Run("case5", func(t *testing.T) {
+	// case4: all error retry and trigger circuit breaker
+	t.Run("case4", func(t *testing.T) {
 		rc := NewRetryContainerWithPercentageLimit()
 		p := BuildMixedPolicy(NewMixedPolicyWithResultRetry(100, AllErrorRetry()))
 		ri = genRPCInfo()
@@ -602,6 +602,100 @@ func TestMockCase4WithDiffRetry(t *testing.T) {
 		test.Assert(t, ret.getResult().(mockResp).code == bizStatusCode1)
 		test.Assert(t, !ok)
 		test.Assert(t, math.Abs(float64(cost.Milliseconds())-250.0) < 50.0, cost.Milliseconds())
+	})
+}
+
+func TestMockCase5WithDiffRetry(t *testing.T) {
+	ri := genRPCInfo(func() interface{} {
+		return &mockResult{}
+	})
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	retryWithTimeout := func(ri rpcinfo.RPCInfo, callTimes, successTimes int32) RPCCallFunc {
+		return func(ctx context.Context, r Retryer, request, response interface{}) (rpcinfo.RPCInfo, error) {
+			ct := atomic.AddInt32(&callTimes, 1)
+			resp := response.(*mockResult)
+			resp.setCallTimes(ct)
+			if ct == successTimes {
+				time.Sleep(100 * time.Millisecond)
+				return ri, nil
+			} else {
+				time.Sleep(150 * time.Millisecond)
+				return ri, kerrors.ErrRPCTimeout.WithCause(errors.New("mock"))
+			}
+		}
+	}
+	t.Run("mixed retry with fixed backoff, the first call succeed", func(t *testing.T) {
+		rc := NewRetryContainer()
+		mp := NewMixedPolicy(300)
+		mp.WithFixedBackOff(100)
+		mp.WithMaxRetryTimes(2)
+		p := BuildMixedPolicy(mp)
+		ri = genRPCInfo(func() interface{} {
+			return &mockResult{}
+		})
+		ret := &mockResult{}
+		start := time.Now()
+		_, ok, err := rc.WithRetryIfNeeded(ctx, &p, retryWithTimeout(ri, 0, 1), ri, nil, ret)
+		cost := time.Since(start) // 100
+		test.Assert(t, err == nil, err)
+		test.Assert(t, ret.getCallTimes() == 1, ret.callTimes)
+		test.Assert(t, !ok)
+		test.Assert(t, math.Abs(float64(cost.Milliseconds())-100.0) < 50.0, cost.Milliseconds())
+	})
+	t.Run("mixed retry with fixed backoff, the second call succeed", func(t *testing.T) {
+		rc := NewRetryContainer()
+		mp := NewMixedPolicy(300)
+		mp.WithFixedBackOff(100)
+		mp.WithMaxRetryTimes(2)
+		p := BuildMixedPolicy(mp)
+		ri = genRPCInfo(func() interface{} {
+			return &mockResult{}
+		})
+		ret := &mockResult{}
+		start := time.Now()
+		_, ok, err := rc.WithRetryIfNeeded(ctx, &p, retryWithTimeout(ri, 0, 2), ri, nil, ret)
+		cost := time.Since(start) // 150+100+100
+		test.Assert(t, err == nil, err)
+		test.Assert(t, ret.getCallTimes() == 2, ret.callTimes)
+		test.Assert(t, !ok)
+		test.Assert(t, math.Abs(float64(cost.Milliseconds())-350.0) < 50.0, cost.Milliseconds())
+	})
+	t.Run("mixed retry with fixed backoff, ends successfully with MaxRetryTimes", func(t *testing.T) {
+		rc := NewRetryContainer()
+		mp := NewMixedPolicy(300)
+		mp.WithFixedBackOff(100)
+		mp.WithMaxRetryTimes(2)
+		p := BuildMixedPolicy(mp)
+		ri = genRPCInfo(func() interface{} {
+			return &mockResult{}
+		})
+		ret := &mockResult{}
+		start := time.Now()
+		_, ok, err := rc.WithRetryIfNeeded(ctx, &p, retryWithTimeout(ri, 0, 3), ri, nil, ret)
+		cost := time.Since(start) // 150+100+150+100+100
+		test.Assert(t, err == nil, err)
+		test.Assert(t, ret.getCallTimes() == 3, ret.callTimes)
+		test.Assert(t, !ok)
+		test.Assert(t, math.Abs(float64(cost.Milliseconds())-600.0) < 50.0, cost.Milliseconds())
+	})
+	t.Run("mixed retry with fixed backoff, ends failed with MaxRetryTimes", func(t *testing.T) {
+		rc := NewRetryContainer()
+		mp := NewMixedPolicy(300)
+		mp.WithFixedBackOff(100)
+		mp.WithMaxRetryTimes(2)
+		p := BuildMixedPolicy(mp)
+		ri = genRPCInfo(func() interface{} {
+			return &mockResult{}
+		})
+		ret := &mockResult{}
+		start := time.Now()
+		_, ok, err := rc.WithRetryIfNeeded(ctx, &p, retryWithTimeout(ri, 0, 4), ri, nil, ret)
+		cost := time.Since(start) // 150+100+150+100+150
+		test.Assert(t, err != nil, err)
+		test.Assert(t, errors.Is(err, kerrors.ErrRPCTimeout), err)
+		test.Assert(t, ret.getCallTimes() == 3, ret.callTimes)
+		test.Assert(t, !ok)
+		test.Assert(t, math.Abs(float64(cost.Milliseconds())-650.0) < 50.0, cost.Milliseconds())
 	})
 }
 
