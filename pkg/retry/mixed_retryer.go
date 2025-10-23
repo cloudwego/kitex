@@ -158,15 +158,17 @@ func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpci
 			doneCount++
 			if doneCount < retryTimes+1 {
 				if callCount < retryTimes+1 {
-					if msg, ok := r.ShouldRetry(ctx, nil, callCount, req, cbKey); ok {
-						if r.isRetryResult(ctx, res.ri, res.resp, res.err, &r.policy.FailurePolicy) {
+					// Check if the result needs retry first to avoid unnecessary backoff on success
+					if r.isRetryResult(ctx, res.ri, res.resp, res.err, &r.policy.FailurePolicy) {
+						// there is potential backoff logic in ShouldRetry
+						if msg, ok := r.ShouldRetry(ctx, nil, callCount, req, cbKey); ok {
 							doCall = true
 							timer.Reset(retryDelay)
 							continue
+						} else if msg != "" {
+							appendMsg := fmt.Sprintf("retried %d, %s", callCount-1, msg)
+							appendErrMsg(res.err, appendMsg)
 						}
-					} else if msg != "" {
-						appendMsg := fmt.Sprintf("retried %d, %s", callCount-1, msg)
-						appendErrMsg(res.err, appendMsg)
 					}
 				} else if r.isRetryResult(ctx, res.ri, res.resp, res.err, &r.policy.FailurePolicy) {
 					continue
