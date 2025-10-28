@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cloudwego/kitex/tool/cmd/kitex/discover"
 	"github.com/cloudwego/kitex/tool/cmd/kitex/utils"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util/env"
 
@@ -65,6 +66,11 @@ func init() {
 }
 
 func main() {
+	// Check for discover subcommand first
+	if len(os.Args) > 1 && os.Args[1] == "discover" {
+		os.Exit(discover.Run(os.Args[2:]))
+	}
+
 	mode := os.Getenv(kargs.EnvPluginMode)
 	if len(os.Args) <= 1 && mode != "" {
 		// run as a plugin
