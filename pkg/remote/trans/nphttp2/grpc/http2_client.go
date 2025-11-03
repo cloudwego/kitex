@@ -642,12 +642,13 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 		s.noHeaders = true
 		close(s.headerChan)
 	}
+	sid := s.id
 	cleanup := &cleanupStream{
-		streamID: s.id,
+		streamID: sid,
 		onWrite: func() {
 			t.mu.Lock()
 			if t.activeStreams != nil {
-				delete(t.activeStreams, s.id)
+				delete(t.activeStreams, sid)
 			}
 			t.mu.Unlock()
 		},
