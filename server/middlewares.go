@@ -36,7 +36,7 @@ func serverTimeoutMW(next endpoint.Endpoint) endpoint.Endpoint {
 
 		ctx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
-		
+
 		return next(ctx, request, response)
 	}
 }
