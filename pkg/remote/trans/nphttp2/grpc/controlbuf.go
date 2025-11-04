@@ -84,6 +84,7 @@ func (il *itemList) dequeue() interface{} {
 	}
 	unused := il.head
 	i := unused.it
+	unused.it = nil
 	il.head = il.head.next
 	if il.head == nil {
 		il.tail = nil
