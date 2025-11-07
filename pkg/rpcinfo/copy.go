@@ -16,6 +16,8 @@
 
 package rpcinfo
 
+import "github.com/cloudwego/kitex/pkg/kerrors"
+
 type plainRPCInfo struct {
 	// use anonymous structs to force objects to be read-only
 	from struct{ EndpointInfo }
@@ -82,17 +84,34 @@ func copyInvocation(i Invocation) Invocation {
 	if i == nil {
 		return nil
 	}
-	ink := i.(*invocation)
-	nink := &invocation{
-		packageName:   ink.PackageName(),
-		serviceName:   ink.ServiceName(),
-		methodName:    ink.MethodName(),
-		methodInfo:    ink.MethodInfo(),
-		streamingMode: ink.StreamingMode(),
-		seqID:         ink.SeqID(),
-		// ignore extra info to users
+	var nink *invocation
+	var bizErr kerrors.BizStatusErrorIface
+	// fast-path, calling function of struct directly
+	if ink, ok := i.(*invocation); ok {
+		nink = &invocation{
+			packageName:   ink.PackageName(),
+			serviceName:   ink.ServiceName(),
+			methodName:    ink.MethodName(),
+			methodInfo:    ink.MethodInfo(),
+			streamingMode: ink.StreamingMode(),
+			seqID:         ink.SeqID(),
+			// ignore extra info to users
+		}
+		bizErr = ink.BizStatusErr()
+	} else {
+		nink = &invocation{
+			packageName:   i.PackageName(),
+			serviceName:   i.ServiceName(),
+			methodName:    i.MethodName(),
+			methodInfo:    i.MethodInfo(),
+			streamingMode: i.StreamingMode(),
+			seqID:         i.SeqID(),
+			// ignore extra info to users
+		}
+		bizErr = i.BizStatusErr()
 	}
-	nink.SetBizStatusErr(ink.BizStatusErr())
+
+	nink.SetBizStatusErr(bizErr)
 	return nink
 }
 
