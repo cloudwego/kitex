@@ -122,6 +122,11 @@ func (s *serverStream) SendMsg(ctx context.Context, res any) error {
 // after CloseSend stream cannot be access again
 func (s *serverStream) CloseSend(exception error) error {
 	s.close(errBizHandlerReturnCancel)
+	if s.wheader != nil {
+		if err := s.sendHeader(); err != nil {
+			return err
+		}
+	}
 	return s.sendTrailer(exception)
 }
 
