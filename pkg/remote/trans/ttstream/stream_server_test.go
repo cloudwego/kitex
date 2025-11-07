@@ -26,12 +26,17 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 func newTestServerStream() *serverStream {
+	return newTestServerStreamWithStreamWriter(mockStreamWriter{})
+}
+
+func newTestServerStreamWithStreamWriter(w streamWriter) *serverStream {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx, cancelFunc := newContextWithCancelReason(ctx, cancel)
-	srvSt := newServerStream(ctx, mockStreamWriter{}, streamFrame{})
+	srvSt := newServerStream(ctx, w, streamFrame{})
 	srvSt.cancelFunc = cancelFunc
 	return srvSt
 }
@@ -88,5 +93,147 @@ func Test_serverStreamStateChange(t *testing.T) {
 			}
 		}()
 		wg.Wait()
+	})
+}
+
+func Test_serverStreamReimburseHeaderFrame(t *testing.T) {
+	t.Run("CloseSend", func(t *testing.T) {
+		var frameNum int
+		srvSt := newTestServerStreamWithStreamWriter(mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				switch f.typ {
+				case headerFrameType:
+					// first frame
+					test.Assert(t, frameNum == 0, f)
+					frameNum++
+				case trailerFrameType:
+					// second frame
+					test.Assert(t, frameNum == 1, f)
+					frameNum++
+				default:
+					t.Fatalf("should not send other frame, frame: %+v, frameNum: %d", f, frameNum)
+				}
+				return nil
+			},
+		})
+		err := srvSt.CloseSend(nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, frameNum == 2, frameNum)
+	})
+	t.Run("Send -> CloseSend", func(t *testing.T) {
+		var frameNum int
+		srvSt := newTestServerStreamWithStreamWriter(mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				switch f.typ {
+				case headerFrameType:
+					// first frame
+					test.Assert(t, frameNum == 0, f)
+					frameNum++
+				case dataFrameType:
+					// second frame
+					test.Assert(t, frameNum == 1, f)
+					frameNum++
+				case trailerFrameType:
+					// second frame
+					test.Assert(t, frameNum == 2, f)
+					frameNum++
+				default:
+					t.Fatalf("should not send other frame, frame: %+v, frameNum: %d", f, frameNum)
+				}
+				return nil
+			},
+		})
+		err := srvSt.SendMsg(context.Background(), new(testResponse))
+		test.Assert(t, err == nil, err)
+		err = srvSt.CloseSend(nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, frameNum == 3, frameNum)
+	})
+	t.Run("Send -> Send -> CloseSend", func(t *testing.T) {
+		var frameNum int
+		srvSt := newTestServerStreamWithStreamWriter(mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				switch f.typ {
+				case headerFrameType:
+					// first frame
+					test.Assert(t, frameNum == 0, f)
+					frameNum++
+				case dataFrameType:
+					// second frame
+					test.Assert(t, frameNum == 1 || frameNum == 2, f)
+					frameNum++
+				case trailerFrameType:
+					// second frame
+					test.Assert(t, frameNum == 3, f)
+					frameNum++
+				default:
+					t.Fatalf("should not send other frame, frame: %+v, frameNum: %d", f, frameNum)
+				}
+				return nil
+			},
+		})
+		err := srvSt.SendMsg(context.Background(), new(testResponse))
+		test.Assert(t, err == nil, err)
+		err = srvSt.SendMsg(context.Background(), new(testResponse))
+		test.Assert(t, err == nil, err)
+		err = srvSt.CloseSend(nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, frameNum == 4, frameNum)
+	})
+	t.Run("SendHeader -> CloseSend", func(t *testing.T) {
+		var frameNum int
+		srvSt := newTestServerStreamWithStreamWriter(mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				switch f.typ {
+				case headerFrameType:
+					// first frame
+					test.Assert(t, frameNum == 0, f)
+					frameNum++
+				case trailerFrameType:
+					// second frame
+					test.Assert(t, frameNum == 1, f)
+					frameNum++
+				default:
+					t.Fatalf("should not send other frame, frame: %+v, frameNum: %d", f, frameNum)
+				}
+				return nil
+			},
+		})
+		err := srvSt.SendHeader(streaming.Header{"testKey": "testVal"})
+		test.Assert(t, err == nil)
+		err = srvSt.CloseSend(nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, frameNum == 2, frameNum)
+	})
+	t.Run("SendHeader -> Send -> CloseSend", func(t *testing.T) {
+		var frameNum int
+		srvSt := newTestServerStreamWithStreamWriter(mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				switch f.typ {
+				case headerFrameType:
+					// first frame
+					test.Assert(t, frameNum == 0, f)
+					frameNum++
+				case dataFrameType:
+					// second frame
+					test.Assert(t, frameNum == 1, f)
+					frameNum++
+				case trailerFrameType:
+					// third frame
+					test.Assert(t, frameNum == 2, f)
+					frameNum++
+				default:
+					t.Fatalf("should not send other frame, frame: %+v, frameNum: %d", f, frameNum)
+				}
+				return nil
+			},
+		})
+		err := srvSt.SendHeader(streaming.Header{"testKey": "testVal"})
+		test.Assert(t, err == nil)
+		err = srvSt.SendMsg(context.Background(), new(testResponse))
+		test.Assert(t, err == nil, err)
+		err = srvSt.CloseSend(nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, frameNum == 3, frameNum)
 	})
 }

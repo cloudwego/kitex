@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 )
@@ -246,6 +247,9 @@ func (s *clientStream) onReadTrailerFrame(fr *Frame) error {
 			// todo: unify bizErr with Exception
 			// bizErr is independent of rpc exception handling
 			exception = bizErr
+			if setter, ok := s.rpcInfo.Invocation().(rpcinfo.InvocationSetter); ok {
+				setter.SetBizStatusErr(bizErr)
+			}
 		}
 	}
 
