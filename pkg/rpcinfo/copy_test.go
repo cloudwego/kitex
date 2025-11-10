@@ -43,13 +43,23 @@ func TestFreezeRPCInfo(t *testing.T) {
 	ctx2 := FreezeRPCInfo(ctx)
 	test.Assert(t, ctx2 != ctx)
 	ri2 := GetRPCInfo(ctx2)
-	test.Assert(t, ri2 != nil)
-	test.Assert(t, ri2 != ri)
+	checkFreezeRPCInfo(t, ri2, ri)
 
-	test.Assert(t, AsTaggable(ri2.From()) == nil)
-	test.Assert(t, AsTaggable(ri2.To()) == nil)
-	test.Assert(t, AsMutableEndpointInfo(ri2.From()) == nil)
-	test.Assert(t, AsMutableEndpointInfo(ri2.To()) == nil)
-	test.Assert(t, AsMutableRPCConfig(ri2.Config()) == nil)
-	test.Assert(t, ri2.Stats() == nil)
+	// call FreezeRPCInfo continuously should not cause a panic
+	ctx3 := FreezeRPCInfo(ctx2)
+	test.Assert(t, ctx3 != ctx2)
+	ri3 := GetRPCInfo(ctx3)
+	checkFreezeRPCInfo(t, ri3, ri2)
+}
+
+func checkFreezeRPCInfo(t *testing.T, ri, prevRI RPCInfo) {
+	test.Assert(t, ri != nil)
+	test.Assert(t, ri != prevRI)
+
+	test.Assert(t, AsTaggable(ri.From()) == nil)
+	test.Assert(t, AsTaggable(ri.To()) == nil)
+	test.Assert(t, AsMutableEndpointInfo(ri.From()) == nil)
+	test.Assert(t, AsMutableEndpointInfo(ri.To()) == nil)
+	test.Assert(t, AsMutableRPCConfig(ri.Config()) == nil)
+	test.Assert(t, ri.Stats() == nil)
 }
