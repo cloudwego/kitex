@@ -19,6 +19,8 @@ package transmeta
 import (
 	"context"
 	"fmt"
+	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"strconv"
 	"time"
 
@@ -198,6 +200,10 @@ func (sh *serverTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 	}
 	if val, ok := ri.To().Tag(rpcinfo.ConnResetTag); ok {
 		strInfo[transmeta.HeaderConnectionReadyToReset] = val
+	}
+
+	if kvs := metainfo.AllBackwardValuesToSend(ctx); len(kvs) > 0 {
+		klog.CtxInfof(ctx, "kitex server send meta at ttheader handler: %v", kvs)
 	}
 
 	return ctx, nil

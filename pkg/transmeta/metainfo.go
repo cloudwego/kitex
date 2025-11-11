@@ -18,6 +18,7 @@ package transmeta
 
 import (
 	"context"
+	"github.com/cloudwego/kitex/pkg/klog"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 
@@ -125,6 +126,7 @@ func addStreamIDToContext(ctx context.Context, md metadata.MD) context.Context {
 
 func (mi *metainfoServerHandler) WriteMeta(ctx context.Context, sendMsg remote.Message) (context.Context, error) {
 	if kvs := metainfo.AllBackwardValuesToSend(ctx); len(kvs) > 0 {
+		klog.CtxInfof(ctx, "kitex server send meta at metainfo handler: %v", kvs)
 		sendMsg.TransInfo().PutTransStrInfo(kvs)
 	}
 
