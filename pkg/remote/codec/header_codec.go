@@ -82,12 +82,14 @@ type ttHeader struct{}
 
 func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (totalLenField []byte, err error) {
 	tm := message.TransInfo()
+	strInfo := tm.TransStrInfo()
+	klog.CtxInfof(ctx, "TransInfo before ttheader encode: %v", strInfo)
 	if totalLenField, err = ttheader.Encode(ctx, ttheader.EncodeParam{
 		Flags:      getFlags(message),
 		SeqID:      message.RPCInfo().Invocation().SeqID(),
 		ProtocolID: getProtocolID(message.RPCInfo().Config().PayloadCodec()),
 		IntInfo:    tm.TransIntInfo(),
-		StrInfo:    tm.TransStrInfo(),
+		StrInfo:    strInfo,
 	}, out); err != nil {
 		return nil, perrors.NewProtocolError(err)
 	}

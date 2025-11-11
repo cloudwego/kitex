@@ -19,7 +19,6 @@ package transmeta
 import (
 	"context"
 	"fmt"
-	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"strconv"
 	"time"
@@ -182,6 +181,7 @@ func (sh *serverTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Messag
 // WriteMeta of serverTTHeaderHandler writes headers of TTHeader protocol to transport
 func (sh *serverTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Message) (context.Context, error) {
 	if !isTTHeader(msg) {
+		klog.CtxInfof(ctx, "kitex server send strInfo at ttheader handler: not ttheader")
 		return ctx, nil
 	}
 	ri := msg.RPCInfo()
@@ -202,9 +202,7 @@ func (sh *serverTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 		strInfo[transmeta.HeaderConnectionReadyToReset] = val
 	}
 
-	if kvs := metainfo.AllBackwardValuesToSend(ctx); len(kvs) > 0 {
-		klog.CtxInfof(ctx, "kitex server send meta at ttheader handler: %v", kvs)
-	}
+	klog.CtxInfof(ctx, "kitex server send strInfo at ttheader handler: %v", strInfo)
 
 	return ctx, nil
 }
