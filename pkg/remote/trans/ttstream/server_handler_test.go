@@ -35,6 +35,7 @@ import (
 	"github.com/cloudwego/kitex/internal/mocks"
 	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -125,9 +126,10 @@ func TestOnRead(t *testing.T) {
 		rawTransHdl, err := factory.NewTransHandler(&remote.ServerOption{
 			SvcSearcher: mock_remote.NewDefaultSvcSearcher(),
 			InitOrResetRPCInfoFunc: func(info rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-				return rpcinfo.NewRPCInfo(rpcinfo.NewEndpointInfo(
-					mocks.MockService2Name, mocks.Mock2Method, nil, make(map[string]string)), nil,
-					rpcinfo.NewInvocation(mocks.MockServiceName, mocks.MockStreamingMethod),
+				return rpcinfo.NewRPCInfo(
+					rpcinfo.EmptyEndpointInfo(),
+					rpcinfo.EmptyEndpointInfo(),
+					rpcinfo.NewServerInvocation(),
 					rpcinfo.NewRPCConfig(),
 					rpcinfo.NewRPCStats())
 			},
@@ -286,5 +288,51 @@ func TestOnRead(t *testing.T) {
 		}()
 		err = transHdl.OnRead(ctx, mockConn)
 		test.Assert(t, err == nil, err)
+	})
+
+	t.Run("invoking handler and getting K_METHOD successfully", func(t *testing.T) {
+		ctx, ripTag, tracer, transHdl, wconn, wbuf, mockConn := prepare()
+		tracer.finishFunc = func(ctx context.Context) {
+			ri := rpcinfo.GetRPCInfo(ctx)
+			test.Assert(t, ri != nil, ri)
+			rip, ok := ri.From().Tag(ripTag)
+			test.Assert(t, ok)
+			test.Assert(t, rip == "127.0.0.1:8888", rip)
+			// retrieve TO method from rpcinfo
+			mt := ri.To().Method()
+			test.Assert(t, mt == mocks.MockStreamingMethod, mt)
+			// retrieve K_METHOD from ctx
+			kMt := ctx.Value(consts.CtxKeyMethod).(string)
+			test.Assert(t, kMt == mocks.MockStreamingMethod, kMt)
+		}
+		var invoked int32
+		transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+			atomic.StoreInt32(&invoked, 1)
+			// retrieve K_METHOD from ctx
+			kMt := ctx.Value(consts.CtxKeyMethod).(string)
+			test.Assert(t, kMt == mocks.MockStreamingMethod, kMt)
+			return nil
+		})
+		err := EncodeFrame(context.Background(), wbuf, &Frame{
+			streamFrame: streamFrame{
+				sid:    1,
+				method: mocks.MockStreamingMethod,
+				header: map[string]string{
+					ttheader.HeaderIDLServiceName:  mocks.MockServiceName,
+					ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
+				},
+			},
+			typ: headerFrameType,
+		})
+		test.Assert(t, err == nil, err)
+		err = wbuf.Flush()
+		test.Assert(t, err == nil, err)
+		go func() {
+			time.Sleep(1 * time.Second)
+			wconn.Close()
+		}()
+		err = transHdl.OnRead(ctx, mockConn)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, atomic.LoadInt32(&invoked) == 1)
 	})
 }
