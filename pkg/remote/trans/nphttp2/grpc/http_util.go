@@ -247,6 +247,7 @@ func (d *decodeState) bizStatusErr() kerrors.BizStatusErrorIface {
 		d.data.bizStatusErr = kerrors.NewGRPCBizStatusErrorWithExtra(
 			safeCastInt32(*(d.data.bizStatusCode)), d.data.rawStatusMsg, d.data.bizStatusExtra)
 		if st, ok := d.data.bizStatusErr.(kerrors.GRPCStatusIface); ok {
+			d.status().SetFromRemoteBusiness(true)
 			st.SetGRPCStatus(d.status())
 		}
 	}

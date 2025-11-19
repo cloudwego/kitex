@@ -38,8 +38,8 @@ func TestErrors(t *testing.T) {
 	test.Assert(t, errors.Is(newErr, kerrors.ErrStreamingProtocol), newErr)
 	test.Assert(t, strings.Contains(newErr.Error(), causeErr.Error()))
 
-	appErr := errApplicationException.newBuilder().withCause(causeErr)
-	test.Assert(t, errors.Is(appErr, errApplicationException), appErr)
+	appErr := ErrApplicationException.newBuilder().withCause(causeErr)
+	test.Assert(t, errors.Is(appErr, ErrApplicationException), appErr)
 	test.Assert(t, !errors.Is(appErr, kerrors.ErrStreamingProtocol), appErr)
 	test.Assert(t, strings.Contains(appErr.Error(), causeErr.Error()))
 
@@ -59,7 +59,7 @@ func TestCommonParentKerror(t *testing.T) {
 	for _, err := range errs {
 		test.Assert(t, errors.Is(err, kerrors.ErrStreamingProtocol), err)
 	}
-	test.Assert(t, !errors.Is(errApplicationException, kerrors.ErrStreamingProtocol))
+	test.Assert(t, !errors.Is(ErrApplicationException, kerrors.ErrStreamingProtocol))
 
 	// canceled Exception
 	errs = []error{
@@ -84,14 +84,14 @@ func TestGetTypeId(t *testing.T) {
 		err          error
 		expectTypeId int32
 	}{
-		{err: errApplicationException, expectTypeId: 12001},
+		{err: ErrApplicationException, expectTypeId: 12001},
 		{err: errUnexpectedHeader, expectTypeId: 12002},
 		{err: errIllegalBizErr, expectTypeId: 12003},
 		{err: errIllegalFrame, expectTypeId: 12004},
 		{err: errIllegalOperation, expectTypeId: 12005},
 		{err: errTransport, expectTypeId: 12006},
-		{err: errApplicationException.newBuilder().withCauseAndTypeId(exception, 1000), expectTypeId: 1000},
-		{err: errApplicationException.newBuilder().withCause(normalErr), expectTypeId: 12001},
+		{err: ErrApplicationException.newBuilder().withCauseAndTypeId(exception, 1000), expectTypeId: 1000},
+		{err: ErrApplicationException.newBuilder().withCause(normalErr), expectTypeId: 12001},
 	}
 
 	for _, testcase := range testcases {

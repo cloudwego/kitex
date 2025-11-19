@@ -2,8 +2,6 @@ module github.com/cloudwego/kitex
 
 go 1.20
 
-replace github.com/cloudwego/gopkg => github.com/DMwangnima/gopkg v0.1.2-0.20251126081112-5f381e4b62fa
-
 require (
 	github.com/bytedance/gopkg v0.1.3
 	github.com/bytedance/sonic v1.14.1
@@ -11,7 +9,7 @@ require (
 	github.com/cloudwego/dynamicgo v0.7.0
 	github.com/cloudwego/fastpb v0.0.5
 	github.com/cloudwego/frugal v0.3.0
-	github.com/cloudwego/gopkg v0.1.6
+	github.com/cloudwego/gopkg v0.1.8-0.20251126081112-5f381e4b62fa
 	github.com/cloudwego/localsession v0.1.2
 	github.com/cloudwego/netpoll v0.7.2
 	github.com/cloudwego/prutal v0.1.3

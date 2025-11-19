@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/endpoint/cep"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
@@ -262,9 +264,6 @@ func newStream(ctx context.Context, cancel context.CancelFunc, s streaming.Clien
 			st.grpcStream.st = st
 		}
 	}
-	if register, ok := s.(streaming.CloseCallbackRegister); ok {
-		register.RegisterCloseCallback(st.DoFinish)
-	}
 	return st
 }
 
@@ -363,18 +362,44 @@ func (s *stream) DoFinish(err error) {
 		// already called
 		return
 	}
+
 	// release stream timeout cancel
 	if s.cancelFunc != nil {
 		s.cancelFunc()
 	}
-	if !isRPCError(err) {
-		// only rpc errors are reported
-		err = nil
+
+	// reporting and release connection
+	reportErr := err
+	if err == nil || err == io.EOF {
+		reportErr = nil
+	}
+	// If the client-side callback returns a biz error or manually calls streaming.FinishStream/streaming.FinishClientStream with a biz error,
+	// it needs to be set.
+	if bizErr, bizOk := err.(kerrors.BizStatusErrorIface); bizOk {
+		if setter, ok := s.ri.Invocation().(rpcinfo.InvocationSetter); ok {
+			setter.SetBizStatusErr(bizErr)
+		}
 	}
 	if s.scm != nil {
-		s.scm.ReleaseConn(err, s.ri)
+		s.scm.ReleaseConn(reportErr, s.ri)
 	}
-	s.kc.opt.TracerCtl.DoFinish(s.ctx, s.ri, err)
+	s.kc.opt.TracerCtl.DoFinish(s.ctx, s.ri, reportErr)
+
+	// processing callback with original err
+	stCfg := s.ri.Config().StreamCallbackConfig()
+	if err == nil || err == io.EOF || stCfg == nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			klog.CtxWarnf(s.ctx, "Panic happened during stream DoFinish. This may caused by injected stream Callback: error=%v, stack=%s", r, string(debug.Stack()))
+		}
+	}()
+	if s.isGRPC {
+		handleGRPC(s.ctx, s.ri, err, stCfg)
+	} else {
+		handleTTStream(s.ctx, s.ri, err, stCfg)
+	}
 }
 
 func (s *stream) GetGRPCStream() streaming.Stream {
@@ -476,18 +501,6 @@ func (s *grpcStream) sendWithTimeout(m interface{}) error {
 
 func (s *grpcStream) DoFinish(err error) {
 	s.st.DoFinish(err)
-}
-
-func isRPCError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if err == io.EOF {
-		return false
-	}
-	_, isBizStatusError := err.(kerrors.BizStatusErrorIface)
-	// if a tracer needs to get the BizStatusError, it should read from rpcinfo.invocation.bizStatusErr
-	return !isBizStatusError
 }
 
 func callWithTimeout(tm time.Duration, call func() error, buildTmErr func(time.Duration) error, cancel func(error)) error {

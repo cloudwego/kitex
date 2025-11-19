@@ -182,7 +182,7 @@ type GRPCBizStatusError struct {
 
 func (e *GRPCBizStatusError) GRPCStatus() *status.Status {
 	if e.status == nil {
-		e.status = status.New(codes.Internal, e.msg)
+		e.status = status.NewRemoteBusinessStatus(codes.Internal, e.msg)
 	}
 	return e.status
 }

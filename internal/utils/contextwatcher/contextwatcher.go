@@ -185,6 +185,7 @@ func (w *contextWatcherReflect) fallbackRegister(ctx context.Context, callback f
 	finCh := make(chan struct{})
 	_, loaded := w.fallbackCtxs.LoadOrStore(ctx, finCh)
 	if loaded {
+		close(finCh)
 		return
 	}
 

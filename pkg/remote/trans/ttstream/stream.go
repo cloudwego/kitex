@@ -31,9 +31,8 @@ import (
 )
 
 var (
-	_ streaming.ClientStream          = (*clientStream)(nil)
-	_ streaming.ServerStream          = (*serverStream)(nil)
-	_ streaming.CloseCallbackRegister = (*stream)(nil)
+	_ streaming.ClientStream = (*clientStream)(nil)
+	_ streaming.ServerStream = (*serverStream)(nil)
 )
 
 var defaultRstException = thrift.NewApplicationException(13, "rst")
@@ -83,8 +82,6 @@ type stream struct {
 	writer   streamWriter
 	wheader  streaming.Header  // wheader == nil means it already be sent
 	wtrailer streaming.Trailer // wtrailer == nil means it already be sent
-
-	closeCallback []func(error)
 }
 
 func (s *stream) Service() string {
@@ -142,16 +139,7 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 	return err
 }
 
-func (s *stream) RegisterCloseCallback(cb func(error)) {
-	s.closeCallback = append(s.closeCallback, cb)
-}
-
-func (s *stream) runCloseCallback(exception error) {
-	if len(s.closeCallback) > 0 {
-		for _, cb := range s.closeCallback {
-			cb(exception)
-		}
-	}
+func (s *stream) runCloseCallback() {
 	contextwatcher.DeregisterContext(s.ctx)
 	_ = s.writer.CloseStream(s.sid)
 }
