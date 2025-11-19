@@ -146,7 +146,7 @@ func (s *serverStream) close(exception *Exception) error {
 	}
 
 	s.reader.close(exception)
-	s.runCloseCallback(exception)
+	s.runCloseCallback()
 
 	return nil
 }
@@ -159,7 +159,7 @@ func (s *serverStream) onReadTrailerFrame(fr *Frame) (err error) {
 	if len(fr.payload) > 0 {
 		// exception is type of (*thrift.ApplicationException)
 		_, _, err = thrift.UnmarshalFastMsg(fr.payload, nil)
-		exception = errApplicationException.newBuilder().withSide(serverSide).withCause(err)
+		exception = ErrApplicationException.newBuilder().withSide(serverSide).withCause(err)
 	} else if len(fr.trailer) > 0 {
 		// when server-side returns biz error, payload is empty and biz error information is stored in trailer frame header
 		bizErr, err := transmeta.ParseBizStatusErr(fr.trailer)
@@ -228,7 +228,7 @@ func (s *serverStream) closeTest(exception error, cancelPath string) error {
 	if err := s.sendRst(exception, cancelPath); err != nil {
 		return err
 	}
-	s.runCloseCallback(exception)
+	s.runCloseCallback()
 	return nil
 }
 

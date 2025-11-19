@@ -148,6 +148,14 @@ func (s *serverStreamingClientImpl[Res]) Recv(ctx context.Context) (*Res, error)
 	return m, s.ClientStream.RecvMsg(ctx, m)
 }
 
+// todo: add test
+func (s *serverStreamingClientImpl[Res]) DoFinish(err error) {
+	if st, ok := s.ClientStream.(WithDoFinish); ok {
+		st.DoFinish(err)
+		return
+	}
+}
+
 // ServerStreamingServer define server side server streaming APIs
 type ServerStreamingServer[Res any] interface {
 	Send(ctx context.Context, res *Res) error
@@ -193,6 +201,13 @@ func (s *clientStreamingClientImpl[Req, Res]) CloseAndRecv(ctx context.Context) 
 	}
 	m := new(Res)
 	return m, s.ClientStream.RecvMsg(ctx, m)
+}
+
+func (s *clientStreamingClientImpl[Req, Res]) DoFinish(err error) {
+	if st, ok := s.ClientStream.(WithDoFinish); ok {
+		st.DoFinish(err)
+		return
+	}
 }
 
 // ClientStreamingServer define server side client streaming APIs
@@ -243,6 +258,13 @@ func (s *bidiStreamingClientImpl[Req, Res]) Send(ctx context.Context, req *Req) 
 func (s *bidiStreamingClientImpl[Req, Res]) Recv(ctx context.Context) (*Res, error) {
 	m := new(Res)
 	return m, s.ClientStream.RecvMsg(ctx, m)
+}
+
+func (s *bidiStreamingClientImpl[Req, Res]) DoFinish(err error) {
+	if st, ok := s.ClientStream.(WithDoFinish); ok {
+		st.DoFinish(err)
+		return
+	}
 }
 
 // BidiStreamingServer define server side bidi streaming APIs

@@ -33,6 +33,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
@@ -49,8 +50,10 @@ type Iface interface {
 // Status represents an RPC status code, message, and details.  It is immutable
 // and should be created with New, Newf, or FromProto.
 type Status struct {
-	s           *spb.Status
-	timeoutType streaming_types.TimeoutType
+	s                  *spb.Status
+	timeoutType        streaming_types.TimeoutType
+	cancelType         streaming_types.CancelType
+	fromRemoteBusiness bool
 }
 
 // New returns a Status representing c and msg.
@@ -63,14 +66,27 @@ func Newf(c codes.Code, format string, a ...interface{}) *Status {
 	return New(c, fmt.Sprintf(format, a...))
 }
 
-// NewTimeoutStatus returns ad Status with specific TimeoutType.
+// NewTimeoutStatus returns a Status with specific TimeoutType.
 func NewTimeoutStatus(c codes.Code, msg string, timeoutType streaming_types.TimeoutType) *Status {
 	return &Status{
-		s: &spb.Status{
-			Code:    int32(c),
-			Message: msg,
-		},
+		s:           &spb.Status{Code: int32(c), Message: msg},
 		timeoutType: timeoutType,
+	}
+}
+
+// NewCancelStatus returns a Status with specific CancelType.
+func NewCancelStatus(c codes.Code, msg string, cancelType streaming_types.CancelType) *Status {
+	return &Status{
+		s:          &spb.Status{Code: int32(c), Message: msg},
+		cancelType: cancelType,
+	}
+}
+
+// NewRemoteBusinessStatus returns a Status from remote business
+func NewRemoteBusinessStatus(c codes.Code, msg string) *Status {
+	return &Status{
+		s:                  &spb.Status{Code: int32(c), Message: msg},
+		fromRemoteBusiness: true,
 	}
 }
 
@@ -118,6 +134,34 @@ func (s *Status) TimeoutType() streaming_types.TimeoutType {
 	return s.timeoutType
 }
 
+// CancelType returns the specific CancelType related to Status.
+func (s *Status) CancelType() streaming_types.CancelType {
+	if s == nil || s.s == nil {
+		return 0
+	}
+	return s.cancelType
+}
+
+// IsFromRemoteBusiness returns whether this Status is from remote business handler/mw
+func (s *Status) IsFromRemoteBusiness() bool {
+	if s == nil || s.s == nil {
+		return false
+	}
+	if s.fromRemoteBusiness {
+		return true
+	}
+	// could not refer to kerrors.ErrBiz because of circular dependency
+	return strings.HasSuffix(s.s.Message, "[biz error]")
+}
+
+// SetFromRemoteBusiness set whether Status is from remote business handler/mw
+func (s *Status) SetFromRemoteBusiness(flag bool) {
+	if s == nil || s.s == nil {
+		return
+	}
+	s.fromRemoteBusiness = flag
+}
+
 // AppendMessage append extra msg for Status
 func (s *Status) AppendMessage(extraMsg string) *Status {
 	if s == nil || s.s == nil || extraMsg == "" {
@@ -141,8 +185,10 @@ func (s *Status) Err() error {
 		return nil
 	}
 	return &Error{
-		e:           s.Proto(),
-		timeoutType: s.timeoutType,
+		e:                  s.Proto(),
+		cancelType:         s.cancelType,
+		timeoutType:        s.timeoutType,
+		fromRemoteBusiness: s.fromRemoteBusiness,
 	}
 }
 
@@ -161,7 +207,12 @@ func (s *Status) WithDetails(details ...proto.Message) (*Status, error) {
 		}
 		p.Details = append(p.Details, any)
 	}
-	return &Status{s: p}, nil
+	return &Status{
+		s:                  p,
+		timeoutType:        s.timeoutType,
+		cancelType:         s.cancelType,
+		fromRemoteBusiness: s.fromRemoteBusiness,
+	}, nil
 }
 
 // Details returns a slice of details messages attached to the status.
@@ -185,8 +236,10 @@ func (s *Status) Details() []interface{} {
 // Error wraps a pointer of a status proto. It implements error and Status,
 // and a nil *Error should never be returned by this package.
 type Error struct {
-	e           *spb.Status
-	timeoutType streaming_types.TimeoutType
+	e                  *spb.Status
+	timeoutType        streaming_types.TimeoutType
+	cancelType         streaming_types.CancelType
+	fromRemoteBusiness bool
 }
 
 func (e *Error) Error() string {
@@ -197,6 +250,8 @@ func (e *Error) Error() string {
 func (e *Error) GRPCStatus() *Status {
 	st := FromProto(e.e)
 	st.timeoutType = e.timeoutType
+	st.cancelType = e.cancelType
+	st.fromRemoteBusiness = e.fromRemoteBusiness
 	return st
 }
 

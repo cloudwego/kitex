@@ -41,6 +41,7 @@ func RegisterContext(ctx context.Context, callback func(context.Context)) {
 	finCh := make(chan struct{})
 	_, loaded := global.ctxs.LoadOrStore(ctx, finCh)
 	if loaded {
+		close(finCh)
 		return
 	}
 

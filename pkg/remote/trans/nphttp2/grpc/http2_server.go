@@ -36,6 +36,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
+	streaming_types "github.com/cloudwego/kitex/pkg/streaming/types"
 
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
@@ -66,17 +67,18 @@ var (
 	// ErrHeaderListSizeLimitViolation indicates that the header list size is larger
 	// than the limit set by peer.
 	ErrHeaderListSizeLimitViolation       = errors.New("transport: trying to send header list size larger than the limit set by peer")
-	errStatusHeaderListSizeLimitViolation = status.Err(codes.Internal, ErrHeaderListSizeLimitViolation.Error()+triggeredByHandlerSideSuffix)
+	errStatusHeaderListSizeLimitViolation = status.NewCancelStatus(codes.Internal, ErrHeaderListSizeLimitViolation.Error()+triggeredByHandlerSideSuffix, streaming_types.LocalCascadedCancel).Err()
 
 	// errors used for cancelling stream.
 	// the code should be codes.Canceled coz it's NOT returned from remote
-	errConnectionEOF      = status.Err(codes.Canceled, "transport: connection EOF"+triggeredByRemoteServiceSuffix)
+	errConnectionEOF      = status.NewCancelStatus(codes.Canceled, "transport: connection EOF"+triggeredByRemoteServiceSuffix, streaming_types.RemoteCascadedCancel).Err()
 	errMaxStreamsExceeded = status.Err(codes.Canceled, "transport: max streams exceeded"+triggeredByRemoteServiceSuffix)
 	errNotReachable       = status.Err(codes.Canceled, "transport: server not reachable"+triggeredByRemoteServiceSuffix)
-	errMaxAgeClosing      = status.Err(codes.Canceled, "transport: closing server transport due to maximum connection age"+triggeredByRemoteServiceSuffix)
-	errIdleClosing        = status.Err(codes.Canceled, "transport: closing server transport due to idleness"+triggeredByRemoteServiceSuffix)
+	errMaxAgeClosing      = status.NewCancelStatus(codes.Canceled, "transport: closing server transport due to maximum connection age"+triggeredByRemoteServiceSuffix, streaming_types.LocalCascadedCancel).Err()
+	// todo: change to status.NewCancelStatus
+	errIdleClosing = status.Err(codes.Canceled, "transport: closing server transport due to idleness"+triggeredByRemoteServiceSuffix)
 
-	errGracefulShutdown = status.Err(codes.Unavailable, gracefulShutdownMsg)
+	errGracefulShutdown = status.NewCancelStatus(codes.Unavailable, gracefulShutdownMsg, streaming_types.RemoteCascadedCancel).Err()
 )
 
 func init() {
@@ -427,7 +429,8 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				t.mu.Unlock()
 				if s != nil {
 					klog.CtxInfof(s.ctx, "KITEX: http2Server.HandleStreams encountered http2.StreamError, err=%v, rstCode: %d"+sendRSTStreamFrameSuffix, err, se.Code)
-					t.closeStream(s, status.Errorf(codes.Canceled, "transport: ReadFrame encountered http2.StreamError: %v [triggered by %s]", err, s.sourceService), true, se.Code, false)
+					t.closeStream(s, status.NewCancelStatus(codes.Canceled, fmt.Sprintf("transport: ReadFrame encountered http2.StreamError: %v [triggered by %s]", err, s.sourceService), streaming_types.RemoteCascadedCancel).Err(),
+						true, se.Code, false)
 				} else {
 					klog.CtxInfof(t.ctx, "KITEX: http2Server.HandleStreams failed to ReadFrame, err=%v, rstCode: %d"+sendRSTStreamFrameSuffix, err, se.Code)
 					t.controlBuf.put(&cleanupStream{
@@ -444,13 +447,14 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				return
 			}
 			klog.CtxWarnf(t.ctx, "transport: http2Server.HandleStreams failed to read frame: %v", err)
-			t.closeWithErr(status.Errorf(codes.Canceled, "transport: ReadFrame encountered err: %v"+triggeredByRemoteServiceSuffix, err))
+			t.closeWithErr(status.NewCancelStatus(codes.Canceled, fmt.Sprintf("transport: ReadFrame encountered err: %v"+triggeredByRemoteServiceSuffix, err), streaming_types.RemoteCascadedCancel).Err())
 			return
 		}
 		switch frame := frame.(type) {
 		case *grpcframe.MetaHeadersFrame:
 			if err := t.operateHeaders(frame, handle, traceCtx); err != nil {
 				klog.CtxErrorf(t.ctx, "transport: http2Server.HandleStreams fatal err: %v", err)
+				// todo: change to status.NewCancelStatus
 				t.closeWithErr(err)
 				break
 			}
@@ -572,7 +576,8 @@ func (t *http2Server) handleData(f *grpcframe.DataFrame) {
 	if size > 0 {
 		if err := s.fc.onData(size); err != nil {
 			klog.CtxInfof(s.ctx, "KITEX: http2Server.handleData inflow control err: %v, rstCode: %d"+sendRSTStreamFrameSuffix, err, http2.ErrCodeFlowControl)
-			t.closeStream(s, status.Errorf(codes.Canceled, "transport: inflow control err: %v [triggered by %s]", err, s.sourceService), true, http2.ErrCodeFlowControl, false)
+			t.closeStream(s, status.NewCancelStatus(codes.Canceled, fmt.Sprintf("transport: inflow control err: %v [triggered by %s]", err, s.sourceService), streaming_types.RemoteCascadedCancel).Err(),
+				true, http2.ErrCodeFlowControl, false)
 			return
 		}
 		if f.Header().Flags.Has(http2.FlagDataPadded) {
@@ -603,7 +608,8 @@ func (t *http2Server) handleRSTStream(f *http2.RSTStreamFrame) {
 		if f.ErrCode == gracefulShutdownCode {
 			t.closeStream(s, errGracefulShutdown, false, 0, false)
 		} else {
-			t.closeStream(s, status.Errorf(codes.Canceled, "transport: RSTStream Frame received with error code: %v [triggered by %s]", f.ErrCode, s.sourceService), false, 0, false)
+			t.closeStream(s, status.NewCancelStatus(codes.Canceled, fmt.Sprintf("transport: RSTStream Frame received with error code: %v [triggered by %s]", f.ErrCode, s.sourceService), streaming_types.RemoteCascadedCancel).Err(),
+				false, 0, false)
 		}
 		return
 	}
@@ -1093,7 +1099,7 @@ func (t *http2Server) finishStream(s *Stream, rst bool, rstCode http2.ErrCode, h
 		// If the stream was already done, return.
 		return
 	}
-	s.cancel(nil)
+	s.cancel(status.NewCancelStatus(codes.Canceled, "handler return", streaming_types.LocalCascadedCancel).Err())
 
 	hdr.cleanup = &cleanupStream{
 		streamID: s.id,

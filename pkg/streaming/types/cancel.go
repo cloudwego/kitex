@@ -16,29 +16,38 @@
 
 package types
 
-import "time"
-
-// TimeoutType identifies specific timeout types including Stream, Recv and Send Timeout.
-// TTHeader Streaming and gRPC Streaming both support these timeout types.
-type TimeoutType uint8
+type CancelType uint8
 
 const (
-	StreamTimeout TimeoutType = iota + 1
-	StreamRecvTimeout
-	StreamSendTimeout
+	LocalCascadedCancel CancelType = iota + 1
+	RemoteCascadedCancel
+	ActiveCancel
 )
 
-type TimeoutError interface {
+type WireError interface {
 	Error() string
 	StatusCode() int32
-	TimeoutType() TimeoutType
-	Timeout() time.Duration
 }
 
-// IsStreamingTimeout judges whether tmType is pre-defined Streaming TimeoutType
-func IsStreamingTimeout(tmType TimeoutType) bool {
-	if tmType < StreamTimeout || tmType > StreamSendTimeout {
-		return false
-	}
-	return true
+type CancelError interface {
+	Error() string
+	StatusCode() int32
+	Type() CancelType
+}
+
+type CancelPoint struct {
+	Name string
+}
+
+type RemoteCascadedCancelError interface {
+	CancelError
+	CancelPath() []CancelPoint
+}
+
+type LocalCascadedCancelError interface {
+	CancelError
+}
+
+type ActiveCancelError interface {
+	CancelError
 }
