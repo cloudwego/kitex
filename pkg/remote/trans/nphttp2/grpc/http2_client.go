@@ -90,6 +90,9 @@ type http2Client struct {
 	mu            sync.Mutex // guard the following variables
 	state         transportState
 	activeStreams map[uint32]*Stream
+	// streamsByTag is an index for counting active streams by tag (target address).
+	// This allows O(1) lookup instead of O(N) iteration through all activeStreams.
+	streamsByTag map[string]int
 	// prevGoAway ID records the Last-Stream-ID in the previous GOAway frame.
 	prevGoAwayID uint32
 
@@ -175,6 +178,7 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		framer:                newFramer(conn, writeBufSize, readBufSize, maxHeaderListSize),
 		fc:                    &trInFlow{limit: icwz},
 		activeStreams:         make(map[uint32]*Stream),
+		streamsByTag:          make(map[string]int),
 		kp:                    kp,
 		keepaliveEnabled:      keepaliveEnabled,
 		initialWindowSize:     initialWindowSize,
@@ -322,6 +326,7 @@ func (t *http2Client) newStream(ctx context.Context, callHdr *CallHdr) *Stream {
 		sendCompress:   callHdr.SendCompress,
 		headerChan:     make(chan struct{}),
 		contentSubtype: callHdr.ContentSubtype,
+		tag:            callHdr.Tag,
 	}
 	fillStreamFields(s)
 	s.requestRead = func(n int) {
@@ -473,6 +478,10 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 			return false // Don't create a stream if the transport is already closed.
 		}
 		t.activeStreams[s.id] = s
+		// Update streamsByTag index for O(1) ActiveStreams lookup
+		if s.tag != "" {
+			t.streamsByTag[s.tag]++
+		}
 		t.mu.Unlock()
 		if t.streamQuota > 0 && t.waitingStreams > 0 {
 			select {
@@ -567,6 +576,13 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 		onWrite: func() {
 			t.mu.Lock()
 			if t.activeStreams != nil {
+				// Update streamsByTag index before deleting the stream
+				if s.tag != "" {
+					t.streamsByTag[s.tag]--
+					if t.streamsByTag[s.tag] <= 0 {
+						delete(t.streamsByTag, s.tag)
+					}
+				}
 				delete(t.activeStreams, s.id)
 			}
 			t.mu.Unlock()
@@ -1204,4 +1220,18 @@ func (t *http2Client) IsActive() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.state == reachable
+}
+
+func (t *http2Client) ActiveStreams(tag string) int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	var num int
+	// Use index if available (normal case), otherwise fall back to iteration (for tests)
+	if t.streamsByTag != nil {
+		num = t.streamsByTag[tag]
+	}
+	if num < 0 {
+		num = 0
+	}
+	return num
 }

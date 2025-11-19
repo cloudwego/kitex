@@ -36,6 +36,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/cloudwego/kitex/transport"
 )
 
 const maxRetry = 6
@@ -83,7 +84,7 @@ func discoveryEventHandler(name string, bus event.Bus, queue event.Queue) func(d
 // newResolveMWBuilder creates a middleware for service discovery.
 // This middleware selects an appropriate instance based on the resolver and loadbalancer given.
 // If retryable error is encountered, it will retry until timeout or an unretryable error is returned.
-func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilder {
+func newResolveMWBuilder(lbf *lbcache.BalancerFactory, cs remote.ConnStatistics) endpoint.MiddlewareBuilder {
 	return func(ctx context.Context) endpoint.Middleware {
 		return func(next endpoint.Endpoint) endpoint.Endpoint {
 			return func(ctx context.Context, request, response interface{}) error {
@@ -94,12 +95,12 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 					return kerrors.ErrNoDestService
 				}
 
-				remote := remoteinfo.AsRemoteInfo(dest)
-				if remote == nil {
+				ri := remoteinfo.AsRemoteInfo(dest)
+				if ri == nil {
 					err := fmt.Errorf("unsupported target EndpointInfo type: %T", dest)
 					return kerrors.ErrInternalException.WithCause(err)
 				}
-				if remote.GetInstance() != nil {
+				if ri.GetInstance() != nil {
 					return next(ctx, request, response)
 				}
 				lb, err := lbf.Get(ctx, dest)
@@ -118,11 +119,16 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 					// we always need to get a new picker every time, because when downstream update deployment,
 					// we may get an old picker that include all outdated instances which will cause connect always failed.
 					picker := lb.GetPicker()
+					cfg := rpcInfo.Config()
+					// gRPC streaming
+					if cs != nil && cfg.InteractionMode() == rpcinfo.Streaming && (cfg.TransportProtocol()&transport.GRPC != 0) {
+						ctx = remote.NewCtxWithConnStatistics(ctx, cs)
+					}
 					ins := picker.Next(ctx, request)
 					if ins == nil {
 						err = kerrors.ErrNoMoreInstance.WithCause(fmt.Errorf("last error: %w", lastErr))
 					} else {
-						remote.SetInstance(ins)
+						ri.SetInstance(ins)
 						// TODO: generalize retry strategy
 						err = next(ctx, request, response)
 					}

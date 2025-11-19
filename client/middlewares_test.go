@@ -35,10 +35,12 @@ import (
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/proxy"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/cloudwego/kitex/transport"
 )
 
 var (
@@ -84,7 +86,7 @@ func TestResolverMW(t *testing.T) {
 
 	var invoked bool
 	cli := newMockClient(t, ctrl).(*kcFinalizerClient)
-	mw := newResolveMWBuilder(cli.lbf)(ctx)
+	mw := newResolveMWBuilder(cli.lbf, nil)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error {
 		invoked = true
 		return nil
@@ -114,14 +116,14 @@ func TestResolverMWOutOfInstance(t *testing.T) {
 	}
 	var invoked bool
 	cli := newMockClient(t, ctrl, WithResolver(resolver)).(*kcFinalizerClient)
-	mw := newResolveMWBuilder(cli.lbf)(ctx)
+	mw := newResolveMWBuilder(cli.lbf, nil)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error {
 		invoked = true
 		return nil
 	}
 
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
-	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	req := new(MockTStruct)
@@ -222,7 +224,7 @@ func BenchmarkResolverMW(b *testing.B) {
 	defer ctrl.Finish()
 
 	cli := newMockClient(b, ctrl).(*kcFinalizerClient)
-	mw := newResolveMWBuilder(cli.lbf)(ctx)
+	mw := newResolveMWBuilder(cli.lbf, nil)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error { return nil }
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
 
@@ -241,7 +243,7 @@ func BenchmarkResolverMWParallel(b *testing.B) {
 	defer ctrl.Finish()
 
 	cli := newMockClient(b, ctrl).(*kcFinalizerClient)
-	mw := newResolveMWBuilder(cli.lbf)(ctx)
+	mw := newResolveMWBuilder(cli.lbf, nil)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error { return nil }
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
 
@@ -278,4 +280,171 @@ func TestDiscoveryEventHandler(t *testing.T) {
 	test.Assert(t, extra["CacheKey"] == cacheKey)
 	added := extra["Added"].([]*instInfo)
 	test.Assert(t, len(added) == 1)
+}
+
+// mockConnStatistics implements remote.ConnStatistics for testing
+type mockConnStatistics struct {
+	activeStreams map[string]int
+}
+
+func (m *mockConnStatistics) ActiveStreams(addr string) int {
+	if m.activeStreams == nil {
+		return 0
+	}
+	return m.activeStreams[addr]
+}
+
+// TestResolverMW_WithConnStatistics_StreamingMode tests that ConnStatistics is passed to context
+// when in gRPC streaming mode
+func TestResolverMW_WithConnStatistics_StreamingMode(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockStats := &mockConnStatistics{
+		activeStreams: map[string]int{
+			"localhost:404": 5,
+		},
+	}
+
+	var contextPassedToEndpoint context.Context
+	cli := newMockClient(t, ctrl).(*kcFinalizerClient)
+	mw := newResolveMWBuilder(cli.lbf, mockStats)(ctx)
+	ep := func(ctx context.Context, request, response interface{}) error {
+		contextPassedToEndpoint = ctx
+		return nil
+	}
+
+	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
+
+	// Create RPC config with streaming mode and gRPC protocol
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetInteractionMode(rpcinfo.Streaming)
+	rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
+
+	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), cfg, rpcinfo.NewRPCStats())
+
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	req := new(MockTStruct)
+	res := new(MockTStruct)
+	err := mw(ep)(ctx, req, res)
+	test.Assert(t, err == nil)
+	test.Assert(t, to.GetInstance() == instance404[0])
+
+	// Verify ConnStatistics was passed to context
+	cs := remote.GetConnStatistics(contextPassedToEndpoint)
+	test.Assert(t, cs != nil, "ConnStatistics should be in context for streaming mode")
+	test.Assert(t, cs.ActiveStreams("localhost:404") == 5)
+}
+
+// TestResolverMW_WithConnStatistics_NonStreamingMode tests that ConnStatistics is NOT passed
+// to context when not in streaming mode
+func TestResolverMW_WithConnStatistics_NonStreamingMode(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockStats := &mockConnStatistics{
+		activeStreams: map[string]int{
+			"localhost:404": 5,
+		},
+	}
+
+	var contextPassedToEndpoint context.Context
+	cli := newMockClient(t, ctrl).(*kcFinalizerClient)
+	mw := newResolveMWBuilder(cli.lbf, mockStats)(ctx)
+	ep := func(ctx context.Context, request, response interface{}) error {
+		contextPassedToEndpoint = ctx
+		return nil
+	}
+
+	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
+
+	// Create RPC config with PingPong mode (not streaming)
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetInteractionMode(rpcinfo.PingPong)
+	rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
+
+	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), cfg, rpcinfo.NewRPCStats())
+
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	req := new(MockTStruct)
+	res := new(MockTStruct)
+	err := mw(ep)(ctx, req, res)
+	test.Assert(t, err == nil)
+
+	// Verify ConnStatistics was NOT passed to context for non-streaming mode
+	cs := remote.GetConnStatistics(contextPassedToEndpoint)
+	test.Assert(t, cs == nil, "ConnStatistics should not be in context for non-streaming mode")
+}
+
+// TestResolverMW_WithConnStatistics_NonGRPC tests that ConnStatistics is NOT passed
+// for non-gRPC protocols
+func TestResolverMW_WithConnStatistics_NonGRPC(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockStats := &mockConnStatistics{
+		activeStreams: map[string]int{
+			"localhost:404": 5,
+		},
+	}
+
+	var contextPassedToEndpoint context.Context
+	cli := newMockClient(t, ctrl).(*kcFinalizerClient)
+	mw := newResolveMWBuilder(cli.lbf, mockStats)(ctx)
+	ep := func(ctx context.Context, request, response interface{}) error {
+		contextPassedToEndpoint = ctx
+		return nil
+	}
+
+	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
+
+	// Create RPC config with streaming mode but non-gRPC protocol
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetInteractionMode(rpcinfo.Streaming)
+	rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader) // Not GRPC
+
+	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), cfg, rpcinfo.NewRPCStats())
+
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	req := new(MockTStruct)
+	res := new(MockTStruct)
+	err := mw(ep)(ctx, req, res)
+	test.Assert(t, err == nil)
+
+	// Verify ConnStatistics was NOT passed for non-gRPC protocol
+	cs := remote.GetConnStatistics(contextPassedToEndpoint)
+	test.Assert(t, cs == nil, "ConnStatistics should not be in context for non-gRPC protocol")
+}
+
+// TestResolverMW_WithoutConnStatistics tests behavior when ConnStatistics is nil
+func TestResolverMW_WithoutConnStatistics(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var contextPassedToEndpoint context.Context
+	cli := newMockClient(t, ctrl).(*kcFinalizerClient)
+	mw := newResolveMWBuilder(cli.lbf, nil)(ctx)
+	ep := func(ctx context.Context, request, response interface{}) error {
+		contextPassedToEndpoint = ctx
+		return nil
+	}
+
+	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
+
+	// Create RPC config with streaming mode and gRPC protocol
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetInteractionMode(rpcinfo.Streaming)
+	rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
+
+	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), cfg, rpcinfo.NewRPCStats())
+
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	req := new(MockTStruct)
+	res := new(MockTStruct)
+	err := mw(ep)(ctx, req, res)
+	test.Assert(t, err == nil)
+
+	// Verify ConnStatistics is nil when not provided
+	cs := remote.GetConnStatistics(contextPassedToEndpoint)
+	test.Assert(t, cs == nil, "ConnStatistics should be nil when not provided")
 }

@@ -44,6 +44,10 @@ type ConnPool interface {
 	Close() error
 }
 
+type ConnStatistics interface {
+	ActiveStreams(addr string) int
+}
+
 // LongConnPool supports Clean connections to a desired address.
 type LongConnPool interface {
 	ConnPool
@@ -65,4 +69,22 @@ type RawConn interface {
 // IsActive is used to check if the connection is active.
 type IsActive interface {
 	IsActive() bool
+}
+
+type connStatisticsKeyType struct{}
+
+var connStatisticsKey connStatisticsKeyType
+
+func NewCtxWithConnStatistics(ctx context.Context, st ConnStatistics) context.Context {
+	if st != nil {
+		return context.WithValue(ctx, connStatisticsKey, st)
+	}
+	return ctx
+}
+
+func GetConnStatistics(ctx context.Context) ConnStatistics {
+	if cs, ok := ctx.Value(connStatisticsKey).(ConnStatistics); ok {
+		return cs
+	}
+	return nil
 }

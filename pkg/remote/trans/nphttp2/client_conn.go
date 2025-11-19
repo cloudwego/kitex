@@ -88,6 +88,12 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 		}
 		host = u.Host
 	}
+	var realAddr string
+	if rawAddr, ok := ri.To().Tag("user_inst_list"); ok {
+		realAddr = rawAddr
+	} else {
+		realAddr = addr
+	}
 	isStreaming := ri.Config().InteractionMode() == rpcinfo.Streaming
 	invocation := ri.Invocation()
 	callHdr := &grpc.CallHdr{
@@ -96,6 +102,7 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 		Method:         fullMethodName(invocation.PackageName(), invocation.ServiceName(), invocation.MethodName()),
 		SendCompress:   remote.GetSendCompressor(ri),
 		ContentSubtype: getContentSubType(ri.Config().PayloadCodec()),
+		Tag:            realAddr,
 	}
 
 	s, err := tr.NewStream(ctx, callHdr)
