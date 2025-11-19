@@ -122,7 +122,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.BoolVar(&a.LocalThriftgo, "local-thriftgo", false,
 		"Use local thriftgo exec instead of kitex embedded thriftgo. This is mainly used for debugging, you need to ensure that thriftgo is installed correctly.")
 	f.Var(&a.BuiltinTpl, "tpl", "Specify kitex built-in template.")
-	f.BoolVar(&a.StreamX, "streamx", false, "Generate streaming code with streamx interface")
+	f.Var(&a.StreamXFeature, "streamx", "Generate streaming code with streamx interface")
 
 	f.Var(&a.FrugalStruct, "frugal-struct", "Replace fastCodec code to frugal. Use `-frugal-struct @all` for all, `-frugal-struct @auto` for annotated structs (go.codec=\"frugal\"), or specify multiple structs (e.g., `-frugal-struct A -frugal-struct B`).")
 
@@ -175,7 +175,7 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 	if err = f.Parse(kitexArgs); err != nil {
 		return err
 	}
-	if a.StreamX {
+	if a.IsUsingStreamX() {
 		a.ThriftOptions = append(a.ThriftOptions, "streamx")
 	}
 	if a.Record {

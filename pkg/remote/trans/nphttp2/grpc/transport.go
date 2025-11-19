@@ -38,6 +38,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	streaming_types "github.com/cloudwego/kitex/pkg/streaming/types"
 )
 
 type bufferPool struct {
@@ -870,9 +871,9 @@ const (
 func ContextErr(err error) error {
 	switch err {
 	case context.DeadlineExceeded:
-		return status.New(codes.DeadlineExceeded, err.Error()).Err()
+		return status.NewTimeoutStatus(codes.DeadlineExceeded, err.Error(), streaming_types.StreamTimeout).Err()
 	case context.Canceled:
-		return status.New(codes.Canceled, err.Error()).Err()
+		return status.NewCancelStatus(codes.Canceled, err.Error(), streaming_types.ActiveCancel).Err()
 	}
 	statusErr, ok := err.(*status.Error)
 	if ok { // only returned by contextWithCancelReason

@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -68,9 +69,11 @@ type rpcConfig struct {
 	payloadCodec      serviceinfo.PayloadCodec
 
 	// stream config
-	streamRecvTimeout time.Duration
-	streamSendTimeout time.Duration
-	streamTimeout     time.Duration
+	streamRecvTimeout          time.Duration
+	streamSendTimeout          time.Duration
+	streamTimeout              time.Duration
+	streamFinishCallback       *streaming.FinishCallback
+	streamIndependentLifecycle bool
 }
 
 func init() {
@@ -220,6 +223,22 @@ func (r *rpcConfig) SetStreamTimeout(timeout time.Duration) {
 
 func (r *rpcConfig) StreamTimeout() time.Duration {
 	return r.streamTimeout
+}
+
+func (r *rpcConfig) SetStreamCallbackConfig(cfg *streaming.FinishCallback) {
+	r.streamFinishCallback = cfg
+}
+
+func (r *rpcConfig) StreamCallbackConfig() *streaming.FinishCallback {
+	return r.streamFinishCallback
+}
+
+func (r *rpcConfig) SetStreamIndependentLifecycle(flag bool) {
+	r.streamIndependentLifecycle = flag
+}
+
+func (r *rpcConfig) StreamIndependentLifecycle() bool {
+	return r.streamIndependentLifecycle
 }
 
 // Clone returns a copy of the current rpcConfig.

@@ -33,6 +33,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
@@ -51,6 +52,7 @@ type Iface interface {
 type Status struct {
 	s           *spb.Status
 	timeoutType streaming_types.TimeoutType
+	cancelType  streaming_types.CancelType
 }
 
 // New returns a Status representing c and msg.
@@ -71,6 +73,14 @@ func NewTimeoutStatus(c codes.Code, msg string, timeoutType streaming_types.Time
 			Message: msg,
 		},
 		timeoutType: timeoutType,
+	}
+}
+
+// NewCancelStatus returns a Status with Cancel code and specific CancelType.
+func NewCancelStatus(c codes.Code, msg string, cancelType streaming_types.CancelType) *Status {
+	return &Status{
+		s:          &spb.Status{Code: int32(c), Message: msg},
+		cancelType: cancelType,
 	}
 }
 
@@ -118,6 +128,22 @@ func (s *Status) TimeoutType() streaming_types.TimeoutType {
 	return s.timeoutType
 }
 
+// CancelType returns the specific CancelType related to Status.
+func (s *Status) CancelType() streaming_types.CancelType {
+	if s == nil || s.s == nil {
+		return 0
+	}
+	return s.cancelType
+}
+
+func (s *Status) IsFromBusiness() bool {
+	if s == nil || s.s == nil {
+		return false
+	}
+	// could not refer to kerrors.ErrBiz because of circular dependency
+	return strings.HasSuffix(s.s.Message, "[biz error]")
+}
+
 // AppendMessage append extra msg for Status
 func (s *Status) AppendMessage(extraMsg string) *Status {
 	if s == nil || s.s == nil || extraMsg == "" {
@@ -142,6 +168,7 @@ func (s *Status) Err() error {
 	}
 	return &Error{
 		e:           s.Proto(),
+		cancelType:  s.cancelType,
 		timeoutType: s.timeoutType,
 	}
 }
@@ -187,6 +214,7 @@ func (s *Status) Details() []interface{} {
 type Error struct {
 	e           *spb.Status
 	timeoutType streaming_types.TimeoutType
+	cancelType  streaming_types.CancelType
 }
 
 func (e *Error) Error() string {
@@ -197,6 +225,7 @@ func (e *Error) Error() string {
 func (e *Error) GRPCStatus() *Status {
 	st := FromProto(e.e)
 	st.timeoutType = e.timeoutType
+	st.cancelType = e.cancelType
 	return st
 }
 

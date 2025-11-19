@@ -17,10 +17,12 @@
 package streamcall
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/cloudwego/kitex/client/callopt"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // These options are directly translated from callopt.Option(s). If you can't find the option with the
@@ -77,5 +79,29 @@ func WithStreamTimeout(d time.Duration) Option {
 		di.WriteString(")")
 
 		o.StreamOptions.StreamTimeout = d
+	}}
+}
+
+// WithIndependentLifecycle ensures that newly created client-side Streams are not controlled
+// by the lifecycle of the passed ctx.
+func WithIndependentLifecycle(flag bool) Option {
+	return Option{f: func(o *callopt.CallOptions, di *strings.Builder) {
+		di.WriteString("WithIndependentLifecycle(")
+		if flag {
+			di.WriteString("true")
+		} else {
+			di.WriteString("false")
+		}
+		di.WriteString(")")
+
+		o.StreamOptions.IndependentLifecycle = flag
+	}}
+}
+
+func WithCallbackConfig(cfg *streaming.FinishCallback) Option {
+	return Option{f: func(o *callopt.CallOptions, di *strings.Builder) {
+		di.WriteString(fmt.Sprintf("WithStreamCallbackConfig(%+v)", cfg))
+
+		o.StreamOptions.FinishCallback = cfg
 	}}
 }

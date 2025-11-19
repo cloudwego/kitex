@@ -465,7 +465,6 @@ func TestStreamTimeout(t *testing.T) {
 				res := new(testResponse)
 				cErr = cs.RecvMsg(ctx, res)
 				test.Assert(t, cErr != nil)
-				t.Logf("client-side Stream Recv err: %v", cErr)
 				test.Assert(t, errors.Is(cErr, kerrors.ErrStreamingTimeout), cErr)
 			}()
 

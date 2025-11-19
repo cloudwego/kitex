@@ -157,7 +157,8 @@ type ServiceInfo struct {
 	// for multiple services scenario, the reference name for the service
 	RefName string
 	// identify whether this service would generate a corresponding handler.
-	GenerateHandler bool
+	GenerateHandler               bool
+	GenerateStreamXClientCallback bool
 }
 
 // AllMethods returns all methods that the service have.

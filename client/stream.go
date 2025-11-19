@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/endpoint/cep"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
@@ -64,6 +66,9 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 	}
 	var ri rpcinfo.RPCInfo
 	ctx, ri, _ = kc.initRPCInfo(ctx, method, 0, nil, true)
+	if ri.Config().StreamIndependentLifecycle() {
+		ctx = context.WithoutCancel(ctx)
+	}
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	var reportErr error
@@ -128,6 +133,9 @@ func (kc *kClient) StreamX(ctx context.Context, method string) (streaming.Client
 	}
 	var ri rpcinfo.RPCInfo
 	ctx, ri, _ = kc.initRPCInfo(ctx, method, 0, nil, true)
+	if ri.Config().StreamIndependentLifecycle() {
+		ctx = context.WithoutCancel(ctx)
+	}
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	var reportErr error
@@ -363,18 +371,39 @@ func (s *stream) DoFinish(err error) {
 		// already called
 		return
 	}
+
 	// release stream timeout cancel
 	if s.cancelFunc != nil {
 		s.cancelFunc()
 	}
-	if !isRPCError(err) {
+
+	// todo: 考虑这里的打点逻辑
+	// 即 client-side callback return biz err 的行为
+	reportErr := err
+	if !isRPCError(reportErr) {
 		// only rpc errors are reported
-		err = nil
+		reportErr = nil
 	}
 	if s.scm != nil {
-		s.scm.ReleaseConn(err, s.ri)
+		s.scm.ReleaseConn(reportErr, s.ri)
 	}
-	s.kc.opt.TracerCtl.DoFinish(s.ctx, s.ri, err)
+	s.kc.opt.TracerCtl.DoFinish(s.ctx, s.ri, reportErr)
+
+	// processing callback with original err
+	defer func() {
+		if r := recover(); r != nil {
+			klog.CtxWarnf(s.ctx, "Panic happened during stream DoFinish. This may caused by injected stream Callback: error=%v, stack=%s", r, string(debug.Stack()))
+		}
+	}()
+	riCfg := s.ri.Config()
+	stCfg := riCfg.StreamCallbackConfig()
+	if stCfg != nil {
+		if s.isGRPC {
+			handleGRPC(s.ctx, s.ri, err, stCfg)
+		} else {
+			handleTTStream(s.ctx, s.ri, err, stCfg)
+		}
+	}
 }
 
 func (s *stream) GetGRPCStream() streaming.Stream {

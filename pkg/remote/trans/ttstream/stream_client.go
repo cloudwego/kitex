@@ -253,7 +253,7 @@ func (s *clientStream) onReadTrailerFrame(fr *Frame) error {
 		if err != nil {
 			exception = errIllegalFrame.newBuilder().withSide(clientSide).withCause(err)
 		} else {
-			exception = errApplicationException.newBuilder().withSide(clientSide).withCause(appEx)
+			exception = ErrApplicationException.newBuilder().withSide(clientSide).withCause(appEx)
 		}
 	} else if len(fr.trailer) > 0 {
 		// when server-side returns biz error, payload is empty and biz error information is stored in trailer frame header

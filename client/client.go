@@ -833,6 +833,12 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 	if sopt.StreamTimeout > 0 {
 		cfg.SetStreamTimeout(sopt.StreamTimeout)
 	}
+	if sopt.FinishCallback != nil {
+		cfg.SetStreamCallbackConfig(sopt.FinishCallback)
+	}
+	if sopt.IndependentLifecycle {
+		cfg.SetStreamIndependentLifecycle(sopt.IndependentLifecycle)
+	}
 
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 
@@ -849,6 +855,12 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 		}
 		if callOpts.StreamOptions.StreamTimeout != 0 {
 			cfg.SetStreamTimeout(callOpts.StreamOptions.StreamTimeout)
+		}
+		if callOpts.StreamOptions.FinishCallback != nil {
+			cfg.SetStreamCallbackConfig(callOpts.StreamOptions.FinishCallback)
+		}
+		if callOpts.StreamOptions.IndependentLifecycle {
+			cfg.SetStreamIndependentLifecycle(callOpts.StreamOptions.IndependentLifecycle)
 		}
 	}
 

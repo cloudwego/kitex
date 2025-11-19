@@ -24,6 +24,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -77,6 +78,8 @@ type StreamConfig interface {
 	StreamRecvTimeout() time.Duration
 	StreamSendTimeout() time.Duration
 	StreamTimeout() time.Duration
+	StreamCallbackConfig() *streaming.FinishCallback
+	StreamIndependentLifecycle() bool
 }
 
 // RPCConfig contains configuration for RPC.

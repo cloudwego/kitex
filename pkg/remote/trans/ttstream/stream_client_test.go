@@ -168,7 +168,7 @@ func Test_clientStream_SendMsg(t *testing.T) {
 	err = cs.SendMsg(ctx, req)
 	test.Assert(t, errors.Is(err, errDownstreamCancel), err)
 	// subsequent close will not affect the error returned by Send
-	ex1 := errApplicationException.newBuilder().withSide(clientSide)
+	ex1 := ErrApplicationException.newBuilder().withSide(clientSide)
 	cs.close(ex1, false, "")
 	err = cs.SendMsg(ctx, req)
 	test.Assert(t, errors.Is(err, errDownstreamCancel), err)

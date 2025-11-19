@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/endpoint/cep"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -63,6 +64,26 @@ func WithStreamTimeout(d time.Duration) StreamOption {
 		di.Push(fmt.Sprintf("WithStreamTimeout(%dms)", d.Milliseconds()))
 
 		o.StreamTimeout = d
+	}}
+}
+
+// WithStreamCallbackConfig adds and calls FinishCallback when client-side stream
+// has finished.
+func WithStreamCallbackConfig(cfg *streaming.FinishCallback) StreamOption {
+	return StreamOption{F: func(o *StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamCallbackConfig(%+v)", cfg))
+
+		o.FinishCallback = cfg
+	}}
+}
+
+// WithStreamIndependentLifecycle ensures that newly created client-side Streams are not controlled
+// by the lifecycle of the passed ctx.
+func WithStreamIndependentLifecycle(flag bool) StreamOption {
+	return StreamOption{F: func(o *StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamIndependentLifecycle(%+v)", flag))
+
+		o.IndependentLifecycle = flag
 	}}
 }
 
