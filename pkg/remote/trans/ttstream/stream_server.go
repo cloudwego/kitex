@@ -65,6 +65,11 @@ func (s *serverStream) SendMsg(ctx context.Context, res any) error {
 // CloseSend by serverStream will be called after server handler returned
 // after CloseSend stream cannot be access again
 func (s *serverStream) CloseSend(exception error) error {
+	if s.wheader != nil {
+		if err := s.sendHeader(); err != nil {
+			return err
+		}
+	}
 	err := s.closeSend(exception)
 	if err != nil {
 		return err
