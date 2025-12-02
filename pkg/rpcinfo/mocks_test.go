@@ -94,6 +94,14 @@ func (m *MockRPCConfig) StreamRecvTimeout() time.Duration {
 	return time.Duration(0)
 }
 
+func (m *MockRPCConfig) StreamSendTimeout() time.Duration {
+	return time.Duration(0)
+}
+
+func (m *MockRPCConfig) StreamTimeout() time.Duration {
+	return time.Duration(0)
+}
+
 type MockRPCStats struct{}
 
 func (m *MockRPCStats) Record(context.Context, stats.Event, stats.Status, string) {}
