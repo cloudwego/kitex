@@ -48,7 +48,6 @@ func WithTag(key, val string) Option {
 }
 
 // WithRecvTimeout add recv timeout for stream.Recv function.
-// NOTICE: ONLY effective for ttheader streaming protocol for now.
 func WithRecvTimeout(d time.Duration) Option {
 	return Option{f: func(o *callopt.CallOptions, di *strings.Builder) {
 		di.WriteString("WithRecvTimeout(")
@@ -56,5 +55,27 @@ func WithRecvTimeout(d time.Duration) Option {
 		di.WriteString(")")
 
 		o.StreamOptions.RecvTimeout = d
+	}}
+}
+
+// WithSendTimeout add send timeout for stream.Send function.
+func WithSendTimeout(d time.Duration) Option {
+	return Option{f: func(o *callopt.CallOptions, di *strings.Builder) {
+		di.WriteString("WithSendTimeout(")
+		di.WriteString(d.String())
+		di.WriteString(")")
+
+		o.StreamOptions.SendTimeout = d
+	}}
+}
+
+// WithStreamTimeout add timeout for whole stream.
+func WithStreamTimeout(d time.Duration) Option {
+	return Option{f: func(o *callopt.CallOptions, di *strings.Builder) {
+		di.WriteString("WithStreamTimeout(")
+		di.WriteString(d.String())
+		di.WriteString(")")
+
+		o.StreamOptions.StreamTimeout = d
 	}}
 }

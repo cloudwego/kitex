@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
@@ -62,6 +63,7 @@ type clientStream struct {
 	// exception as Recv
 	closeStreamException atomic.Value // type must be of *Exception
 	storeExceptionOnce   sync.Once
+	streamTimeout        time.Duration // whole stream timeout
 
 	// for Header()/Trailer()
 	headerSig  chan int32
@@ -125,6 +127,11 @@ func (s *clientStream) Context() context.Context {
 	return s.ctx
 }
 
+func (s *clientStream) Cancel(err error) {
+	finalEx, cancelPath := s.parseCancelErr(err)
+	s.close(finalEx, true, cancelPath)
+}
+
 // ctxDoneCallback convert ctx.Err() to ttstream related err and close client-side stream.
 // it is invoked in container.Pipe
 func (s *clientStream) ctxDoneCallback(ctx context.Context) {
@@ -133,30 +140,37 @@ func (s *clientStream) ctxDoneCallback(ctx context.Context) {
 	s.close(finalEx, true, cancelPath)
 }
 
-// parseCtxErr parses information in ctx.Err and returning ttstream Exception and cascading cancelPath
-func (s *clientStream) parseCtxErr(ctx context.Context) (finalEx *Exception, cancelPath string) {
+func (s *clientStream) parseCancelErr(err error) (finalEx *Exception, cancelPath string) {
 	svcName := s.rpcInfo.From().ServiceName()
-	cErr := ctx.Err()
-	switch cErr {
+	switch err {
 	// biz code invokes cancel()
-	case context.Canceled:
+	case nil, context.Canceled:
 		finalEx = errBizCancel.newBuilder().withSide(clientSide)
 		// the initial node sending rst, the original cancelPath is empty
 		cancelPath = appendCancelPath("", svcName)
+	// stream timeout
+	case context.DeadlineExceeded:
+		finalEx = newTimeoutException(errStreamTimeout, clientSide, s.streamTimeout)
+		cancelPath = appendCancelPath("", svcName)
 	default:
-		if tEx, ok := cErr.(*Exception); ok {
+		if tEx, ok := err.(*Exception); ok {
 			// for cascading cancel case, we need to change the side from server to client
 			finalEx = tEx.newBuilder().withSide(clientSide)
 			cancelPath = appendCancelPath(tEx.cancelPath, svcName)
 		} else {
 			// ctx provided by other sources(e.g. gRPC handler has been canceled, cErr is gRPC error)
-			finalEx = errInternalCancel.newBuilder().withSide(clientSide).withCause(cErr)
+			finalEx = errInternalCancel.newBuilder().withSide(clientSide).withCause(err)
 			// as upstream cascading path may have existed(e.g. gRPC service chains), using non-ttstream path
 			// as a unified placeholder enables quick identification of such scenarios
 			cancelPath = appendCancelPath("non-ttstream path", svcName)
 		}
 	}
 	return
+}
+
+// parseCtxErr parses information in ctx.Err and returning ttstream Exception and cascading cancelPath
+func (s *clientStream) parseCtxErr(ctx context.Context) (finalEx *Exception, cancelPath string) {
+	return s.parseCancelErr(ctx.Err())
 }
 
 func (s *clientStream) close(exception error, sendRst bool, cancelPath string) {
@@ -202,6 +216,10 @@ func (s *clientStream) close(exception error, sendRst bool, cancelPath string) {
 
 func (s *clientStream) setMetaFrameHandler(metaHandler MetaFrameHandler) {
 	s.metaFrameHandler = metaHandler
+}
+
+func (s *clientStream) setStreamTimeout(tm time.Duration) {
+	s.streamTimeout = tm
 }
 
 // === clientStream OnRead callback

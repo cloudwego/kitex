@@ -39,6 +39,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	streaming_types "github.com/cloudwego/kitex/pkg/streaming/types"
 )
 
 type Iface interface {
@@ -48,7 +49,8 @@ type Iface interface {
 // Status represents an RPC status code, message, and details.  It is immutable
 // and should be created with New, Newf, or FromProto.
 type Status struct {
-	s *spb.Status
+	s           *spb.Status
+	timeoutType streaming_types.TimeoutType
 }
 
 // New returns a Status representing c and msg.
@@ -59,6 +61,17 @@ func New(c codes.Code, msg string) *Status {
 // Newf returns New(c, fmt.Sprintf(format, a...)).
 func Newf(c codes.Code, format string, a ...interface{}) *Status {
 	return New(c, fmt.Sprintf(format, a...))
+}
+
+// NewTimeoutStatus returns ad Status with specific TimeoutType.
+func NewTimeoutStatus(c codes.Code, msg string, timeoutType streaming_types.TimeoutType) *Status {
+	return &Status{
+		s: &spb.Status{
+			Code:    int32(c),
+			Message: msg,
+		},
+		timeoutType: timeoutType,
+	}
 }
 
 // ErrorProto returns an error representing s.  If s.Code is OK, returns nil.
@@ -97,6 +110,14 @@ func (s *Status) Message() string {
 	return s.s.Message
 }
 
+// TimeoutType returns the specific TimeoutType related to Status.
+func (s *Status) TimeoutType() streaming_types.TimeoutType {
+	if s == nil || s.s == nil {
+		return 0
+	}
+	return s.timeoutType
+}
+
 // AppendMessage append extra msg for Status
 func (s *Status) AppendMessage(extraMsg string) *Status {
 	if s == nil || s.s == nil || extraMsg == "" {
@@ -119,7 +140,10 @@ func (s *Status) Err() error {
 	if s.Code() == codes.OK {
 		return nil
 	}
-	return &Error{e: s.Proto()}
+	return &Error{
+		e:           s.Proto(),
+		timeoutType: s.timeoutType,
+	}
 }
 
 // WithDetails returns a new status with the provided details messages appended to the status.
@@ -161,7 +185,8 @@ func (s *Status) Details() []interface{} {
 // Error wraps a pointer of a status proto. It implements error and Status,
 // and a nil *Error should never be returned by this package.
 type Error struct {
-	e *spb.Status
+	e           *spb.Status
+	timeoutType streaming_types.TimeoutType
 }
 
 func (e *Error) Error() string {
@@ -170,7 +195,9 @@ func (e *Error) Error() string {
 
 // GRPCStatus returns the Status represented by se.
 func (e *Error) GRPCStatus() *Status {
-	return FromProto(e.e)
+	st := FromProto(e.e)
+	st.timeoutType = e.timeoutType
+	return st
 }
 
 // Is implements future error.Is functionality.

@@ -21,12 +21,16 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/internal/utils/contextwatcher"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/container"
@@ -152,11 +156,20 @@ func (t *serverTransport) readFrame(reader bufiox.Reader) error {
 
 	var s *serverStream
 	if fr.typ == headerFrameType {
+		var ctx context.Context
+		var cancel context.CancelFunc
 		// server recv a header frame, we should create a new stream
-		ctx, cancel := context.WithCancel(context.Background())
+		tm, ok := parseStreamTimeout(fr)
+		if ok {
+			ctx, cancel = context.WithTimeout(context.Background(), tm)
+		} else {
+			ctx, cancel = context.WithCancel(context.Background())
+		}
 		ctx, cFunc := newContextWithCancelReason(ctx, cancel)
 		s = newServerStream(ctx, t, fr.streamFrame)
 		s.cancelFunc = cFunc
+		s.timeout = tm
+		contextwatcher.RegisterContext(s.ctx, s.ctxDoneCallback)
 		t.storeStream(s)
 		err = t.spipe.Write(context.Background(), s)
 	} else {
@@ -260,4 +273,17 @@ READ:
 	}
 	t.scache = t.scache[:n]
 	goto READ
+}
+
+func parseStreamTimeout(fr *Frame) (time.Duration, bool) {
+	tmStr, ok := fr.meta[ttheader.StreamTimeout]
+	if !ok {
+		return 0, false
+	}
+	tmMs, err := strconv.Atoi(tmStr)
+	if err != nil {
+		klog.Errorf("KITEX: ttstream parse ttheader IntKey StreamTimeout failed, got: %s", tmStr)
+		return 0, false
+	}
+	return time.Duration(tmMs) * time.Millisecond, true
 }

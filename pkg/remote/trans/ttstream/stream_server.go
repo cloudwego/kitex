@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
@@ -33,8 +34,9 @@ var _ ServerStreamMeta = (*serverStream)(nil)
 
 func newServerStream(ctx context.Context, writer streamWriter, smeta streamFrame) *serverStream {
 	s := newBasicStream(ctx, writer, smeta)
-	s.reader = newStreamReader()
-	return &serverStream{stream: s}
+	ss := &serverStream{stream: s}
+	s.reader = newStreamReaderWithCtxDoneCallback(ss.ctxDoneCallback)
+	return ss
 }
 
 // initial state: streamStateActive
@@ -51,6 +53,7 @@ type serverStream struct {
 	*stream
 	state      int32
 	cancelFunc cancelWithReason
+	timeout    time.Duration
 }
 
 func (s *serverStream) SetHeader(hd streaming.Header) error {
@@ -227,4 +230,27 @@ func (s *serverStream) closeTest(exception error, cancelPath string) error {
 	}
 	s.runCloseCallback(exception)
 	return nil
+}
+
+func (s *serverStream) ctxDoneCallback(ctx context.Context) {
+	finalEx := s.parseCtxErr(ctx)
+	s.close(finalEx)
+}
+
+func (s *serverStream) parseCtxErr(ctx context.Context) (finalEx *Exception) {
+	cErr := ctx.Err()
+	switch cErr {
+	// stream timeout
+	case context.DeadlineExceeded:
+		finalEx = newTimeoutException(errStreamTimeout, serverSide, s.timeout)
+	// other close stream scenarios, there is no need to process
+	default:
+		if ex, ok := cErr.(*Exception); ok {
+			finalEx = ex
+		} else {
+			finalEx = errInternalCancel.newBuilder().withSide(serverSide).withCause(cErr)
+		}
+	}
+
+	return finalEx
 }

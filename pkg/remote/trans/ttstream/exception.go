@@ -40,6 +40,10 @@ var (
 	errInternalCancel         = newException("internal canceled", kerrors.ErrStreamingCanceled, 12011)
 	errBizHandlerReturnCancel = newException("canceled by business handler returning", kerrors.ErrStreamingCanceled, 12012)
 	errConnectionClosedCancel = newException("canceled by connection closed", kerrors.ErrStreamingCanceled, 12013)
+
+	errStreamTimeout     = newException("stream timeout", kerrors.ErrStreamingTimeout, 12014)
+	errStreamRecvTimeout = newException("stream Recv timeout", kerrors.ErrStreamingTimeout, 12015)
+	errStreamSendTimeout = newException("stream Send timeout", kerrors.ErrStreamingTimeout, 12016)
 )
 
 const (
@@ -164,7 +168,7 @@ func (e *Exception) TypeId() int32 {
 // appendCancelPath is a common util func to process cancelPath metadata in Rst Frame and Exception
 func appendCancelPath(oriCp, node string) string {
 	if len(oriCp) > 0 {
-		return strings.Join([]string{oriCp, node}, ",")
+		return oriCp + "," + node
 	}
 	return node
 }
