@@ -19,12 +19,12 @@ package ttstream
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
+	"github.com/cloudwego/kitex/internal/utils/contextwatcher"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	ktransport "github.com/cloudwego/kitex/transport"
@@ -84,7 +84,6 @@ type stream struct {
 	wheader  streaming.Header  // wheader == nil means it already be sent
 	wtrailer streaming.Trailer // wtrailer == nil means it already be sent
 
-	recvTimeout   time.Duration
 	closeCallback []func(error)
 }
 
@@ -125,17 +124,11 @@ func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
 }
 
 func (s *stream) RecvMsg(ctx context.Context, data any) error {
-	nctx := s.ctx
-	if s.recvTimeout > 0 {
-		var cancel context.CancelFunc
-		nctx, cancel = context.WithTimeout(nctx, s.recvTimeout)
-		defer cancel()
-	}
-	payload, err := s.reader.output(nctx)
+	payload, err := s.reader.output(s.ctx)
 	if err != nil {
 		return err
 	}
-	err = DecodePayload(nctx, payload, data)
+	err = DecodePayload(s.ctx, payload, data)
 	// payload will not be access after decode
 	mcache.Free(payload)
 
@@ -153,19 +146,13 @@ func (s *stream) RegisterCloseCallback(cb func(error)) {
 	s.closeCallback = append(s.closeCallback, cb)
 }
 
-func (s *stream) setRecvTimeout(timeout time.Duration) {
-	if timeout <= 0 {
-		return
-	}
-	s.recvTimeout = timeout
-}
-
 func (s *stream) runCloseCallback(exception error) {
 	if len(s.closeCallback) > 0 {
 		for _, cb := range s.closeCallback {
 			cb(exception)
 		}
 	}
+	contextwatcher.DeregisterContext(s.ctx)
 	_ = s.writer.CloseStream(s.sid)
 }
 

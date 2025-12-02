@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	streaming_types "github.com/cloudwego/kitex/pkg/streaming/types"
 )
 
 func TestStatus(t *testing.T) {
@@ -70,7 +71,7 @@ func TestError(t *testing.T) {
 	s.Code = 1
 	s.Message = "test err"
 
-	er := &Error{s}
+	er := &Error{e: s}
 	test.Assert(t, len(er.Error()) > 0)
 
 	status := er.GRPCStatus()
@@ -101,7 +102,7 @@ func TestFromContextError(t *testing.T) {
 	s := new(spb.Status)
 	s.Code = 1
 	s.Message = "test err"
-	grpcErr := &Error{s}
+	grpcErr := &Error{e: s}
 	// grpc err
 	codeGrpcErr := Code(grpcErr)
 	test.Assert(t, codeGrpcErr == codes.Canceled)
@@ -113,4 +114,59 @@ func TestFromContextError(t *testing.T) {
 	// no err
 	codeNil := Code(nil)
 	test.Assert(t, codeNil == codes.OK)
+}
+
+func TestTimeoutStatus(t *testing.T) {
+	t.Run("stream timeout status", func(t *testing.T) {
+		statusMsg := "stream timeout exceeded"
+		status := NewTimeoutStatus(codes.DeadlineExceeded, statusMsg, streaming_types.StreamTimeout)
+		test.Assert(t, status != nil)
+		test.Assert(t, status.Code() == codes.DeadlineExceeded)
+		test.Assert(t, status.Message() == statusMsg)
+		test.Assert(t, status.TimeoutType() == streaming_types.StreamTimeout)
+
+		err := status.Err()
+		test.Assert(t, err != nil)
+		statusErr, ok := err.(*Error)
+		test.Assert(t, ok)
+		test.Assert(t, statusErr.timeoutType == streaming_types.StreamTimeout)
+
+		recoveredStatus := statusErr.GRPCStatus()
+		test.Assert(t, recoveredStatus.Code() == codes.DeadlineExceeded)
+		test.Assert(t, recoveredStatus.Message() == statusMsg)
+	})
+	t.Run("stream recv timeout status", func(t *testing.T) {
+		statusMsg := "stream recv timeout exceeded"
+		status := NewTimeoutStatus(codes.DeadlineExceeded, statusMsg, streaming_types.StreamRecvTimeout)
+		test.Assert(t, status != nil)
+		test.Assert(t, status.Code() == codes.DeadlineExceeded)
+		test.Assert(t, status.Message() == statusMsg)
+		test.Assert(t, status.TimeoutType() == streaming_types.StreamRecvTimeout)
+
+		err := status.Err()
+		test.Assert(t, err != nil)
+		statusErr, ok := err.(*Error)
+		test.Assert(t, ok)
+		test.Assert(t, statusErr.timeoutType == streaming_types.StreamRecvTimeout)
+	})
+	t.Run("stream send timeout status", func(t *testing.T) {
+		statusMsg := "stream send timeout exceeded"
+		status := NewTimeoutStatus(codes.DeadlineExceeded, statusMsg, streaming_types.StreamSendTimeout)
+		test.Assert(t, status != nil)
+		test.Assert(t, status.Code() == codes.DeadlineExceeded)
+		test.Assert(t, status.Message() == statusMsg)
+		test.Assert(t, status.TimeoutType() == streaming_types.StreamSendTimeout)
+
+		err := status.Err()
+		test.Assert(t, err != nil)
+		statusErr, ok := err.(*Error)
+		test.Assert(t, ok)
+		test.Assert(t, statusErr.timeoutType == streaming_types.StreamSendTimeout)
+	})
+	t.Run("nil status timeout type", func(t *testing.T) {
+		var nilStatus *Status
+		test.Assert(t, nilStatus.TimeoutType() == 0)
+		test.Assert(t, nilStatus.Code() == codes.OK)
+		test.Assert(t, nilStatus.Message() == "")
+	})
 }

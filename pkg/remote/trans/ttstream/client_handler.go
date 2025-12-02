@@ -18,10 +18,13 @@ package ttstream
 
 import (
 	"context"
+	"strconv"
+	"time"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
+	"github.com/cloudwego/kitex/internal/utils/contextwatcher"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -48,7 +51,6 @@ type clientTransHandler struct {
 
 // NewStream creates a client stream
 func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (streaming.ClientStream, error) {
-	rconfig := ri.Config()
 	invocation := ri.Invocation()
 	method := invocation.MethodName()
 	addr := ri.To().Address()
@@ -68,6 +70,8 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	if intHeader == nil {
 		intHeader = IntHeader{}
 	}
+	tm := injectStreamTimeout(ctx, intHeader)
+
 	if strHeader == nil {
 		strHeader = map[string]string{}
 	}
@@ -82,12 +86,24 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	// create new stream
 	cs := newClientStream(ctx, trans, streamFrame{sid: genStreamID(), method: method})
 	// stream should be configured before WriteStream or there would be a race condition for metaFrameHandler
-	cs.setRecvTimeout(rconfig.StreamRecvTimeout())
 	cs.setMetaFrameHandler(c.metaHandler)
+	cs.setStreamTimeout(tm)
+
+	contextwatcher.RegisterContext(ctx, cs.ctxDoneCallback)
 
 	if err = trans.WriteStream(ctx, cs, intHeader, strHeader); err != nil {
 		return nil, err
 	}
 
 	return cs, err
+}
+
+func injectStreamTimeout(ctx context.Context, hd IntHeader) time.Duration {
+	ddl, ok := ctx.Deadline()
+	if !ok {
+		return 0
+	}
+	tm := time.Until(ddl)
+	hd[ttheader.StreamTimeout] = strconv.Itoa(int(tm.Milliseconds()))
+	return tm
 }
