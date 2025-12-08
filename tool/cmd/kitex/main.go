@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/cloudwego/kitex/tool/cmd/kitex/utils"
-	"github.com/cloudwego/kitex/tool/internal_pkg/util/env"
 
 	"github.com/cloudwego/kitex/tool/cmd/kitex/sdk"
 
@@ -32,8 +31,9 @@ import (
 	"github.com/cloudwego/kitex/tool/cmd/kitex/versions"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
+	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/prutal"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
-	"github.com/cloudwego/kitex/tool/internal_pkg/prutal"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util/env"
 )
 
 var args kargs.Arguments
@@ -97,18 +97,6 @@ func main() {
 			os.Exit(versions.CompatibilityCheckExitCode)
 		}
 	}
-	if args.IsProtobuf() {
-		// Whether using protoc or prutal, no longer generate the fast api for protobuf
-		args.Config.NoFastAPI = true
-		if !env.UseProtoc() {
-			g := prutal.NewPrutalGen(args.Config)
-			if err := g.Process(); err != nil {
-				log.Errorf("%s", err)
-				os.Exit(1)
-			}
-			return
-		}
-	}
 
 	out := new(bytes.Buffer)
 	cmd, err := args.BuildCmd(out)
@@ -118,11 +106,16 @@ func main() {
 	}
 
 	if args.IsThrift() && !args.LocalThriftgo {
+		// [sdk.KiteXSDKPlugin] implements [github.com/cloudwego/thriftgo/plugin.SDKPlugin],
+		// through which cloudwego/thriftgo invokes [pluginmode/thriftgo.Invoke] to do codegen.
 		if err = sdk.InvokeThriftgoBySDK(curpath, cmd); err != nil {
 			// todo: optimize -use and remove error returned from thriftgo
 			out.WriteString(err.Error())
 		}
+	} else if args.IsProtobuf() && !env.UseProtoc() {
+		err = prutal.NewPrutalGen(args.Config).Process()
 	} else {
+		// external tool based codegen
 		err = kargs.ValidateCMD(cmd.Path, args.IDLType)
 		if err != nil {
 			log.Warn(err)

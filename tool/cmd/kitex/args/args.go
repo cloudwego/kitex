@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
+	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/prutal"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util/env"
@@ -78,7 +79,7 @@ func (a *Arguments) AddExtraFlag(e *ExtraFlag) {
 func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 	f.BoolVar(&a.NoFastAPI, "no-fast-api", false,
-		"Generate codes without injecting fast method.")
+		"Generate codes without injecting fast method. Forced to true when using protobuf (either specified with -type or detected from IDL).")
 	f.StringVar(&a.ModuleName, "module", "",
 		"Specify the Go module name to generate go.mod.")
 	f.StringVar(&a.ServiceName, "service", "",
@@ -169,7 +170,7 @@ Flags:
 	return f
 }
 
-// ParseArgs parses command line arguments.
+// ParseArgs parses command line arguments and sets default values based on inputs.
 func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err error) {
 	f := a.buildFlags(version)
 	if err = f.Parse(kitexArgs); err != nil {
@@ -202,6 +203,12 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 	if err != nil {
 		return err
 	}
+
+	if a.IsProtobuf() {
+		// Whether using protoc or prutal, no longer generate the fast api for protobuf
+		a.Config.NoFastAPI = true
+	}
+
 	err = a.checkServiceName()
 	if err != nil {
 		return err
@@ -414,6 +421,10 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 		}
 		cmd.Args = append(cmd.Args, a.IDL)
 
+	} else if a.IsProtobuf() && !env.UseProtoc() {
+		os.Setenv(EnvPluginMode, prutal.PluginName)
+		cmd.Path = "" // invalidate cmd to prevent anything being executed.
+		return nil, nil
 	} else if a.IsProtobuf() {
 		os.Setenv(EnvPluginMode, protoc.PluginName)
 		a.ThriftOptions = a.ThriftOptions[:0]
