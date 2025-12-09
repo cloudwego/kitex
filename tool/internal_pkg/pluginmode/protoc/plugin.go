@@ -171,15 +171,17 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 	}
 
 	// TODO: should we move this to Generator.GenerateService?
-	pp.PackageInfo.ServiceInfo = pp.Services[len(pp.Services)-1]
-	var svcs []*generator.ServiceInfo
-	for _, svc := range pp.Services {
-		if svc.GenerateHandler {
-			svc.RefName = "service" + svc.ServiceName
-			svcs = append(svcs, svc)
+	if len(pp.Services) > 0 {
+		pp.PackageInfo.ServiceInfo = pp.Services[len(pp.Services)-1]
+		var svcs []*generator.ServiceInfo
+		for _, svc := range pp.Services {
+			if svc.GenerateHandler {
+				svc.RefName = "service" + svc.ServiceName
+				svcs = append(svcs, svc)
+			}
 		}
+		pp.PackageInfo.Services = svcs
 	}
-	pp.PackageInfo.Services = svcs
 
 	if pp.Config.GenerateMain {
 		if len(pp.Services) == 0 {
