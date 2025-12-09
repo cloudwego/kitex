@@ -106,8 +106,7 @@ func main() {
 	}
 
 	if args.IsThrift() && !args.LocalThriftgo {
-		// [sdk.KiteXSDKPlugin] implements [github.com/cloudwego/thriftgo/plugin.SDKPlugin],
-		// through which cloudwego/thriftgo invokes [pluginmode/thriftgo.Invoke] to do codegen.
+		// [sdk.KiteXSDKPlugin] implements [plugin.SDKPlugin], which invokes kitex thriftgo plugin
 		if err = sdk.InvokeThriftgoBySDK(curpath, cmd); err != nil {
 			// todo: optimize -use and remove error returned from thriftgo
 			out.WriteString(err.Error())

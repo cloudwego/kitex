@@ -423,7 +423,7 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 
 	} else if a.IsProtobuf() && !env.UseProtoc() {
 		os.Setenv(EnvPluginMode, prutal.PluginName)
-		cmd.Path = "" // invalidate cmd to prevent anything being executed.
+		cmd.Path = "" // invalidate cmd to prevent anything from being executed.
 		return nil, nil
 	} else if a.IsProtobuf() {
 		os.Setenv(EnvPluginMode, protoc.PluginName)
