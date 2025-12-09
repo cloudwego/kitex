@@ -172,7 +172,8 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 
 	// TODO: should we move this to Generator.GenerateService?
 	if len(pp.Services) > 0 {
-		pp.PackageInfo.ServiceInfo = pp.Services[len(pp.Services)-1]
+		// pp.PackageInfo.ServiceInfo
+		pp.ServiceInfo = pp.Services[len(pp.Services)-1]
 		var svcs []*generator.ServiceInfo
 		for _, svc := range pp.Services {
 			if svc.GenerateHandler {

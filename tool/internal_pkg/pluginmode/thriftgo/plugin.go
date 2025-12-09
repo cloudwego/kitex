@@ -85,6 +85,7 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 
 	// TODO: should we move this to Generator.GenerateService?
 	if len(conv.Services) > 0 {
+		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
 		var svcs []*generator.ServiceInfo
 		for _, svc := range conv.Services {
 			if svc.GenerateHandler {
