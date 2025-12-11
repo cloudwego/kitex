@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/endpoint/cep"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -40,12 +41,39 @@ func WithStreamOptions(opts ...StreamOption) Option {
 }
 
 // WithStreamRecvTimeout add recv timeout for stream.Recv function.
-// NOTICE: ONLY effective for ttheader streaming protocol for now.
 func WithStreamRecvTimeout(d time.Duration) StreamOption {
 	return StreamOption{F: func(o *client.StreamOptions, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithStreamRecvTimeout(%dms)", d.Milliseconds()))
 
 		o.RecvTimeout = d
+	}}
+}
+
+// WithStreamSendTimeout add send timeout for stream.Send function.
+func WithStreamSendTimeout(d time.Duration) StreamOption {
+	return StreamOption{F: func(o *client.StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamSendTimeout(%dms)", d.Milliseconds()))
+
+		o.SendTimeout = d
+	}}
+}
+
+// WithStreamTimeout add timeout for whole stream.
+func WithStreamTimeout(d time.Duration) StreamOption {
+	return StreamOption{F: func(o *client.StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamTimeout(%dms)", d.Milliseconds()))
+
+		o.StreamTimeout = d
+	}}
+}
+
+// WithStreamCallbackConfig adds and calls FinishCallback when client-side stream
+// has finished.
+func WithStreamCallbackConfig(cfg *streaming.FinishCallback) StreamOption {
+	return StreamOption{F: func(o *StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamCallbackConfig(%+v)", cfg))
+
+		o.FinishCallback = cfg
 	}}
 }
 

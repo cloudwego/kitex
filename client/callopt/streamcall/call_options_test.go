@@ -25,11 +25,29 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 )
 
-func TestWithRecvTimeout(t *testing.T) {
-	var sb strings.Builder
-	callOpts := callopt.CallOptions{}
-	testTimeout := 1 * time.Second
-	WithRecvTimeout(testTimeout).f(&callOpts, &sb)
-	test.Assert(t, callOpts.StreamOptions.RecvTimeout == testTimeout)
-	test.Assert(t, sb.String() == "WithRecvTimeout(1s)")
+func Test_streamCallTimeoutCallOptions(t *testing.T) {
+	t.Run("WithRecvTimeout", func(t *testing.T) {
+		var sb strings.Builder
+		callOpts := callopt.CallOptions{}
+		testTimeout := 1 * time.Second
+		WithRecvTimeout(testTimeout).f(&callOpts, &sb)
+		test.Assert(t, callOpts.StreamOptions.RecvTimeout == testTimeout)
+		test.Assert(t, sb.String() == "WithRecvTimeout(1s)")
+	})
+	t.Run("WithSendTimeout", func(t *testing.T) {
+		var sb strings.Builder
+		callOpts := callopt.CallOptions{}
+		testTimeout := 1 * time.Second
+		WithSendTimeout(testTimeout).f(&callOpts, &sb)
+		test.Assert(t, callOpts.StreamOptions.SendTimeout == testTimeout)
+		test.Assert(t, sb.String() == "WithSendTimeout(1s)")
+	})
+	t.Run("WithStreamTimeout", func(t *testing.T) {
+		var sb strings.Builder
+		callOpts := callopt.CallOptions{}
+		testTimeout := 1 * time.Second
+		WithStreamTimeout(testTimeout).f(&callOpts, &sb)
+		test.Assert(t, callOpts.StreamOptions.StreamTimeout == testTimeout)
+		test.Assert(t, sb.String() == "WithStreamTimeout(1s)")
+	})
 }

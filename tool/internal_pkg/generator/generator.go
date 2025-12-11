@@ -152,7 +152,7 @@ type Config struct {
 
 	BuiltinTpl util.StringSlice // specify the built-in template to use
 
-	StreamX bool
+	StreamXFeature util.OptionalString
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -172,6 +172,13 @@ func (c *Config) Pack() (res []string) {
 		if str, ok := x.Interface().(interface{ String() string }); ok {
 			res = append(res, n+"="+str.String())
 			continue
+		}
+		// For types with pointer receiver methods, try the address
+		if x.CanAddr() {
+			if str, ok := x.Addr().Interface().(interface{ String() string }); ok {
+				res = append(res, n+"="+str.String())
+				continue
+			}
 		}
 
 		switch x.Kind() {
@@ -218,6 +225,15 @@ func (c *Config) Unpack(args []string) error {
 					x.SetInt(int64(d))
 				}
 				continue
+			}
+			// Support types that implement Set(string) error (like flag.Value)
+			if x.CanAddr() {
+				if setter, ok := x.Addr().Interface().(interface{ Set(string) error }); ok {
+					if err := setter.Set(value); err != nil {
+						return fmt.Errorf("failed to set %s: %w", name, err)
+					}
+					continue
+				}
 			}
 			switch x.Kind() {
 			case reflect.Bool:
@@ -308,6 +324,14 @@ func (c *Config) IsUsingMultipleServicesTpl() bool {
 		}
 	}
 	return false
+}
+
+func (c *Config) IsUsingStreamX() bool {
+	return c.StreamXFeature.IsSet()
+}
+
+func (c *Config) IsUsingStreamxClientCallback() bool {
+	return c.StreamXFeature.String() == "client_callback"
 }
 
 func (c *Config) PkgOutputPath(pkg string) string {
@@ -484,9 +508,12 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 		Path: util.JoinPath(output, svcPkg+".go"),
 		Text: tpl.ServiceTpl,
 	}
-	if g.StreamX {
+	if g.IsUsingStreamX() {
 		cliTask.Text = tpl.ClientTplV2
 		svcTask.Text = tpl.ServiceTplV2
+		if g.IsUsingStreamxClientCallback() {
+			pkg.GenerateStreamXClientCallback = true
+		}
 	}
 	tasks := []*Task{cliTask, svrTask, svcTask}
 
@@ -536,7 +563,7 @@ func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 	pkg.ExternalKitexGen = g.Use
 	pkg.FrugalPretouch = g.FrugalPretouch
 	pkg.Module = g.ModuleName
-	pkg.StreamX = g.StreamX
+	pkg.StreamX = g.IsUsingStreamX()
 	if strings.EqualFold(g.Protocol, transport.HESSIAN2.String()) {
 		pkg.Protocol = transport.HESSIAN2
 	}
@@ -561,7 +588,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 			pkg.AddImport("transport", "github.com/cloudwego/kitex/transport")
 			pkg.AddImport("streamcall", "github.com/cloudwego/kitex/client/callopt/streamcall")
 		}
-		if !g.StreamX && pkg.HasStreaming {
+		if !g.IsUsingStreamX() && pkg.HasStreaming {
 			pkg.AddImport("streamclient", "github.com/cloudwego/kitex/client/streamclient")
 		}
 		if len(pkg.AllMethods()) > 0 {
@@ -601,7 +628,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 			pkg.AddImports("context")
 		}
 		for _, m := range pkg.ServiceInfo.AllMethods() {
-			if !g.StreamX && (m.ClientStreaming || m.ServerStreaming) {
+			if !g.IsUsingStreamX() && (m.ClientStreaming || m.ServerStreaming) {
 				pkg.AddImports("fmt")
 			}
 			if m.GenArgResultStruct {
@@ -620,7 +647,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 					pkg.AddImport(dep.PkgRefName, dep.ImportPath)
 				}
 			}
-			if m.ClientStreaming || m.ServerStreaming || (pkg.Codec == "protobuf" && !g.StreamX) {
+			if m.ClientStreaming || m.ServerStreaming || (pkg.Codec == "protobuf" && !g.IsUsingStreamX()) {
 				// protobuf handler support both PingPong and Unary (streaming) requests
 				pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
 			}

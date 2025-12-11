@@ -18,6 +18,7 @@ package rpcinfo_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -32,6 +33,9 @@ func TestRPCConfig(t *testing.T) {
 	test.Assert(t, c.ReadWriteTimeout() != 0)
 	test.Assert(t, c.IOBufferSize() != 0)
 	test.Assert(t, c.TransportProtocol() == transport.PurePayload)
+	test.Assert(t, c.StreamTimeout() == 0)
+	test.Assert(t, c.StreamRecvTimeout() == 0)
+	test.Assert(t, c.StreamSendTimeout() == 0)
 }
 
 func TestSetTransportProtocol(t *testing.T) {
@@ -138,4 +142,18 @@ func TestSetTransportProtocol(t *testing.T) {
 		rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.TTHeader)
 		test.Assert(t, (c.TransportProtocol()&transport.TTHeader == transport.TTHeader) && (c.TransportProtocol()&transport.GRPC == transport.GRPC), c.TransportProtocol())
 	})
+}
+
+func TestStreamConfig(t *testing.T) {
+	cfg := rpcinfo.NewRPCConfig()
+	c := rpcinfo.AsMutableRPCConfig(cfg)
+	stTm := 1 * time.Second
+	recvTm := 2 * time.Second
+	sendTm := 3 * time.Second
+	c.SetStreamTimeout(stTm)
+	c.SetStreamRecvTimeout(recvTm)
+	c.SetStreamSendTimeout(sendTm)
+	test.Assert(t, cfg.StreamTimeout() == stTm, cfg)
+	test.Assert(t, cfg.StreamRecvTimeout() == recvTm, cfg)
+	test.Assert(t, cfg.StreamSendTimeout() == sendTm, cfg)
 }

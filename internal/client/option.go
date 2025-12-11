@@ -49,6 +49,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
@@ -102,6 +103,9 @@ type StreamOption struct {
 type StreamOptions struct {
 	EventHandler                 stream.StreamEventHandler
 	RecvTimeout                  time.Duration
+	SendTimeout                  time.Duration
+	StreamTimeout                time.Duration
+	FinishCallback               *streaming.FinishCallback
 	StreamMiddlewares            []cep.StreamMiddleware
 	StreamMiddlewareBuilders     []cep.StreamMiddlewareBuilder
 	StreamRecvMiddlewares        []cep.StreamRecvMiddleware

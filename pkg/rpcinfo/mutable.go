@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -54,6 +55,9 @@ type MutableRPCConfig interface {
 	SetPayloadCodec(codec serviceinfo.PayloadCodec)
 
 	SetStreamRecvTimeout(timeout time.Duration)
+	SetStreamSendTimeout(timeout time.Duration)
+	SetStreamTimeout(timeout time.Duration)
+	SetStreamCallbackConfig(cfg *streaming.FinishCallback)
 }
 
 // MutableRPCStats is used to change the information in the RPCStats.

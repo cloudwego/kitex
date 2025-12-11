@@ -38,6 +38,20 @@ type Client interface {
 	{{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{.Type}}{{end}}, callOptions ...callopt.Option ) ({{if not .Void}}r {{.Resp.Type}}, {{end}}err error)
 {{- end}}
 {{- end}}
+{{- if .GenerateStreamXClientCallback}}
+{{- range .AllMethods}}
+{{- if or .ClientStreaming .ServerStreaming}}
+{{- $arg := index .Args 0}}
+{{- if and .ClientStreaming .ServerStreaming}}
+    {{.Name}}WithCallback(ctx context.Context, callback streaming.BidiStreamingCallback[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}, {{.ServiceName}}_{{.RawName}}Client], callOptions ...streamcall.Option) (err error)
+{{- else if .ClientStreaming}}
+    {{.Name}}WithCallback(ctx context.Context, callback streaming.ClientStreamingCallback[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}, {{.ServiceName}}_{{.RawName}}Client], callOptions ...streamcall.Option) (err error)
+{{- else}}
+    {{.Name}}WithCallback(ctx context.Context{{range .Args}}, {{.RawName}} {{.Type}}{{end}}, callback streaming.ServerStreamingCallback[{{NotPtr .Resp.Type}}, {{.ServiceName}}_{{.RawName}}Client], callOptions ...streamcall.Option) (err error)
+{{- end}}
+{{- end}}
+{{- end}}
+{{- end}}
 }
 
 {{range .AllMethods}}
@@ -106,6 +120,42 @@ func (p *k{{$.ServiceName}}Client) {{.Name}}(ctx context.Context {{range .Args}}
 }
 {{- end}}
 {{end}}
+{{- if .GenerateStreamXClientCallback}}
+
+{{- range .AllMethods}}
+{{- if or .ClientStreaming .ServerStreaming}}
+{{$arg := index .Args 0}}
+{{- if and .ClientStreaming .ServerStreaming}}
+func (p *k{{$.ServiceName}}Client) {{.Name}}WithCallback(ctx context.Context, callback streaming.BidiStreamingCallback[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}, {{.ServiceName}}_{{.RawName}}Client], callOptions ...streamcall.Option) (err error) {
+    ctx = client.NewCtxWithCallOptions(ctx, streamcall.GetCallOptions(callOptions))
+    st, err := p.kClient.{{.Name}}(ctx)
+    if err != nil {
+        return err
+    }
+    return streaming.HandleBidiStreaming[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}, {{.ServiceName}}_{{.RawName}}Client](st.Context(), st, callback)
+}
+{{- else if .ClientStreaming}}
+func (p *k{{$.ServiceName}}Client) {{.Name}}WithCallback(ctx context.Context, callback streaming.ClientStreamingCallback[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}, {{.ServiceName}}_{{.RawName}}Client], callOptions ...streamcall.Option) (err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, streamcall.GetCallOptions(callOptions))
+    st, err := p.kClient.{{.Name}}(ctx)
+    if err != nil {
+        return err
+    }
+    return streaming.HandleClientStreaming[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}, {{.ServiceName}}_{{.RawName}}Client](st.Context(), st, callback)
+}
+{{- else}}
+func (p *k{{$.ServiceName}}Client) {{.Name}}WithCallback(ctx context.Context{{range .Args}}, {{.RawName}} {{.Type}}{{end}}, callback streaming.ServerStreamingCallback[{{NotPtr .Resp.Type}}, {{.ServiceName}}_{{.RawName}}Client], callOptions ...streamcall.Option) (err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, streamcall.GetCallOptions(callOptions))
+    st, err := p.kClient.{{.Name}}(ctx{{range .Args}}, {{.RawName}}{{end}})
+    if err != nil {
+        return err
+    }
+    return streaming.HandleServerStreaming[{{NotPtr .Resp.Type}}, {{.ServiceName}}_{{.RawName}}Client](st.Context(), st, callback)
+}
+{{- end}}
+{{- end}}
+{{- end}}
+{{- end}}
 
 {{template "@client.go-EOF" .}}
 `
