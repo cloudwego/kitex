@@ -17,11 +17,11 @@ Kitex [kaɪt'eks] is a **high-performance** and **strong-extensibility** Go RPC 
 
 - **High Performance**
 
-Kitex integrates [Netpoll](https://github.com/cloudwego/netpoll), a high-performance network library, which offers significant performance advantage over [go net](https://pkg.go.dev/net).
+Kitex integrates [Netpoll](https://github.com/cloudwego/netpoll), a high-performance network library, which offers a significant performance advantage over [go net](https://pkg.go.dev/net).
 
 - **Extensibility**
 
-Kitex provides many interfaces with default implementation for users to customize. You can extend or inject them into Kitex to fulfill your needs (please refer to the framework extension section below).
+Kitex provides many interfaces with default implementations for users to customize. You can extend or inject them into Kitex to fulfill your needs (please refer to the framework extension section below).
 
 - **Multi-message Protocol**
 
@@ -74,7 +74,7 @@ Kitex has built-in code generation tools that support generating **Thrift**, **P
   - For Transport Protocol, Exception Instruction and Version Specification, please refer to [doc](https://www.cloudwego.io/docs/kitex/reference/).
 
 - **Best Practice**
-  - Kitex best practices in production, such as graceful shutdown, error handling, integration testing. [More](https://www.cloudwego.io/docs/kitex/best-practice/)
+  - Kitex best practices in production, such as graceful shutdown, error handling, and integration testing. [More](https://www.cloudwego.io/docs/kitex/best-practice/)
 
 - **FAQ**
 
@@ -82,7 +82,7 @@ Kitex has built-in code generation tools that support generating **Thrift**, **P
 
 ## Performance
 
-Performance benchmark can only provide limited reference. In production, there are many factors can affect actual performance.
+Performance benchmark can only provide a limited reference. In production, there are many factors that can affect actual performance.
 
 We provide the [kitex-benchmark](https://github.com/cloudwego/kitex-benchmark) project to track and compare the performance of Kitex and other frameworks under different conditions for reference.
 
@@ -113,7 +113,7 @@ Kitex is distributed under the [Apache License, version 2.0](https://github.com/
 - Email: [conduct@cloudwego.io](conduct@cloudwego.io)
 - How to become a member: [COMMUNITY MEMBERSHIP](https://github.com/cloudwego/community/blob/main/COMMUNITY_MEMBERSHIP.md)
 - Issues: [Issues](https://github.com/cloudwego/kitex/issues)
-- Discord: Join community with [Discord Channel](https://discord.gg/jceZSE7DsW).
+- Discord: Join the community with [Discord Channel](https://discord.gg/jceZSE7DsW).
 - Lark: Scan the QR code below with [Lark](https://www.larksuite.com/zh_cn/download) to join our CloudWeGo/kitex user group.
 
   ![LarkGroup](images/lark_group.png)
