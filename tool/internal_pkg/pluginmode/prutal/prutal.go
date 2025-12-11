@@ -31,6 +31,9 @@ import (
 	"github.com/cloudwego/prutal/prutalgen/pkg/prutalgen"
 )
 
+// PluginName .
+const PluginName = "prutal-gen-kitex"
+
 type PrutalGen struct {
 	g generator.Generator
 	c *generator.Config
