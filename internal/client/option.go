@@ -102,6 +102,8 @@ type StreamOption struct {
 type StreamOptions struct {
 	EventHandler                 stream.StreamEventHandler
 	RecvTimeout                  time.Duration
+	SendTimeout                  time.Duration
+	StreamTimeout                time.Duration
 	StreamMiddlewares            []cep.StreamMiddleware
 	StreamMiddlewareBuilders     []cep.StreamMiddlewareBuilder
 	StreamRecvMiddlewares        []cep.StreamRecvMiddleware

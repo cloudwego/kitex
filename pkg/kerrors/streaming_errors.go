@@ -22,3 +22,7 @@ var ErrStreamingProtocol = &basicError{"streaming protocol error"}
 
 // ErrStreamingCanceled is the parent type of all streaming canceled errors
 var ErrStreamingCanceled = &basicError{"streaming canceled"}
+
+// ErrStreamingTimeout is the parent type of all streaming timeout errors
+// including Stream timeout, Recv timeout and Send timeout
+var ErrStreamingTimeout = &basicError{"streaming timeout"}

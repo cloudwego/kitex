@@ -75,6 +75,8 @@ type TimeoutProvider interface {
 
 type StreamConfig interface {
 	StreamRecvTimeout() time.Duration
+	StreamSendTimeout() time.Duration
+	StreamTimeout() time.Duration
 }
 
 // RPCConfig contains configuration for RPC.

@@ -54,6 +54,8 @@ type MutableRPCConfig interface {
 	SetPayloadCodec(codec serviceinfo.PayloadCodec)
 
 	SetStreamRecvTimeout(timeout time.Duration)
+	SetStreamSendTimeout(timeout time.Duration)
+	SetStreamTimeout(timeout time.Duration)
 }
 
 // MutableRPCStats is used to change the information in the RPCStats.

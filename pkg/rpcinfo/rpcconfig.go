@@ -69,6 +69,8 @@ type rpcConfig struct {
 
 	// stream config
 	streamRecvTimeout time.Duration
+	streamSendTimeout time.Duration
+	streamTimeout     time.Duration
 }
 
 func init() {
@@ -202,6 +204,22 @@ func (r *rpcConfig) SetStreamRecvTimeout(timeout time.Duration) {
 
 func (r *rpcConfig) StreamRecvTimeout() time.Duration {
 	return r.streamRecvTimeout
+}
+
+func (r *rpcConfig) SetStreamSendTimeout(timeout time.Duration) {
+	r.streamSendTimeout = timeout
+}
+
+func (r *rpcConfig) StreamSendTimeout() time.Duration {
+	return r.streamSendTimeout
+}
+
+func (r *rpcConfig) SetStreamTimeout(timeout time.Duration) {
+	r.streamTimeout = timeout
+}
+
+func (r *rpcConfig) StreamTimeout() time.Duration {
+	return r.streamTimeout
 }
 
 // Clone returns a copy of the current rpcConfig.

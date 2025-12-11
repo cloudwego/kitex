@@ -97,6 +97,9 @@ type ClientStream interface {
 	CloseSend(ctx context.Context) error
 	// Context the stream context.Context
 	Context() context.Context
+	// Cancel immediately terminates the entire lifecycle of the Stream and notifies the peer of the cancel error.
+	// The passed-in err is also utilized for operations such as logging and reporting.
+	Cancel(err error)
 }
 
 // ServerStream define server stream APIs
