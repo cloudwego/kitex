@@ -170,25 +170,34 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 		pp.GenerateFile(gen, f)
 	}
 
+	// TODO: should we move this to Generator.GenerateService?
+	if len(pp.Services) > 0 {
+		// pp.PackageInfo.ServiceInfo
+		pp.ServiceInfo = pp.Services[len(pp.Services)-1]
+		var svcs []*generator.ServiceInfo
+		for _, svc := range pp.Services {
+			if svc.GenerateHandler {
+				svc.RefName = "service" + svc.ServiceName
+				svcs = append(svcs, svc)
+			}
+		}
+		pp.PackageInfo.Services = svcs
+	}
+
 	if pp.Config.GenerateMain {
 		if len(pp.Services) == 0 {
 			gen.Error(errors.New("no service defined"))
 			return
 		}
+
+		// shallow copy for main package generation backward compatibility
+		pkgInfo := pp.PackageInfo
 		if !pp.IsUsingMultipleServicesTpl() {
-			// if -tpl multiple_services is not set, specify the last service as the target service
-			pp.ServiceInfo = pp.Services[len(pp.Services)-1]
+			pkgInfo.Services = nil
 		} else {
-			var svcs []*generator.ServiceInfo
-			for _, svc := range pp.Services {
-				if svc.GenerateHandler {
-					svc.RefName = "service" + svc.ServiceName
-					svcs = append(svcs, svc)
-				}
-			}
-			pp.PackageInfo.Services = svcs
+			pkgInfo.ServiceInfo = nil
 		}
-		fs, err := pp.kg.GenerateMainPackage(&pp.PackageInfo)
+		fs, err := pp.kg.GenerateMainPackage(&pkgInfo)
 		if err != nil {
 			pp.err = err
 		}
@@ -202,7 +211,6 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 			gen.Error(errors.New("no service defined"))
 			return
 		}
-		pp.ServiceInfo = pp.Services[len(pp.Services)-1]
 		fs, err := pp.kg.GenerateCustomPackage(&pp.PackageInfo)
 		if err != nil {
 			pp.err = err

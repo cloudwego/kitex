@@ -83,24 +83,31 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 		}
 	}
 
+	// TODO: should we move this to Generator.GenerateService?
+	if len(conv.Services) > 0 {
+		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
+		var svcs []*generator.ServiceInfo
+		for _, svc := range conv.Services {
+			if svc.GenerateHandler {
+				svc.RefName = "service" + svc.ServiceName
+				svcs = append(svcs, svc)
+			}
+		}
+		conv.Package.Services = svcs
+	}
+
 	if conv.Config.GenerateMain {
 		if len(conv.Services) == 0 {
 			return conv.failResp(errors.New("no service defined in the IDL"))
 		}
+		// shallow copy for main package generation backward compatibility
+		pkgInfo := conv.Package
 		if !conv.Config.IsUsingMultipleServicesTpl() {
-			// if -tpl multiple_services is not set, specify the last service as the target service
-			conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
+			pkgInfo.Services = nil
 		} else {
-			var svcs []*generator.ServiceInfo
-			for _, svc := range conv.Services {
-				if svc.GenerateHandler {
-					svc.RefName = "service" + svc.ServiceName
-					svcs = append(svcs, svc)
-				}
-			}
-			conv.Package.Services = svcs
+			pkgInfo.ServiceInfo = nil
 		}
-		fs, err := gen.GenerateMainPackage(&conv.Package)
+		fs, err := gen.GenerateMainPackage(&pkgInfo)
 		if err != nil {
 			return conv.failResp(err)
 		}
@@ -111,7 +118,6 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 		if len(conv.Services) == 0 {
 			return conv.failResp(errors.New("no service defined in the IDL"))
 		}
-		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
 		fs, err := gen.GenerateCustomPackage(&conv.Package)
 		if err != nil {
 			return conv.failResp(err)
