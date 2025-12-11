@@ -102,6 +102,26 @@ func TestResolverMW(t *testing.T) {
 	test.Assert(t, to.GetInstance() == instance404[0])
 }
 
+func TestResolverMWErrGetConnection(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	cli := newMockClient(t, ctrl).(*kcFinalizerClient)
+	mw := newResolveMWBuilder(cli.lbf)(ctx)
+	ep := func(ctx context.Context, request, response interface{}) error {
+		return kerrors.ErrGetConnection
+	}
+
+	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "mock_to_service"}, "")
+	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
+
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	req := new(MockTStruct)
+	res := new(MockTStruct)
+	err := mw(ep)(ctx, req, res)
+	test.Assert(t, err == kerrors.ErrGetConnection)
+}
+
 func TestResolverMWOutOfInstance(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

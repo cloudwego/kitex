@@ -134,7 +134,7 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 					}
 					if retryable(err) {
 						lastErr = err
-						klog.CtxWarnf(ctx, "KITEX: auto retry retryable error, retry=%d error=%s", i+1, err.Error())
+						klog.CtxWarnf(ctx, "KITEX: auto retry retryable error, to_service=%s, retry=%d error=%s", dest.ServiceName(), i+1, err.Error())
 						continue
 					}
 					return err
