@@ -27,13 +27,22 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
-type mockStreamWriter struct{}
+type mockStreamWriter struct {
+	writeFrameFunc  func(f *Frame) error
+	closeStreamFunc func(sid int32) error
+}
 
 func (m mockStreamWriter) WriteFrame(f *Frame) error {
+	if m.writeFrameFunc != nil {
+		return m.writeFrameFunc(f)
+	}
 	return nil
 }
 
 func (m mockStreamWriter) CloseStream(sid int32) error {
+	if m.closeStreamFunc != nil {
+		return m.closeStreamFunc(sid)
+	}
 	return nil
 }
 
