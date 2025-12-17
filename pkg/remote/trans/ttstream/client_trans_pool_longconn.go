@@ -24,10 +24,12 @@ import (
 
 var DefaultLongConnConfig = LongConnConfig{
 	MaxIdleTimeout: time.Minute,
+	DialTimeout:    time.Second,
 }
 
 type LongConnConfig struct {
 	MaxIdleTimeout time.Duration
+	DialTimeout    time.Duration
 }
 
 func newLongConnTransPool(config LongConnConfig) transPool {
@@ -35,6 +37,9 @@ func newLongConnTransPool(config LongConnConfig) transPool {
 	tp.config = DefaultLongConnConfig
 	if config.MaxIdleTimeout > 0 {
 		tp.config.MaxIdleTimeout = config.MaxIdleTimeout
+	}
+	if config.DialTimeout > 0 {
+		tp.config.DialTimeout = config.DialTimeout
 	}
 	tp.transPool = container.NewObjectPool(tp.config.MaxIdleTimeout)
 	return tp
@@ -58,7 +63,7 @@ func (c *longConnTransPool) Get(network, addr string) (trans *clientTransport, e
 	}
 
 	// create new connection
-	conn, err := dialer.DialConnection(network, addr, time.Second)
+	conn, err := dialer.DialConnection(network, addr, c.config.DialTimeout)
 	if err != nil {
 		return nil, err
 	}

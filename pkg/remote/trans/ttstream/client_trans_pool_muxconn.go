@@ -32,11 +32,13 @@ import (
 var DefaultMuxConnConfig = MuxConnConfig{
 	PoolSize:       runtime.GOMAXPROCS(0),
 	MaxIdleTimeout: time.Minute,
+	DialTimeout:    time.Second,
 }
 
 type MuxConnConfig struct {
 	PoolSize       int
 	MaxIdleTimeout time.Duration
+	DialTimeout    time.Duration
 }
 
 var _ transPool = (*muxConnTransPool)(nil)
@@ -94,7 +96,7 @@ func (tl *muxConnTransList) Get(network, addr string) (*clientTransport, error) 
 		return trans, nil
 	}
 	// it may create more than tl.size transport if multi client try to get transport concurrently
-	conn, err := dialer.DialConnection(network, addr, time.Second)
+	conn, err := dialer.DialConnection(network, addr, tl.pool.config.DialTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +114,16 @@ func (tl *muxConnTransList) Get(network, addr string) (*clientTransport, error) 
 
 func newMuxConnTransPool(config MuxConnConfig) transPool {
 	t := new(muxConnTransPool)
-	t.config = config
+	t.config = DefaultMuxConnConfig
+	if config.PoolSize > 0 {
+		t.config.PoolSize = config.PoolSize
+	}
+	if config.MaxIdleTimeout > 0 {
+		t.config.MaxIdleTimeout = config.MaxIdleTimeout
+	}
+	if config.DialTimeout > 0 {
+		t.config.DialTimeout = config.DialTimeout
+	}
 	return t
 }
 
