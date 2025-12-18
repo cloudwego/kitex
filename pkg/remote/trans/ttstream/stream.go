@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
+	"github.com/cloudwego/kitex/internal/utils/contextwatcher"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	ktransport "github.com/cloudwego/kitex/transport"
@@ -166,6 +167,7 @@ func (s *stream) runCloseCallback(exception error) {
 			cb(exception)
 		}
 	}
+	contextwatcher.DeregisterContext(s.ctx)
 	_ = s.writer.CloseStream(s.sid)
 }
 

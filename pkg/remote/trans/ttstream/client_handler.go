@@ -22,6 +22,7 @@ import (
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
+	"github.com/cloudwego/kitex/internal/utils/contextwatcher"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -84,6 +85,8 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	// stream should be configured before WriteStream or there would be a race condition for metaFrameHandler
 	cs.setRecvTimeout(rconfig.StreamRecvTimeout())
 	cs.setMetaFrameHandler(c.metaHandler)
+
+	contextwatcher.RegisterContext(ctx, cs.ctxDoneCallback)
 
 	if err = trans.WriteStream(ctx, cs, intHeader, strHeader); err != nil {
 		return nil, err
