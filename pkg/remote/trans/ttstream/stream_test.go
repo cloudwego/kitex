@@ -20,9 +20,7 @@ package ttstream
 
 import (
 	"context"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
@@ -55,26 +53,6 @@ func TestGenericStreaming(t *testing.T) {
 	// test.Assert(t, err == nil, err)
 	// test.Assert(t, res.A == req.A)
 	// test.Assert(t, res.B == req.B)
-}
-
-// TestStreamRecvTimeout tests that RecvMsg correctly handles timeout scenarios
-func TestStreamRecvTimeout(t *testing.T) {
-	_, ss, err := newTestStreamPipe(testServiceInfo, "Bidi")
-	test.Assert(t, err == nil, err)
-
-	// Set a very short timeout for testing
-	ss.setRecvTimeout(time.Millisecond * 10)
-
-	// Create a context that won't expire
-	ctx := context.Background()
-
-	// Try to receive message - should timeout quickly
-	res := new(testResponse)
-	err = ss.RecvMsg(ctx, res)
-	test.Assert(t, err != nil, "RecvMsg should timeout")
-	test.Assert(t, strings.Contains(err.Error(), "timeout") ||
-		strings.Contains(err.Error(), "deadline exceeded"),
-		"Error should be timeout related")
 }
 
 // TestStreamRecvWithCancellation tests that RecvMsg respects context cancellation

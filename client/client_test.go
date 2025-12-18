@@ -1266,22 +1266,66 @@ func Test_initRPCInfoWithStreamClientCallOption(t *testing.T) {
 	mtd := mocks.MockMethod
 	svcInfo := mocks.ServiceInfo()
 	callOptTimeout := 1 * time.Second
+	cliTimeout := 2 * time.Second
 	testService := "testService"
 
-	// config call option
-	cliIntf, err := NewClient(svcInfo, WithTransportProtocol(transport.TTHeaderStreaming), WithDestService(testService))
-	test.Assert(t, err == nil, err)
-	cli := cliIntf.(*kcFinalizerClient)
-	ctx := NewCtxWithCallOptions(context.Background(), streamcall.GetCallOptions([]streamcall.Option{streamcall.WithRecvTimeout(callOptTimeout)}))
-	_, ri, _ := cli.initRPCInfo(ctx, mtd, 0, nil, true)
-	test.Assert(t, ri.Config().StreamRecvTimeout() == callOptTimeout)
+	testcases := []struct {
+		desc       string
+		cliOpt     StreamOption
+		callOpt    streamcall.Option
+		verifyFunc func(t *testing.T, ri rpcinfo.RPCInfo, isPureCli bool)
+	}{
+		{
+			desc:    "stream recv timeout",
+			cliOpt:  WithStreamRecvTimeout(cliTimeout),
+			callOpt: streamcall.WithRecvTimeout(callOptTimeout),
+			verifyFunc: func(t *testing.T, ri rpcinfo.RPCInfo, isPureCli bool) {
+				if isPureCli {
+					test.Assert(t, ri.Config().StreamRecvTimeout() == cliTimeout, ri)
+				} else {
+					test.Assert(t, ri.Config().StreamRecvTimeout() == callOptTimeout, ri)
+				}
+			},
+		},
+		{
+			desc:    "stream send timeout",
+			cliOpt:  WithStreamSendTimeout(cliTimeout),
+			callOpt: streamcall.WithSendTimeout(callOptTimeout),
+			verifyFunc: func(t *testing.T, ri rpcinfo.RPCInfo, isPureCli bool) {
+				if isPureCli {
+					test.Assert(t, ri.Config().StreamSendTimeout() == cliTimeout, ri)
+				} else {
+					test.Assert(t, ri.Config().StreamSendTimeout() == callOptTimeout, ri)
+				}
+			},
+		},
+		{
+			desc:    "stream timeout",
+			cliOpt:  WithStreamTimeout(cliTimeout),
+			callOpt: streamcall.WithStreamTimeout(callOptTimeout),
+			verifyFunc: func(t *testing.T, ri rpcinfo.RPCInfo, isPureCli bool) {
+				if isPureCli {
+					test.Assert(t, ri.Config().StreamTimeout() == cliTimeout, ri)
+				} else {
+					test.Assert(t, ri.Config().StreamTimeout() == callOptTimeout, ri)
+				}
+			},
+		},
+	}
 
-	// call option has higher priority
-	cliTimeout := 2 * time.Second
-	cliIntf, err = NewClient(svcInfo, WithTransportProtocol(transport.TTHeaderStreaming), WithStreamOptions(WithStreamRecvTimeout(cliTimeout)), WithDestService(testService))
-	test.Assert(t, err == nil, err)
-	cli = cliIntf.(*kcFinalizerClient)
-	ctx = NewCtxWithCallOptions(context.Background(), streamcall.GetCallOptions([]streamcall.Option{streamcall.WithRecvTimeout(callOptTimeout)}))
-	_, ri, _ = cli.initRPCInfo(ctx, mtd, 0, nil, true)
-	test.Assert(t, ri.Config().StreamRecvTimeout() == callOptTimeout)
+	for _, tc := range testcases {
+		t.Run(tc.desc, func(t *testing.T) {
+			// config client option
+			cliIntf, err := NewClient(svcInfo, WithTransportProtocol(transport.TTHeaderStreaming), WithDestService(testService), WithStreamOptions(tc.cliOpt))
+			test.Assert(t, err == nil, err)
+			cli := cliIntf.(*kcFinalizerClient)
+			_, ri, _ := cli.initRPCInfo(ctx, mtd, 0, nil, true)
+			tc.verifyFunc(t, ri, true)
+
+			// call option has higher priority
+			ctx = NewCtxWithCallOptions(context.Background(), streamcall.GetCallOptions([]streamcall.Option{tc.callOpt}))
+			_, ri, _ = cli.initRPCInfo(ctx, mtd, 0, nil, true)
+			tc.verifyFunc(t, ri, false)
+		})
+	}
 }

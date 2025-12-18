@@ -31,6 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -173,6 +174,18 @@ func (c *clientConn) Close() error {
 func (c *clientConn) Header() (metadata.MD, error) { return c.s.Header() }
 func (c *clientConn) Trailer() metadata.MD         { return c.s.Trailer() }
 func (c *clientConn) GetRecvCompress() string      { return c.s.RecvCompress() }
+
+func (c *clientConn) Cancel(err error) {
+	var finalErr error
+	if err == nil {
+		finalErr = status.Err(codes.Canceled, context.Canceled.Error())
+	} else if _, ok := err.(*status.Error); ok {
+		finalErr = err
+	} else {
+		finalErr = status.Errorf(codes.Canceled, err.Error())
+	}
+	c.tr.CloseStream(c.s, finalErr)
+}
 
 type hasGetRecvCompress interface {
 	GetRecvCompress() string

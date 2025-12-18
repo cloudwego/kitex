@@ -21,11 +21,14 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/remote"
+	streaming_types "github.com/cloudwego/kitex/pkg/streaming/types"
 )
 
 func TestErrors(t *testing.T) {
@@ -35,8 +38,8 @@ func TestErrors(t *testing.T) {
 	test.Assert(t, errors.Is(newErr, kerrors.ErrStreamingProtocol), newErr)
 	test.Assert(t, strings.Contains(newErr.Error(), causeErr.Error()))
 
-	appErr := errApplicationException.newBuilder().withCause(causeErr)
-	test.Assert(t, errors.Is(appErr, errApplicationException), appErr)
+	appErr := ErrApplicationException.newBuilder().withCause(causeErr)
+	test.Assert(t, errors.Is(appErr, ErrApplicationException), appErr)
 	test.Assert(t, !errors.Is(appErr, kerrors.ErrStreamingProtocol), appErr)
 	test.Assert(t, strings.Contains(appErr.Error(), causeErr.Error()))
 
@@ -56,7 +59,7 @@ func TestCommonParentKerror(t *testing.T) {
 	for _, err := range errs {
 		test.Assert(t, errors.Is(err, kerrors.ErrStreamingProtocol), err)
 	}
-	test.Assert(t, !errors.Is(errApplicationException, kerrors.ErrStreamingProtocol))
+	test.Assert(t, !errors.Is(ErrApplicationException, kerrors.ErrStreamingProtocol))
 
 	// canceled Exception
 	errs = []error{
@@ -69,6 +72,9 @@ func TestCommonParentKerror(t *testing.T) {
 	for _, err := range errs {
 		test.Assert(t, errors.Is(err, kerrors.ErrStreamingCanceled), err)
 	}
+
+	// timeout Exception
+	test.Assert(t, errors.Is(errStreamTimeout, kerrors.ErrStreamingTimeout))
 }
 
 func TestGetTypeId(t *testing.T) {
@@ -78,14 +84,14 @@ func TestGetTypeId(t *testing.T) {
 		err          error
 		expectTypeId int32
 	}{
-		{err: errApplicationException, expectTypeId: 12001},
+		{err: ErrApplicationException, expectTypeId: 12001},
 		{err: errUnexpectedHeader, expectTypeId: 12002},
 		{err: errIllegalBizErr, expectTypeId: 12003},
 		{err: errIllegalFrame, expectTypeId: 12004},
 		{err: errIllegalOperation, expectTypeId: 12005},
 		{err: errTransport, expectTypeId: 12006},
-		{err: errApplicationException.newBuilder().withCauseAndTypeId(exception, 1000), expectTypeId: 1000},
-		{err: errApplicationException.newBuilder().withCause(normalErr), expectTypeId: 12001},
+		{err: ErrApplicationException.newBuilder().withCauseAndTypeId(exception, 1000), expectTypeId: 1000},
+		{err: ErrApplicationException.newBuilder().withCause(normalErr), expectTypeId: 12001},
 	}
 
 	for _, testcase := range testcases {
@@ -155,6 +161,62 @@ func TestCanceledException(t *testing.T) {
 		t.Log(ex5)
 		test.Assert(t, errors.Is(ex5, kerrors.ErrStreamingCanceled))
 		test.Assert(t, errors.Is(ex5, errUpstreamCancel))
+	})
+}
+
+func TestTimeoutException(t *testing.T) {
+	t.Run("stream timeout", func(t *testing.T) {
+		// [ttstream error, code=12014] [client-side stream] timeout config: 1s
+		clientEx := NewTimeoutException(streaming_types.StreamTimeout, remote.Client, time.Second)
+		t.Log(clientEx)
+		test.Assert(t, clientEx != nil)
+		test.Assert(t, errors.Is(clientEx, kerrors.ErrStreamingTimeout))
+		test.Assert(t, errors.Is(clientEx, errStreamTimeout))
+		test.Assert(t, clientEx.TypeId() == 12014, clientEx.TypeId())
+
+		// [ttstream error, code=12014] [server-side stream] timeout config: 2s
+		serverEx := NewTimeoutException(streaming_types.StreamTimeout, remote.Server, 2*time.Second)
+		t.Log(serverEx)
+		test.Assert(t, serverEx != nil)
+		test.Assert(t, errors.Is(serverEx, kerrors.ErrStreamingTimeout))
+		test.Assert(t, errors.Is(serverEx, errStreamTimeout))
+		test.Assert(t, serverEx.TypeId() == 12014, serverEx.TypeId())
+	})
+
+	t.Run("stream recv timeout", func(t *testing.T) {
+		// [ttstream error, code=12015] [client-side stream] timeout config: 500ms
+		clientEx := NewTimeoutException(streaming_types.StreamRecvTimeout, remote.Client, 500*time.Millisecond)
+		t.Log(clientEx)
+		test.Assert(t, clientEx != nil)
+		test.Assert(t, errors.Is(clientEx, kerrors.ErrStreamingTimeout))
+		test.Assert(t, errors.Is(clientEx, errStreamRecvTimeout))
+		test.Assert(t, clientEx.TypeId() == 12015, clientEx.TypeId())
+
+		// [ttstream error, code=12015] [server-side stream] timeout config: 1s
+		serverEx := NewTimeoutException(streaming_types.StreamRecvTimeout, remote.Server, time.Second)
+		t.Log(serverEx)
+		test.Assert(t, serverEx != nil)
+		test.Assert(t, errors.Is(serverEx, kerrors.ErrStreamingTimeout))
+		test.Assert(t, errors.Is(serverEx, errStreamRecvTimeout))
+		test.Assert(t, serverEx.TypeId() == 12015, serverEx.TypeId())
+	})
+
+	t.Run("stream send timeout", func(t *testing.T) {
+		// [ttstream error, code=12016] [client-side stream] timeout config: 800ms
+		clientEx := NewTimeoutException(streaming_types.StreamSendTimeout, remote.Client, 800*time.Millisecond)
+		t.Log(clientEx)
+		test.Assert(t, clientEx != nil)
+		test.Assert(t, errors.Is(clientEx, kerrors.ErrStreamingTimeout))
+		test.Assert(t, errors.Is(clientEx, errStreamSendTimeout))
+		test.Assert(t, clientEx.TypeId() == 12016, clientEx.TypeId())
+
+		// [ttstream error, code=12016] [server-side stream] timeout config: 1.5s
+		serverEx := NewTimeoutException(streaming_types.StreamSendTimeout, remote.Server, 1500*time.Millisecond)
+		t.Log(serverEx)
+		test.Assert(t, serverEx != nil)
+		test.Assert(t, errors.Is(serverEx, kerrors.ErrStreamingTimeout))
+		test.Assert(t, errors.Is(serverEx, errStreamSendTimeout))
+		test.Assert(t, serverEx.TypeId() == 12016, serverEx.TypeId())
 	})
 }
 

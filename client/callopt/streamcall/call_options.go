@@ -17,10 +17,12 @@
 package streamcall
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/cloudwego/kitex/client/callopt"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // These options are directly translated from callopt.Option(s). If you can't find the option with the
@@ -48,7 +50,6 @@ func WithTag(key, val string) Option {
 }
 
 // WithRecvTimeout add recv timeout for stream.Recv function.
-// NOTICE: ONLY effective for ttheader streaming protocol for now.
 func WithRecvTimeout(d time.Duration) Option {
 	return Option{f: func(o *callopt.CallOptions, di *strings.Builder) {
 		di.WriteString("WithRecvTimeout(")
@@ -56,5 +57,37 @@ func WithRecvTimeout(d time.Duration) Option {
 		di.WriteString(")")
 
 		o.StreamOptions.RecvTimeout = d
+	}}
+}
+
+// WithSendTimeout add send timeout for stream.Send function.
+func WithSendTimeout(d time.Duration) Option {
+	return Option{f: func(o *callopt.CallOptions, di *strings.Builder) {
+		di.WriteString("WithSendTimeout(")
+		di.WriteString(d.String())
+		di.WriteString(")")
+
+		o.StreamOptions.SendTimeout = d
+	}}
+}
+
+// WithStreamTimeout add timeout for whole stream.
+func WithStreamTimeout(d time.Duration) Option {
+	return Option{f: func(o *callopt.CallOptions, di *strings.Builder) {
+		di.WriteString("WithStreamTimeout(")
+		di.WriteString(d.String())
+		di.WriteString(")")
+
+		o.StreamOptions.StreamTimeout = d
+	}}
+}
+
+// WithCallbackConfig adds and calls FinishCallback when client-side stream
+// has finished.
+func WithCallbackConfig(cfg *streaming.FinishCallback) Option {
+	return Option{f: func(o *callopt.CallOptions, di *strings.Builder) {
+		fmt.Fprintf(di, "WithCallbackConfig(%+v)", cfg)
+
+		o.StreamOptions.FinishCallback = cfg
 	}}
 }

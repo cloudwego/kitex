@@ -22,10 +22,11 @@ import (
 	"strings"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	streaming_types "github.com/cloudwego/kitex/pkg/streaming/types"
 )
 
 var (
-	errApplicationException = newException("application exception", nil, 12001)
+	ErrApplicationException = newException("application exception", nil, 12001)
 	errUnexpectedHeader     = newException("unexpected header frame", kerrors.ErrStreamingProtocol, 12002)
 	errIllegalBizErr        = newException("illegal bizErr", kerrors.ErrStreamingProtocol, 12003)
 	errIllegalFrame         = newException("illegal frame", kerrors.ErrStreamingProtocol, 12004)
@@ -33,13 +34,17 @@ var (
 	errTransport            = newException("transport is closing", kerrors.ErrStreamingProtocol, 12006)
 
 	errBizCancel = newException("user code invoking stream RPC with context processed by context.WithCancel or context.WithTimeout, then invoking cancel() actively",
-		kerrors.ErrStreamingCanceled, 12007)
-	errBizCancelWithCause     = newException("user code canceled with cancelCause(error)", kerrors.ErrStreamingCanceled, 12008)
-	errDownstreamCancel       = newException("canceled by downstream", kerrors.ErrStreamingCanceled, 12009)
-	errUpstreamCancel         = newException("canceled by upstream", kerrors.ErrStreamingCanceled, 12010)
+		kerrors.ErrStreamingCanceled, 12007).withCancelType(streaming_types.ActiveCancel)
+	errBizCancelWithCause     = newException("user code canceled with cancelCause(error)", kerrors.ErrStreamingCanceled, 12008).withCancelType(streaming_types.ActiveCancel)
+	errDownstreamCancel       = newException("canceled by downstream", kerrors.ErrStreamingCanceled, 12009).withCancelType(streaming_types.RemoteCascadedCancel)
+	errUpstreamCancel         = newException("canceled by upstream", kerrors.ErrStreamingCanceled, 12010).withCancelType(streaming_types.RemoteCascadedCancel)
 	errInternalCancel         = newException("internal canceled", kerrors.ErrStreamingCanceled, 12011)
-	errBizHandlerReturnCancel = newException("canceled by business handler returning", kerrors.ErrStreamingCanceled, 12012)
-	errConnectionClosedCancel = newException("canceled by connection closed", kerrors.ErrStreamingCanceled, 12013)
+	errBizHandlerReturnCancel = newException("canceled by business handler returning", kerrors.ErrStreamingCanceled, 12012).withCancelType(streaming_types.LocalCascadedCancel)
+	errConnectionClosedCancel = newException("canceled by connection closed", kerrors.ErrStreamingCanceled, 12013).withCancelType(streaming_types.LocalCascadedCancel)
+
+	errStreamTimeout     = newException("stream timeout", kerrors.ErrStreamingTimeout, 12014).withTimeoutType(streaming_types.StreamTimeout)
+	errStreamRecvTimeout = newException("stream Recv timeout", kerrors.ErrStreamingTimeout, 12015).withTimeoutType(streaming_types.StreamRecvTimeout)
+	errStreamSendTimeout = newException("stream Send timeout", kerrors.ErrStreamingTimeout, 12016).withTimeoutType(streaming_types.StreamSendTimeout)
 )
 
 const (
@@ -54,8 +59,10 @@ type Exception struct {
 	typeId  int32
 
 	// extended information, for better troubleshooting experience
-	side       sideType
-	cancelPath string
+	side        sideType
+	cancelPath  string
+	cancelType  streaming_types.CancelType
+	timeoutType streaming_types.TimeoutType
 
 	// error hierarchy
 	parent error
@@ -143,6 +150,18 @@ func (e *Exception) isCancelPathSet() bool {
 	return e.bitSet&setCancelPath != 0
 }
 
+func (e *Exception) withTimeoutType(typ streaming_types.TimeoutType) *Exception {
+	// there is no need to modify bitSet since timeoutType would not be printed
+	e.timeoutType = typ
+	return e
+}
+
+func (e *Exception) withCancelType(typ streaming_types.CancelType) *Exception {
+	// there is no need to modify bitSet since cancelType would not be printed
+	e.cancelType = typ
+	return e
+}
+
 func (e *Exception) Is(target error) bool {
 	if rawEx, ok := target.(*Exception); ok {
 		return rawEx.message == e.message
@@ -161,10 +180,25 @@ func (e *Exception) TypeId() int32 {
 	return e.typeId
 }
 
+func (e *Exception) TimeoutType() streaming_types.TimeoutType {
+	return e.timeoutType
+}
+
+func (e *Exception) CancelType() streaming_types.CancelType {
+	return e.cancelType
+}
+
+func (e *Exception) CancelPaths() []string {
+	if e.cancelPath == "" {
+		return nil
+	}
+	return strings.Split(e.cancelPath, ",")
+}
+
 // appendCancelPath is a common util func to process cancelPath metadata in Rst Frame and Exception
 func appendCancelPath(oriCp, node string) string {
 	if len(oriCp) > 0 {
-		return strings.Join([]string{oriCp, node}, ",")
+		return oriCp + "," + node
 	}
 	return node
 }

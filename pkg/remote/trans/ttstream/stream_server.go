@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
@@ -33,8 +34,9 @@ var _ ServerStreamMeta = (*serverStream)(nil)
 
 func newServerStream(ctx context.Context, writer streamWriter, smeta streamFrame) *serverStream {
 	s := newBasicStream(ctx, writer, smeta)
-	s.reader = newStreamReader()
-	return &serverStream{stream: s}
+	ss := &serverStream{stream: s}
+	s.reader = newStreamReaderWithCtxDoneCallback(ss.ctxDoneCallback)
+	return ss
 }
 
 // initial state: streamStateActive
@@ -51,6 +53,7 @@ type serverStream struct {
 	*stream
 	state      int32
 	cancelFunc cancelWithReason
+	timeout    time.Duration
 }
 
 func (s *serverStream) SetHeader(hd streaming.Header) error {
@@ -148,7 +151,7 @@ func (s *serverStream) close(exception *Exception) error {
 	}
 
 	s.reader.close(exception)
-	s.runCloseCallback(exception)
+	s.runCloseCallback()
 
 	return nil
 }
@@ -161,7 +164,7 @@ func (s *serverStream) onReadTrailerFrame(fr *Frame) (err error) {
 	if len(fr.payload) > 0 {
 		// exception is type of (*thrift.ApplicationException)
 		_, _, err = thrift.UnmarshalFastMsg(fr.payload, nil)
-		exception = errApplicationException.newBuilder().withSide(serverSide).withCause(err)
+		exception = ErrApplicationException.newBuilder().withSide(serverSide).withCause(err)
 	} else if len(fr.trailer) > 0 {
 		// when server-side returns biz error, payload is empty and biz error information is stored in trailer frame header
 		bizErr, err := transmeta.ParseBizStatusErr(fr.trailer)
@@ -230,6 +233,29 @@ func (s *serverStream) closeTest(exception error, cancelPath string) error {
 	if err := s.sendRst(exception, cancelPath); err != nil {
 		return err
 	}
-	s.runCloseCallback(exception)
+	s.runCloseCallback()
 	return nil
+}
+
+func (s *serverStream) ctxDoneCallback(ctx context.Context) {
+	finalEx := s.parseCtxErr(ctx)
+	s.close(finalEx)
+}
+
+func (s *serverStream) parseCtxErr(ctx context.Context) (finalEx *Exception) {
+	cErr := ctx.Err()
+	switch cErr {
+	// stream timeout
+	case context.DeadlineExceeded:
+		finalEx = newTimeoutException(errStreamTimeout, serverSide, s.timeout)
+	// other close stream scenarios, there is no need to process
+	default:
+		if ex, ok := cErr.(*Exception); ok {
+			finalEx = ex
+		} else {
+			finalEx = errInternalCancel.newBuilder().withSide(serverSide).withCause(cErr)
+		}
+	}
+
+	return finalEx
 }
