@@ -16,12 +16,17 @@
 
 package generic
 
-import "github.com/cloudwego/kitex/pkg/generic/thrift"
+import (
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
+
+	dthrift "github.com/cloudwego/dynamicgo/thrift"
+)
 
 type thriftIDLProviderOptions struct {
-	parseMode   *thrift.ParseMode
-	goTag       *goTagOption
-	serviceName string
+	parseMode    *thrift.ParseMode
+	goTag        *goTagOption
+	serviceName  string
+	dynamicGoOpt *dthrift.Options
 }
 
 type goTagOption struct {
@@ -59,5 +64,12 @@ func WithGoTagDisabled(disable bool) ThriftIDLProviderOption {
 func WithIDLServiceName(serviceName string) ThriftIDLProviderOption {
 	return ThriftIDLProviderOption{F: func(opt *thriftIDLProviderOptions) {
 		opt.serviceName = serviceName
+	}}
+}
+
+// WithDynamicGoOptions passes the dynamicgo parsing options.
+func WithDynamicGoOptions(opts *dthrift.Options) ThriftIDLProviderOption {
+	return ThriftIDLProviderOption{F: func(opt *thriftIDLProviderOptions) {
+		opt.dynamicGoOpt = opts
 	}}
 }
