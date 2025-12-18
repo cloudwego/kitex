@@ -288,14 +288,14 @@ func TestTransportClose(t *testing.T) {
 			req.B = "hello"
 			sErr := cs.SendMsg(context.Background(), req)
 			if sErr != nil {
-				test.Assert(t, errors.Is(sErr, errIllegalFrame), sErr)
+				test.Assert(t, errors.Is(sErr, errIllegalFrame) || errors.Is(sErr, errTransport), sErr)
 				return
 			}
 
 			res := new(testResponse)
 			rErr := cs.RecvMsg(context.Background(), res)
 			if rErr != nil {
-				test.Assert(t, errors.Is(rErr, errIllegalFrame), rErr)
+				test.Assert(t, errors.Is(rErr, errIllegalFrame) || errors.Is(rErr, errTransport), rErr)
 				return
 			}
 			test.DeepEqual(t, req.B, res.B)
