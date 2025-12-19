@@ -824,7 +824,7 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)
-		go func() {
+		localsession.Go(func() {
 			defer wg.Done()
 
 			// miss context here
@@ -839,7 +839,7 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 				test.Assert(t, !ok, "can get metainfo")
 				test.Assert(t, ctx.Value(k1) != v1, "can get v1")
 			}
-		}()
+		})
 		wg.Wait()
 
 		return &mocks.MyResponse{Name: "mock"}, nil
