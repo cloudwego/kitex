@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/cloudwego/kitex/tool/cmd/kitex/utils"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util/env"
 
 	"github.com/cloudwego/kitex/tool/cmd/kitex/sdk"
@@ -97,6 +98,22 @@ func main() {
 			os.Exit(versions.CompatibilityCheckExitCode)
 		}
 	}
+
+	// git clone or checkout dependencies if needed
+	for i, inc := range args.Includes {
+		if strings.HasPrefix(inc, "git@") || strings.HasPrefix(inc, "http://") || strings.HasPrefix(inc, "https://") {
+			localGitPath, errMsg, err := util.RunGitCommand(inc)
+			if err != nil {
+				if errMsg == "" {
+					errMsg = err.Error()
+				}
+				log.Errorf("git checkout %q err: %s\ntry remove ~/.kitex and try again.", inc, errMsg)
+				os.Exit(1)
+			}
+			args.Includes[i] = localGitPath
+		}
+	}
+
 	if args.IsProtobuf() {
 		// Whether using protoc or prutal, no longer generate the fast api for protobuf
 		args.Config.NoFastAPI = true
