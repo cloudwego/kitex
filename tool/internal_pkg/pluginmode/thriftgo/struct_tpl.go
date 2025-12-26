@@ -738,7 +738,7 @@ const FieldDeepCopyBaseType = `
 	{{- end}}
 	{{- if .IsPointer}}
 		if {{$Src}} != nil {
-			{{- if .Type.Category.IsBinary}}
+			{{- if and .Type.Category.IsBinary (not (IsGoStringType .TypeName))}}
 			tmp := make([]byte, len(*{{$Src}}))
 			if len(*{{$Src}}) != 0 {
 				copy(tmp, *{{$Src}})
@@ -750,7 +750,7 @@ const FieldDeepCopyBaseType = `
 			{{- end}}
 		}
 	{{- else}}
-		{{- if .Type.Category.IsBinary}}
+		{{- if and .Type.Category.IsBinary (not (IsGoStringType .TypeName))}}
 		if len({{$Src}}) != 0 {
 			tmp := make([]byte, len({{$Src}}))
 			copy(tmp, {{$Src}})
