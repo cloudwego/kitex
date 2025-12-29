@@ -119,7 +119,7 @@ func (t *clientTransport) Close(exception error) (err error) {
 	// close streams first
 	t.streams.Range(func(key, value any) bool {
 		s := value.(*clientStream)
-		s.close(exception, false, "")
+		s.close(exception, false, "", nil)
 		return true
 	})
 	// then close stream and frame pipes

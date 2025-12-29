@@ -16,6 +16,8 @@
 
 package ttstream
 
+import "github.com/cloudwego/kitex/pkg/rpcinfo"
+
 // ClientHandlerOption define client handler options
 type ClientHandlerOption func(cp *clientTransHandler)
 
@@ -54,5 +56,12 @@ func WithClientShortConnPool() ClientHandlerOption {
 func WithClientMuxConnPool(config MuxConnConfig) ClientHandlerOption {
 	return func(cp *clientTransHandler) {
 		cp.transPool = newMuxConnTransPool(config)
+	}
+}
+
+// WithClientTraceController configures TraceController to report detailed streaming events
+func WithClientTraceController(traceCtl *rpcinfo.TraceController) ClientHandlerOption {
+	return func(cp *clientTransHandler) {
+		cp.traceCtl = traceCtl
 	}
 }

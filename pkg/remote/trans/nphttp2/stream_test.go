@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 func TestStream(t *testing.T) {
@@ -37,7 +38,7 @@ func TestStream(t *testing.T) {
 
 	handler, err := NewSvrTransHandlerFactory().NewTransHandler(opt)
 	test.Assert(t, err == nil, err)
-	ctx := newMockCtxWithRPCInfo()
+	ctx := newMockCtxWithRPCInfo(serviceinfo.StreamingNone)
 
 	// test newServerStream()
 	stream := newServerStream(ctx, serverConn, handler)

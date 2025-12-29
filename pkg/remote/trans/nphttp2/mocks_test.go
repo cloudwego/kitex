@@ -279,7 +279,10 @@ var (
 
 const defaultMockReadWriteBufferSize = 16
 
-func newMockConnPool() *connPool {
+func newMockConnPool(traceCtl *rpcinfo.TraceController) *connPool {
+	if traceCtl == nil {
+		traceCtl = &rpcinfo.TraceController{}
+	}
 	connPool := NewConnPool("test", uint32(0), grpc.ConnectOptions{
 		KeepaliveParams:       grpc.ClientKeepalive{},
 		InitialWindowSize:     0,
@@ -287,6 +290,7 @@ func newMockConnPool() *connPool {
 		WriteBufferSize:       defaultMockReadWriteBufferSize,
 		ReadBufferSize:        defaultMockReadWriteBufferSize,
 		MaxHeaderListSize:     nil,
+		TraceController:       traceCtl,
 	})
 	return connPool
 }
@@ -309,7 +313,7 @@ func newMockServerOption() *remote.ServerOption {
 		MaxConnectionIdleTime: 0,
 		ReadWriteTimeout:      0,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-			return newMockRPCInfo()
+			return newMockRPCInfo(serviceinfo.StreamingNone)
 		},
 		TracerCtl: &rpcinfo.TraceController{},
 		GRPCCfg: &grpc.ServerConfig{
@@ -324,13 +328,13 @@ func newMockServerOption() *remote.ServerOption {
 	}
 }
 
-func newMockClientOption() *remote.ClientOption {
+func newMockClientOption(ctl *rpcinfo.TraceController) *remote.ClientOption {
 	return &remote.ClientOption{
 		SvcInfo:           nil,
 		CliHandlerFactory: nil,
 		Codec:             nil,
 		PayloadCodec:      nil,
-		ConnPool:          newMockConnPool(),
+		ConnPool:          newMockConnPool(ctl),
 		Dialer:            newMockDialer(),
 		Option: remote.Option{
 			Outbounds:             nil,
@@ -361,17 +365,18 @@ func newMockDialerWithDialFunc(dialFunc func(network, address string, timeout ti
 	return d
 }
 
-func newMockCtxWithRPCInfo() context.Context {
-	return rpcinfo.NewCtxWithRPCInfo(context.Background(), newMockRPCInfo())
+func newMockCtxWithRPCInfo(mode serviceinfo.StreamingMode) context.Context {
+	return rpcinfo.NewCtxWithRPCInfo(context.Background(), newMockRPCInfo(mode))
 }
 
-func newMockRPCInfo() rpcinfo.RPCInfo {
+func newMockRPCInfo(mode serviceinfo.StreamingMode) rpcinfo.RPCInfo {
 	method := "method"
 	c := rpcinfo.NewEndpointInfo("", method, nil, nil)
 	endpointTags := map[string]string{}
 	endpointTags[rpcinfo.HTTPURL] = "https://github.com/cloudwego/kitex"
 	s := rpcinfo.NewEndpointInfo("", method, nil, endpointTags)
 	ink := rpcinfo.NewInvocation("", method)
+	ink.SetStreamingMode(mode)
 	cfg := rpcinfo.NewRPCConfig()
 	rpcinfo.AsMutableRPCConfig(cfg).SetPayloadCodec(serviceinfo.Protobuf)
 	ri := rpcinfo.NewRPCInfo(c, s, ink, cfg, rpcinfo.NewRPCStats())

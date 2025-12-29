@@ -323,7 +323,6 @@ func (kc *kClient) initMiddlewares(ctx context.Context) (mw middleware) {
 
 	// 3. stream middlewares
 	kc.opt.Streaming.InitMiddlewares(ctx)
-	kc.opt.StreamOptions.EventHandler = kc.opt.TracerCtl.GetStreamEventHandler()
 	mw.smws = mw.mws
 	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {
 		// integrate xds if enabled

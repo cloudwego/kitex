@@ -471,6 +471,7 @@ func parseGraceAndPollTime(ctx context.Context) (graceTime, pollTime time.Durati
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {
 	c := t.opt.TracerCtl.DoStart(ctx, ri)
+	t.opt.TracerCtl.HandleStreamStartEvent(c, ri, rpcinfo.StreamStartEvent{})
 	return c
 }
 
@@ -482,6 +483,7 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	if panicErr != nil {
 		rpcStats.SetPanicked(panicErr)
 	}
+	t.opt.TracerCtl.HandleStreamFinishEvent(ctx, ri, rpcinfo.StreamFinishEvent{})
 	t.opt.TracerCtl.DoFinish(ctx, ri, err)
 	rpcStats.Reset()
 }

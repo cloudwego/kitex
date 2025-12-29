@@ -31,6 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 var _ remote.LongConnPool = &connPool{}
@@ -44,6 +45,11 @@ func poolSize() uint32 {
 
 // NewConnPool ...
 func NewConnPool(remoteService string, size uint32, connOpts grpc.ConnectOptions) *connPool {
+	if connOpts.TraceController == nil {
+		connOpts.TraceController = &rpcinfo.TraceController{}
+	}
+	// process Header and Trailer retrieving for unary
+	connOpts.TraceController.AppendClientStreamEventHandler(unaryMetaEventHandler)
 	if size == 0 {
 		size = poolSize()
 	}

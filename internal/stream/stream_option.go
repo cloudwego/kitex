@@ -25,6 +25,7 @@ import (
 )
 
 // StreamEventHandler is used to handle stream events
+// Deprecated: using HandleStreamRecvEvent/HandleStreamSendEvent in pkg/rpcinfo/ClientStreamEventHandler or pkg/rpcinfo/ServerStreamEventHandler directly
 type StreamEventHandler = func(ctx context.Context, evt stats.Event, err error)
 
 type StreamingConfig struct {
