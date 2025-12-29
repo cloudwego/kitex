@@ -21,12 +21,13 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 func TestClientConn(t *testing.T) {
 	// init
-	connPool := newMockConnPool()
-	ctx := newMockCtxWithRPCInfo()
+	connPool := newMockConnPool(nil)
+	ctx := newMockCtxWithRPCInfo(serviceinfo.StreamingNone)
 	conn, err := connPool.Get(ctx, "tcp", mockAddr0, newMockConnOption())
 	test.Assert(t, err == nil, err)
 	defer conn.Close()
@@ -62,10 +63,10 @@ func TestClientConn(t *testing.T) {
 }
 
 func TestClientConnStreamDesc(t *testing.T) {
-	connPool := newMockConnPool()
+	connPool := newMockConnPool(nil)
 
 	// streaming
-	ctx := newMockCtxWithRPCInfo()
+	ctx := newMockCtxWithRPCInfo(serviceinfo.StreamingNone)
 	ri := rpcinfo.GetRPCInfo(ctx)
 	test.Assert(t, ri != nil)
 	rpcinfo.AsMutableRPCConfig(ri.Config()).SetInteractionMode(rpcinfo.Streaming)

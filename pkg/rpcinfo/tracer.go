@@ -38,6 +38,12 @@ type StreamEventReporter interface {
 type TraceController struct {
 	tracers              []stats.Tracer
 	streamEventReporters []StreamEventReporter
+
+	streamStartEventHandlers      []func(ctx context.Context, ri RPCInfo, evt StreamStartEvent)
+	streamRecvEventHandlers       []func(ctx context.Context, ri RPCInfo, evt StreamRecvEvent)
+	streamSendEventHandlers       []func(ctx context.Context, ri RPCInfo, evt StreamSendEvent)
+	streamRecvHeaderEventHandlers []func(ctx context.Context, ri RPCInfo, evt StreamRecvHeaderEvent)
+	streamFinishEventHandlers     []func(ctx context.Context, ri RPCInfo, evt StreamFinishEvent)
 }
 
 // Append appends a new tracer to the controller.
@@ -45,6 +51,8 @@ func (c *TraceController) Append(col stats.Tracer) {
 	c.tracers = append(c.tracers, col)
 	if reporter, ok := col.(StreamEventReporter); ok {
 		c.streamEventReporters = append(c.streamEventReporters, reporter)
+		c.streamRecvEventHandlers = append(c.streamRecvEventHandlers, c.handleStreamRecvEventWrapper(reporter))
+		c.streamSendEventHandlers = append(c.streamSendEventHandlers, c.handleStreamSendEventWrapper(reporter))
 	}
 }
 
@@ -106,6 +114,7 @@ func (c *TraceController) ReportStreamEvent(ctx context.Context, statsEvent stat
 	}
 }
 
+// Deprecated: use GetStreamRecvEventHandler and GetStreamSendEventHandler
 // GetStreamEventHandler returns the stream event handler
 // If there's no StreamEventReporter, nil is returned for client/server to skip adding tracing middlewares
 func (c *TraceController) GetStreamEventHandler() stream.StreamEventHandler {

@@ -77,7 +77,7 @@ type StreamOption struct {
 }
 
 type StreamOptions struct {
-	EventHandler                 streaming.EventHandler
+	StreamEventHandlers          []rpcinfo.StreamEventHandler
 	StreamMiddlewares            []sep.StreamMiddleware
 	StreamMiddlewareBuilders     []sep.StreamMiddlewareBuilder
 	StreamRecvMiddlewares        []sep.StreamRecvMiddleware
@@ -173,6 +173,12 @@ type Options struct {
 	EnableContextTimeout            bool
 }
 
+func (o *Options) initTraceController() {
+	for _, hdl := range o.StreamOptions.StreamEventHandlers {
+		o.TracerCtl.AppendStreamEventHandler(hdl)
+	}
+}
+
 type Limit struct {
 	Limits        *limit.Option
 	LimitReporter limiter.LimitReporter
@@ -205,6 +211,7 @@ func NewOptions(opts []Option) *Options {
 	}
 	ApplyOptions(opts, o)
 
+	o.initTraceController()
 	rpcinfo.AsMutableRPCConfig(o.Configs).LockConfig(o.LockBits)
 	if o.StatsLevel == nil {
 		level := stats.LevelDisabled

@@ -148,14 +148,17 @@ func TestRetryOption(t *testing.T) {
 func TestTransportProtocolOption(t *testing.T) {
 	opts := []client.Option{WithTransportProtocol(transport.GRPC)}
 	options := client.NewOptions(opts)
+	test.Assert(t, options.GRPCConnectOpts.TraceController != nil)
 	test.Assert(t, options.RemoteOpt.ConnPool != nil)
 	test.Assert(t, options.RemoteOpt.CliHandlerFactory != nil)
 	opts = []client.Option{WithTransportProtocol(transport.GRPCStreaming)}
 	options = client.NewOptions(opts)
+	test.Assert(t, options.GRPCConnectOpts.TraceController != nil)
 	test.Assert(t, options.RemoteOpt.GRPCStreamingConnPool != nil)
 	test.Assert(t, options.RemoteOpt.GRPCStreamingCliHandlerFactory != nil)
 	opts = []client.Option{WithTransportProtocol(transport.TTHeaderStreaming)}
 	options = client.NewOptions(opts)
+	test.Assert(t, len(options.TTHeaderStreamingOptions.TransportOptions) == 1)
 	test.Assert(t, options.RemoteOpt.TTHeaderStreamingCliHandlerFactory != nil)
 }
 

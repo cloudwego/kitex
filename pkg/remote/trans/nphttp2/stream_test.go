@@ -38,7 +38,7 @@ func TestStream(t *testing.T) {
 
 	handler, err := NewSvrTransHandlerFactory().NewTransHandler(opt)
 	test.Assert(t, err == nil, err)
-	ctx := newMockCtxWithRPCInfo()
+	ctx := newMockCtxWithRPCInfo(serviceinfo.StreamingNone)
 
 	// test newServerStream()
 	stream := newServerStream(ctx, &serviceinfo.ServiceInfo{

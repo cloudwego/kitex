@@ -81,7 +81,7 @@ func TestServerHandler(t *testing.T) {
 		},
 	})
 	msg := newMockNewMessage()
-	ri := newMockRPCInfo()
+	ri := newMockRPCInfo(serviceinfo.StreamingNone)
 	mcfg := rpcinfo.AsMutableRPCConfig(ri.Config())
 	mcfg.SetTransportProtocol(transport.PurePayload)
 	mcfg.SetPayloadCodec(serviceinfo.Protobuf)
@@ -131,7 +131,7 @@ func TestServerHandler(t *testing.T) {
 	npConn.mockMetaHeaderFrame()
 	go func() {
 		// test OnActive()
-		ctx, err := handler.OnActive(newMockCtxWithRPCInfo(), npConn)
+		ctx, err := handler.OnActive(newMockCtxWithRPCInfo(serviceinfo.StreamingNone), npConn)
 		test.Assert(t, err == nil, err)
 
 		handler.OnRead(ctx, npConn)

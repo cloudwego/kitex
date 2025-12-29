@@ -100,7 +100,7 @@ type StreamOption struct {
 }
 
 type StreamOptions struct {
-	EventHandler                 stream.StreamEventHandler
+	StreamEventHandlers          []rpcinfo.StreamEventHandler
 	RecvTimeout                  time.Duration
 	StreamMiddlewares            []cep.StreamMiddleware
 	StreamMiddlewareBuilders     []cep.StreamMiddlewareBuilder
@@ -249,6 +249,8 @@ func NewOptions(opts []Option) *Options {
 	o.UnaryOptions.opts = o
 	o.Apply(opts)
 
+	// initTraceController should be invoked before initRemoteOpt since TraceController would be injected to ConnPool
+	o.initTraceController()
 	o.initRemoteOpt()
 
 	if o.UnaryOptions.RetryContainer != nil && o.DebugService != nil {
@@ -265,6 +267,12 @@ func NewOptions(opts []Option) *Options {
 	return o
 }
 
+func (o *Options) initTraceController() {
+	for _, hdl := range o.StreamOptions.StreamEventHandlers {
+		o.TracerCtl.AppendStreamEventHandler(hdl)
+	}
+}
+
 func (o *Options) initRemoteOpt() {
 	var zero connpool2.IdleConfig
 
@@ -274,6 +282,7 @@ func (o *Options) initRemoteOpt() {
 			// grpc unary short connection
 			o.GRPCConnectOpts.ShortConn = true
 		}
+		o.GRPCConnectOpts.TraceController = o.TracerCtl
 		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
@@ -283,6 +292,7 @@ func (o *Options) initRemoteOpt() {
 			// grpc unary short connection
 			o.GRPCConnectOpts.ShortConn = true
 		}
+		o.GRPCConnectOpts.TraceController = o.TracerCtl
 		o.RemoteOpt.GRPCStreamingConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.GRPCStreamingCliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
@@ -292,6 +302,7 @@ func (o *Options) initRemoteOpt() {
 			// configure short conn pool
 			o.TTHeaderStreamingOptions.TransportOptions = append(o.TTHeaderStreamingOptions.TransportOptions, ttstream.WithClientShortConnPool())
 		}
+		o.TTHeaderStreamingOptions.TransportOptions = append(o.TTHeaderStreamingOptions.TransportOptions, ttstream.WithClientTraceController(o.TracerCtl))
 		o.RemoteOpt.TTHeaderStreamingCliHandlerFactory = ttstream.NewCliTransHandlerFactory(o.TTHeaderStreamingOptions.TransportOptions...)
 	}
 	if o.RemoteOpt.ConnPool == nil {

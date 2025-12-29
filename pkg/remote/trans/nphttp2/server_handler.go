@@ -148,15 +148,13 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 
 func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans, conn net.Conn) {
 	tr := svrTrans.tr
-	ri := svrTrans.pool.Get().(rpcinfo.RPCInfo)
+	// Do not reuse rpcinfo for streaming.
+	//
+	// Users commonly launch goroutines to use Stream. If rpcinfo reuse is enabled,
+	// they must ensure these asynchronous goroutines exit before the handler returns.
+	// Usability takes precedence over performance.
+	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
 	rCtx := rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
-	defer func() {
-		// reset rpcinfo for performance (PR #584)
-		if rpcinfo.PoolEnabled() {
-			ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
-			svrTrans.pool.Put(ri)
-		}
-	}()
 
 	ink := ri.Invocation().(rpcinfo.InvocationSetter)
 	sm := s.Method()
@@ -279,8 +277,8 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 	}
 	if bizStatusErr := ri.Invocation().BizStatusErr(); bizStatusErr != nil {
 		var st *status.Status
-		if sterr, ok := bizStatusErr.(status.Iface); ok {
-			st = sterr.GRPCStatus()
+		if stErr, ok := bizStatusErr.(status.Iface); ok {
+			st = stErr.GRPCStatus()
 		} else {
 			st = status.New(codes.Internal, bizStatusErr.BizMessage())
 		}
@@ -338,7 +336,6 @@ const (
 
 type SvrTrans struct {
 	tr   grpcTransport.ServerTransport
-	pool *sync.Pool // value is rpcInfo
 	elem *list.Element
 	// num of active handlers
 	handlerNum int32
@@ -358,14 +355,7 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	if err != nil {
 		return nil, err
 	}
-	pool := &sync.Pool{
-		New: func() interface{} {
-			// init rpcinfo
-			ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
-			return ri
-		},
-	}
-	svrTrans := &SvrTrans{tr: tr, pool: pool}
+	svrTrans := &SvrTrans{tr: tr}
 	t.mu.Lock()
 	elem := t.li.PushBack(svrTrans)
 	t.mu.Unlock()
@@ -461,6 +451,7 @@ func parseGraceAndPollTime(ctx context.Context) (graceTime, pollTime time.Durati
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {
 	c := t.opt.TracerCtl.DoStart(ctx, ri)
+	t.opt.TracerCtl.HandleStreamStartEvent(c, ri, rpcinfo.StreamStartEvent{})
 	return c
 }
 
@@ -472,6 +463,7 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	if panicErr != nil {
 		rpcStats.SetPanicked(panicErr)
 	}
+	t.opt.TracerCtl.HandleStreamFinishEvent(ctx, ri, rpcinfo.StreamFinishEvent{})
 	t.opt.TracerCtl.DoFinish(ctx, ri, err)
 	rpcStats.Reset()
 }

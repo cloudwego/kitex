@@ -76,6 +76,9 @@ const (
 	checksumGenerateFinish
 	checksumValidateStart
 	checksumValidateFinish
+	streamStart
+	streamRecvHeader
+	streamFinish
 
 	// NOTE: add new events before this line
 	predefinedEventNum
@@ -102,8 +105,11 @@ var (
 	ChecksumGenerateFinish = newEvent(checksumGenerateFinish, LevelDetailed)
 
 	// Streaming Events
-	StreamRecv = newEvent(streamRecv, LevelDetailed)
-	StreamSend = newEvent(streamSend, LevelDetailed)
+	StreamRecv       = newEvent(streamRecv, LevelDetailed)
+	StreamSend       = newEvent(streamSend, LevelDetailed)
+	StreamStart      = newEvent(streamStart, LevelDetailed)
+	StreamRecvHeader = newEvent(streamRecvHeader, LevelDetailed)
+	StreamFinish     = newEvent(streamFinish, LevelDetailed)
 )
 
 // errors

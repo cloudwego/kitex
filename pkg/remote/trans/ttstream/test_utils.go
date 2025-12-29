@@ -20,9 +20,11 @@ package ttstream
 
 import (
 	"context"
+	"testing"
 
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
@@ -44,6 +46,16 @@ func (m mockStreamWriter) CloseStream(sid int32) error {
 		return m.closeStreamFunc(sid)
 	}
 	return nil
+}
+
+func newTestConnectionPipe(t *testing.T) (netpoll.Connection, netpoll.Connection) {
+	cfd, sfd := netpoll.GetSysFdPairs()
+	cconn, err := netpoll.NewFDConnection(cfd)
+	test.Assert(t, err == nil, err)
+	sconn, err := netpoll.NewFDConnection(sfd)
+	test.Assert(t, err == nil, err)
+
+	return cconn, sconn
 }
 
 func newTestStreamPipe(sinfo *serviceinfo.ServiceInfo, method string) (*clientStream, *serverStream, error) {

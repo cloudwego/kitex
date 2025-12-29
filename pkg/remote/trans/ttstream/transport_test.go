@@ -490,7 +490,7 @@ func (m *mockProxy) SendRstToUpstream(t *testing.T, ex error) {
 }
 
 func (m *mockProxy) SendRstToDownstream(t *testing.T, ex error) {
-	m.downSt.close(ex, true, m.nodeName)
+	m.downSt.close(ex, true, m.nodeName, nil)
 }
 
 func (m *mockProxy) Run(t *testing.T) {

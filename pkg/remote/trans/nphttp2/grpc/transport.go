@@ -38,6 +38,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 type bufferPool struct {
@@ -290,6 +291,8 @@ type Stream struct {
 	closeStreamErr atomic.Value
 	// sourceService is the source service name of this stream
 	sourceService string
+
+	ri rpcinfo.RPCInfo // only for client-side stream, avoid invoke rpcinfo.GetRPCInfo frequently
 }
 
 // isHeaderSent is only valid on the server-side.
@@ -636,6 +639,8 @@ type ConnectOptions struct {
 	ShortConn bool
 	// TLSConfig
 	TLSConfig *tls.Config
+	// TraceController is responsible for report detailed streaming events
+	TraceController *rpcinfo.TraceController
 }
 
 // NewServerTransport creates a ServerTransport with conn or non-nil error

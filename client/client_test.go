@@ -1285,3 +1285,29 @@ func Test_initRPCInfoWithStreamClientCallOption(t *testing.T) {
 	_, ri, _ = cli.initRPCInfo(ctx, mtd, 0, nil, true)
 	test.Assert(t, ri.Config().StreamRecvTimeout() == callOptTimeout)
 }
+
+func Test_WithStreamEventHandler(t *testing.T) {
+	svcInfo := mocks.ServiceInfo()
+	testService := "testService"
+
+	cliIntf, err := NewClient(svcInfo, WithDestService(testService))
+	test.Assert(t, err == nil, err)
+	cli := cliIntf.(*kcFinalizerClient)
+	test.Assert(t, len(cli.opt.StreamOptions.StreamEventHandlers) == 0, cli.opt)
+
+	cliIntf, err = NewClient(svcInfo,
+		WithDestService(testService),
+		WithStreamOptions(
+			WithStreamEventHandler(rpcinfo.StreamEventHandler{}),
+			WithStreamEventHandler(rpcinfo.StreamEventHandler{
+				HandleStreamStartEvent:      func(ctx context.Context, ri rpcinfo.RPCInfo, evt rpcinfo.StreamStartEvent) {},
+				HandleStreamRecvEvent:       func(ctx context.Context, ri rpcinfo.RPCInfo, evt rpcinfo.StreamRecvEvent) {},
+				HandleStreamSendEvent:       func(ctx context.Context, ri rpcinfo.RPCInfo, evt rpcinfo.StreamSendEvent) {},
+				HandleStreamRecvHeaderEvent: func(ctx context.Context, ri rpcinfo.RPCInfo, evt rpcinfo.StreamRecvHeaderEvent) {},
+				HandleStreamFinishEvent:     func(ctx context.Context, ri rpcinfo.RPCInfo, evt rpcinfo.StreamFinishEvent) {},
+			}),
+		))
+	test.Assert(t, err == nil, err)
+	cli = cliIntf.(*kcFinalizerClient)
+	test.Assert(t, len(cli.opt.StreamOptions.StreamEventHandlers) == 2, cli.opt)
+}

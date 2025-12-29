@@ -38,7 +38,7 @@ func Test_clientStreamStateChange(t *testing.T) {
 	t.Run("serverStream close, then RecvMsg/SendMsg returning exception", func(t *testing.T) {
 		cliSt := newTestClientStream(context.Background())
 		testException := errors.New("test")
-		cliSt.close(testException, false, "")
+		cliSt.close(testException, false, "", nil)
 		rErr := cliSt.RecvMsg(cliSt.ctx, nil)
 		test.Assert(t, rErr == testException, rErr)
 		sErr := cliSt.SendMsg(cliSt.ctx, nil)
@@ -47,9 +47,9 @@ func Test_clientStreamStateChange(t *testing.T) {
 	t.Run("serverStream close twice with different exception, RecvMsg/SendMsg returning the first time exception", func(t *testing.T) {
 		cliSt := newTestClientStream(context.Background())
 		testException1 := errors.New("test1")
-		cliSt.close(testException1, false, "")
+		cliSt.close(testException1, false, "", nil)
 		testException2 := errors.New("test2")
-		cliSt.close(testException2, false, "")
+		cliSt.close(testException2, false, "", nil)
 
 		rErr := cliSt.RecvMsg(cliSt.ctx, nil)
 		test.Assert(t, rErr == testException1, rErr)
@@ -63,7 +63,7 @@ func Test_clientStreamStateChange(t *testing.T) {
 		testException := errors.New("test")
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			cliSt.close(testException, false, "")
+			cliSt.close(testException, false, "", nil)
 		}()
 		go func() {
 			defer wg.Done()
@@ -164,12 +164,12 @@ func Test_clientStream_SendMsg(t *testing.T) {
 	cs = newClientStream(ctx, &mockStreamWriter{}, streamFrame{})
 	// Send retrieves the close stream exception
 	ex := errDownstreamCancel.newBuilder().withSide(clientSide)
-	cs.close(ex, false, "")
+	cs.close(ex, false, "", nil)
 	err = cs.SendMsg(ctx, req)
 	test.Assert(t, errors.Is(err, errDownstreamCancel), err)
 	// subsequent close will not affect the error returned by Send
 	ex1 := errApplicationException.newBuilder().withSide(clientSide)
-	cs.close(ex1, false, "")
+	cs.close(ex1, false, "", nil)
 	err = cs.SendMsg(ctx, req)
 	test.Assert(t, errors.Is(err, errDownstreamCancel), err)
 }

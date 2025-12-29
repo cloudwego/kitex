@@ -44,6 +44,7 @@ type clientTransHandler struct {
 	transPool     transPool
 	metaHandler   MetaFrameHandler
 	headerHandler HeaderFrameWriteHandler
+	traceCtl      *rpcinfo.TraceController
 }
 
 // NewStream creates a client stream
@@ -84,10 +85,13 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	// stream should be configured before WriteStream or there would be a race condition for metaFrameHandler
 	cs.setRecvTimeout(rconfig.StreamRecvTimeout())
 	cs.setMetaFrameHandler(c.metaHandler)
+	cs.setTraceController(c.traceCtl)
 
 	if err = trans.WriteStream(ctx, cs, intHeader, strHeader); err != nil {
 		return nil, err
 	}
+
+	cs.handleStreamStartEvent(rpcinfo.StreamStartEvent{})
 
 	return cs, err
 }

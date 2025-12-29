@@ -67,6 +67,8 @@ type clientStream struct {
 	// for Header()/Trailer()
 	headerSig  chan int32
 	trailerSig chan int32
+
+	traceCtl *rpcinfo.TraceController
 }
 
 func (s *clientStream) Header() (streaming.Header, error) {
@@ -131,7 +133,7 @@ func (s *clientStream) Context() context.Context {
 func (s *clientStream) ctxDoneCallback(ctx context.Context) {
 	finalEx, cancelPath := s.parseCtxErr(ctx)
 
-	s.close(finalEx, true, cancelPath)
+	s.close(finalEx, true, cancelPath, nil)
 }
 
 // parseCtxErr parses information in ctx.Err and returning ttstream Exception and cascading cancelPath
@@ -160,7 +162,7 @@ func (s *clientStream) parseCtxErr(ctx context.Context) (finalEx *Exception, can
 	return
 }
 
-func (s *clientStream) close(exception error, sendRst bool, cancelPath string) {
+func (s *clientStream) close(exception error, sendRst bool, cancelPath string, trailer streaming.Trailer) {
 	if exception != nil {
 		// store exception before change clientStream state
 		// otherwise clientStream.Send would not get the real stream closed reason
@@ -174,14 +176,11 @@ func (s *clientStream) close(exception error, sendRst bool, cancelPath string) {
 		// stream has been closed before
 		return
 	}
-	select {
-	case s.headerSig <- streamSigInactive:
-	default:
-	}
-	select {
-	case s.trailerSig <- streamSigInactive:
-	default:
-	}
+	s.closeSignalMeta(trailer)
+
+	// handleStreamFinishEvent should be invoked before runCloseCallback
+	// since tracer would be finished in runCloseCallback
+	s.handleStreamFinishEvent(rpcinfo.StreamFinishEvent{TTStreamTrailer: trailer})
 	// clientStream.Recv would get the exception
 	s.reader.close(exception)
 	if sendRst {
@@ -201,8 +200,56 @@ func (s *clientStream) close(exception error, sendRst bool, cancelPath string) {
 	s.runCloseCallback(exception)
 }
 
+func (s *clientStream) closeSignalMeta(trailer streaming.Trailer) {
+	// signal header
+	headerSig := streamSigInactive
+	if trailer == nil {
+		headerSig = streamSigNone
+	}
+	select {
+	case s.headerSig <- headerSig:
+	default:
+	}
+
+	// signal trailer
+	trailerSig := streamSigActive
+	if trailer == nil {
+		trailerSig = streamSigInactive
+	}
+	s.trailer = trailer
+	select {
+	case s.trailerSig <- trailerSig:
+	default:
+	}
+}
+
 func (s *clientStream) setMetaFrameHandler(metaHandler MetaFrameHandler) {
 	s.metaFrameHandler = metaHandler
+}
+
+func (s *clientStream) setTraceController(traceCtl *rpcinfo.TraceController) {
+	s.traceCtl = traceCtl
+}
+
+func (s *clientStream) handleStreamStartEvent(event rpcinfo.StreamStartEvent) {
+	if s.traceCtl == nil {
+		return
+	}
+	s.traceCtl.HandleStreamStartEvent(s.ctx, s.rpcInfo, event)
+}
+
+func (s *clientStream) handleStreamRecvHeaderEvent(event rpcinfo.StreamRecvHeaderEvent) {
+	if s.traceCtl == nil {
+		return
+	}
+	s.traceCtl.HandleStreamRecvHeaderEvent(s.ctx, s.rpcInfo, event)
+}
+
+func (s *clientStream) handleStreamFinishEvent(event rpcinfo.StreamFinishEvent) {
+	if s.traceCtl == nil {
+		return
+	}
+	s.traceCtl.HandleStreamFinishEvent(s.ctx, s.rpcInfo, event)
 }
 
 // === clientStream OnRead callback
@@ -224,6 +271,7 @@ func (s *clientStream) onReadHeaderFrame(fr *Frame) error {
 	default:
 		return errUnexpectedHeader.newBuilder().withSide(clientSide).withCause(fmt.Errorf("stream[%d] already set header", s.sid))
 	}
+	s.handleStreamRecvHeaderEvent(rpcinfo.StreamRecvHeaderEvent{TTStreamHeader: s.header})
 	return nil
 }
 
@@ -253,19 +301,8 @@ func (s *clientStream) onReadTrailerFrame(fr *Frame) error {
 		}
 	}
 
-	s.trailer = fr.trailer
-	select {
-	case s.trailerSig <- streamSigActive:
-	default:
-	}
-	select {
-	case s.headerSig <- streamSigNone:
-		// if trailer arrived, we should return unblock stream.Header()
-	default:
-	}
-
 	// client-side stream recv trailer, the lifecycle of whole stream has ended
-	s.close(exception, false, "")
+	s.close(exception, false, "", fr.trailer)
 	return nil
 }
 
@@ -298,7 +335,14 @@ func (s *clientStream) onReadRstFrame(fr *Frame) (err error) {
 	} else {
 		rstEx = rstEx.withCauseAndTypeId(appEx, appEx.TypeId())
 	}
+	s.cancelSignalMeta()
 
+	// when receiving rst frame, we should close stream and there is no need to send rst frame
+	s.close(rstEx, false, "", nil)
+	return nil
+}
+
+func (s *clientStream) cancelSignalMeta() {
 	select {
 	case s.trailerSig <- streamSigCancel:
 	default:
@@ -307,8 +351,4 @@ func (s *clientStream) onReadRstFrame(fr *Frame) (err error) {
 	case s.headerSig <- streamSigCancel:
 	default:
 	}
-
-	// when receiving rst frame, we should close stream and there is no need to send rst frame
-	s.close(rstEx, false, "")
-	return nil
 }

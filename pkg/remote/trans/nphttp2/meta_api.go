@@ -18,11 +18,12 @@ package nphttp2
 
 import (
 	"context"
-	"net"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
@@ -131,25 +132,42 @@ func GetTrailerMetadataFromCtx(ctx context.Context) *metadata.MD {
 	return nil
 }
 
-// set header and trailer to the ctx by default.
-func receiveHeaderAndTrailer(ctx context.Context, conn net.Conn) context.Context {
-	if md, err := conn.(hasHeader).Header(); err == nil {
-		if h := ctx.Value(headerKey{}); h != nil {
-			// If using GRPCHeader(), set the value directly
-			hd := h.(*metadata.MD)
-			*hd = md
-		} else {
-			ctx = context.WithValue(ctx, headerKey{}, &md)
-		}
+var unaryMetaEventHandler = rpcinfo.StreamEventHandler{
+	HandleStreamRecvHeaderEvent: unaryMetaHandleRecvHeaderEvent,
+	HandleStreamFinishEvent:     unaryMetaHandleFinishEvent,
+}
+
+func unaryMetaHandleRecvHeaderEvent(ctx context.Context, ri rpcinfo.RPCInfo, evt rpcinfo.StreamRecvHeaderEvent) {
+	if !isUnary(ri) {
+		return
 	}
-	if md := conn.(hasTrailer).Trailer(); md != nil {
-		if t := ctx.Value(trailerKey{}); t != nil {
-			// If using GRPCTrailer(), set the value directly
-			tr := t.(*metadata.MD)
-			*tr = md
-		} else {
-			ctx = context.WithValue(ctx, trailerKey{}, &md)
-		}
+
+	h := ctx.Value(headerKey{})
+	if h == nil {
+		return
 	}
-	return ctx
+	// If using GRPCHeader(), set the value directly
+	hd := h.(*metadata.MD)
+	*hd = evt.GRPCHeader
+}
+
+func unaryMetaHandleFinishEvent(ctx context.Context, ri rpcinfo.RPCInfo, evt rpcinfo.StreamFinishEvent) {
+	if !isUnary(ri) {
+		return
+	}
+
+	t := ctx.Value(trailerKey{})
+	if t == nil {
+		return
+	}
+	if evt.GRPCTrailer != nil {
+		// If using GRPCTrailer(), set the value directly
+		tr := t.(*metadata.MD)
+		*tr = evt.GRPCTrailer
+	}
+}
+
+func isUnary(ri rpcinfo.RPCInfo) bool {
+	mode := ri.Invocation().StreamingMode()
+	return mode == serviceinfo.StreamingNone || mode == serviceinfo.StreamingUnary
 }

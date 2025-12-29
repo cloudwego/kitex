@@ -33,10 +33,10 @@ import (
 
 func TestClientHandler(t *testing.T) {
 	// init
-	opt := newMockClientOption()
-	ctx := newMockCtxWithRPCInfo()
+	opt := newMockClientOption(nil)
+	ctx := newMockCtxWithRPCInfo(serviceinfo.StreamingNone)
 	msg := newMockNewMessage()
-	ri := newMockRPCInfo()
+	ri := rpcinfo.GetRPCInfo(ctx)
 	msg.RPCInfoFunc = func() rpcinfo.RPCInfo {
 		return ri
 	}
