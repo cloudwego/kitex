@@ -155,7 +155,7 @@ func (t *serverTransport) readFrame(reader bufiox.Reader) error {
 		// server recv a header frame, we should create a new stream
 		ctx, cancel := context.WithCancel(context.Background())
 		ctx, cFunc := newContextWithCancelReason(ctx, cancel)
-		s = newServerStream(ctx, t, fr.streamFrame)
+		s = newServerStream(ctx, t, fr.streamFrame, fr.protocolID)
 		s.cancelFunc = cFunc
 		t.storeStream(s)
 		err = t.spipe.Write(context.Background(), s)
@@ -219,6 +219,7 @@ func (t *serverTransport) loopWrite() error {
 		for i := 0; i < n; i++ {
 			fr := fcache[i]
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
+				recycleFrame(fr)
 				return err
 			}
 			recycleFrame(fr)

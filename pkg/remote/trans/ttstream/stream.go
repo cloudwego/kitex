@@ -40,7 +40,7 @@ var defaultRstException = thrift.NewApplicationException(13, "rst")
 
 // newBasicStream is a common function creating stream basic fields,
 // pls use newClientStream or newServerStream to create the real stream exposing to users
-func newBasicStream(ctx context.Context, writer streamWriter, smeta streamFrame) *stream {
+func newBasicStream(ctx context.Context, writer streamWriter, smeta streamFrame, protocolId ttheader.ProtocolID) *stream {
 	s := new(stream)
 	s.ctx = ctx
 	s.rpcInfo = rpcinfo.GetRPCInfo(ctx)
@@ -48,6 +48,8 @@ func newBasicStream(ctx context.Context, writer streamWriter, smeta streamFrame)
 	s.writer = writer
 	s.wheader = make(streaming.Header)
 	s.wtrailer = make(streaming.Trailer)
+	s.protocolId = protocolId
+	s.codec = getCodec(s.protocolId)
 	return s
 }
 
@@ -86,6 +88,8 @@ type stream struct {
 
 	recvTimeout   time.Duration
 	closeCallback []func(error)
+	protocolId    ttheader.ProtocolID // a stream can only communicate using one type of payload: thrift or pb
+	codec         codec
 }
 
 func (s *stream) Service() string {
@@ -109,7 +113,7 @@ func (s *stream) TransportProtocol() ktransport.Protocol {
 // here, and the context passed in by the user is ignored.
 func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
 	// encode payload
-	payload, err := EncodePayload(s.ctx, msg)
+	payload, needRecycle, err := s.codec.encode(s.ctx, s.rpcInfo, msg)
 	if err != nil {
 		return err
 	}
@@ -121,7 +125,7 @@ func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
 		}
 	}
 	// send data frame
-	return s.writeFrame(dataFrameType, nil, nil, payload)
+	return s.writeFrame(dataFrameType, nil, nil, payload, needRecycle)
 }
 
 func (s *stream) RecvMsg(ctx context.Context, data any) error {
@@ -135,7 +139,7 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 	if err != nil {
 		return err
 	}
-	err = DecodePayload(nctx, payload, data)
+	err = s.codec.decode(nctx, s.rpcInfo, payload, data)
 	// payload will not be access after decode
 	mcache.Free(payload)
 
@@ -169,8 +173,8 @@ func (s *stream) runCloseCallback(exception error) {
 	_ = s.writer.CloseStream(s.sid)
 }
 
-func (s *stream) writeFrame(ftype int32, header streaming.Header, trailer streaming.Trailer, payload []byte) (err error) {
-	fr := newFrame(streamFrame{sid: s.sid, method: s.method, header: header, trailer: trailer}, ftype, payload)
+func (s *stream) writeFrame(ftype int32, header streaming.Header, trailer streaming.Trailer, payload []byte, recyclePayload bool) (err error) {
+	fr := newFrame(streamFrame{sid: s.sid, method: s.method, header: header, trailer: trailer}, ftype, payload, recyclePayload, s.protocolId)
 	return s.writer.WriteFrame(fr)
 }
 
@@ -190,7 +194,7 @@ func (s *stream) sendTrailer(exception error) (err error) {
 			return err
 		}
 	}
-	err = s.writeFrame(trailerFrameType, nil, wtrailer, payload)
+	err = s.writeFrame(trailerFrameType, nil, wtrailer, payload, false)
 	return err
 }
 
@@ -207,7 +211,7 @@ func (s *stream) sendRst(exception error, cancelPath string) (err error) {
 		header = make(streaming.Header)
 		header[ttheader.HeaderTTStreamCancelPath] = cancelPath
 	}
-	return s.writeFrame(rstFrameType, header, nil, payload)
+	return s.writeFrame(rstFrameType, header, nil, payload, false)
 }
 
 // === Frame OnRead callback

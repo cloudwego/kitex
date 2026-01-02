@@ -34,8 +34,8 @@ import (
 
 var _ ClientStreamMeta = (*clientStream)(nil)
 
-func newClientStream(ctx context.Context, writer streamWriter, smeta streamFrame) *clientStream {
-	s := newBasicStream(ctx, writer, smeta)
+func newClientStream(ctx context.Context, writer streamWriter, smeta streamFrame, protocolId ttheader.ProtocolID) *clientStream {
+	s := newBasicStream(ctx, writer, smeta, protocolId)
 	cs := &clientStream{
 		stream:     s,
 		headerSig:  make(chan int32, 1),

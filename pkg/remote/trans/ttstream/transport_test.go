@@ -78,7 +78,7 @@ func TestTransportBasic(t *testing.T) {
 	ctrans := newClientTransport(cconn, nil)
 	defer ctrans.Close(nil)
 	ctx := context.Background()
-	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"}, ttheader.ProtocolIDThriftStruct)
 	err = ctrans.WriteStream(ctx, cs, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
 	strans := newServerTransport(sconn)
@@ -147,7 +147,7 @@ func TestTransportServerStreaming(t *testing.T) {
 	ctrans := newClientTransport(cconn, nil)
 	defer ctrans.Close(nil)
 	ctx := context.Background()
-	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"}, ttheader.ProtocolIDThriftStruct)
 	err = ctrans.WriteStream(ctx, cs, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
 	strans := newServerTransport(sconn)
@@ -212,7 +212,7 @@ func TestTransportException(t *testing.T) {
 	ctrans := newClientTransport(cconn, nil)
 	defer ctrans.Close(nil)
 	ctx := context.Background()
-	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"}, ttheader.ProtocolIDThriftStruct)
 	err = ctrans.WriteStream(ctx, cs, make(IntHeader), make(streaming.Header))
 	test.Assert(t, err == nil, err)
 	strans := newServerTransport(sconn)
@@ -242,7 +242,7 @@ func TestTransportException(t *testing.T) {
 
 	// server send illegal frame
 	ctx = context.Background()
-	cs = newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	cs = newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"}, ttheader.ProtocolIDThriftStruct)
 	err = ctrans.WriteStream(ctx, cs, make(IntHeader), make(streaming.Header))
 	test.Assert(t, err == nil, err)
 	ss, err = strans.ReadStream(context.Background())
@@ -271,7 +271,7 @@ func TestTransportClose(t *testing.T) {
 	ctrans := newClientTransport(cconn, nil)
 	defer ctrans.Close(nil)
 	ctx := context.Background()
-	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"}, ttheader.ProtocolIDThriftStruct)
 	err = ctrans.WriteStream(ctx, cs, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
 	strans := newServerTransport(sconn)
@@ -349,7 +349,7 @@ func Test_clientStreamReceiveTrailer(t *testing.T) {
 	ctrans := newClientTransport(cconn, nil)
 	defer ctrans.Close(nil)
 	ctx := context.Background()
-	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"}, ttheader.ProtocolIDThriftStruct)
 	err = ctrans.WriteStream(ctx, cs, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
 	strans := newServerTransport(sconn)
@@ -407,7 +407,7 @@ func Test_clientStreamReceiveMetaFrame(t *testing.T) {
 		nil, remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)}, testMethod), nil, nil, nil,
 	))
 	finishCh := make(chan struct{})
-	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: testMethod})
+	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: testMethod}, ttheader.ProtocolIDThriftStruct)
 	cs.setMetaFrameHandler(&mockMetaFrameHandler{
 		onMetaFrame: func(ctx context.Context, intHeader IntHeader, header streaming.Header, payload []byte) error {
 			ri := rpcinfo.GetRPCInfo(ctx)
@@ -571,7 +571,7 @@ func initTestStreams(t *testing.T, cCtx context.Context, method, cliNodeName, sr
 	intHeader := make(IntHeader)
 	strHeader := make(streaming.Header)
 	ctrans := newClientTransport(cconn, nil)
-	cs := newClientStream(cCtx, ctrans, streamFrame{sid: genStreamID(), method: method})
+	cs := newClientStream(cCtx, ctrans, streamFrame{sid: genStreamID(), method: method}, ttheader.ProtocolIDThriftStruct)
 	cs.rpcInfo = rpcinfo.NewRPCInfo(
 		rpcinfo.NewEndpointInfo(cliNodeName, method, nil, nil), nil, nil, nil, nil)
 	err = ctrans.WriteStream(cCtx, cs, intHeader, strHeader)

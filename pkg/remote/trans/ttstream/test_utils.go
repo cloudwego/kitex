@@ -21,6 +21,7 @@ package ttstream
 import (
 	"context"
 
+	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -61,7 +62,7 @@ func newTestStreamPipe(sinfo *serviceinfo.ServiceInfo, method string) (*clientSt
 	strHeader := make(streaming.Header)
 	ctrans := newClientTransport(cconn, nil)
 	ctx := context.Background()
-	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: method})
+	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: method}, ttheader.ProtocolIDThriftStruct)
 	if err = ctrans.WriteStream(ctx, cs, intHeader, strHeader); err != nil {
 		return nil, nil, err
 	}

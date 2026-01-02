@@ -25,6 +25,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/gopkg/protocol/ttheader"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
@@ -36,7 +38,7 @@ func newTestServerStream() *serverStream {
 func newTestServerStreamWithStreamWriter(w streamWriter) *serverStream {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx, cancelFunc := newContextWithCancelReason(ctx, cancel)
-	srvSt := newServerStream(ctx, w, streamFrame{})
+	srvSt := newServerStream(ctx, w, streamFrame{}, ttheader.ProtocolIDThriftStruct)
 	srvSt.cancelFunc = cancelFunc
 	return srvSt
 }

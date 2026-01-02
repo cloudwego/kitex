@@ -61,15 +61,17 @@ var (
 // Frame define a TTHeader Streaming Frame
 type Frame struct {
 	streamFrame
-	typ     int32
-	payload []byte
+	typ            int32
+	payload        []byte
+	recyclePayload bool
+	protocolID     ttheader.ProtocolID
 }
 
 func (f *Frame) String() string {
 	return fmt.Sprintf("[sid=%d ftype=%d fmethod=%s]", f.sid, f.typ, f.method)
 }
 
-func newFrame(sframe streamFrame, typ int32, payload []byte) (fr *Frame) {
+func newFrame(sframe streamFrame, typ int32, payload []byte, recyclePayload bool, protocolId ttheader.ProtocolID) (fr *Frame) {
 	v := framePool.Get()
 	if v == nil {
 		fr = new(Frame)
@@ -79,13 +81,20 @@ func newFrame(sframe streamFrame, typ int32, payload []byte) (fr *Frame) {
 	fr.streamFrame = sframe
 	fr.typ = typ
 	fr.payload = payload
+	fr.recyclePayload = recyclePayload
+	fr.protocolID = protocolId
 	return fr
 }
 
 func recycleFrame(frame *Frame) {
 	frame.streamFrame = streamFrame{}
 	frame.typ = 0
+	if frame.recyclePayload {
+		mcache.Free(frame.payload)
+		frame.recyclePayload = false
+	}
 	frame.payload = nil
+	frame.protocolID = 0
 	framePool.Put(frame)
 }
 
@@ -95,7 +104,7 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr *Frame) (err erro
 	param := ttheader.EncodeParam{
 		Flags:      ttheader.HeaderFlagsStreaming,
 		SeqID:      fr.sid,
-		ProtocolID: ttheader.ProtocolIDThriftStruct,
+		ProtocolID: fr.protocolID,
 	}
 
 	param.IntInfo = fr.meta
@@ -168,6 +177,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	}
 	fmethod := dp.IntInfo[ttheader.ToMethod]
 	fsid := dp.SeqID
+	protocolId := dp.ProtocolID
 
 	// frame payload
 	var fpayload []byte
@@ -184,7 +194,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 
 	fr = newFrame(
 		streamFrame{sid: fsid, method: fmethod, meta: fmeta, header: fheader, trailer: ftrailer},
-		ftype, fpayload,
+		ftype, fpayload, false, protocolId,
 	)
 	return fr, nil
 }

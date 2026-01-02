@@ -229,6 +229,7 @@ func (t *clientTransport) loopWrite() error {
 		for i := 0; i < n; i++ {
 			fr := fcache[i]
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
+				recycleFrame(fr)
 				return err
 			}
 			recycleFrame(fr)
@@ -275,7 +276,7 @@ func (t *clientTransport) WriteStream(
 ) error {
 	t.storeStream(s)
 	// send create stream request for server
-	fr := newFrame(streamFrame{sid: s.sid, method: s.method, header: strHeader, meta: intHeader}, headerFrameType, nil)
+	fr := newFrame(streamFrame{sid: s.sid, method: s.method, header: strHeader, meta: intHeader}, headerFrameType, nil, false, s.protocolId)
 	if err := t.WriteFrame(fr); err != nil {
 		return err
 	}

@@ -31,8 +31,8 @@ import (
 
 var _ ServerStreamMeta = (*serverStream)(nil)
 
-func newServerStream(ctx context.Context, writer streamWriter, smeta streamFrame) *serverStream {
-	s := newBasicStream(ctx, writer, smeta)
+func newServerStream(ctx context.Context, writer streamWriter, smeta streamFrame, protocolId ttheader.ProtocolID) *serverStream {
+	s := newBasicStream(ctx, writer, smeta, protocolId)
 	s.reader = newStreamReader()
 	return &serverStream{stream: s}
 }
@@ -82,7 +82,7 @@ func (s *serverStream) sendHeader() (err error) {
 	if wheader == nil {
 		return fmt.Errorf("stream header already sent")
 	}
-	err = s.writeFrame(headerFrameType, wheader, nil, nil)
+	err = s.writeFrame(headerFrameType, wheader, nil, nil, false)
 	return err
 }
 
