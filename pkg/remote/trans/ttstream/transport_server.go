@@ -219,6 +219,7 @@ func (t *serverTransport) loopWrite() error {
 		for i := 0; i < n; i++ {
 			fr := fcache[i]
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
+				recycleFrame(fr)
 				return err
 			}
 			recycleFrame(fr)

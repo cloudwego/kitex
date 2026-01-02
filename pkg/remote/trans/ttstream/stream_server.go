@@ -82,7 +82,7 @@ func (s *serverStream) sendHeader() (err error) {
 	if wheader == nil {
 		return fmt.Errorf("stream header already sent")
 	}
-	err = s.writeFrame(headerFrameType, wheader, nil, nil)
+	err = s.writeFrame(headerFrameType, wheader, nil, nil, false)
 	return err
 }
 

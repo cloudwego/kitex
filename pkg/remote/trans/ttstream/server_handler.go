@@ -178,8 +178,12 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *serve
 	stCtx := rpcinfo.NewCtxWithRPCInfo(st.ctx, ri)
 
 	ink := ri.Invocation().(rpcinfo.InvocationSetter)
-	// TODO: support protobuf codec, and make `strict` true when combine service is not supported.
-	sinfo := t.opt.SvcSearcher.SearchService(st.Service(), st.Method(), false, serviceinfo.Thrift)
+	cfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	cfg.SetTransportProtocol(st.TransportProtocol())
+	payloadCodec := getPayloadCodecFromProtocolID(st.protocolID)
+	cfg.SetPayloadCodec(payloadCodec)
+	// TODO: make `strict` true when combine service is not supported.
+	sinfo := t.opt.SvcSearcher.SearchService(st.Service(), st.Method(), false, payloadCodec)
 	if sinfo == nil {
 		err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", st.Service()))
 		return
@@ -202,7 +206,6 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *serve
 		//nolint:staticcheck // SA1029: consts.CtxKeyMethod has been used and we just follow it
 		stCtx = context.WithValue(stCtx, consts.CtxKeyMethod, st.Method())
 	}
-	rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(st.TransportProtocol())
 
 	// headerHandler return a new stream level ctx
 	// it contains rpcinfo modified by HeaderHandler
@@ -332,4 +335,11 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	}
 	t.opt.TracerCtl.DoFinish(ctx, ri, err)
 	rpcStats.Reset()
+}
+
+func getPayloadCodecFromProtocolID(protocolID ttheader.ProtocolID) serviceinfo.PayloadCodec {
+	if protocolID == ttheader.ProtocolIDProtobufStruct {
+		return serviceinfo.Protobuf
+	}
+	return serviceinfo.Thrift
 }

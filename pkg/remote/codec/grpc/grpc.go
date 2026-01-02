@@ -23,16 +23,13 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/cloudwego/fastpb"
-
 	"github.com/cloudwego/gopkg/bufiox"
-	"google.golang.org/protobuf/proto"
 
+	icodec "github.com/cloudwego/kitex/internal/codec"
 	"github.com/cloudwego/kitex/internal/generic"
 	"github.com/cloudwego/kitex/internal/utils/safemcache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -126,53 +123,24 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 			payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
 		}
 	case serviceinfo.Protobuf:
-		switch t := message.Data().(type) {
-		// Deprecated: fastpb is no longer used
-		case fastpb.Writer:
-			size := t.Size()
-			if !isCompressed {
-				payload = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
-				t.FastWrite(payload[dataFrameHeaderLen:])
-				binary.BigEndian.PutUint32(payload[1:dataFrameHeaderLen], uint32(size))
-				return writer.WriteData(payload)
-			}
-			payload = safemcache.Malloc(size)
-			t.FastWrite(payload)
-		case marshaler:
-			size := t.Size()
-			if !isCompressed {
-				payload = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
-				if _, err = t.MarshalTo(payload[dataFrameHeaderLen:]); err != nil {
-					return err
-				}
-				binary.BigEndian.PutUint32(payload[1:dataFrameHeaderLen], uint32(size))
-				return writer.WriteData(payload)
-			}
-			payload = safemcache.Malloc(size)
-			if _, err = t.MarshalTo(payload); err != nil {
-				return err
-			}
-		case protobufV2MsgCodec:
-			payload, err = t.XXX_Marshal(nil, true)
-		case proto.Message:
-			payload, err = proto.Marshal(t)
-		case protobuf.ProtobufMsgCodec:
-			payload, err = t.Marshal(nil)
-		case protobuf.MessageWriterWithContext:
-			methodName := message.RPCInfo().Invocation().MethodName()
-			if methodName == "" {
-				return errors.New("empty methodName in grpc Encode")
-			}
-			actualMsg, err := t.WritePb(ctx, methodName)
+		var res icodec.EncodeResult
+		if !isCompressed {
+			res, err = icodec.GRPCEncodeProtobufStruct(ctx, message.RPCInfo(), message.Data(), false)
 			if err != nil {
 				return err
 			}
-			payload, ok = actualMsg.([]byte)
-			if !ok {
-				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("grpc marshal message failed: %s", err.Error()))
+			payload = res.Payload
+			if res.PreAllocate {
+				payload[0] = 0
+				binary.BigEndian.PutUint32(payload[1:dataFrameHeaderLen], uint32(res.PreAllocateSize))
+				return writer.WriteData(payload)
 			}
-		default:
-			return ErrInvalidPayload
+		} else {
+			res, err = icodec.GRPCEncodeProtobufStruct(ctx, message.RPCInfo(), message.Data(), true)
+			if err != nil {
+				return err
+			}
+			payload = res.Payload
 		}
 	default:
 		return ErrInvalidPayload
@@ -240,34 +208,7 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 			return thrift.UnmarshalThriftData(ctx, c.ThriftCodec, "", d, message.Data())
 		}
 	case serviceinfo.Protobuf:
-		// Deprecated: fastpb is no longer used
-		if t, ok := data.(fastpb.Reader); ok {
-			if len(d) == 0 {
-				// if all fields of a struct is default value, data will be nil
-				// In the implementation of fastpb, if data is nil, then fastpb will skip creating this struct, as a result user will get a nil pointer which is not expected.
-				// So, when data is nil, use default protobuf unmarshal method to decode the struct.
-				// todo: fix fastpb
-			} else {
-				_, err = fastpb.ReadMessage(d, fastpb.SkipTypeCheck, t)
-				return err
-			}
-		}
-		switch t := data.(type) {
-		case protobufV2MsgCodec:
-			return t.XXX_Unmarshal(d)
-		case proto.Message:
-			return proto.Unmarshal(d, t)
-		case protobuf.ProtobufMsgCodec:
-			return t.Unmarshal(d)
-		case protobuf.MessageReaderWithMethodWithContext:
-			methodName := message.RPCInfo().Invocation().MethodName()
-			if methodName == "" {
-				return errors.New("empty methodName in grpc Decode")
-			}
-			return t.ReadPb(ctx, methodName, d)
-		default:
-			return ErrInvalidPayload
-		}
+		return icodec.DecodeProtobufStruct(ctx, message.RPCInfo(), d, data)
 	default:
 		return ErrInvalidPayload
 	}
