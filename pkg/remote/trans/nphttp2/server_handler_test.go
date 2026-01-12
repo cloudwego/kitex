@@ -19,6 +19,7 @@ package nphttp2
 import (
 	"context"
 	"errors"
+	"net"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -371,4 +372,110 @@ func Test_parseGraceAndPollTime(t *testing.T) {
 	graceTime, pollTime = parseGraceAndPollTime(ctx)
 	test.Assert(t, graceTime < defaultGraceTime, graceTime)
 	test.Assert(t, pollTime < defaultMaxPollTime, pollTime)
+}
+
+func Test_RPCInfoReuse(t *testing.T) {
+	testcases := []struct {
+		desc         string
+		mode         serviceinfo.StreamingMode
+		expectReuse  bool
+		disableReuse bool
+	}{
+		{
+			desc:        "Unary",
+			mode:        serviceinfo.StreamingUnary,
+			expectReuse: true,
+		},
+		{
+			desc:        "None",
+			mode:        serviceinfo.StreamingNone,
+			expectReuse: true,
+		},
+		{
+			desc:         "Unary with disable rpcinfo reuse",
+			mode:         serviceinfo.StreamingUnary,
+			disableReuse: true,
+		},
+		{
+			desc:         "None with disable rpcinfo reuse",
+			mode:         serviceinfo.StreamingNone,
+			disableReuse: true,
+		},
+		{
+			desc: "ClientStreaming",
+			mode: serviceinfo.StreamingClient,
+		},
+		{
+			desc: "ServerStreaming",
+			mode: serviceinfo.StreamingServer,
+		},
+		{
+			desc: "BidiStreaming",
+			mode: serviceinfo.StreamingBidirectional,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.desc, func(t *testing.T) {
+			if tc.disableReuse {
+				rpcinfo.EnablePool(false)
+				defer rpcinfo.EnablePool(true)
+			}
+
+			var poolPutCount int32
+			var capturedRPCInfo rpcinfo.RPCInfo
+
+			opt := newMockServerOption()
+			initFunc := opt.InitOrResetRPCInfoFunc
+			opt.InitOrResetRPCInfoFunc = func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+				if ri != nil {
+					atomic.AddInt32(&poolPutCount, 1)
+				}
+				return initFunc(ri, addr)
+			}
+
+			opt.SvcSearcher = mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+				"Greeter": {
+					Methods: map[string]serviceinfo.MethodInfo{
+						"SayHello": serviceinfo.NewMethodInfo(func(ctx context.Context, handler, args, result interface{}) error {
+							return nil
+						}, func() interface{} { return nil }, func() interface{} { return nil }, false,
+							serviceinfo.WithStreamingMode(tc.mode),
+						),
+					},
+				},
+			})
+
+			handler, err := NewSvrTransHandlerFactory().NewTransHandler(opt)
+			test.Assert(t, err == nil, err)
+
+			hdlFin := make(chan struct{})
+			handler.(remote.InvokeHandleFuncSetter).SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) error {
+				capturedRPCInfo = rpcinfo.GetRPCInfo(ctx)
+				close(hdlFin)
+				return nil
+			})
+
+			npConn := newMockNpConn(mockAddr0)
+			npConn.mockSettingFrame()
+			npConn.mockMetaHeaderFrame()
+
+			ctx, err := handler.OnActive(newMockCtxWithRPCInfo(), npConn)
+			test.Assert(t, err == nil, err)
+
+			go func() {
+				handler.OnRead(ctx, npConn)
+			}()
+
+			<-hdlFin
+			test.Assert(t, capturedRPCInfo != nil)
+			time.Sleep(time.Millisecond * 50) // Wait for defer to complete
+			putCount := atomic.LoadInt32(&poolPutCount)
+			if tc.expectReuse {
+				test.Assert(t, putCount == 1, putCount)
+			} else {
+				test.Assert(t, putCount == 0, putCount)
+			}
+		})
+	}
 }

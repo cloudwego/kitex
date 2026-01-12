@@ -35,7 +35,6 @@ type grpcServerStream struct {
 type serverStream struct {
 	ctx     context.Context
 	rpcInfo rpcinfo.RPCInfo
-	svcInfo *serviceinfo.ServiceInfo
 	conn    *serverConn
 	handler remote.TransReadWriter
 	// for grpc compatibility
@@ -49,11 +48,10 @@ func (s *serverStream) GetGRPCStream() streaming.Stream {
 }
 
 // newServerStream ...
-func newServerStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn *serverConn, handler remote.TransReadWriter) *serverStream {
+func newServerStream(ctx context.Context, conn *serverConn, handler remote.TransReadWriter) *serverStream {
 	sx := &serverStream{
 		ctx:     ctx,
 		rpcInfo: rpcinfo.GetRPCInfo(ctx),
-		svcInfo: svcInfo,
 		conn:    conn,
 		handler: handler,
 	}

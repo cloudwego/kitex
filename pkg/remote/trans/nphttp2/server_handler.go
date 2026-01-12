@@ -147,12 +147,13 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 }
 
 func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans, conn net.Conn) {
+	var needRecycle bool
 	tr := svrTrans.tr
 	ri := svrTrans.pool.Get().(rpcinfo.RPCInfo)
 	rCtx := rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
 	defer func() {
 		// reset rpcinfo for performance (PR #584)
-		if rpcinfo.PoolEnabled() {
+		if rpcinfo.PoolEnabled() && needRecycle {
 			ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
 			svrTrans.pool.Put(ri)
 		}
@@ -233,7 +234,7 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 		methodInfo = svcInfo.MethodInfo(streamingBidirectionalCtx, methodName)
 	}
 
-	rawStream := newServerStream(rCtx, svcInfo, newServerConn(tr, s), t)
+	rawStream := newServerStream(rCtx, newServerConn(tr, s), t)
 	// inject rawStream so that GetServerConn only relies on it
 	rCtx = context.WithValue(rCtx, serverConnKey{}, rawStream)
 	// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
@@ -257,9 +258,18 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 			}
 		}
 	} else {
+		mode := methodInfo.StreamingMode()
 		ink.SetMethodInfo(methodInfo)
-		ink.SetStreamingMode(methodInfo.StreamingMode())
-		if streaming.UnaryCompatibleMiddleware(methodInfo.StreamingMode(), t.opt.CompatibleMiddlewareForUnary) {
+		ink.SetStreamingMode(mode)
+		if mode == serviceinfo.StreamingUnary || mode == serviceinfo.StreamingNone {
+			// Do not reuse rpcinfo for streaming.
+			//
+			// Users commonly launch goroutines to use Stream. If rpcinfo reuse is enabled,
+			// they must ensure these asynchronous goroutines exit before the handler returns.
+			// Usability takes precedence over performance.
+			needRecycle = true
+		}
+		if streaming.UnaryCompatibleMiddleware(mode, t.opt.CompatibleMiddlewareForUnary) {
 			// making streaming unary APIs capable of using the same server middleware as non-streaming APIs
 			// note: rawStream skips recv/send middleware for unary API requests to avoid confusion
 			err = invokeStreamUnaryHandler(rCtx, rawStream, methodInfo, t.inkHdlFunc, ri)
@@ -279,8 +289,8 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 	}
 	if bizStatusErr := ri.Invocation().BizStatusErr(); bizStatusErr != nil {
 		var st *status.Status
-		if sterr, ok := bizStatusErr.(status.Iface); ok {
-			st = sterr.GRPCStatus()
+		if stErr, ok := bizStatusErr.(status.Iface); ok {
+			st = stErr.GRPCStatus()
 		} else {
 			st = status.New(codes.Internal, bizStatusErr.BizMessage())
 		}

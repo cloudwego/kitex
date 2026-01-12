@@ -22,7 +22,6 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 func TestStream(t *testing.T) {
@@ -41,15 +40,7 @@ func TestStream(t *testing.T) {
 	ctx := newMockCtxWithRPCInfo()
 
 	// test newServerStream()
-	stream := newServerStream(ctx, &serviceinfo.ServiceInfo{
-		PackageName:     "",
-		ServiceName:     "",
-		HandlerType:     nil,
-		Methods:         nil,
-		PayloadCodec:    0,
-		KiteXGenVersion: "",
-		Extra:           nil,
-	}, serverConn, handler)
+	stream := newServerStream(ctx, serverConn, handler)
 
 	// test Context()
 	strCtx := stream.GetGRPCStream().Context()
