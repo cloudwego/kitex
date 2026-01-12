@@ -25,6 +25,7 @@ import (
 	"net"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -334,5 +335,81 @@ func TestOnRead(t *testing.T) {
 		err = transHdl.OnRead(ctx, mockConn)
 		test.Assert(t, err == nil, err)
 		test.Assert(t, atomic.LoadInt32(&invoked) == 1)
+	})
+
+	t.Run("rpcinfo reuse disabled", func(t *testing.T) {
+		var ri rpcinfo.RPCInfo
+		ctx, _, _, transHdl, wconn, wbuf, mockConn := prepare()
+
+		transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+			ri = rpcinfo.GetRPCInfo(ctx)
+			return nil
+		})
+		err := EncodeFrame(context.Background(), wbuf, &Frame{
+			streamFrame: streamFrame{
+				sid:    1,
+				method: mocks.MockStreamingMethod,
+				header: map[string]string{
+					ttheader.HeaderIDLServiceName:  mocks.MockServiceName,
+					ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
+				},
+			},
+			typ: headerFrameType,
+		})
+		test.Assert(t, err == nil, err)
+		err = wbuf.Flush()
+		test.Assert(t, err == nil, err)
+		go func() {
+			time.Sleep(1 * time.Second)
+			wconn.Close()
+		}()
+		err = transHdl.OnRead(ctx, mockConn)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, ri.Invocation().MethodName() == mocks.MockStreamingMethod, ri)
+	})
+
+	t.Run("access rpcinfo asynchronously would not cause panic", func(t *testing.T) {
+		ctx, _, _, transHdl, wconn, wbuf, mockConn := prepare()
+		var wg sync.WaitGroup
+
+		transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+			for i := 0; i < 20; i++ {
+				wg.Add(1)
+				go func(c context.Context) {
+					defer func() {
+						if r := recover(); r != nil {
+							t.Error(r)
+						}
+						wg.Done()
+					}()
+					time.Sleep(50 * time.Millisecond)
+					ri := rpcinfo.GetRPCInfo(c)
+					// access rpcinfo
+					ri.From().Tag("key")
+				}(ctx)
+			}
+			return nil
+		})
+		err := EncodeFrame(context.Background(), wbuf, &Frame{
+			streamFrame: streamFrame{
+				sid:    1,
+				method: mocks.MockStreamingMethod,
+				header: map[string]string{
+					ttheader.HeaderIDLServiceName:  mocks.MockServiceName,
+					ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
+				},
+			},
+			typ: headerFrameType,
+		})
+		test.Assert(t, err == nil, err)
+		err = wbuf.Flush()
+		test.Assert(t, err == nil, err)
+		go func() {
+			time.Sleep(1 * time.Second)
+			wconn.Close()
+		}()
+		err = transHdl.OnRead(ctx, mockConn)
+		test.Assert(t, err == nil, err)
+		wg.Wait()
 	})
 }

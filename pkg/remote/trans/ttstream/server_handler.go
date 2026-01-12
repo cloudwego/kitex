@@ -169,14 +169,13 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 // - close   server stream
 // igrore the ctx passed in and make use of st.ctx instead
 func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *serverStream) (err error) {
+	// Do not reuse rpcinfo for streaming.
+	//
+	// Users commonly launch goroutines to use Stream. If rpcinfo reuse is enabled,
+	// they must ensure these asynchronous goroutines exit before the handler returns.
+	// Usability takes precedence over performance.
 	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
 	stCtx := rpcinfo.NewCtxWithRPCInfo(st.ctx, ri)
-	defer func() {
-		if rpcinfo.PoolEnabled() {
-			ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
-			// TODO: rpcinfo pool
-		}
-	}()
 
 	ink := ri.Invocation().(rpcinfo.InvocationSetter)
 	// TODO: support protobuf codec, and make `strict` true when combine service is not supported.
