@@ -136,6 +136,8 @@ func typeOf(sample interface{}, t *descriptor.TypeDescriptor, opt *writerOption)
 		return descriptor.MAP, writeVariousComparableMap[int32], nil
 	case map[int64]interface{}:
 		return descriptor.MAP, writeVariousComparableMap[int64], nil
+	case map[int]interface{}:
+		return descriptor.MAP, writeVariousComparableMap[int], nil
 	}
 	return 0, nil, fmt.Errorf("unsupported type:%T, expected type:%s", sample, tt)
 }
