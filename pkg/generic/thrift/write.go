@@ -335,19 +335,19 @@ func writeIntSeries[T ~int | ~int8 | ~uint8 | ~int16 | ~int32 | ~int64](ctx cont
 	switch t.Type {
 	case descriptor.I08:
 		// uint8 will never exceed the range
-		if _, ok := val.(uint8); !ok && (i < math.MinInt8 || i > math.MaxInt8) {
+		if _, ok := val.(uint8); !ok && (int64(i) < math.MinInt8 || int64(i) > math.MaxInt8) {
 			return fmt.Errorf("value is beyond range of i8: %v", i)
 		}
 		return out.WriteByte(int8(i))
 	case descriptor.I16:
-		if i < math.MinInt16 || i > math.MaxInt16 {
+		if int64(i) < math.MinInt16 || int64(i) > math.MaxInt16 {
 			return fmt.Errorf("value is beyond range of i16: %v", i)
 		}
 		return out.WriteI16(int16(i))
 	case descriptor.I32:
 		// for int on 32-bit architectures: this branch is considered dead hence removed by go compiler
 		// for int on 64-bit architectures: this branch functions as writeInt64() does
-		if i < math.MinInt32 || i > math.MaxInt32 {
+		if int64(i) < math.MinInt32 || int64(i) > math.MaxInt32 {
 			return fmt.Errorf("value is beyond range of i32: %v", i)
 		}
 		return out.WriteI32(int32(i))
