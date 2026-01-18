@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -68,7 +69,8 @@ type rpcConfig struct {
 	payloadCodec      serviceinfo.PayloadCodec
 
 	// stream config
-	streamRecvTimeout time.Duration
+	streamRecvTimeout       time.Duration
+	streamRecvTimeoutConfig streaming.TimeoutConfig
 }
 
 func init() {
@@ -202,6 +204,14 @@ func (r *rpcConfig) SetStreamRecvTimeout(timeout time.Duration) {
 
 func (r *rpcConfig) StreamRecvTimeout() time.Duration {
 	return r.streamRecvTimeout
+}
+
+func (r *rpcConfig) SetStreamRecvTimeoutConfig(cfg streaming.TimeoutConfig) {
+	r.streamRecvTimeoutConfig = cfg
+}
+
+func (r *rpcConfig) StreamRecvTimeoutConfig() streaming.TimeoutConfig {
+	return r.streamRecvTimeoutConfig
 }
 
 // Clone returns a copy of the current rpcConfig.

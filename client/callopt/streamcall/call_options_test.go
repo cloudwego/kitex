@@ -23,6 +23,7 @@ import (
 
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 func TestWithRecvTimeout(t *testing.T) {
@@ -32,4 +33,25 @@ func TestWithRecvTimeout(t *testing.T) {
 	WithRecvTimeout(testTimeout).f(&callOpts, &sb)
 	test.Assert(t, callOpts.StreamOptions.RecvTimeout == testTimeout)
 	test.Assert(t, sb.String() == "WithRecvTimeout(1s)")
+}
+
+func TestWithRecvTimeoutConfig(t *testing.T) {
+	// config timeout
+	sb := strings.Builder{}
+	callOpts := callopt.CallOptions{}
+	WithRecvTimeoutConfig(streaming.TimeoutConfig{Timeout: 1 * time.Second}).f(&callOpts, &sb)
+	test.Assert(t, callOpts.StreamOptions.RecvTimeoutConfig.Timeout == 1*time.Second, callOpts)
+	test.Assert(t, !callOpts.StreamOptions.RecvTimeoutConfig.DisableCancelRemote, callOpts)
+	// config DisableCancelRemote
+	sb = strings.Builder{}
+	callOpts = callopt.CallOptions{}
+	WithRecvTimeoutConfig(streaming.TimeoutConfig{DisableCancelRemote: true}).f(&callOpts, &sb)
+	test.Assert(t, callOpts.StreamOptions.RecvTimeoutConfig.Timeout == 0, callOpts)
+	test.Assert(t, callOpts.StreamOptions.RecvTimeoutConfig.DisableCancelRemote, callOpts)
+	// config timeout and DisableCancelRemote
+	sb = strings.Builder{}
+	callOpts = callopt.CallOptions{}
+	WithRecvTimeoutConfig(streaming.TimeoutConfig{Timeout: 1 * time.Second, DisableCancelRemote: true}).f(&callOpts, &sb)
+	test.Assert(t, callOpts.StreamOptions.RecvTimeoutConfig.Timeout == 1*time.Second, callOpts)
+	test.Assert(t, callOpts.StreamOptions.RecvTimeoutConfig.DisableCancelRemote, callOpts)
 }

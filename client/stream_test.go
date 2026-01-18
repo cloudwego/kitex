@@ -21,7 +21,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 
@@ -34,6 +37,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -207,11 +213,12 @@ func TestClosedClient(t *testing.T) {
 
 type mockStream struct {
 	streaming.ClientStream
-	ctx    context.Context
-	close  func() error
-	header func() (streaming.Header, error)
-	recv   func(ctx context.Context, msg interface{}) error
-	send   func(ctx context.Context, msg interface{}) error
+	ctx           context.Context
+	close         func() error
+	header        func() (streaming.Header, error)
+	recv          func(ctx context.Context, msg interface{}) error
+	send          func(ctx context.Context, msg interface{}) error
+	cancelWithErr func(err error)
 }
 
 func (s *mockStream) Context() context.Context {
@@ -234,10 +241,21 @@ func (s *mockStream) CloseSend(ctx context.Context) error {
 	return s.close()
 }
 
+func (s *mockStream) CancelWithErr(err error) {
+	s.cancelWithErr(err)
+}
+
+func (s *mockStream) Close() error {
+	if s.close != nil {
+		return s.close()
+	}
+	return nil
+}
+
 func Test_newStream(t *testing.T) {
 	sendErr := errors.New("send error")
 	recvErr := errors.New("recv error")
-	ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	st := &mockStream{
 		ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 	}
@@ -274,6 +292,8 @@ func Test_newStream(t *testing.T) {
 	test.Assert(t, s.streamingMode == serviceinfo.StreamingClient)
 	test.Assert(t, s.SendMsg(context.Background(), nil) == sendErr)
 	test.Assert(t, s.RecvMsg(context.Background(), nil) == recvErr)
+	test.Assert(t, s.recvTmCfg.Timeout == 0, s.recvTmCfg)
+	test.Assert(t, !s.recvTmCfg.DisableCancelRemote, s.recvTmCfg)
 }
 
 type mockTracer struct {
@@ -304,7 +324,7 @@ func Test_stream_Header(t *testing.T) {
 		cr := mock_remote.NewMockConnReleaser(ctrl)
 		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(0)
 		scr := remotecli.NewStreamConnManager(cr)
-		s := newStream(ctx, st, scr, &kClient{}, nil, serviceinfo.StreamingBidirectional, nil, nil, nil, nil)
+		s := newStream(ctx, st, scr, &kClient{}, rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), nil), serviceinfo.StreamingBidirectional, nil, nil, nil, nil)
 		md, err := s.Header()
 
 		test.Assert(t, err == nil)
@@ -314,7 +334,7 @@ func Test_stream_Header(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		headerErr := errors.New("header error")
-		ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 		st := &mockStream{
 			header: func() (streaming.Header, error) {
 				return nil, headerErr
@@ -354,7 +374,7 @@ func Test_stream_RecvMsg(t *testing.T) {
 		cr := mock_remote.NewMockConnReleaser(ctrl)
 		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(0)
 		scm := remotecli.NewStreamConnManager(cr)
-		mockRPCInfo := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), nil, nil)
+		mockRPCInfo := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), rpcinfo.NewRPCConfig(), nil)
 		kc := &kClient{
 			opt: client.NewOptions(nil),
 		}
@@ -372,7 +392,7 @@ func Test_stream_RecvMsg(t *testing.T) {
 	})
 
 	t.Run("no-error-client-streaming", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), nil, rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 		}
@@ -408,7 +428,7 @@ func Test_stream_RecvMsg(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		recvErr := errors.New("recv error")
-		ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 		}
@@ -453,7 +473,7 @@ func Test_stream_SendMsg(t *testing.T) {
 		kc := &kClient{
 			opt: client.NewOptions(nil),
 		}
-		s := newStream(ctx, &mockStream{}, scm, kc, nil, serviceinfo.StreamingBidirectional, func(ctx context.Context, stream streaming.ClientStream, message interface{}) (err error) {
+		s := newStream(ctx, &mockStream{}, scm, kc, rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), nil), serviceinfo.StreamingBidirectional, func(ctx context.Context, stream streaming.ClientStream, message interface{}) (err error) {
 			return nil
 		}, nil,
 			func(stream streaming.Stream, message interface{}) (err error) {
@@ -474,7 +494,7 @@ func Test_stream_SendMsg(t *testing.T) {
 		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
 		scm := remotecli.NewStreamConnManager(cr)
 		sendErr := errors.New("recv error")
-		ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 		}
@@ -519,7 +539,7 @@ func Test_stream_Close(t *testing.T) {
 			called = true
 			return nil
 		},
-	}, scm, &kClient{}, nil, serviceinfo.StreamingBidirectional, nil, nil, nil, nil)
+	}, scm, &kClient{}, rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), nil), serviceinfo.StreamingBidirectional, nil, nil, nil, nil)
 
 	err := s.CloseSend(context.Background())
 
@@ -532,7 +552,7 @@ func Test_stream_DoFinish(t *testing.T) {
 	defer ctrl.Finish()
 
 	t.Run("no-error", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 		}
@@ -562,7 +582,7 @@ func Test_stream_DoFinish(t *testing.T) {
 	})
 
 	t.Run("EOF", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 		}
@@ -577,7 +597,7 @@ func Test_stream_DoFinish(t *testing.T) {
 		cr := mock_remote.NewMockConnReleaser(ctrl)
 		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
 		scm := remotecli.NewStreamConnManager(cr)
-		s := newStream(ctx, st, scm, kc, ri, serviceinfo.StreamingBidirectional, nil, nil, nil, nil)
+		s := newStream(st.ctx, st, scm, kc, ri, serviceinfo.StreamingBidirectional, nil, nil, nil, nil)
 
 		finishCalled := false
 		err := errors.New("any err")
@@ -592,7 +612,7 @@ func Test_stream_DoFinish(t *testing.T) {
 	})
 
 	t.Run("biz-status-error", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 		}
@@ -622,7 +642,7 @@ func Test_stream_DoFinish(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 		}
@@ -669,7 +689,7 @@ func Test_isRPCError(t *testing.T) {
 }
 
 func TestContextFallback(t *testing.T) {
-	mockRPCInfo := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), nil, nil)
+	mockRPCInfo := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), rpcinfo.NewRPCConfig(), nil)
 	mockSt := &mockStream{
 		recv: func(ctx context.Context, message interface{}) error {
 			test.Assert(t, ctx == context.Background())
@@ -808,4 +828,301 @@ func TestStreamXDoFinish(t *testing.T) {
 	// Check if DoFinish is called
 	test.Assert(t, finishCalled, "DoFinish was not called")
 	fmt.Printf("Final finishCalled status: %v\n", finishCalled)
+}
+
+// TestRecvTimeout tests recv timeout scenarios
+func TestRecvTimeout(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	t.Run("no timeout set", func(t *testing.T) {
+		// no timeout, recv should not timeout even if it takes time
+		recvCalled := false
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+		st := &mockStream{
+			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
+			recv: func(ctx context.Context, msg interface{}) error {
+				recvCalled = true
+				time.Sleep(50 * time.Millisecond)
+				return nil
+			},
+		}
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(0)
+		scm := remotecli.NewStreamConnManager(cr)
+		kc := &kClient{
+			opt: client.NewOptions(nil),
+		}
+		s := newStream(st.ctx, st, scm, kc, ri, serviceinfo.StreamingBidirectional,
+			sendEndpoint, recvEndpoint, nil, nil)
+
+		err := s.RecvMsg(context.Background(), nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, recvCalled)
+	})
+
+	t.Run("timeout set but finish normally", func(t *testing.T) {
+		// timeout set to 100ms, but recv finishes in 20ms
+		recvCalled := false
+		cfg := rpcinfo.NewRPCConfig()
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+			Timeout:             100 * time.Millisecond,
+			DisableCancelRemote: false,
+		})
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), cfg, rpcinfo.NewRPCStats())
+		st := &mockStream{
+			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
+			recv: func(ctx context.Context, msg interface{}) error {
+				recvCalled = true
+				time.Sleep(20 * time.Millisecond)
+				return nil
+			},
+		}
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(0)
+		scm := remotecli.NewStreamConnManager(cr)
+		kc := &kClient{
+			opt: client.NewOptions(nil),
+		}
+		s := newStream(st.ctx, st, scm, kc, ri, serviceinfo.StreamingBidirectional,
+			sendEndpoint, recvEndpoint, nil, nil)
+
+		err := s.RecvMsg(context.Background(), nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, recvCalled)
+	})
+
+	t.Run("timeout and cancel remote", func(t *testing.T) {
+		// timeout set to 50ms, recv takes 200ms, should timeout and cancel remote
+		var recvCalled, cancelCalled atomic.Bool
+		cfg := rpcinfo.NewRPCConfig()
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+			Timeout:             50 * time.Millisecond,
+			DisableCancelRemote: false,
+		})
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), cfg, rpcinfo.NewRPCStats())
+		st := &mockStream{
+			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
+			recv: func(ctx context.Context, msg interface{}) error {
+				recvCalled.Store(true)
+				time.Sleep(200 * time.Millisecond)
+				return nil
+			},
+			cancelWithErr: func(err error) {
+				cancelCalled.Store(true)
+				test.Assert(t, err != nil, "cancel error should not be nil")
+			},
+		}
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
+		scm := remotecli.NewStreamConnManager(cr)
+		kc := &kClient{
+			opt: client.NewOptions(nil),
+		}
+		// create a grpc stream wrapper to enable timeout logic
+		grpcInner := &mockGRPCInnerStream{
+			recv: func(msg interface{}) error {
+				// This will be called by the recv endpoint
+				return st.recv(context.Background(), msg)
+			},
+			ctx: st.ctx,
+		}
+		grpcSt := &mockGRPCStreamWrapper{
+			mockStream: st,
+			grpcStream: grpcInner,
+		}
+
+		s := newStream(st.ctx, grpcSt, scm, kc, ri, serviceinfo.StreamingBidirectional,
+			sendEndpoint, recvEndpoint,
+			func(stream streaming.Stream, msg interface{}) error {
+				return nil
+			},
+			func(stream streaming.Stream, msg interface{}) error {
+				return stream.RecvMsg(msg)
+			})
+
+		err := s.RecvMsg(context.Background(), nil)
+		test.Assert(t, err != nil)
+		stat, ok := status.FromError(err)
+		test.Assert(t, ok, err)
+		test.Assert(t, stat.Code() == codes.RecvDeadlineExceeded, stat)
+		test.Assert(t, strings.Contains(stat.Message(), "stream Recv timeout"), stat.Message())
+		test.Assert(t, cancelCalled.Load())
+		test.Assert(t, recvCalled.Load())
+	})
+
+	t.Run("timeout but no cancel remote", func(t *testing.T) {
+		// timeout set to 50ms with DisableCancelRemote=true, recv takes 200ms
+		// should timeout but NOT cancel remote
+		var recvCalled, cancelCalled atomic.Bool
+		cfg := rpcinfo.NewRPCConfig()
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+			Timeout:             50 * time.Millisecond,
+			DisableCancelRemote: true,
+		})
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), cfg, rpcinfo.NewRPCStats())
+		st := &mockStream{
+			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
+			recv: func(ctx context.Context, msg interface{}) error {
+				recvCalled.Store(true)
+				time.Sleep(200 * time.Millisecond)
+				return nil
+			},
+			cancelWithErr: func(err error) {
+				cancelCalled.Store(true)
+			},
+		}
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
+		scm := remotecli.NewStreamConnManager(cr)
+		kc := &kClient{
+			opt: client.NewOptions(nil),
+		}
+		// create a grpc stream wrapper to enable timeout logic
+		grpcInner := &mockGRPCInnerStream{
+			recv: func(msg interface{}) error {
+				// This will be called by the recv endpoint
+				return st.recv(context.Background(), msg)
+			},
+			ctx: st.ctx,
+		}
+		grpcSt := &mockGRPCStreamWrapper{
+			mockStream: st,
+			grpcStream: grpcInner,
+		}
+
+		s := newStream(st.ctx, grpcSt, scm, kc, ri, serviceinfo.StreamingBidirectional,
+			sendEndpoint, recvEndpoint,
+			func(stream streaming.Stream, msg interface{}) error {
+				return nil
+			},
+			func(stream streaming.Stream, msg interface{}) error {
+				return stream.RecvMsg(msg)
+			})
+
+		err := s.RecvMsg(context.Background(), nil)
+		stat, ok := status.FromError(err)
+		test.Assert(t, ok, err)
+		test.Assert(t, stat.Code() == codes.RecvDeadlineExceeded, stat)
+		test.Assert(t, strings.Contains(stat.Message(), "stream Recv timeout"), stat.Message())
+		test.Assert(t, err != nil)
+		test.Assert(t, !cancelCalled.Load())
+		test.Assert(t, recvCalled.Load())
+	})
+
+	t.Run("panic in recv and recovered", func(t *testing.T) {
+		// recv panics, should be recovered and converted to error
+		var recvCalled, cancelCalled atomic.Bool
+		cfg := rpcinfo.NewRPCConfig()
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+			Timeout:             100 * time.Millisecond,
+			DisableCancelRemote: false,
+		})
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), cfg, rpcinfo.NewRPCStats())
+		st := &mockStream{
+			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
+			recv: func(ctx context.Context, msg interface{}) error {
+				recvCalled.Store(true)
+				panic("test panic in recv")
+			},
+			cancelWithErr: func(err error) {
+				cancelCalled.Store(true)
+				test.Assert(t, err != nil, "cancel error should not be nil")
+			},
+		}
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
+		scm := remotecli.NewStreamConnManager(cr)
+		kc := &kClient{
+			opt: client.NewOptions(nil),
+		}
+		// create a grpc stream wrapper to enable timeout logic
+		grpcInner := &mockGRPCInnerStream{
+			recv: func(msg interface{}) error {
+				// This will be called by the recv endpoint
+				return st.recv(context.Background(), msg)
+			},
+			ctx: st.ctx,
+		}
+		grpcSt := &mockGRPCStreamWrapper{
+			mockStream: st,
+			grpcStream: grpcInner,
+		}
+
+		s := newStream(st.ctx, grpcSt, scm, kc, ri, serviceinfo.StreamingBidirectional,
+			sendEndpoint, recvEndpoint,
+			func(stream streaming.Stream, msg interface{}) error {
+				return nil
+			},
+			func(stream streaming.Stream, msg interface{}) error {
+				return stream.RecvMsg(msg)
+			})
+
+		err := s.RecvMsg(context.Background(), nil)
+		test.Assert(t, err != nil)
+		stat, ok := status.FromError(err)
+		test.Assert(t, ok, err)
+		test.Assert(t, stat.Code() == codes.Internal, stat)
+		test.Assert(t, strings.Contains(stat.Message(), "stream Recv panic"), stat.Message())
+		test.Assert(t, strings.Contains(stat.Message(), "test panic in recv"), stat.Message())
+		test.Assert(t, cancelCalled.Load())
+		test.Assert(t, recvCalled.Load())
+	})
+}
+
+// mockGRPCStreamWrapper wraps mockStream to implement GRPCStreamGetter interface
+type mockGRPCStreamWrapper struct {
+	*mockStream
+	grpcStream *mockGRPCInnerStream
+}
+
+func (s *mockGRPCStreamWrapper) GetGRPCStream() streaming.Stream {
+	return s.grpcStream
+}
+
+// mockGRPCInnerStream implements streaming.Stream interface for gRPC
+type mockGRPCInnerStream struct {
+	recv func(msg interface{}) error
+	ctx  context.Context
+}
+
+func (s *mockGRPCInnerStream) Context() context.Context {
+	if s.ctx != nil {
+		return s.ctx
+	}
+	return context.Background()
+}
+
+func (s *mockGRPCInnerStream) SetHeader(md metadata.MD) error {
+	return nil
+}
+
+func (s *mockGRPCInnerStream) SendHeader(md metadata.MD) error {
+	return nil
+}
+
+func (s *mockGRPCInnerStream) SetTrailer(md metadata.MD) {
+}
+
+func (s *mockGRPCInnerStream) Header() (metadata.MD, error) {
+	return metadata.MD{}, nil
+}
+
+func (s *mockGRPCInnerStream) Trailer() metadata.MD {
+	return metadata.MD{}
+}
+
+func (s *mockGRPCInnerStream) RecvMsg(m interface{}) error {
+	if s.recv != nil {
+		return s.recv(m)
+	}
+	return nil
+}
+
+func (s *mockGRPCInnerStream) SendMsg(m interface{}) error {
+	return nil
+}
+
+func (s *mockGRPCInnerStream) Close() error {
+	return nil
 }

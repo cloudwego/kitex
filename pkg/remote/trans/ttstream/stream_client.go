@@ -131,13 +131,13 @@ func (s *clientStream) Context() context.Context {
 // ctxDoneCallback convert ctx.Err() to ttstream related err and close client-side stream.
 // it is invoked in container.Pipe
 func (s *clientStream) ctxDoneCallback(ctx context.Context) {
-	finalEx, cancelPath := s.parseCtxErr(ctx)
+	finalEx, noCancel, cancelPath := s.parseCtxErr(ctx)
 
-	s.close(finalEx, true, cancelPath, nil)
+	s.close(finalEx, !noCancel, cancelPath, nil)
 }
 
 // parseCtxErr parses information in ctx.Err and returning ttstream Exception and cascading cancelPath
-func (s *clientStream) parseCtxErr(ctx context.Context) (finalEx *Exception, cancelPath string) {
+func (s *clientStream) parseCtxErr(ctx context.Context) (finalEx *Exception, noCancel bool, cancelPath string) {
 	svcName := s.rpcInfo.From().ServiceName()
 	cErr := ctx.Err()
 	switch cErr {
@@ -146,6 +146,14 @@ func (s *clientStream) parseCtxErr(ctx context.Context) (finalEx *Exception, can
 		finalEx = errBizCancel.newBuilder().withSide(clientSide)
 		// the initial node sending rst, the original cancelPath is empty
 		cancelPath = appendCancelPath("", svcName)
+	case context.DeadlineExceeded:
+		finalEx = newStreamRecvTimeoutException(s.recvTimeoutConfig)
+		if s.recvTimeoutConfig.DisableCancelRemote {
+			noCancel = true
+		} else {
+			// the initial node sending rst, the original cancelPath is empty
+			cancelPath = appendCancelPath("", svcName)
+		}
 	default:
 		if tEx, ok := cErr.(*Exception); ok {
 			// for cascading cancel case, we need to change the side from server to client

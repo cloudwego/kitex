@@ -18,9 +18,11 @@ package rpcinfo_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -32,6 +34,7 @@ func TestRPCConfig(t *testing.T) {
 	test.Assert(t, c.ReadWriteTimeout() != 0)
 	test.Assert(t, c.IOBufferSize() != 0)
 	test.Assert(t, c.TransportProtocol() == transport.PurePayload)
+	test.Assert(t, c.StreamRecvTimeoutConfig() == streaming.TimeoutConfig{})
 }
 
 func TestSetTransportProtocol(t *testing.T) {
@@ -138,4 +141,19 @@ func TestSetTransportProtocol(t *testing.T) {
 		rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.TTHeader)
 		test.Assert(t, (c.TransportProtocol()&transport.TTHeader == transport.TTHeader) && (c.TransportProtocol()&transport.GRPC == transport.GRPC), c.TransportProtocol())
 	})
+}
+
+func TestStreamConfig(t *testing.T) {
+	cfg := rpcinfo.NewRPCConfig()
+	c := rpcinfo.AsMutableRPCConfig(cfg)
+	test.Assert(t, cfg.StreamRecvTimeoutConfig().Timeout == 0, cfg)
+	test.Assert(t, !cfg.StreamRecvTimeoutConfig().DisableCancelRemote, cfg)
+
+	tmCfg := streaming.TimeoutConfig{
+		Timeout:             1 * time.Second,
+		DisableCancelRemote: true,
+	}
+	c.SetStreamRecvTimeoutConfig(tmCfg)
+	test.Assert(t, cfg.StreamRecvTimeoutConfig().Timeout == 1*time.Second, cfg)
+	test.Assert(t, cfg.StreamRecvTimeoutConfig().DisableCancelRemote, cfg)
 }

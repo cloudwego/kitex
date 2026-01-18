@@ -75,6 +75,7 @@ var (
 	errNotReachable       = status.Err(codes.Canceled, "transport: server not reachable"+triggeredByRemoteServiceSuffix)
 	errMaxAgeClosing      = status.Err(codes.Canceled, "transport: closing server transport due to maximum connection age"+triggeredByRemoteServiceSuffix)
 	errIdleClosing        = status.Err(codes.Canceled, "transport: closing server transport due to idleness"+triggeredByRemoteServiceSuffix)
+	errBizHandlerReturn   = status.Err(codes.Canceled, "transport: canceled by business handler returning")
 
 	errGracefulShutdown = status.Err(codes.Unavailable, gracefulShutdownMsg)
 )
@@ -293,7 +294,10 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
 		runErr := t.loopy.run(conn.RemoteAddr().String())
 		if runErr != nil {
-			klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v", runErr)
+			// gRPC connection closures are uncommon.
+			// Considering that certain proxies or generic sidecars may use short connections,
+			// the log level is set to info for troubleshooting only.
+			klog.CtxInfof(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v", runErr)
 		}
 		t.conn.Close()
 		close(t.writerDone)
@@ -1093,7 +1097,7 @@ func (t *http2Server) finishStream(s *Stream, rst bool, rstCode http2.ErrCode, h
 		// If the stream was already done, return.
 		return
 	}
-	s.cancel(nil)
+	s.cancel(errBizHandlerReturn)
 
 	hdr.cleanup = &cleanupStream{
 		streamID: s.id,

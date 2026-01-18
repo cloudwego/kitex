@@ -377,6 +377,14 @@ func verifyCancelError(t *testing.T, err error) {
 }
 
 func (h *testStreamHandler) handleFullStreamingMode(t *testing.T, s *Stream) {
+	waitCh := make(chan struct{})
+	go func() {
+		// mock using ctx of Stream
+		<-s.Context().Done()
+		test.Assert(t, s.Context().Err() == errBizHandlerReturn, s.Context().Err())
+		close(waitCh)
+	}()
+
 	switch s.Method() {
 	case normalUnaryMethod:
 		msg := make([]byte, 5)
@@ -558,6 +566,7 @@ func (h *testStreamHandler) handleFullStreamingMode(t *testing.T, s *Stream) {
 		err := h.t.WriteStatus(s, status.New(codes.OK, ""))
 		test.Assert(t, err == nil, err)
 	}
+	<-waitCh
 	h.srv.srvReady <- struct{}{}
 }
 

@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 func TestErrors(t *testing.T) {
@@ -43,6 +45,9 @@ func TestErrors(t *testing.T) {
 	newExWithNilErr := errIllegalFrame.newBuilder().withCause(nil)
 	test.Assert(t, !newExWithNilErr.isCauseSet(), newExWithNilErr)
 	test.Assert(t, newExWithNilErr.cause == nil, newExWithNilErr)
+
+	recvTmErr := newStreamRecvTimeoutException(streaming.TimeoutConfig{Timeout: 1 * time.Second})
+	test.Assert(t, errors.Is(recvTmErr, kerrors.ErrStreamingTimeout), recvTmErr)
 }
 
 func TestCommonParentKerror(t *testing.T) {
@@ -68,6 +73,14 @@ func TestCommonParentKerror(t *testing.T) {
 	}
 	for _, err := range errs {
 		test.Assert(t, errors.Is(err, kerrors.ErrStreamingCanceled), err)
+	}
+
+	// timeout Exception
+	errs = []error{
+		newStreamRecvTimeoutException(streaming.TimeoutConfig{Timeout: 1 * time.Second}),
+	}
+	for _, err := range errs {
+		test.Assert(t, errors.Is(err, kerrors.ErrStreamingTimeout), err)
 	}
 }
 

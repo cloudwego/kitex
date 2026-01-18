@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 var (
@@ -41,6 +42,10 @@ var (
 	errBizHandlerReturnCancel = newException("canceled by business handler returning", kerrors.ErrStreamingCanceled, 12012)
 	errConnectionClosedCancel = newException("canceled by connection closed", kerrors.ErrStreamingCanceled, 12013)
 )
+
+func newStreamRecvTimeoutException(cfg streaming.TimeoutConfig) *Exception {
+	return newException(fmt.Sprintf("stream Recv timeout, timeout config=%+v", cfg), kerrors.ErrStreamingTimeout, 12014).withSide(clientSide)
+}
 
 const (
 	setSide = 1 << iota

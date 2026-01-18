@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 CloudWeGo Authors
+ * Copyright 2026 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,14 +14,10 @@
  * limitations under the License.
  */
 
-package kerrors
+package stream
 
-// ErrStreamingProtocol is the parent type of all streaming protocol(e.g. gRPC, TTHeader Streaming)
-// related but not user-aware errors.
-var ErrStreamingProtocol = &basicError{"streaming protocol error"}
-
-// ErrStreamingCanceled is the parent type of all streaming canceled errors
-var ErrStreamingCanceled = &basicError{"streaming canceled"}
-
-// ErrStreamingTimeout is the parent type of all streaming timeout errors
-var ErrStreamingTimeout = &basicError{"streaming timeout"}
+// CancelableClientStream is implemented by client-side Stream of gRPC in transport layer.
+// It terminates the local stream's lifecycle and cancels the remote peer.
+type CancelableClientStream interface {
+	CancelWithErr(err error)
+}

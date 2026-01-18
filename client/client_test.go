@@ -54,6 +54,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
 	"github.com/cloudwego/kitex/transport"
@@ -1310,4 +1311,47 @@ func Test_WithStreamEventHandler(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	cli = cliIntf.(*kcFinalizerClient)
 	test.Assert(t, len(cli.opt.StreamOptions.StreamEventHandlers) == 2, cli.opt)
+}
+
+func Test_WithStreamRecvTimeoutConfig(t *testing.T) {
+	t.Run("WithStreamRecvTimeoutConfig", func(t *testing.T) {
+		cliIntf, err := NewClient(svcInfo, WithDestService("destService"),
+			WithStreamOptions(
+				WithStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+					Timeout:             1 * time.Second,
+					DisableCancelRemote: true,
+				}),
+			))
+		test.Assert(t, err == nil, err)
+		cli := cliIntf.(*kcFinalizerClient)
+		test.Assert(t, cli.opt.StreamOptions.RecvTimeoutConfig.Timeout == 1*time.Second, cli.opt)
+		test.Assert(t, cli.opt.StreamOptions.RecvTimeoutConfig.DisableCancelRemote, cli.opt)
+	})
+
+	t.Run("WithStreamRecvTimeout - deprecated", func(t *testing.T) {
+		cliIntf, err := NewClient(svcInfo, WithDestService("destService"),
+			WithStreamOptions(
+				WithStreamRecvTimeout(2*time.Second),
+			))
+		test.Assert(t, err == nil, err)
+		cli := cliIntf.(*kcFinalizerClient)
+		test.Assert(t, cli.opt.StreamOptions.RecvTimeout == 2*time.Second, cli.opt)
+	})
+
+	t.Run("both set", func(t *testing.T) {
+		cliIntf, err := NewClient(svcInfo, WithDestService("destService"),
+			WithStreamOptions(
+				WithStreamRecvTimeout(5*time.Second),
+				WithStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+					Timeout:             1 * time.Second,
+					DisableCancelRemote: true,
+				}),
+			))
+		test.Assert(t, err == nil, err)
+		cli := cliIntf.(*kcFinalizerClient)
+		// both should be set
+		test.Assert(t, cli.opt.StreamOptions.RecvTimeout == 5*time.Second, cli.opt)
+		test.Assert(t, cli.opt.StreamOptions.RecvTimeoutConfig.Timeout == 1*time.Second, cli.opt)
+		test.Assert(t, cli.opt.StreamOptions.RecvTimeoutConfig.DisableCancelRemote, cli.opt)
+	})
 }

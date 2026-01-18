@@ -174,6 +174,10 @@ func (c *clientConn) Header() (metadata.MD, error) { return c.s.Header() }
 func (c *clientConn) Trailer() metadata.MD         { return c.s.Trailer() }
 func (c *clientConn) GetRecvCompress() string      { return c.s.RecvCompress() }
 
+func (c *clientConn) cancel(err error) {
+	c.tr.CloseStream(c.s, err)
+}
+
 type hasGetRecvCompress interface {
 	GetRecvCompress() string
 }
