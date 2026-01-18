@@ -19,7 +19,6 @@ package ttstream
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/protocol/thrift"
@@ -84,8 +83,8 @@ type stream struct {
 	wheader  streaming.Header  // wheader == nil means it already be sent
 	wtrailer streaming.Trailer // wtrailer == nil means it already be sent
 
-	recvTimeout   time.Duration
-	closeCallback []func(error)
+	recvTimeoutConfig streaming.TimeoutConfig
+	closeCallback     []func(error)
 }
 
 func (s *stream) Service() string {
@@ -126,9 +125,9 @@ func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
 
 func (s *stream) RecvMsg(ctx context.Context, data any) error {
 	nctx := s.ctx
-	if s.recvTimeout > 0 {
+	if s.recvTimeoutConfig.Timeout > 0 {
 		var cancel context.CancelFunc
-		nctx, cancel = context.WithTimeout(nctx, s.recvTimeout)
+		nctx, cancel = context.WithTimeout(nctx, s.recvTimeoutConfig.Timeout)
 		defer cancel()
 	}
 	payload, err := s.reader.output(nctx)
@@ -153,11 +152,24 @@ func (s *stream) RegisterCloseCallback(cb func(error)) {
 	s.closeCallback = append(s.closeCallback, cb)
 }
 
-func (s *stream) setRecvTimeout(timeout time.Duration) {
-	if timeout <= 0 {
+func (s *stream) setRecvTimeoutConfig(cfg rpcinfo.RPCConfig) {
+	tmCfg := cfg.StreamRecvTimeoutConfig()
+	// WithStreamRecvTimeoutConfig has higher priority
+	if tmCfg.Timeout > 0 {
+		s.recvTimeoutConfig = tmCfg
 		return
 	}
-	s.recvTimeout = timeout
+	// compatible for WithStreamRecvTimeout(tm), it's equivalent to
+	// streaming.TimeoutConfig{
+	//   Timeout: tm,
+	//   DisableCancelRemote: false,
+	// }
+	tm := cfg.StreamRecvTimeout()
+	if tm > 0 {
+		s.recvTimeoutConfig = streaming.TimeoutConfig{
+			Timeout: tm,
+		}
+	}
 }
 
 func (s *stream) runCloseCallback(exception error) {

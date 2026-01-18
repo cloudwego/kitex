@@ -138,8 +138,16 @@ func (h *testStreamHandler) handleStream(t *testing.T, s *Stream) {
 	}
 	// send a response back to the client.
 	h.t.Write(s, nil, resp, &Options{})
+	waitCh := make(chan struct{})
+	go func() {
+		// mock using ctx of Stream
+		<-s.Context().Done()
+		test.Assert(t, s.Context().Err() == errBizHandlerReturn, s.Context().Err())
+		close(waitCh)
+	}()
 	// send the trailer to end the stream.
 	h.t.WriteStatus(s, status.New(codes.OK, ""))
+	<-waitCh
 }
 
 func (h *testStreamHandler) handleStreamPingPong(t *testing.T, s *Stream) {

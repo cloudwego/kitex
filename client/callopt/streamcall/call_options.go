@@ -17,10 +17,12 @@
 package streamcall
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/cloudwego/kitex/client/callopt"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // These options are directly translated from callopt.Option(s). If you can't find the option with the
@@ -49,6 +51,10 @@ func WithTag(key, val string) Option {
 
 // WithRecvTimeout add recv timeout for stream.Recv function.
 // NOTICE: ONLY effective for ttheader streaming protocol for now.
+//
+// Deprecated: using WithRecvTimeoutConfig
+// When WithRecvTimeout and WithRecvTimeoutConfig are both configured for ttstream,
+// WithRecvTimeoutConfig has higher priority.
 func WithRecvTimeout(d time.Duration) Option {
 	return Option{f: func(o *callopt.CallOptions, di *strings.Builder) {
 		di.WriteString("WithRecvTimeout(")
@@ -56,5 +62,27 @@ func WithRecvTimeout(d time.Duration) Option {
 		di.WriteString(")")
 
 		o.StreamOptions.RecvTimeout = d
+	}}
+}
+
+// WithRecvTimeoutConfig add recv timeout for stream.Recv function.
+// By default, it will cancel the remote peer when timeout.
+//
+// However, in certain scenarios (e.g., resume-enabled transfers: A → B → C), A may not wish to cancel B and C upon detecting a timeout.
+// It expects B and C to complete one round of streaming communication and cache the results.
+// This allows A to resume the request from the disconnected point on the next attempt, completing the resume-from-breakpoint process.
+// Config like this:
+//
+//	WithRecvTimeoutConfig(streaming.TimeoutConfig{
+//			    Timeout: tm,
+//			    DisableCancelRemote: true,
+//	})
+//
+// The remote peer must promptly exit the handler; otherwise, there is a risk of stream leakage!
+func WithRecvTimeoutConfig(cfg streaming.TimeoutConfig) Option {
+	return Option{f: func(o *callopt.CallOptions, di *strings.Builder) {
+		fmt.Fprintf(di, "WithRecvTimeoutConfig(+%v)", cfg)
+
+		o.StreamOptions.RecvTimeoutConfig = cfg
 	}}
 }

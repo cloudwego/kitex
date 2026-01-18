@@ -58,6 +58,8 @@ func (c Code) String() string {
 		return "DataLoss"
 	case Unauthenticated:
 		return "Unauthenticated"
+	case RecvDeadlineExceeded:
+		return "RecvDeadlineExceeded"
 	default:
 		return "Code(" + strconv.FormatInt(int64(c), 10) + ")"
 	}

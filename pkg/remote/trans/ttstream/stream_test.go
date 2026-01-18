@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 func TestGenericStreaming(t *testing.T) {
@@ -63,7 +65,9 @@ func TestStreamRecvTimeout(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// Set a very short timeout for testing
-	ss.setRecvTimeout(time.Millisecond * 10)
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeout(time.Millisecond * 10)
+	ss.setRecvTimeoutConfig(cfg)
 
 	// Create a context that won't expire
 	ctx := context.Background()
@@ -103,4 +107,58 @@ func TestStreamRecvWithCancellation(t *testing.T) {
 	// Verify content
 	test.Assert(t, res.A == req.A)
 	test.Assert(t, res.B == req.B)
+}
+
+// TestSetRecvTimeoutConfig tests setRecvTimeoutConfig method with different configuration scenarios
+func TestSetRecvTimeoutConfig(t *testing.T) {
+	t.Run("only set StreamRecvTimeout", func(t *testing.T) {
+		_, ss, err := newTestStreamPipe(testServiceInfo, "Bidi")
+		test.Assert(t, err == nil, err)
+
+		cfg := rpcinfo.NewRPCConfig()
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeout(100 * time.Millisecond)
+
+		ss.setRecvTimeoutConfig(cfg)
+
+		// verify timeout config is set from StreamRecvTimeout
+		test.Assert(t, ss.recvTimeoutConfig.Timeout == 100*time.Millisecond, ss.recvTimeoutConfig)
+		test.Assert(t, ss.recvTimeoutConfig.DisableCancelRemote == false, ss.recvTimeoutConfig)
+	})
+
+	t.Run("only set StreamRecvTimeoutConfig", func(t *testing.T) {
+		_, ss, err := newTestStreamPipe(testServiceInfo, "Bidi")
+		test.Assert(t, err == nil, err)
+
+		cfg := rpcinfo.NewRPCConfig()
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+			Timeout:             200 * time.Millisecond,
+			DisableCancelRemote: true,
+		})
+
+		ss.setRecvTimeoutConfig(cfg)
+
+		// verify timeout config is set from StreamRecvTimeoutConfig
+		test.Assert(t, ss.recvTimeoutConfig.Timeout == 200*time.Millisecond, ss.recvTimeoutConfig)
+		test.Assert(t, ss.recvTimeoutConfig.DisableCancelRemote == true, ss.recvTimeoutConfig)
+	})
+
+	t.Run("both set, StreamRecvTimeoutConfig has higher priority", func(t *testing.T) {
+		_, ss, err := newTestStreamPipe(testServiceInfo, "Bidi")
+		test.Assert(t, err == nil, err)
+
+		cfg := rpcinfo.NewRPCConfig()
+		// set StreamRecvTimeout first with a longer duration
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeout(500 * time.Millisecond)
+		// then set StreamRecvTimeoutConfig with a shorter duration
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+			Timeout:             50 * time.Millisecond,
+			DisableCancelRemote: true,
+		})
+
+		ss.setRecvTimeoutConfig(cfg)
+
+		// verify StreamRecvTimeoutConfig takes priority over StreamRecvTimeout
+		test.Assert(t, ss.recvTimeoutConfig.Timeout == 50*time.Millisecond, ss.recvTimeoutConfig)
+		test.Assert(t, ss.recvTimeoutConfig.DisableCancelRemote == true, ss.recvTimeoutConfig)
+	})
 }

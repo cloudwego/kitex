@@ -23,6 +23,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -92,6 +93,14 @@ func (m *MockRPCConfig) TransportProtocol() (r transport.Protocol) {
 
 func (m *MockRPCConfig) StreamRecvTimeout() time.Duration {
 	return time.Duration(0)
+}
+
+func (m *MockRPCConfig) StreamRecvTimeoutConfig() streaming.TimeoutConfig {
+	return streaming.TimeoutConfig{}
+}
+
+func (m *MockRPCConfig) StreamSendTimeoutConfig() streaming.TimeoutConfig {
+	return streaming.TimeoutConfig{}
 }
 
 type MockRPCStats struct{}

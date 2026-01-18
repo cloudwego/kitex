@@ -83,7 +83,8 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	// create new stream
 	cs := newClientStream(ctx, trans, streamFrame{sid: genStreamID(), method: method})
 	// stream should be configured before WriteStream or there would be a race condition for metaFrameHandler
-	cs.setRecvTimeout(rconfig.StreamRecvTimeout())
+
+	cs.setRecvTimeoutConfig(rconfig)
 	cs.setMetaFrameHandler(c.metaHandler)
 	cs.setTraceController(c.traceCtl)
 

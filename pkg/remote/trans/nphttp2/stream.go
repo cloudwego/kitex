@@ -256,6 +256,10 @@ func (s *clientStream) Context() context.Context {
 	return s.ctx
 }
 
+func (s *clientStream) CancelWithErr(err error) {
+	s.conn.cancel(err)
+}
+
 func streamingHeaderToHTTP2MD(header streaming.Header) metadata.MD {
 	md := metadata.MD{}
 	for k, v := range header {

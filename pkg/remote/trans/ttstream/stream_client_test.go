@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 func newTestClientStream(ctx context.Context) *clientStream {
@@ -90,13 +91,14 @@ func Test_clientStream_parseCtxErr(t *testing.T) {
 		desc             string
 		ctxFunc          func() (context.Context, context.CancelFunc)
 		expectEx         *Exception
+		expectNoCancel   bool
 		expectCancelPath string
 	}{
 		{
 			desc: "invoke cancel() actively",
 			ctxFunc: func() (context.Context, context.CancelFunc) {
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
-					rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, nil, nil))
+					rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, rpcinfo.NewRPCConfig(), nil))
 				return context.WithCancel(ctx)
 			},
 			expectEx:         errBizCancel.newBuilder().withSide(clientSide),
@@ -106,7 +108,7 @@ func Test_clientStream_parseCtxErr(t *testing.T) {
 			desc: "cascading cancel",
 			ctxFunc: func() (context.Context, context.CancelFunc) {
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
-					rpcinfo.NewEndpointInfo("serviceB", "testMethod", nil, nil), nil, nil, nil, nil))
+					rpcinfo.NewEndpointInfo("serviceB", "testMethod", nil, nil), nil, nil, rpcinfo.NewRPCConfig(), nil))
 				ctx, cancel := context.WithCancel(ctx)
 				ctx, cancelFunc := newContextWithCancelReason(ctx, cancel)
 				cause := defaultRstException
@@ -118,10 +120,42 @@ func Test_clientStream_parseCtxErr(t *testing.T) {
 			expectCancelPath: "serviceA,serviceB",
 		},
 		{
+			desc: "recv timeout",
+			ctxFunc: func() (context.Context, context.CancelFunc) {
+				cfg := rpcinfo.NewRPCConfig()
+				tm := 100 * time.Millisecond
+				rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+					Timeout: tm,
+				})
+				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
+					rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, cfg, nil))
+				return context.WithTimeout(ctx, tm)
+			},
+			expectEx:         newStreamRecvTimeoutException(streaming.TimeoutConfig{Timeout: 100 * time.Millisecond}),
+			expectCancelPath: "serviceA",
+		},
+		{
+			desc: "recv timeout with DisableCancelRemote",
+			ctxFunc: func() (context.Context, context.CancelFunc) {
+				cfg := rpcinfo.NewRPCConfig()
+				tm := 100 * time.Millisecond
+				rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+					Timeout:             tm,
+					DisableCancelRemote: true,
+				})
+				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
+					rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, cfg, nil))
+				return context.WithTimeout(ctx, tm)
+			},
+			expectEx:         newStreamRecvTimeoutException(streaming.TimeoutConfig{Timeout: 100 * time.Millisecond, DisableCancelRemote: true}),
+			expectNoCancel:   true,
+			expectCancelPath: "",
+		},
+		{
 			desc: "other customized ctx Err",
 			ctxFunc: func() (context.Context, context.CancelFunc) {
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
-					rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, nil, nil))
+					rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, rpcinfo.NewRPCConfig(), nil))
 				ctx, cancel := context.WithCancel(ctx)
 				ctx, cancelFunc := newContextWithCancelReason(ctx, cancel)
 				return ctx, func() {
@@ -137,10 +171,19 @@ func Test_clientStream_parseCtxErr(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx, cancel := tc.ctxFunc()
 			cs := newClientStream(ctx, nil, streamFrame{})
-			cancel()
-			finalEx, cancelPath := cs.parseCtxErr(ctx)
+			ri := rpcinfo.GetRPCInfo(ctx)
+			if ri.Config().StreamRecvTimeoutConfig().Timeout > 0 {
+				cs.setRecvTimeoutConfig(ri.Config())
+				// wait for timeout
+				<-ctx.Done()
+			} else {
+				// cancel directly
+				cancel()
+			}
+			finalEx, noCancel, cancelPath := cs.parseCtxErr(ctx)
 			test.DeepEqual(t, finalEx, tc.expectEx)
 			test.Assert(t, tc.expectCancelPath == cancelPath, cancelPath)
+			test.Assert(t, tc.expectNoCancel == noCancel, noCancel)
 		})
 	}
 }

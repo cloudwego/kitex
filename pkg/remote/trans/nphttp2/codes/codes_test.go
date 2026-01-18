@@ -57,4 +57,6 @@ func TestCodeString(t *testing.T) {
 	test.Assert(t, c.String() == "OK")
 	c = _maxCode
 	test.Assert(t, c.String() == "Code("+strconv.FormatInt(int64(c), 10)+")")
+	c = RecvDeadlineExceeded
+	test.Assert(t, c.String() == "RecvDeadlineExceeded")
 }

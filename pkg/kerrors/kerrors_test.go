@@ -50,6 +50,7 @@ func TestIsKitexError(t *testing.T) {
 		// streaming errors
 		ErrStreamingProtocol,
 		ErrStreamingCanceled,
+		ErrStreamingTimeout,
 	}
 	for _, e := range errs {
 		test.Assert(t, IsKitexError(e))

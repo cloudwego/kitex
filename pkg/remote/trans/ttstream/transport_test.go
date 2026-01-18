@@ -1167,3 +1167,190 @@ func TestProxyCancel(t *testing.T) {
 		}
 	})
 }
+
+func TestRecvTimeout(t *testing.T) {
+	t.Run("ClientStreaming - only StreamRecvTimeout", func(t *testing.T) {
+		testRecvTimeoutClientStreaming(t, false, true, 50*time.Millisecond, 0)
+	})
+	t.Run("ClientStreaming - only StreamRecvTimeoutConfig", func(t *testing.T) {
+		testRecvTimeoutClientStreaming(t, true, false, 0, 50*time.Millisecond)
+	})
+	t.Run("ClientStreaming - both set, StreamRecvTimeoutConfig has higher priority", func(t *testing.T) {
+		testRecvTimeoutClientStreaming(t, true, true, 200*time.Millisecond, 50*time.Millisecond)
+	})
+	t.Run("ServerStreaming - only StreamRecvTimeout", func(t *testing.T) {
+		testRecvTimeoutServerStreaming(t, false, true, 50*time.Millisecond, 0)
+	})
+	t.Run("ServerStreaming - only StreamRecvTimeoutConfig", func(t *testing.T) {
+		testRecvTimeoutServerStreaming(t, true, false, 0, 50*time.Millisecond)
+	})
+	t.Run("ServerStreaming - both set, StreamRecvTimeoutConfig has higher priority", func(t *testing.T) {
+		testRecvTimeoutServerStreaming(t, true, true, 200*time.Millisecond, 50*time.Millisecond)
+	})
+	t.Run("BidiStreaming - only StreamRecvTimeout", func(t *testing.T) {
+		testRecvTimeoutBidiStreaming(t, false, true, 50*time.Millisecond, 0)
+	})
+	t.Run("BidiStreaming - only StreamRecvTimeoutConfig", func(t *testing.T) {
+		testRecvTimeoutBidiStreaming(t, true, false, 0, 50*time.Millisecond)
+	})
+	t.Run("BidiStreaming - both set, StreamRecvTimeoutConfig has higher priority", func(t *testing.T) {
+		testRecvTimeoutBidiStreaming(t, true, true, 200*time.Millisecond, 50*time.Millisecond)
+	})
+}
+
+func testRecvTimeoutClientStreaming(t *testing.T, setTimeoutConfig, setRecvTimeout bool, recvTimeout, configTimeout time.Duration) {
+	cliNodeName := "ttstream client"
+	srvNodeName := "ttstream server"
+	method := "ClientStreaming"
+
+	cliSt, srvSt := initTestStreams(t, context.Background(), method, cliNodeName, srvNodeName)
+
+	cfg := rpcinfo.NewRPCConfig()
+	if setRecvTimeout {
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeout(recvTimeout)
+	}
+	if setTimeoutConfig {
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+			Timeout: configTimeout,
+		})
+	}
+	cliSt.setRecvTimeoutConfig(cfg)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		req := new(testRequest)
+		req.A = 1
+		req.B = "hello"
+		sErr := cliSt.SendMsg(cliSt.ctx, req)
+		test.Assert(t, sErr == nil, sErr)
+
+		res := new(testResponse)
+		rErr := cliSt.RecvMsg(cliSt.ctx, res)
+		test.Assert(t, rErr != nil, rErr)
+		test.Assert(t, errors.Is(rErr, kerrors.ErrStreamingTimeout), rErr)
+		t.Logf("client-side stream Recv timeout err: %v", rErr)
+	}()
+
+	req := new(testRequest)
+	sErr := srvSt.RecvMsg(srvSt.ctx, req)
+	test.Assert(t, sErr == nil, sErr)
+	test.Assert(t, req.A == 1)
+	test.Assert(t, req.B == "hello")
+
+	time.Sleep(100 * time.Millisecond)
+
+	sErr = srvSt.RecvMsg(srvSt.ctx, req)
+	test.Assert(t, sErr != nil)
+	test.Assert(t, errors.Is(sErr, kerrors.ErrStreamingCanceled), sErr)
+	test.Assert(t, errors.Is(sErr, errUpstreamCancel), sErr)
+	t.Logf("server-side stream Recv err: %v", sErr)
+
+	wg.Wait()
+}
+
+func testRecvTimeoutServerStreaming(t *testing.T, setTimeoutConfig, setRecvTimeout bool, recvTimeout, configTimeout time.Duration) {
+	cliNodeName := "ttstream client"
+	srvNodeName := "ttstream server"
+	method := "ServerStreaming"
+
+	cliSt, srvSt := initTestStreams(t, context.Background(), method, cliNodeName, srvNodeName)
+
+	cfg := rpcinfo.NewRPCConfig()
+	if setRecvTimeout {
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeout(recvTimeout)
+	}
+	if setTimeoutConfig {
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+			Timeout:             configTimeout,
+			DisableCancelRemote: false,
+		})
+	}
+	cliSt.setRecvTimeoutConfig(cfg)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		req := new(testRequest)
+		req.A = 1
+		req.B = "hello"
+		sErr := cliSt.SendMsg(cliSt.ctx, req)
+		test.Assert(t, sErr == nil, sErr)
+
+		res := new(testResponse)
+		rErr := cliSt.RecvMsg(cliSt.ctx, res)
+		test.Assert(t, rErr != nil)
+		test.Assert(t, errors.Is(rErr, kerrors.ErrStreamingTimeout), rErr)
+		t.Logf("client-side stream Recv timeout err: %v", rErr)
+	}()
+
+	req := new(testRequest)
+	rErr := srvSt.RecvMsg(srvSt.ctx, req)
+	test.Assert(t, rErr == nil, rErr)
+	test.Assert(t, req.A == 1)
+	test.Assert(t, req.B == "hello")
+
+	time.Sleep(100 * time.Millisecond)
+
+	res := new(testResponse)
+	res.A = 2
+	sErr := srvSt.SendMsg(srvSt.ctx, res)
+	test.Assert(t, sErr != nil, "server should receive cancel error")
+	test.Assert(t, errors.Is(sErr, kerrors.ErrStreamingCanceled), sErr)
+	test.Assert(t, errors.Is(sErr, errUpstreamCancel), sErr)
+	t.Logf("server-side stream Send err: %v", sErr)
+
+	wg.Wait()
+}
+
+func testRecvTimeoutBidiStreaming(t *testing.T, setTimeoutConfig, setRecvTimeout bool, recvTimeout, configTimeout time.Duration) {
+	cliNodeName := "ttstream client"
+	srvNodeName := "ttstream server"
+	method := "BidiStreaming"
+
+	cliSt, srvSt := initTestStreams(t, context.Background(), method, cliNodeName, srvNodeName)
+
+	cfg := rpcinfo.NewRPCConfig()
+	if setRecvTimeout {
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeout(recvTimeout)
+	}
+	if setTimeoutConfig {
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+			Timeout: configTimeout,
+		})
+	}
+	cliSt.setRecvTimeoutConfig(cfg)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		req := new(testRequest)
+		req.A = 1
+		req.B = "hello"
+		sErr := cliSt.SendMsg(cliSt.ctx, req)
+		test.Assert(t, sErr == nil, sErr)
+
+		res := new(testResponse)
+		rErr := cliSt.RecvMsg(cliSt.ctx, res)
+		test.Assert(t, rErr != nil)
+		test.Assert(t, errors.Is(rErr, kerrors.ErrStreamingTimeout), rErr)
+		t.Logf("client-side stream Recv timeout err: %v", rErr)
+	}()
+
+	req := new(testRequest)
+	rErr := srvSt.RecvMsg(srvSt.ctx, req)
+	test.Assert(t, rErr == nil, rErr)
+	test.Assert(t, req.A == 1)
+	test.Assert(t, req.B == "hello")
+
+	rErr = srvSt.RecvMsg(srvSt.ctx, req)
+	test.Assert(t, rErr != nil)
+	test.Assert(t, errors.Is(rErr, kerrors.ErrStreamingCanceled), rErr)
+	test.Assert(t, errors.Is(rErr, errUpstreamCancel), rErr)
+	t.Logf("server-side stream Recv err: %v", rErr)
+
+	wg.Wait()
+}
