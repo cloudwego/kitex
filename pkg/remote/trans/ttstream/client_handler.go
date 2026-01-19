@@ -18,6 +18,7 @@ package ttstream
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
@@ -25,6 +26,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
@@ -56,10 +58,13 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	if addr == nil {
 		return nil, kerrors.ErrNoDestAddress
 	}
+	protocolID, err := getProtocolID(ri)
+	if err != nil {
+		return nil, err
+	}
 
 	var strHeader streaming.Header
 	var intHeader IntHeader
-	var err error
 	if c.headerHandler != nil {
 		intHeader, strHeader, err = c.headerHandler.OnWriteStream(ctx)
 		if err != nil {
@@ -81,7 +86,7 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	}
 
 	// create new stream
-	cs := newClientStream(ctx, trans, streamFrame{sid: genStreamID(), method: method})
+	cs := newClientStream(ctx, trans, streamFrame{sid: genStreamID(), method: method, protocolID: protocolID})
 	// stream should be configured before WriteStream or there would be a race condition for metaFrameHandler
 	cs.setRecvTimeout(rconfig.StreamRecvTimeout())
 	cs.setMetaFrameHandler(c.metaHandler)
@@ -94,4 +99,15 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	cs.handleStreamStartEvent(rpcinfo.StreamStartEvent{})
 
 	return cs, err
+}
+
+func getProtocolID(ri rpcinfo.RPCInfo) (ttheader.ProtocolID, error) {
+	switch ri.Config().PayloadCodec() {
+	case serviceinfo.Thrift:
+		return ttheader.ProtocolIDThriftStruct, nil
+	case serviceinfo.Protobuf:
+		return ttheader.ProtocolIDProtobufStruct, nil
+	default:
+		return 0, fmt.Errorf("not supported payload type: %v", ri.Config().PayloadCodec())
+	}
 }

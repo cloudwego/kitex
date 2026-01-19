@@ -60,11 +60,8 @@ func NewClient(destService string, opts ...client.Option) (Client, error) {
 
     {{template "@client.go-NewClient-option" .}}
 	{{if .HasStreaming}}
-	{{- if eq $.Codec "thrift"}}{{/* thrift streaming enable ttheader streaming protocol by default */}}
+	{{/* thrift streaming enable ttheader streaming protocol by default */}}
 	options = append(options, client.WithTransportProtocol(transport.TTHeaderStreaming))
-	{{- else}}
-	options = append(options, client.WithTransportProtocol(transport.GRPC))
-	{{- end}}
 	{{end}}
 	options = append(options, opts...)
 

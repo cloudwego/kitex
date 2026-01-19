@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/ttheader"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
@@ -31,10 +32,11 @@ func TestFrameCodec(t *testing.T) {
 	writer := bufiox.NewDefaultWriter(&buf)
 	reader := bufiox.NewDefaultReader(&buf)
 	wframe := newFrame(streamFrame{
-		sid:    0,
-		method: "method",
-		header: map[string]string{"key": "value"},
-	}, headerFrameType, []byte("hello world"))
+		sid:        0,
+		method:     "method",
+		header:     map[string]string{"key": "value"},
+		protocolID: ttheader.ProtocolIDThriftStruct,
+	}, headerFrameType, []byte("hello world"), false)
 
 	for i := 0; i < 10; i++ {
 		wframe.sid = int32(i)

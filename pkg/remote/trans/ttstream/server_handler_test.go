@@ -164,252 +164,265 @@ func TestOnRead(t *testing.T) {
 		return
 	}
 
-	t.Run("invoking handler successfully", func(t *testing.T) {
-		ctx, ripTag, tracer, transHdl, wconn, wbuf, mockConn := prepare()
-		tracer.finishFunc = func(ctx context.Context) {
-			ri := rpcinfo.GetRPCInfo(ctx)
-			test.Assert(t, ri != nil, ri)
-			rip, ok := ri.From().Tag(ripTag)
-			test.Assert(t, ok)
-			test.Assert(t, rip == "127.0.0.1:8888", rip)
-		}
-		var invoked int32
-		transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
-			atomic.StoreInt32(&invoked, 1)
-			return nil
-		})
-		err := EncodeFrame(context.Background(), wbuf, &Frame{
-			streamFrame: streamFrame{
-				sid:    1,
-				method: mocks.MockStreamingMethod,
-				header: map[string]string{
-					ttheader.HeaderIDLServiceName:  mocks.MockServiceName,
-					ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
-				},
-			},
-			typ: headerFrameType,
-		})
-		test.Assert(t, err == nil, err)
-		err = wbuf.Flush()
-		test.Assert(t, err == nil, err)
-		go func() {
-			time.Sleep(1 * time.Second)
-			wconn.Close()
-		}()
-		err = transHdl.OnRead(ctx, mockConn)
-		test.Assert(t, err == nil, err)
-		test.Assert(t, atomic.LoadInt32(&invoked) == 1)
-	})
+	for _, protocolID := range []ttheader.ProtocolID{ttheader.ProtocolIDThriftStruct, ttheader.ProtocolIDProtobufStruct} {
 
-	t.Run("invoking handler panic", func(t *testing.T) {
-		ctx, ripTag, tracer, transHdl, wconn, wbuf, mockConn := prepare()
-		tracer.finishFunc = func(ctx context.Context) {
-			ri := rpcinfo.GetRPCInfo(ctx)
-			test.Assert(t, ri != nil, ri)
-			rip, ok := ri.From().Tag(ripTag)
-			test.Assert(t, ok)
-			test.Assert(t, rip == "127.0.0.1:8888", rip)
-			ok, pErr := ri.Stats().Panicked()
-			test.Assert(t, ok)
-			test.Assert(t, errors.Is(pErr.(error), kerrors.ErrPanic), pErr)
-			test.Assert(t, errors.Is(ri.Stats().Error(), kerrors.ErrPanic))
-		}
-		transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
-			defer func() {
-				if handlerErr := recover(); handlerErr != nil {
-					ri := rpcinfo.GetRPCInfo(ctx)
-					err = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[panic] %s", handlerErr), string(debug.Stack()))
-					rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
-					rpcStats.SetPanicked(err)
-				}
-			}()
-			panic("test")
-		})
-		err := EncodeFrame(context.Background(), wbuf, &Frame{
-			streamFrame: streamFrame{
-				sid:    1,
-				method: mocks.MockStreamingMethod,
-				header: map[string]string{
-					ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
-				},
-			},
-			typ: headerFrameType,
-		})
-		test.Assert(t, err == nil, err)
-		err = wbuf.Flush()
-		test.Assert(t, err == nil, err)
-		go func() {
-			time.Sleep(1 * time.Second)
-			wconn.Close()
-		}()
-		err = transHdl.OnRead(ctx, mockConn)
-		test.Assert(t, err == nil, err)
-	})
-
-	t.Run("invoking handler throws biz error", func(t *testing.T) {
-		ctx, ripTag, tracer, transHdl, wconn, wbuf, mockConn := prepare()
-		tracer.finishFunc = func(ctx context.Context) {
-			ri := rpcinfo.GetRPCInfo(ctx)
-			test.Assert(t, ri != nil, ri)
-			rip, ok := ri.From().Tag(ripTag)
-			test.Assert(t, ok)
-			test.Assert(t, rip == "127.0.0.1:8888", rip)
-			bizErr := ri.Invocation().BizStatusErr()
-			test.Assert(t, bizErr.BizStatusCode() == 10000, bizErr)
-			test.Assert(t, strings.Contains(bizErr.BizMessage(), "biz-error test"), bizErr)
-		}
-		transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
-			ri := rpcinfo.GetRPCInfo(ctx)
-			defer func() {
-				if bizErr, ok := kerrors.FromBizStatusError(err); ok {
-					if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
-						setter.SetBizStatusErr(bizErr)
-						err = nil
-					}
-				}
-			}()
-			return kerrors.NewBizStatusError(10000, "biz-error test")
-		})
-		err := EncodeFrame(context.Background(), wbuf, &Frame{
-			streamFrame: streamFrame{
-				sid:    1,
-				method: mocks.MockStreamingMethod,
-				header: map[string]string{
-					ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
-				},
-			},
-			typ: headerFrameType,
-		})
-		test.Assert(t, err == nil, err)
-		err = wbuf.Flush()
-		test.Assert(t, err == nil, err)
-		go func() {
-			time.Sleep(1 * time.Second)
-			wconn.Close()
-		}()
-		err = transHdl.OnRead(ctx, mockConn)
-		test.Assert(t, err == nil, err)
-	})
-
-	t.Run("invoking handler and getting K_METHOD successfully", func(t *testing.T) {
-		ctx, ripTag, tracer, transHdl, wconn, wbuf, mockConn := prepare()
-		tracer.finishFunc = func(ctx context.Context) {
-			ri := rpcinfo.GetRPCInfo(ctx)
-			test.Assert(t, ri != nil, ri)
-			rip, ok := ri.From().Tag(ripTag)
-			test.Assert(t, ok)
-			test.Assert(t, rip == "127.0.0.1:8888", rip)
-			// retrieve TO method from rpcinfo
-			mt := ri.To().Method()
-			test.Assert(t, mt == mocks.MockStreamingMethod, mt)
-			// retrieve K_METHOD from ctx
-			kMt := ctx.Value(consts.CtxKeyMethod).(string)
-			test.Assert(t, kMt == mocks.MockStreamingMethod, kMt)
-		}
-		var invoked int32
-		transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
-			atomic.StoreInt32(&invoked, 1)
-			// retrieve K_METHOD from ctx
-			kMt := ctx.Value(consts.CtxKeyMethod).(string)
-			test.Assert(t, kMt == mocks.MockStreamingMethod, kMt)
-			return nil
-		})
-		err := EncodeFrame(context.Background(), wbuf, &Frame{
-			streamFrame: streamFrame{
-				sid:    1,
-				method: mocks.MockStreamingMethod,
-				header: map[string]string{
-					ttheader.HeaderIDLServiceName:  mocks.MockServiceName,
-					ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
-				},
-			},
-			typ: headerFrameType,
-		})
-		test.Assert(t, err == nil, err)
-		err = wbuf.Flush()
-		test.Assert(t, err == nil, err)
-		go func() {
-			time.Sleep(1 * time.Second)
-			wconn.Close()
-		}()
-		err = transHdl.OnRead(ctx, mockConn)
-		test.Assert(t, err == nil, err)
-		test.Assert(t, atomic.LoadInt32(&invoked) == 1)
-	})
-
-	t.Run("rpcinfo reuse disabled", func(t *testing.T) {
-		var ri rpcinfo.RPCInfo
-		ctx, _, _, transHdl, wconn, wbuf, mockConn := prepare()
-
-		transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
-			ri = rpcinfo.GetRPCInfo(ctx)
-			return nil
-		})
-		err := EncodeFrame(context.Background(), wbuf, &Frame{
-			streamFrame: streamFrame{
-				sid:    1,
-				method: mocks.MockStreamingMethod,
-				header: map[string]string{
-					ttheader.HeaderIDLServiceName:  mocks.MockServiceName,
-					ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
-				},
-			},
-			typ: headerFrameType,
-		})
-		test.Assert(t, err == nil, err)
-		err = wbuf.Flush()
-		test.Assert(t, err == nil, err)
-		go func() {
-			time.Sleep(1 * time.Second)
-			wconn.Close()
-		}()
-		err = transHdl.OnRead(ctx, mockConn)
-		test.Assert(t, err == nil, err)
-		test.Assert(t, ri.Invocation().MethodName() == mocks.MockStreamingMethod, ri)
-	})
-
-	t.Run("access rpcinfo asynchronously would not cause panic", func(t *testing.T) {
-		ctx, _, _, transHdl, wconn, wbuf, mockConn := prepare()
-		var wg sync.WaitGroup
-
-		transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
-			for i := 0; i < 20; i++ {
-				wg.Add(1)
-				go func(c context.Context) {
-					defer func() {
-						if r := recover(); r != nil {
-							t.Error(r)
-						}
-						wg.Done()
-					}()
-					time.Sleep(50 * time.Millisecond)
-					ri := rpcinfo.GetRPCInfo(c)
-					// access rpcinfo
-					ri.From().Tag("key")
-				}(ctx)
+		t.Run("invoking handler successfully", func(t *testing.T) {
+			ctx, ripTag, tracer, transHdl, wconn, wbuf, mockConn := prepare()
+			tracer.finishFunc = func(ctx context.Context) {
+				ri := rpcinfo.GetRPCInfo(ctx)
+				test.Assert(t, ri != nil, ri)
+				rip, ok := ri.From().Tag(ripTag)
+				test.Assert(t, ok)
+				test.Assert(t, rip == "127.0.0.1:8888", rip)
+				test.Assert(t, ri.Config().PayloadCodec() == getPayloadCodecFromProtocolID(protocolID), ri.Config())
 			}
-			return nil
-		})
-		err := EncodeFrame(context.Background(), wbuf, &Frame{
-			streamFrame: streamFrame{
-				sid:    1,
-				method: mocks.MockStreamingMethod,
-				header: map[string]string{
-					ttheader.HeaderIDLServiceName:  mocks.MockServiceName,
-					ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
+			var invoked int32
+			transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+				atomic.StoreInt32(&invoked, 1)
+				return nil
+			})
+			err := EncodeFrame(context.Background(), wbuf, &Frame{
+				streamFrame: streamFrame{
+					sid:    1,
+					method: mocks.MockStreamingMethod,
+					header: map[string]string{
+						ttheader.HeaderIDLServiceName:  mocks.MockServiceName,
+						ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
+					},
+					protocolID: protocolID,
 				},
-			},
-			typ: headerFrameType,
+				typ: headerFrameType,
+			})
+			test.Assert(t, err == nil, err)
+			err = wbuf.Flush()
+			test.Assert(t, err == nil, err)
+			go func() {
+				time.Sleep(1 * time.Second)
+				wconn.Close()
+			}()
+			err = transHdl.OnRead(ctx, mockConn)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, atomic.LoadInt32(&invoked) == 1)
 		})
-		test.Assert(t, err == nil, err)
-		err = wbuf.Flush()
-		test.Assert(t, err == nil, err)
-		go func() {
-			time.Sleep(1 * time.Second)
-			wconn.Close()
-		}()
-		err = transHdl.OnRead(ctx, mockConn)
-		test.Assert(t, err == nil, err)
-		wg.Wait()
-	})
+
+		t.Run("invoking handler panic", func(t *testing.T) {
+			ctx, ripTag, tracer, transHdl, wconn, wbuf, mockConn := prepare()
+			tracer.finishFunc = func(ctx context.Context) {
+				ri := rpcinfo.GetRPCInfo(ctx)
+				test.Assert(t, ri != nil, ri)
+				rip, ok := ri.From().Tag(ripTag)
+				test.Assert(t, ok)
+				test.Assert(t, rip == "127.0.0.1:8888", rip)
+				ok, pErr := ri.Stats().Panicked()
+				test.Assert(t, ok)
+				test.Assert(t, errors.Is(pErr.(error), kerrors.ErrPanic), pErr)
+				test.Assert(t, errors.Is(ri.Stats().Error(), kerrors.ErrPanic))
+				test.Assert(t, ri.Config().PayloadCodec() == getPayloadCodecFromProtocolID(protocolID), ri.Config())
+			}
+			transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+				defer func() {
+					if handlerErr := recover(); handlerErr != nil {
+						ri := rpcinfo.GetRPCInfo(ctx)
+						err = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[panic] %s", handlerErr), string(debug.Stack()))
+						rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
+						rpcStats.SetPanicked(err)
+					}
+				}()
+				panic("test")
+			})
+			err := EncodeFrame(context.Background(), wbuf, &Frame{
+				streamFrame: streamFrame{
+					sid:    1,
+					method: mocks.MockStreamingMethod,
+					header: map[string]string{
+						ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
+					},
+					protocolID: protocolID,
+				},
+				typ: headerFrameType,
+			})
+			test.Assert(t, err == nil, err)
+			err = wbuf.Flush()
+			test.Assert(t, err == nil, err)
+			go func() {
+				time.Sleep(1 * time.Second)
+				wconn.Close()
+			}()
+			err = transHdl.OnRead(ctx, mockConn)
+			test.Assert(t, err == nil, err)
+		})
+
+		t.Run("invoking handler throws biz error", func(t *testing.T) {
+			ctx, ripTag, tracer, transHdl, wconn, wbuf, mockConn := prepare()
+			tracer.finishFunc = func(ctx context.Context) {
+				ri := rpcinfo.GetRPCInfo(ctx)
+				test.Assert(t, ri != nil, ri)
+				rip, ok := ri.From().Tag(ripTag)
+				test.Assert(t, ok)
+				test.Assert(t, rip == "127.0.0.1:8888", rip)
+				bizErr := ri.Invocation().BizStatusErr()
+				test.Assert(t, bizErr.BizStatusCode() == 10000, bizErr)
+				test.Assert(t, strings.Contains(bizErr.BizMessage(), "biz-error test"), bizErr)
+				test.Assert(t, ri.Config().PayloadCodec() == getPayloadCodecFromProtocolID(protocolID), ri.Config())
+			}
+			transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+				ri := rpcinfo.GetRPCInfo(ctx)
+				defer func() {
+					if bizErr, ok := kerrors.FromBizStatusError(err); ok {
+						if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+							setter.SetBizStatusErr(bizErr)
+							err = nil
+						}
+					}
+				}()
+				return kerrors.NewBizStatusError(10000, "biz-error test")
+			})
+			err := EncodeFrame(context.Background(), wbuf, &Frame{
+				streamFrame: streamFrame{
+					sid:    1,
+					method: mocks.MockStreamingMethod,
+					header: map[string]string{
+						ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
+					},
+					protocolID: protocolID,
+				},
+				typ: headerFrameType,
+			})
+			test.Assert(t, err == nil, err)
+			err = wbuf.Flush()
+			test.Assert(t, err == nil, err)
+			go func() {
+				time.Sleep(1 * time.Second)
+				wconn.Close()
+			}()
+			err = transHdl.OnRead(ctx, mockConn)
+			test.Assert(t, err == nil, err)
+		})
+
+		t.Run("invoking handler and getting K_METHOD successfully", func(t *testing.T) {
+			ctx, ripTag, tracer, transHdl, wconn, wbuf, mockConn := prepare()
+			tracer.finishFunc = func(ctx context.Context) {
+				ri := rpcinfo.GetRPCInfo(ctx)
+				test.Assert(t, ri != nil, ri)
+				rip, ok := ri.From().Tag(ripTag)
+				test.Assert(t, ok)
+				test.Assert(t, rip == "127.0.0.1:8888", rip)
+				// retrieve TO method from rpcinfo
+				mt := ri.To().Method()
+				test.Assert(t, mt == mocks.MockStreamingMethod, mt)
+				// retrieve K_METHOD from ctx
+				kMt := ctx.Value(consts.CtxKeyMethod).(string)
+				test.Assert(t, kMt == mocks.MockStreamingMethod, kMt)
+				test.Assert(t, ri.Config().PayloadCodec() == getPayloadCodecFromProtocolID(protocolID), ri.Config())
+			}
+			var invoked int32
+			transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+				atomic.StoreInt32(&invoked, 1)
+				// retrieve K_METHOD from ctx
+				kMt := ctx.Value(consts.CtxKeyMethod).(string)
+				test.Assert(t, kMt == mocks.MockStreamingMethod, kMt)
+				return nil
+			})
+			err := EncodeFrame(context.Background(), wbuf, &Frame{
+				streamFrame: streamFrame{
+					sid:    1,
+					method: mocks.MockStreamingMethod,
+					header: map[string]string{
+						ttheader.HeaderIDLServiceName:  mocks.MockServiceName,
+						ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
+					},
+					protocolID: protocolID,
+				},
+				typ: headerFrameType,
+			})
+			test.Assert(t, err == nil, err)
+			err = wbuf.Flush()
+			test.Assert(t, err == nil, err)
+			go func() {
+				time.Sleep(1 * time.Second)
+				wconn.Close()
+			}()
+			err = transHdl.OnRead(ctx, mockConn)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, atomic.LoadInt32(&invoked) == 1)
+		})
+
+		t.Run("rpcinfo reuse disabled", func(t *testing.T) {
+			var ri rpcinfo.RPCInfo
+			ctx, _, _, transHdl, wconn, wbuf, mockConn := prepare()
+
+			transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+				ri = rpcinfo.GetRPCInfo(ctx)
+				return nil
+			})
+			err := EncodeFrame(context.Background(), wbuf, &Frame{
+				streamFrame: streamFrame{
+					sid:    1,
+					method: mocks.MockStreamingMethod,
+					header: map[string]string{
+						ttheader.HeaderIDLServiceName:  mocks.MockServiceName,
+						ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
+					},
+					protocolID: protocolID,
+				},
+				typ: headerFrameType,
+			})
+			test.Assert(t, err == nil, err)
+			err = wbuf.Flush()
+			test.Assert(t, err == nil, err)
+			go func() {
+				time.Sleep(1 * time.Second)
+				wconn.Close()
+			}()
+			err = transHdl.OnRead(ctx, mockConn)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, ri.Invocation().MethodName() == mocks.MockStreamingMethod, ri)
+		})
+
+		t.Run("access rpcinfo asynchronously would not cause panic", func(t *testing.T) {
+			ctx, _, _, transHdl, wconn, wbuf, mockConn := prepare()
+			var wg sync.WaitGroup
+
+			transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+				for i := 0; i < 20; i++ {
+					wg.Add(1)
+					go func(c context.Context) {
+						defer func() {
+							if r := recover(); r != nil {
+								t.Error(r)
+							}
+							wg.Done()
+						}()
+						time.Sleep(50 * time.Millisecond)
+						ri := rpcinfo.GetRPCInfo(c)
+						// access rpcinfo
+						ri.From().Tag("key")
+					}(ctx)
+				}
+				return nil
+			})
+			err := EncodeFrame(context.Background(), wbuf, &Frame{
+				streamFrame: streamFrame{
+					sid:    1,
+					method: mocks.MockStreamingMethod,
+					header: map[string]string{
+						ttheader.HeaderIDLServiceName:  mocks.MockServiceName,
+						ttheader.HeaderTransRemoteAddr: "127.0.0.1:8888",
+					},
+					protocolID: protocolID,
+				},
+				typ: headerFrameType,
+			})
+			test.Assert(t, err == nil, err)
+			err = wbuf.Flush()
+			test.Assert(t, err == nil, err)
+			go func() {
+				time.Sleep(1 * time.Second)
+				wconn.Close()
+			}()
+			err = transHdl.OnRead(ctx, mockConn)
+			test.Assert(t, err == nil, err)
+			wg.Wait()
+		})
+	}
 }

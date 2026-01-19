@@ -26,12 +26,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/gopkg/protocol/ttheader"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 func newTestClientStream(ctx context.Context) *clientStream {
-	return newClientStream(ctx, mockStreamWriter{}, streamFrame{})
+	return newClientStream(ctx, mockStreamWriter{}, streamFrame{protocolID: ttheader.ProtocolIDThriftStruct})
 }
 
 func Test_clientStreamStateChange(t *testing.T) {
@@ -136,7 +138,7 @@ func Test_clientStream_parseCtxErr(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx, cancel := tc.ctxFunc()
-			cs := newClientStream(ctx, nil, streamFrame{})
+			cs := newClientStream(ctx, nil, streamFrame{protocolID: ttheader.ProtocolIDThriftStruct})
 			cancel()
 			finalEx, cancelPath := cs.parseCtxErr(ctx)
 			test.DeepEqual(t, finalEx, tc.expectEx)
@@ -147,7 +149,7 @@ func Test_clientStream_parseCtxErr(t *testing.T) {
 
 func Test_clientStream_SendMsg(t *testing.T) {
 	ctx := context.Background()
-	cs := newClientStream(ctx, &mockStreamWriter{}, streamFrame{})
+	cs := newClientStream(ctx, &mockStreamWriter{}, streamFrame{protocolID: ttheader.ProtocolIDThriftStruct})
 	req := &testRequest{B: "SendMsgTest"}
 
 	// Send successfully
@@ -161,7 +163,7 @@ func Test_clientStream_SendMsg(t *testing.T) {
 	test.Assert(t, errors.Is(err, errIllegalOperation), err)
 	test.Assert(t, strings.Contains(err.Error(), "stream is closed send"))
 
-	cs = newClientStream(ctx, &mockStreamWriter{}, streamFrame{})
+	cs = newClientStream(ctx, &mockStreamWriter{}, streamFrame{protocolID: ttheader.ProtocolIDThriftStruct})
 	// Send retrieves the close stream exception
 	ex := errDownstreamCancel.newBuilder().withSide(clientSide)
 	cs.close(ex, false, "", nil)

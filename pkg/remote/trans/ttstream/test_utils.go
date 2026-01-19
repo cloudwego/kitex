@@ -22,6 +22,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -73,7 +74,7 @@ func newTestStreamPipe(sinfo *serviceinfo.ServiceInfo, method string) (*clientSt
 	strHeader := make(streaming.Header)
 	ctrans := newClientTransport(cconn, nil)
 	ctx := context.Background()
-	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: method})
+	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: method, protocolID: ttheader.ProtocolIDThriftStruct})
 	if err = ctrans.WriteStream(ctx, cs, intHeader, strHeader); err != nil {
 		return nil, nil, err
 	}
