@@ -22,7 +22,6 @@ import (
 	"io"
 	"sync/atomic"
 
-	internal_stream "github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/endpoint/cep"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -31,7 +30,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
@@ -184,7 +182,7 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 		}
 
 		clientStream := newStream(ctx, st, scm, kc, ri, ri.Invocation().MethodInfo().StreamingMode(),
-			sendEP, recvEP, kc.opt.StreamOptions.EventHandler, grpcSendEP, grpcRecvEP)
+			sendEP, recvEP, grpcSendEP, grpcRecvEP)
 		rresp := resp.(*streaming.Result)
 		rresp.ClientStream = clientStream
 		rresp.Stream = clientStream.GetGRPCStream()
@@ -194,12 +192,11 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 
 type stream struct {
 	streaming.ClientStream
-	grpcStream   *grpcStream
-	ctx          context.Context
-	scm          *remotecli.StreamConnManager
-	kc           *kClient
-	ri           rpcinfo.RPCInfo
-	eventHandler internal_stream.StreamEventHandler
+	grpcStream *grpcStream
+	ctx        context.Context
+	scm        *remotecli.StreamConnManager
+	kc         *kClient
+	ri         rpcinfo.RPCInfo
 
 	recv cep.StreamRecvEndpoint
 	send cep.StreamSendEndpoint
@@ -215,7 +212,7 @@ var (
 )
 
 func newStream(ctx context.Context, s streaming.ClientStream, scm *remotecli.StreamConnManager, kc *kClient, ri rpcinfo.RPCInfo, mode serviceinfo.StreamingMode,
-	sendEP cep.StreamSendEndpoint, recvEP cep.StreamRecvEndpoint, eventHandler internal_stream.StreamEventHandler, grpcSendEP endpoint.SendEndpoint, grpcRecvEP endpoint.RecvEndpoint,
+	sendEP cep.StreamSendEndpoint, recvEP cep.StreamRecvEndpoint, grpcSendEP endpoint.SendEndpoint, grpcRecvEP endpoint.RecvEndpoint,
 ) *stream {
 	st := &stream{
 		ClientStream:  s,
@@ -226,7 +223,6 @@ func newStream(ctx context.Context, s streaming.ClientStream, scm *remotecli.Str
 		streamingMode: mode,
 		recv:          recvEP,
 		send:          sendEP,
-		eventHandler:  eventHandler,
 	}
 	if grpcStreamGetter, ok := s.(streaming.GRPCStreamGetter); ok {
 		if grpcStream := grpcStreamGetter.GetGRPCStream(); grpcStream != nil {
@@ -267,13 +263,17 @@ func (s *stream) RecvMsg(ctx context.Context, m interface{}) (err error) {
 		// And it should be returned to the calling business code for error handling
 		err = s.ri.Invocation().BizStatusErr()
 	}
-	if s.eventHandler != nil {
-		s.eventHandler(s.ctx, stats.StreamRecv, err)
-	}
+	s.handleStreamRecvEvent(err)
 	if err != nil || s.streamingMode == serviceinfo.StreamingClient {
 		s.DoFinish(err)
 	}
 	return
+}
+
+func (s *stream) handleStreamRecvEvent(err error) {
+	s.kc.opt.TracerCtl.HandleStreamRecvEvent(s.ctx, s.ri, rpcinfo.StreamRecvEvent{
+		Err: err,
+	})
 }
 
 // SendMsg sends a message to the server.
@@ -287,13 +287,17 @@ func (s *stream) SendMsg(ctx context.Context, m interface{}) (err error) {
 		}
 	}
 	err = s.send(ctx, s.ClientStream, m)
-	if s.eventHandler != nil {
-		s.eventHandler(s.ctx, stats.StreamSend, err)
-	}
+	s.handleStreamSendEvent(err)
 	if err != nil {
 		s.DoFinish(err)
 	}
 	return
+}
+
+func (s *stream) handleStreamSendEvent(err error) {
+	s.kc.opt.TracerCtl.HandleStreamSendEvent(s.ctx, s.ri, rpcinfo.StreamSendEvent{
+		Err: err,
+	})
 }
 
 // DoFinish implements the streaming.WithDoFinish interface, and it records the end of stream
@@ -353,9 +357,7 @@ func (s *grpcStream) RecvMsg(m interface{}) (err error) {
 		// And it should be returned to the calling business code for error handling
 		err = s.st.ri.Invocation().BizStatusErr()
 	}
-	if s.st.eventHandler != nil {
-		s.st.eventHandler(s.st.ctx, stats.StreamRecv, err)
-	}
+	s.st.handleStreamRecvEvent(err)
 	if err != nil || s.st.streamingMode == serviceinfo.StreamingClient {
 		s.st.DoFinish(err)
 	}
@@ -364,9 +366,7 @@ func (s *grpcStream) RecvMsg(m interface{}) (err error) {
 
 func (s *grpcStream) SendMsg(m interface{}) (err error) {
 	err = s.sendEndpoint(s.Stream, m)
-	if s.st.eventHandler != nil {
-		s.st.eventHandler(s.st.ctx, stats.StreamSend, err)
-	}
+	s.st.handleStreamSendEvent(err)
 	if err != nil {
 		s.st.DoFinish(err)
 	}

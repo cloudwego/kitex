@@ -29,6 +29,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
@@ -147,7 +148,7 @@ func TestGetServerConn(t *testing.T) {
 				SvcSearcher: mock_remote.NewDefaultSvcSearcher(),
 				GRPCCfg:     grpc.DefaultServerConfig(),
 				InitOrResetRPCInfoFunc: func(info rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-					return newMockRPCInfo()
+					return newMockRPCInfo(serviceinfo.StreamingNone)
 				},
 				TracerCtl: &rpcinfo.TraceController{},
 			})

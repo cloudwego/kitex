@@ -23,6 +23,7 @@ import (
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/endpoint/sep"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -91,6 +92,15 @@ func WithStreamSendMiddlewareBuilder(mwb sep.StreamSendMiddlewareBuilder) Stream
 		di.Push(fmt.Sprintf("WithStreamSendMiddlewareBuilder(%+v)", utils.GetFuncName(mwb)))
 
 		o.StreamSendMiddlewareBuilders = append(o.StreamSendMiddlewareBuilders, mwb)
+	}}
+}
+
+// WithStreamEventHandler add StreamEventHandler for detailed streaming event tracing
+func WithStreamEventHandler(hdl rpcinfo.ServerStreamEventHandler) StreamOption {
+	return StreamOption{F: func(o *internal_server.StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamEventHandler(%+v)", hdl))
+
+		o.StreamEventHandlers = append(o.StreamEventHandlers, hdl)
 	}}
 }
 

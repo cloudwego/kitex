@@ -150,7 +150,6 @@ func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 
 	// 2. stream middleware
 	s.opt.Streaming.InitMiddlewares(ctx)
-	s.opt.StreamOptions.EventHandler = s.opt.TracerCtl.GetStreamEventHandler()
 	s.opt.StreamOptions.InitMiddlewares(ctx)
 
 	// 3. universal middleware

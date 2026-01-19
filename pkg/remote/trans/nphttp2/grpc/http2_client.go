@@ -47,6 +47,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/peer"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -119,6 +120,8 @@ type http2Client struct {
 	onClose func()
 
 	bufferPool *bufferPool
+
+	traceCtl *rpcinfo.TraceController
 }
 
 // newHTTP2Client constructs a connected ClientTransport to addr based on HTTP2
@@ -196,6 +199,7 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		onGoAway:              onGoAway,
 		onClose:               onClose,
 		bufferPool:            newBufferPool(),
+		traceCtl:              opts.TraceController,
 	}
 	t.controlBuf = newControlBuffer(t.ctx.Done())
 	if opts.InitialWindowSize >= defaultWindowSize {
@@ -385,6 +389,7 @@ func (t *http2Client) newStream(ctx context.Context, callHdr *CallHdr) *Stream {
 		sendCompress:   callHdr.SendCompress,
 		headerChan:     make(chan struct{}),
 		contentSubtype: callHdr.ContentSubtype,
+		ri:             rpcinfo.GetRPCInfo(ctx),
 	}
 	fillStreamFields(s)
 	s.requestRead = func(n int) {
@@ -586,6 +591,8 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 			return nil, ErrConnClosing
 		}
 	}
+	t.handleStreamStartEvent(s, rpcinfo.StreamStartEvent{})
+
 	return s, nil
 }
 
@@ -625,6 +632,7 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 	if len(mdata) > 0 {
 		s.trailer = mdata
 	}
+	t.handleStreamFinishEvent(s, rpcinfo.StreamFinishEvent{GRPCTrailer: mdata})
 	if err != nil {
 		// This will unblock reads eventually.
 		s.write(recvMsg{err: err})
@@ -1110,6 +1118,8 @@ func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 			if len(state.data.mdata) > 0 {
 				s.header = state.data.mdata
 			}
+			// For client-side Streams, it is common to parse the metadata conveyed in the peer's Header Frame.
+			t.handleStreamRecvHeaderEvent(s, rpcinfo.StreamRecvHeaderEvent{GRPCHeader: s.header})
 		} else {
 			// HEADERS frame block carries a Trailers-Only.
 			s.noHeaders = true

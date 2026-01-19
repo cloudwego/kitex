@@ -124,6 +124,9 @@ func TestTraceController_AppendStreamEventReporter(t *testing.T) {
 		ctl := &TraceController{}
 		ctl.Append(&mockStreamReporter{})
 		test.Assert(t, ctl.HasStreamEventReporter())
+		// for compatibility
+		test.Assert(t, len(ctl.streamRecvEventHandlers) == 1, ctl)
+		test.Assert(t, len(ctl.streamSendEventHandlers) == 1, ctl)
 	})
 }
 
