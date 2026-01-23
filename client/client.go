@@ -826,6 +826,9 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 	if sopt.RecvTimeout > 0 {
 		cfg.SetStreamRecvTimeout(sopt.RecvTimeout)
 	}
+	if sopt.RecvTimeoutConfig.Timeout > 0 {
+		cfg.SetStreamRecvTimeoutConfig(sopt.RecvTimeoutConfig)
+	}
 
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 
@@ -836,6 +839,9 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 		}
 		if callOpts.StreamOptions.RecvTimeout != 0 {
 			cfg.SetStreamRecvTimeout(callOpts.StreamOptions.RecvTimeout)
+		}
+		if callOpts.StreamOptions.RecvTimeoutConfig.Timeout > 0 {
+			cfg.SetStreamRecvTimeoutConfig(callOpts.StreamOptions.RecvTimeoutConfig)
 		}
 	}
 
