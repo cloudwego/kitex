@@ -345,9 +345,9 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 	}
 	var cancel context.CancelFunc
 	if state.data.timeoutSet {
-		s.ctx, cancel = context.WithTimeout(t.ctx, state.data.timeout)
+		s.ctx, cancel = context.WithTimeout(context.Background(), state.data.timeout)
 	} else {
-		s.ctx, cancel = context.WithCancel(t.ctx)
+		s.ctx, cancel = context.WithCancel(context.Background())
 	}
 	s.ctx, s.cancel = newContextWithCancelReason(s.ctx, cancel)
 	// Attach the received metadata to the context.
