@@ -257,6 +257,7 @@ func TestTransportException(t *testing.T) {
 	test.Assert(t, errors.Is(err, errIllegalFrame), err)
 }
 
+// Todo: 修复这个单测
 func TestTransportClose(t *testing.T) {
 	cfd, sfd := netpoll.GetSysFdPairs()
 	cconn, err := netpoll.NewFDConnection(cfd)

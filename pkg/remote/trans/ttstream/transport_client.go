@@ -18,7 +18,6 @@ package ttstream
 
 import (
 	"context"
-	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -29,7 +28,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/container"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -43,12 +41,12 @@ import (
 var ticker = utils.NewSyncSharedTicker(5 * time.Second)
 
 type clientTransport struct {
-	conn          netpoll.Connection
-	pool          transPool
-	streams       sync.Map                       // key=streamID val=clientStream
-	scache        []*clientStream                // size is streamCacheSize
-	spipe         *container.Pipe[*clientStream] // in-coming clientStream pipe
-	fpipe         *container.Pipe[*Frame]        // out-coming frame pipe
+	conn   netpoll.Connection
+	pool   transPool
+	stream atomic.Pointer[clientStream]
+	// protect writer
+	mu            sync.Mutex
+	writer        *writerBuffer
 	closedFlag    int32
 	closedTrigger chan struct{}
 }
@@ -59,11 +57,8 @@ func newClientTransport(conn netpoll.Connection, pool transPool) *clientTranspor
 	t := &clientTransport{
 		conn:          conn,
 		pool:          pool,
-		streams:       sync.Map{},
-		spipe:         container.NewPipe[*clientStream](),
-		scache:        make([]*clientStream, 0, streamCacheSize),
-		fpipe:         container.NewPipe[*Frame](),
-		closedTrigger: make(chan struct{}, 2),
+		writer:        newWriterBuffer(conn.Writer()),
+		closedTrigger: make(chan struct{}, 1),
 	}
 	addr := ""
 	if t.Addr() != nil {
@@ -83,19 +78,6 @@ func newClientTransport(conn netpoll.Connection, pool transPool) *clientTranspor
 			t.closedTrigger <- struct{}{}
 		}()
 		err = t.loopRead()
-	}, gofunc.NewBasicInfo("", addr))
-	gofunc.RecoverGoFuncWithInfo(context.Background(), func() {
-		var err error
-		defer func() {
-			if err != nil {
-				if !isIgnoreError(err) {
-					klog.Warnf("clientTransport[%s] loop write err: %v", t.Addr(), err)
-				}
-				_ = t.Close(err)
-			}
-			t.closedTrigger <- struct{}{}
-		}()
-		err = t.loopWrite()
 	}, gofunc.NewBasicInfo("", addr))
 
 	// add to stream cleanup ticker
@@ -117,14 +99,9 @@ func (t *clientTransport) Close(exception error) (err error) {
 	}
 	klog.Debugf("client transport[%s] is closing", t.Addr())
 	// close streams first
-	t.streams.Range(func(key, value any) bool {
-		s := value.(*clientStream)
+	if s := t.stream.Load(); s != nil {
 		s.close(exception, false, "", nil)
-		return true
-	})
-	// then close stream and frame pipes
-	t.spipe.Close()
-	t.fpipe.Close()
+	}
 
 	// remove cleanup stream task from ticker to avoid goroutine leak
 	ticker.Delete(t)
@@ -135,7 +112,6 @@ func (t *clientTransport) Close(exception error) (err error) {
 // WaitClosed waits for send loop and recv loop closed
 func (t *clientTransport) WaitClosed() {
 	<-t.closedTrigger
-	<-t.closedTrigger
 }
 
 func (t *clientTransport) IsActive() bool {
@@ -143,21 +119,26 @@ func (t *clientTransport) IsActive() bool {
 }
 
 func (t *clientTransport) storeStream(s *clientStream) {
-	t.streams.Store(s.sid, s)
+	t.stream.Store(s)
 }
 
 func (t *clientTransport) loadStream(sid int32) (s *clientStream, ok bool) {
-	val, ok := t.streams.Load(sid)
-	if !ok {
-		return s, false
+	s = t.stream.Load()
+	if s == nil {
+		return nil, false
 	}
-	s = val.(*clientStream)
-	return s, true
+	if s.sid == sid {
+		return s, true
+	}
+	return nil, false
 }
 
 func (t *clientTransport) deleteStream(sid int32) {
-	// remove stream from transport
-	t.streams.Delete(sid)
+	s := t.stream.Load()
+	if s == nil || s.sid != sid {
+		return
+	}
+	t.stream.CompareAndSwap(s, nil)
 }
 
 func (t *clientTransport) readFrame(reader bufiox.Reader) error {
@@ -173,8 +154,6 @@ func (t *clientTransport) readFrame(reader bufiox.Reader) error {
 	s, ok = t.loadStream(fr.sid)
 	if !ok {
 		klog.Debugf("transport[%s] read a unknown stream: frame[%s]", t.Addr(), fr)
-		// ignore unknown stream error
-		err = nil
 	} else {
 		// process different frames
 		switch fr.typ {
@@ -209,39 +188,22 @@ func (t *clientTransport) loopRead() error {
 	}
 }
 
-func (t *clientTransport) loopWrite() error {
-	defer func() {
-		// loop write should help to close connection
-		_ = t.conn.Close()
-	}()
-	writer := newWriterBuffer(t.conn.Writer())
-	fcache := make([]*Frame, frameCacheSize)
-	// Important note:
-	// loopWrite may cannot find stream by sid since it may send trailer and delete sid from streams
-	for {
-		n, err := t.fpipe.Read(context.Background(), fcache)
-		if err != nil {
-			return err
-		}
-		if n == 0 {
-			return io.EOF
-		}
-		for i := 0; i < n; i++ {
-			fr := fcache[i]
-			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
-				return err
-			}
-			recycleFrame(fr)
-		}
-		if err = writer.Flush(); err != nil {
-			return errTransport.newBuilder().withCause(err)
-		}
-	}
-}
-
 // WriteFrame is concurrent safe
+// If WriteFrame returns non-nil err, the clientTransport would be closed
 func (t *clientTransport) WriteFrame(fr *Frame) (err error) {
-	return t.fpipe.Write(context.Background(), fr)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if err = EncodeFrame(context.Background(), t.writer, fr); err != nil {
+		t.Close(err)
+		return err
+	}
+	recycleFrame(fr)
+	if err = t.writer.Flush(); err != nil {
+		err = errTransport.newBuilder().withCause(err)
+		t.Close(err)
+		return err
+	}
+	return nil
 }
 
 func (t *clientTransport) CloseStream(sid int32) (err error) {
