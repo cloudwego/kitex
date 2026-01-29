@@ -318,7 +318,7 @@ func TestTransportClose(t *testing.T) {
 		res.B = req.B
 		sErr := ss.SendMsg(context.Background(), res)
 		if sErr != nil {
-			test.Assert(t, errors.Is(sErr, errConnectionClosedCancel), sErr)
+			test.Assert(t, errors.Is(sErr, errTransport) || errors.Is(sErr, errConnectionClosedCancel), sErr)
 			break
 		}
 	}
@@ -1351,6 +1351,274 @@ func testRecvTimeoutBidiStreaming(t *testing.T, setTimeoutConfig, setRecvTimeout
 	test.Assert(t, errors.Is(rErr, kerrors.ErrStreamingCanceled), rErr)
 	test.Assert(t, errors.Is(rErr, errUpstreamCancel), rErr)
 	t.Logf("server-side stream Recv err: %v", rErr)
+
+	wg.Wait()
+}
+
+func TestSendFailed(t *testing.T) {
+	t.Run("ClientStreaming", testSendFailedClientStreaming)
+	t.Run("ServerStreaming", testSendFailedServerStreaming)
+	t.Run("BidiStreaming", testSendFailedBidiStreaming)
+}
+
+func testSendFailedClientStreaming(t *testing.T) {
+	cfd, sfd := netpoll.GetSysFdPairs()
+	cconn, err := netpoll.NewFDConnection(cfd)
+	test.Assert(t, err == nil, err)
+	sconn, err := netpoll.NewFDConnection(sfd)
+	test.Assert(t, err == nil, err)
+
+	intHeader := make(IntHeader)
+	strHeader := make(streaming.Header)
+	ctrans := newClientTransport(cconn, nil)
+	defer ctrans.Close(nil)
+	ctx := context.Background()
+	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "ClientStreaming"})
+	err = ctrans.WriteStream(ctx, cs, intHeader, strHeader)
+	test.Assert(t, err == nil, err)
+	strans := newServerTransport(sconn)
+	ss, err := strans.ReadStream(context.Background())
+	test.Assert(t, err == nil, err)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 10; i++ {
+			req := new(testRequest)
+			req.A = int32(i)
+			req.B = "hello"
+			sErr := cs.SendMsg(cs.Context(), req)
+			if sErr != nil {
+				t.Logf("client SendMsg err after %d messages: %v", i, sErr)
+				test.Assert(t, errors.Is(sErr, errTransport) || errors.Is(sErr, errIllegalFrame), sErr)
+				// second Send should get the same err
+				newSErr := cs.SendMsg(cs.Context(), req)
+				test.Assert(t, newSErr != nil, newSErr)
+				test.DeepEqual(t, newSErr, sErr)
+				return
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		t.Error("client should receive error when connection closed")
+	}()
+
+	for i := 0; i < 3; i++ {
+		req := new(testRequest)
+		rErr := ss.RecvMsg(ss.ctx, req)
+		test.Assert(t, rErr == nil, rErr)
+		test.Assert(t, req.A == int32(i))
+	}
+
+	err = sconn.Close()
+	test.Assert(t, err == nil, err)
+
+	req := new(testRequest)
+	rErr := ss.RecvMsg(ss.ctx, req)
+	if rErr != nil {
+		t.Logf("server RecvMsg err: %v", rErr)
+		test.Assert(t, errors.Is(rErr, errConnectionClosedCancel) || errors.Is(rErr, errTransport), rErr)
+	}
+
+	wg.Wait()
+}
+
+func testSendFailedServerStreaming(t *testing.T) {
+	cfd, sfd := netpoll.GetSysFdPairs()
+	cconn, err := netpoll.NewFDConnection(cfd)
+	test.Assert(t, err == nil, err)
+	sconn, err := netpoll.NewFDConnection(sfd)
+	test.Assert(t, err == nil, err)
+
+	intHeader := make(IntHeader)
+	strHeader := make(streaming.Header)
+	ctrans := newClientTransport(cconn, nil)
+	defer ctrans.Close(nil)
+	ctx := context.Background()
+	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "ServerStreaming"})
+	err = ctrans.WriteStream(ctx, cs, intHeader, strHeader)
+	test.Assert(t, err == nil, err)
+	strans := newServerTransport(sconn)
+	ss, err := strans.ReadStream(context.Background())
+	test.Assert(t, err == nil, err)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		req := new(testRequest)
+		req.A = 1
+		req.B = "hello"
+		sErr := cs.SendMsg(ctx, req)
+		test.Assert(t, sErr == nil, sErr)
+		sErr = cs.CloseSend(ctx)
+		test.Assert(t, sErr == nil, sErr)
+
+		for i := 0; i < 10; i++ {
+			res := new(testResponse)
+			rErr := cs.RecvMsg(cs.Context(), res)
+			if rErr != nil {
+				t.Logf("client RecvMsg err after %d messages: %v", i, rErr)
+				test.Assert(t, errors.Is(rErr, errTransport) || errors.Is(rErr, errIllegalFrame), rErr)
+				return
+			}
+		}
+		t.Error("client should receive error when connection closed")
+	}()
+
+	go func() {
+		defer wg.Done()
+		req := new(testRequest)
+		rErr := ss.RecvMsg(ss.ctx, req)
+		test.Assert(t, rErr == nil, rErr)
+
+		for i := 0; i < 3; i++ {
+			res := new(testResponse)
+			res.A = int32(i)
+			res.B = req.B
+			sErr := ss.SendMsg(ss.ctx, res)
+			test.Assert(t, sErr == nil, sErr)
+			time.Sleep(50 * time.Millisecond)
+		}
+
+		err = sconn.Close()
+		test.Assert(t, err == nil, err)
+
+		time.Sleep(50 * time.Millisecond)
+		for i := 3; i < 10; i++ {
+			res := new(testResponse)
+			res.A = int32(i)
+			sErr := ss.SendMsg(ss.ctx, res)
+			if sErr != nil {
+				t.Logf("server SendMsg err at message %d: %v", i, sErr)
+				test.Assert(t, errors.Is(sErr, errTransport) || errors.Is(sErr, errConnectionClosedCancel), sErr)
+				// second Send should get the same err
+				newSErr := ss.SendMsg(ss.ctx, res)
+				test.Assert(t, newSErr != nil, newSErr)
+				test.DeepEqual(t, newSErr, sErr)
+				return
+			}
+		}
+	}()
+
+	wg.Wait()
+}
+
+func testSendFailedBidiStreaming(t *testing.T) {
+	cfd, sfd := netpoll.GetSysFdPairs()
+	cconn, err := netpoll.NewFDConnection(cfd)
+	test.Assert(t, err == nil, err)
+	sconn, err := netpoll.NewFDConnection(sfd)
+	test.Assert(t, err == nil, err)
+
+	intHeader := make(IntHeader)
+	strHeader := make(streaming.Header)
+	ctrans := newClientTransport(cconn, nil)
+	defer ctrans.Close(nil)
+	ctx := context.Background()
+	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "BidiStreaming"})
+	err = ctrans.WriteStream(ctx, cs, intHeader, strHeader)
+	test.Assert(t, err == nil, err)
+	strans := newServerTransport(sconn)
+	ss, err := strans.ReadStream(context.Background())
+	test.Assert(t, err == nil, err)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		var cliWg sync.WaitGroup
+		cliWg.Add(2)
+
+		go func() {
+			defer cliWg.Done()
+			for i := 0; i < 10; i++ {
+				req := new(testRequest)
+				req.A = int32(i)
+				req.B = "hello"
+				sErr := cs.SendMsg(cs.Context(), req)
+				if sErr != nil {
+					t.Logf("client SendMsg err at message %d: %v", i, sErr)
+					test.Assert(t, errors.Is(sErr, errTransport) || errors.Is(sErr, errIllegalFrame), sErr)
+					// second Send should get the same err
+					newSErr := cs.SendMsg(cs.Context(), req)
+					test.Assert(t, newSErr != nil, newSErr)
+					test.DeepEqual(t, newSErr, sErr)
+					return
+				}
+				time.Sleep(50 * time.Millisecond)
+			}
+		}()
+
+		go func() {
+			defer cliWg.Done()
+			for i := 0; i < 10; i++ {
+				res := new(testResponse)
+				rErr := cs.RecvMsg(cs.Context(), res)
+				if rErr != nil {
+					t.Logf("client RecvMsg err at message %d: %v", i, rErr)
+					test.Assert(t, errors.Is(rErr, errTransport) || errors.Is(rErr, errIllegalFrame), rErr)
+					return
+				}
+			}
+		}()
+
+		cliWg.Wait()
+	}()
+
+	go func() {
+		defer wg.Done()
+		var srvWg sync.WaitGroup
+		srvWg.Add(2)
+
+		go func() {
+			defer srvWg.Done()
+			for i := 0; i < 10; i++ {
+				req := new(testRequest)
+				rErr := ss.RecvMsg(ss.ctx, req)
+				if rErr != nil {
+					t.Logf("server RecvMsg err at message %d: %v", i, rErr)
+					test.Assert(t, errors.Is(rErr, errTransport) || errors.Is(rErr, errConnectionClosedCancel), rErr)
+					return
+				}
+			}
+		}()
+
+		go func() {
+			defer srvWg.Done()
+			for i := 0; i < 5; i++ {
+				res := new(testResponse)
+				res.A = int32(i)
+				res.B = "world"
+				sErr := ss.SendMsg(ss.ctx, res)
+				test.Assert(t, sErr == nil, sErr)
+				time.Sleep(50 * time.Millisecond)
+			}
+
+			err = sconn.Close()
+			test.Assert(t, err == nil, err)
+
+			time.Sleep(50 * time.Millisecond)
+			for i := 5; i < 10; i++ {
+				res := new(testResponse)
+				res.A = int32(i)
+				sErr := ss.SendMsg(ss.ctx, res)
+				if sErr != nil {
+					t.Logf("server SendMsg err at message %d: %v", i, sErr)
+					test.Assert(t, errors.Is(sErr, errTransport) || errors.Is(sErr, errConnectionClosedCancel), sErr)
+					// second Send should get the same err
+					newSErr := ss.SendMsg(ss.ctx, res)
+					test.Assert(t, newSErr != nil, newSErr)
+					test.DeepEqual(t, newSErr, sErr)
+					return
+				}
+			}
+		}()
+
+		srvWg.Wait()
+	}()
 
 	wg.Wait()
 }

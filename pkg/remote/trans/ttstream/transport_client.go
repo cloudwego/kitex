@@ -18,7 +18,6 @@ package ttstream
 
 import (
 	"context"
-	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -29,7 +28,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/container"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -43,13 +41,15 @@ import (
 var ticker = utils.NewSyncSharedTicker(5 * time.Second)
 
 type clientTransport struct {
-	conn          netpoll.Connection
-	pool          transPool
-	streams       sync.Map                       // key=streamID val=clientStream
-	scache        []*clientStream                // size is streamCacheSize
-	spipe         *container.Pipe[*clientStream] // in-coming clientStream pipe
-	fpipe         *container.Pipe[*Frame]        // out-coming frame pipe
-	closedFlag    int32
+	conn    netpoll.Connection
+	pool    transPool
+	streams sync.Map // key=streamID val=clientStream
+
+	mu        sync.Mutex // protect state, closedErr and writer
+	state     int32
+	closedErr error
+	writer    *writerBuffer
+
 	closedTrigger chan struct{}
 }
 
@@ -60,10 +60,8 @@ func newClientTransport(conn netpoll.Connection, pool transPool) *clientTranspor
 		conn:          conn,
 		pool:          pool,
 		streams:       sync.Map{},
-		spipe:         container.NewPipe[*clientStream](),
-		scache:        make([]*clientStream, 0, streamCacheSize),
-		fpipe:         container.NewPipe[*Frame](),
-		closedTrigger: make(chan struct{}, 2),
+		writer:        newWriterBuffer(conn.Writer()),
+		closedTrigger: make(chan struct{}, 1),
 	}
 	addr := ""
 	if t.Addr() != nil {
@@ -84,19 +82,6 @@ func newClientTransport(conn netpoll.Connection, pool transPool) *clientTranspor
 		}()
 		err = t.loopRead()
 	}, gofunc.NewBasicInfo("", addr))
-	gofunc.RecoverGoFuncWithInfo(context.Background(), func() {
-		var err error
-		defer func() {
-			if err != nil {
-				if !isIgnoreError(err) {
-					klog.Warnf("clientTransport[%s] loop write err: %v", t.Addr(), err)
-				}
-				_ = t.Close(err)
-			}
-			t.closedTrigger <- struct{}{}
-		}()
-		err = t.loopWrite()
-	}, gofunc.NewBasicInfo("", addr))
 
 	// add to stream cleanup ticker
 	ticker.Add(t)
@@ -111,35 +96,55 @@ func (t *clientTransport) Addr() net.Addr {
 // Close will close transport and destroy all resource and goroutines when transPool discard the transport
 // when an exception is encountered and the transport needs to be closed,
 // the exception is not nil and the currently surviving streams are aware of this exception.
-func (t *clientTransport) Close(exception error) (err error) {
-	if !atomic.CompareAndSwapInt32(&t.closedFlag, 0, 1) {
-		return nil
+func (t *clientTransport) Close(exception error) error {
+	t.mu.Lock()
+	if t.state == connStateClosed {
+		closedErr := t.closedErr
+		t.mu.Unlock()
+		return closedErr
 	}
+	t.setClosedStateLocked(exception)
+	t.mu.Unlock()
+
+	t.releaseResources(exception)
+
+	return exception
+}
+
+// setClosedStateLocked sets the closed state and closed reason.
+// Must be called with t.mu held.
+func (t *clientTransport) setClosedStateLocked(err error) {
+	t.state = connStateClosed
+	t.closedErr = err
+}
+
+func (t *clientTransport) releaseResources(err error) {
 	klog.Debugf("client transport[%s] is closing", t.Addr())
 	// close streams first
 	t.streams.Range(func(key, value any) bool {
 		s := value.(*clientStream)
-		s.close(exception, false, "", nil)
+		s.close(err, false, "", nil)
 		return true
 	})
-	// then close stream and frame pipes
-	t.spipe.Close()
-	t.fpipe.Close()
+
+	if cErr := t.conn.Close(); cErr != nil {
+		klog.Infof("KITEX: ttstream clientTransport Close Connection failed, err: %v", cErr)
+	}
 
 	// remove cleanup stream task from ticker to avoid goroutine leak
 	ticker.Delete(t)
-
-	return err
 }
 
 // WaitClosed waits for send loop and recv loop closed
 func (t *clientTransport) WaitClosed() {
 	<-t.closedTrigger
-	<-t.closedTrigger
 }
 
 func (t *clientTransport) IsActive() bool {
-	return atomic.LoadInt32(&t.closedFlag) == 0 && t.conn.IsActive()
+	t.mu.Lock()
+	isClosed := t.state == connStateClosed
+	t.mu.Unlock()
+	return !isClosed && t.conn.IsActive()
 }
 
 func (t *clientTransport) storeStream(s *clientStream) {
@@ -209,39 +214,29 @@ func (t *clientTransport) loopRead() error {
 	}
 }
 
-func (t *clientTransport) loopWrite() error {
-	defer func() {
-		// loop write should help to close connection
-		_ = t.conn.Close()
-	}()
-	writer := newWriterBuffer(t.conn.Writer())
-	fcache := make([]*Frame, frameCacheSize)
-	// Important note:
-	// loopWrite may cannot find stream by sid since it may send trailer and delete sid from streams
-	for {
-		n, err := t.fpipe.Read(context.Background(), fcache)
-		if err != nil {
-			return err
-		}
-		if n == 0 {
-			return io.EOF
-		}
-		for i := 0; i < n; i++ {
-			fr := fcache[i]
-			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
-				return err
-			}
-			recycleFrame(fr)
-		}
-		if err = writer.Flush(); err != nil {
-			return errTransport.newBuilder().withCause(err)
-		}
-	}
-}
-
 // WriteFrame is concurrent safe
 func (t *clientTransport) WriteFrame(fr *Frame) (err error) {
-	return t.fpipe.Write(context.Background(), fr)
+	var needRelease bool
+	t.mu.Lock()
+	defer func() {
+		t.mu.Unlock()
+		if needRelease {
+			t.releaseResources(err)
+		}
+	}()
+	if t.state == connStateClosed {
+		err = t.closedErr
+		return err
+	}
+
+	if err = encodeFrameAndFlush(context.Background(), t.writer, fr); err != nil {
+		t.setClosedStateLocked(err)
+		needRelease = true
+		return err
+	}
+	recycleFrame(fr)
+
+	return nil
 }
 
 func (t *clientTransport) CloseStream(sid int32) (err error) {

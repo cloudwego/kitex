@@ -50,6 +50,21 @@ func TestFrameCodec(t *testing.T) {
 		test.DeepEqual(t, string(wframe.payload), string(rframe.payload))
 		test.DeepEqual(t, wframe.header, rframe.header)
 	}
+
+	for i := 0; i < 10; i++ {
+		wframe.sid = int32(i)
+		err = encodeFrameAndFlush(context.Background(), writer, wframe)
+		test.Assert(t, err == nil, err)
+	}
+	err = writer.Flush()
+	test.Assert(t, err == nil, err)
+
+	for i := 0; i < 10; i++ {
+		rframe, err := DecodeFrame(context.Background(), reader)
+		test.Assert(t, err == nil, err)
+		test.DeepEqual(t, string(wframe.payload), string(rframe.payload))
+		test.DeepEqual(t, wframe.header, rframe.header)
+	}
 }
 
 func TestFrameWithoutPayloadCodec(t *testing.T) {
