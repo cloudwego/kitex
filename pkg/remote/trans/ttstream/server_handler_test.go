@@ -101,7 +101,9 @@ func (m *mockTracer) Start(ctx context.Context) context.Context {
 }
 
 func (m *mockTracer) Finish(ctx context.Context) {
-	m.finishFunc(ctx)
+	if m.finishFunc != nil {
+		m.finishFunc(ctx)
+	}
 }
 
 type mockHeaderFrameReadHandler struct {
