@@ -358,6 +358,28 @@ func WithGRPCUnknownServiceHandler(f func(ctx context.Context, methodName string
 	}}
 }
 
+// WithGRPCReuseWriteBuffer enables write buffer reusing across connection lifecycle.
+// When enabled, a fixed-size buffer allocation (default 64KB) is no longer assigned to each connection.
+// Instead, buffers are allocated on-demand from buffer pool and put back to buffer pool after each flush.
+// Trading CPU overhead (malloc/free) for reduced memory usage.
+//
+// Use cases:
+//   - Scenarios with thousands of idle/low-traffic connections
+//   - Memory-constrained environments
+//
+// Trade-offs:
+//   - Reduces memory: ~2*WriteBufferSize per connection
+//   - Increases CPU: buffer pool malloc/free overhead on each write=>flush cycle
+//   - Slightly higher GC pressure
+//
+// This feature is disabled by default. (optimized for throughput)
+func WithGRPCReuseWriteBuffer(cfg grpc.ReuseWriteBufferConfig) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCReuseWriteBuffer(%+v)", cfg))
+		o.RemoteOpt.GRPCCfg.ReuseWriteBufferConfig = cfg
+	}}
+}
+
 // Deprecated: Use WithConnectionLimiter instead.
 func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {

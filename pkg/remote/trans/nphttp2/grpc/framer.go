@@ -21,6 +21,7 @@ import (
 	"net"
 
 	"github.com/bytedance/gopkg/lang/dirtmake"
+	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2/hpack"
 
@@ -30,17 +31,17 @@ import (
 type framer struct {
 	*grpcframe.Framer
 	reader netpoll.Reader
-	writer *bufWriter
+	writer bufWriter
 }
 
-func newFramer(conn net.Conn, writeBufferSize, readBufferSize, maxHeaderListSize uint32) *framer {
+func newFramer(conn net.Conn, writeBufferSize, readBufferSize, maxHeaderListSize uint32, reuseCfg ReuseWriteBufferConfig) *framer {
 	var r netpoll.Reader
 	if npConn, ok := conn.(interface{ Reader() netpoll.Reader }); ok {
 		r = npConn.Reader()
 	} else {
 		r = netpoll.NewReader(conn)
 	}
-	w := newBufWriter(conn, int(writeBufferSize))
+	w := newBufWriter(conn, int(writeBufferSize), reuseCfg)
 	fr := &framer{
 		reader: r,
 		writer: w,
@@ -55,7 +56,33 @@ func newFramer(conn net.Conn, writeBufferSize, readBufferSize, maxHeaderListSize
 	return fr
 }
 
-type bufWriter struct {
+type ReuseWriteBufferConfig struct {
+	Enable bool
+}
+
+type bufWriter interface {
+	Write(b []byte) (n int, err error)
+	Flush() error
+	GetOffset() int
+}
+
+func newBufWriter(writer io.Writer, batchSize int, reuseCfg ReuseWriteBufferConfig) bufWriter {
+	w := &keepBufWriter{
+		batchSize: batchSize,
+		writer:    writer,
+	}
+
+	if !reuseCfg.Enable {
+		// Using pre-allocated memory dedicated to each connection
+		w.buf = dirtmake.Bytes(batchSize*2, batchSize*2)
+		return w
+	}
+
+	return &reuseBufWriter{w}
+}
+
+// keepBufWriter pre-allocates batchSize * 2 buf and keeps it resident throughout the connection lifecycle.
+type keepBufWriter struct {
 	writer    io.Writer
 	buf       []byte
 	offset    int
@@ -63,15 +90,7 @@ type bufWriter struct {
 	err       error
 }
 
-func newBufWriter(writer io.Writer, batchSize int) *bufWriter {
-	return &bufWriter{
-		buf:       dirtmake.Bytes(batchSize*2, batchSize*2),
-		batchSize: batchSize,
-		writer:    writer,
-	}
-}
-
-func (w *bufWriter) Write(b []byte) (n int, err error) {
+func (w *keepBufWriter) Write(b []byte) (n int, err error) {
 	if w.err != nil {
 		return 0, w.err
 	}
@@ -84,13 +103,23 @@ func (w *bufWriter) Write(b []byte) (n int, err error) {
 		w.offset += nn
 		n += nn
 		if w.offset >= w.batchSize {
-			err = w.Flush()
+			if err = w.flushAllocatedBuffer(); err != nil {
+				return n, err
+			}
 		}
 	}
 	return n, err
 }
 
-func (w *bufWriter) Flush() error {
+func (w *keepBufWriter) Flush() error {
+	return w.flushAllocatedBuffer()
+}
+
+func (w *keepBufWriter) GetOffset() int {
+	return w.offset
+}
+
+func (w *keepBufWriter) flushAllocatedBuffer() error {
 	if w.err != nil {
 		return w.err
 	}
@@ -100,4 +129,48 @@ func (w *bufWriter) Flush() error {
 	_, w.err = w.writer.Write(w.buf[:w.offset])
 	w.offset = 0
 	return w.err
+}
+
+// During the Write=>Write=> … =>Write=>Flush cycle,
+// the first Write allocates batchSize * 2 buf from mcache, and the final Flush returns it.
+type reuseBufWriter struct {
+	*keepBufWriter
+}
+
+func (w *reuseBufWriter) Write(b []byte) (n int, err error) {
+	if w.err != nil {
+		return 0, w.err
+	}
+	if w.batchSize == 0 { // buffer has been disabled.
+		return w.writer.Write(b)
+	}
+	if w.buf == nil {
+		w.buf = mcache.Malloc(w.batchSize*2, w.batchSize*2)
+	}
+	for len(b) > 0 {
+		nn := copy(w.buf[w.offset:], b)
+		b = b[nn:]
+		w.offset += nn
+		n += nn
+		if w.offset >= w.batchSize {
+			if err = w.flushAllocatedBuffer(); err != nil {
+				return n, err
+			}
+		}
+	}
+	return n, err
+}
+
+func (w *reuseBufWriter) Flush() error {
+	err := w.flushAllocatedBuffer()
+	// Reuse only when err is nil, to prevent the underlying connection from still holding buf after a Write failure.
+	if err == nil && w.buf != nil {
+		mcache.Free(w.buf)
+		w.buf = nil
+	}
+	return err
+}
+
+func (w *reuseBufWriter) GetOffset() int {
+	return w.offset
 }

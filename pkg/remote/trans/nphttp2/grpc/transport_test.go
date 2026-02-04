@@ -2312,49 +2312,83 @@ func TestPingPong1MB(t *testing.T) {
 
 // This is a stress-test of flow control logic.
 func runPingPongTest(t *testing.T, msgSize int) {
-	server, client := setUp(t, 0, 0, pingpong)
-	defer server.stop()
-	defer client.Close(errSelfCloseForTest)
-	waitWhileTrue(t, func() (bool, error) {
-		server.mu.Lock()
-		defer server.mu.Unlock()
-		if len(server.conns) == 0 {
-			return true, fmt.Errorf("timed out while waiting for server transport to be created")
-		}
-		return false, nil
-	})
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
-	defer cancel()
-	stream, err := client.NewStream(ctx, &CallHdr{})
-	if err != nil {
-		t.Fatalf("Failed to create stream. Err: %v", err)
-	}
-	msg := make([]byte, msgSize)
-	outgoingHeader := make([]byte, 5)
-	outgoingHeader[0] = byte(0)
-	binary.BigEndian.PutUint32(outgoingHeader[1:], uint32(msgSize))
-	opts := &Options{}
-	incomingHeader := make([]byte, 5)
-
-	ctx, cancel = context.WithTimeout(ctx, 500*time.Millisecond)
-	defer cancel()
-	for ctx.Err() == nil {
-		if err := client.Write(stream, outgoingHeader, msg, opts); err != nil {
-			t.Fatalf("Error on client while writing message. Err: %v", err)
-		}
-		if _, err := stream.Read(incomingHeader); err != nil {
-			t.Fatalf("Error on client while reading data header. Err: %v", err)
-		}
-		sz := binary.BigEndian.Uint32(incomingHeader[1:])
-		recvMsg := make([]byte, int(sz))
-		if _, err := stream.Read(recvMsg); err != nil {
-			t.Fatalf("Error on client while reading data. Err: %v", err)
-		}
+	testcases := []struct {
+		desc      string
+		setupFunc func(t *testing.T) (*server, *http2Client)
+	}{
+		{
+			desc: "normal",
+			setupFunc: func(t *testing.T) (*server, *http2Client) {
+				return setUp(t, 0, 0, pingpong)
+			},
+		},
+		{
+			desc: "client enables writer buffer sharing",
+			setupFunc: func(t *testing.T) (*server, *http2Client) {
+				return setUpWithOptions(t, 0, &ServerConfig{}, pingpong, ConnectOptions{ReuseWriteBufferConfig: ReuseWriteBufferConfig{Enable: true}})
+			},
+		},
+		{
+			desc: "server enables writer buffer sharing",
+			setupFunc: func(t *testing.T) (*server, *http2Client) {
+				return setUpWithOptions(t, 0, &ServerConfig{ReuseWriteBufferConfig: ReuseWriteBufferConfig{Enable: true}}, pingpong, ConnectOptions{})
+			},
+		},
+		{
+			desc: "client and server enable writer buffer sharing",
+			setupFunc: func(t *testing.T) (*server, *http2Client) {
+				return setUpWithOptions(t, 0, &ServerConfig{ReuseWriteBufferConfig: ReuseWriteBufferConfig{Enable: true}}, pingpong, ConnectOptions{ReuseWriteBufferConfig: ReuseWriteBufferConfig{Enable: true}})
+			},
+		},
 	}
 
-	client.Write(stream, nil, nil, &Options{Last: true})
-	if _, err := stream.Read(incomingHeader); err != io.EOF {
-		t.Fatalf("Client expected EOF from the server. Got: %v", err)
+	for _, tc := range testcases {
+		t.Run(tc.desc, func(t *testing.T) {
+			server, client := tc.setupFunc(t)
+			defer server.stop()
+			defer client.Close(errSelfCloseForTest)
+			waitWhileTrue(t, func() (bool, error) {
+				server.mu.Lock()
+				defer server.mu.Unlock()
+				if len(server.conns) == 0 {
+					return true, fmt.Errorf("timed out while waiting for server transport to be created")
+				}
+				return false, nil
+			})
+			ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
+			defer cancel()
+			stream, err := client.NewStream(ctx, &CallHdr{})
+			if err != nil {
+				t.Fatalf("Failed to create stream. Err: %v", err)
+			}
+			msg := make([]byte, msgSize)
+			outgoingHeader := make([]byte, 5)
+			outgoingHeader[0] = byte(0)
+			binary.BigEndian.PutUint32(outgoingHeader[1:], uint32(msgSize))
+			opts := &Options{}
+			incomingHeader := make([]byte, 5)
+
+			ctx, cancel = context.WithTimeout(ctx, 500*time.Millisecond)
+			defer cancel()
+			for ctx.Err() == nil {
+				if err := client.Write(stream, outgoingHeader, msg, opts); err != nil {
+					t.Fatalf("Error on client while writing message. Err: %v", err)
+				}
+				if _, err := stream.Read(incomingHeader); err != nil {
+					t.Fatalf("Error on client while reading data header. Err: %v", err)
+				}
+				sz := binary.BigEndian.Uint32(incomingHeader[1:])
+				recvMsg := make([]byte, int(sz))
+				if _, err := stream.Read(recvMsg); err != nil {
+					t.Fatalf("Error on client while reading data. Err: %v", err)
+				}
+			}
+
+			client.Write(stream, nil, nil, &Options{Last: true})
+			if _, err := stream.Read(incomingHeader); err != io.EOF {
+				t.Fatalf("Client expected EOF from the server. Got: %v", err)
+			}
+		})
 	}
 }
 
