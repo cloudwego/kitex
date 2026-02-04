@@ -299,3 +299,13 @@ func decodeException(buf []byte) (*gopkgthrift.ApplicationException, error) {
 	}
 	return ex, nil
 }
+
+func encodeFrameAndFlush(ctx context.Context, writer bufiox.Writer, fr *Frame) (err error) {
+	if err = EncodeFrame(ctx, writer, fr); err != nil {
+		return err
+	}
+	if err = writer.Flush(); err != nil {
+		return errTransport.newBuilder().withCause(err)
+	}
+	return nil
+}

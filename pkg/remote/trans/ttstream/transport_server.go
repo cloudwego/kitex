@@ -22,7 +22,6 @@ import (
 	"io"
 	"net"
 	"sync"
-	"sync/atomic"
 
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
@@ -36,11 +35,15 @@ import (
 type serverTransport struct {
 	conn netpoll.Connection
 	// transport should operate directly on stream
-	streams       sync.Map                       // key=streamID val=stream
-	scache        []*serverStream                // size is streamCacheSize
-	spipe         *container.Pipe[*serverStream] // in-coming stream pipe
-	fpipe         *container.Pipe[*Frame]        // out-coming frame pipe
-	closedFlag    int32
+	streams sync.Map                       // key=streamID val=stream
+	scache  []*serverStream                // size is streamCacheSize
+	spipe   *container.Pipe[*serverStream] // in-coming stream pipe
+
+	mu        sync.Mutex // protect writer
+	state     int32
+	closedErr error
+	writer    *writerBuffer
+
 	closedTrigger chan struct{}
 }
 
@@ -52,8 +55,8 @@ func newServerTransport(conn netpoll.Connection) *serverTransport {
 		streams:       sync.Map{},
 		spipe:         container.NewPipe[*serverStream](),
 		scache:        make([]*serverStream, 0, streamCacheSize),
-		fpipe:         container.NewPipe[*Frame](),
-		closedTrigger: make(chan struct{}, 2),
+		writer:        newWriterBuffer(conn.Writer()),
+		closedTrigger: make(chan struct{}, 1),
 	}
 	addr := ""
 	if t.Addr() != nil {
@@ -74,19 +77,6 @@ func newServerTransport(conn netpoll.Connection) *serverTransport {
 		}()
 		err = t.loopRead()
 	}, gofunc.NewBasicInfo("", addr))
-	gofunc.RecoverGoFuncWithInfo(context.Background(), func() {
-		var err error
-		defer func() {
-			if err != nil {
-				if !isIgnoreError(err) {
-					klog.Warnf("transport[%s] loop write err: %v", t.Addr(), err)
-				}
-				_ = t.Close(err)
-			}
-			t.closedTrigger <- struct{}{}
-		}()
-		err = t.loopWrite()
-	}, gofunc.NewBasicInfo("", addr))
 	return t
 }
 
@@ -97,32 +87,56 @@ func (t *serverTransport) Addr() net.Addr {
 // Close will close transport and destroy all resource and goroutines when connection is disconnected
 // when an exception is encountered and the transport needs to be closed,
 // the exception is not nil and the currently surviving streams are aware of this exception.
-func (t *serverTransport) Close(exception error) (err error) {
-	if !atomic.CompareAndSwapInt32(&t.closedFlag, 0, 1) {
-		return nil
+func (t *serverTransport) Close(exception error) error {
+	t.mu.Lock()
+	if t.state == connStateClosed {
+		closedErr := t.closedErr
+		t.mu.Unlock()
+		return closedErr
 	}
+	t.setClosedStateLocked(exception)
+	t.mu.Unlock()
+
+	t.releaseResources(exception)
+
+	return exception
+}
+
+// setClosedStateLocked sets the closed state and closed reason.
+// Must be called with t.mu held.
+func (t *serverTransport) setClosedStateLocked(err error) {
+	t.state = connStateClosed
+	t.closedErr = err
+}
+
+func (t *serverTransport) releaseResources(err error) {
 	klog.Debugf("server transport[%s] is closing", t.Addr())
 	// close streams first
-	ex := errConnectionClosedCancel.newBuilder().withCause(exception)
+	ex := errConnectionClosedCancel.newBuilder().withCause(err)
 	t.streams.Range(func(key, value any) bool {
 		s := value.(*serverStream)
 		_ = s.close(ex)
 		return true
 	})
-	// then close stream and frame pipes
+
+	if cErr := t.conn.Close(); cErr != nil {
+		klog.Infof("KITEX: ttstream serverTransport Close Connection failed, err: %v", cErr)
+	}
+
+	// then close stream pipes
 	t.spipe.Close()
-	t.fpipe.Close()
-	return err
 }
 
 // WaitClosed waits for send loop and recv loop closed
 func (t *serverTransport) WaitClosed() {
 	<-t.closedTrigger
-	<-t.closedTrigger
 }
 
 func (t *serverTransport) IsActive() bool {
-	return atomic.LoadInt32(&t.closedFlag) == 0 && t.conn.IsActive()
+	t.mu.Lock()
+	isClosed := t.state == connStateClosed
+	t.mu.Unlock()
+	return !isClosed && t.conn.IsActive()
 }
 
 func (t *serverTransport) storeStream(s *serverStream) {
@@ -199,39 +213,29 @@ func (t *serverTransport) loopRead() error {
 	}
 }
 
-func (t *serverTransport) loopWrite() error {
-	defer func() {
-		// loop write should help to close connection
-		_ = t.conn.Close()
-	}()
-	writer := newWriterBuffer(t.conn.Writer())
-	fcache := make([]*Frame, frameCacheSize)
-	// Important note:
-	// loopWrite may cannot find stream by sid since it may send trailer and delete sid from streams
-	for {
-		n, err := t.fpipe.Read(context.Background(), fcache)
-		if err != nil {
-			return err
-		}
-		if n == 0 {
-			return io.EOF
-		}
-		for i := 0; i < n; i++ {
-			fr := fcache[i]
-			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
-				return err
-			}
-			recycleFrame(fr)
-		}
-		if err = writer.Flush(); err != nil {
-			return err
-		}
-	}
-}
-
 // WriteFrame is concurrent safe
 func (t *serverTransport) WriteFrame(fr *Frame) (err error) {
-	return t.fpipe.Write(context.Background(), fr)
+	var needRelease bool
+	t.mu.Lock()
+	defer func() {
+		t.mu.Unlock()
+		if needRelease {
+			t.releaseResources(err)
+		}
+	}()
+	if t.state == connStateClosed {
+		err = t.closedErr
+		return err
+	}
+
+	if err = encodeFrameAndFlush(context.Background(), t.writer, fr); err != nil {
+		t.setClosedStateLocked(err)
+		needRelease = true
+		return err
+	}
+	recycleFrame(fr)
+
+	return nil
 }
 
 func (t *serverTransport) CloseStream(sid int32) (err error) {

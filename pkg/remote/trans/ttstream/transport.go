@@ -31,6 +31,9 @@ const (
 
 	streamCacheSize = 32
 	frameCacheSize  = 256
+
+	connStateOpen   = 0
+	connStateClosed = 1
 )
 
 func isIgnoreError(err error) bool {
