@@ -26,6 +26,7 @@ import (
 
 	igeneric "github.com/cloudwego/kitex/internal/generic"
 	"github.com/cloudwego/kitex/internal/mocks"
+	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -494,4 +495,15 @@ func NewRemoteMsgWithPayloadType(ct serviceinfo.PayloadCodec) remote.Message {
 	mcfg.SetTransportProtocol(transport.TTHeader)
 	mcfg.SetPayloadCodec(ct)
 	return remoteMsg
+}
+
+func TestWithGRPCReuseWriteBuffer(t *testing.T) {
+	opts := internal_server.NewOptions([]internal_server.Option{})
+	test.Assert(t, !opts.RemoteOpt.GRPCCfg.ReuseWriteBufferConfig.Enable, opts.RemoteOpt.GRPCCfg.ReuseWriteBufferConfig)
+	opts = internal_server.NewOptions([]internal_server.Option{WithGRPCReuseWriteBuffer(grpc.ReuseWriteBufferConfig{Enable: true})})
+	test.Assert(t, opts.RemoteOpt.GRPCCfg.ReuseWriteBufferConfig.Enable, opts.RemoteOpt.GRPCCfg.ReuseWriteBufferConfig)
+	opts = internal_server.NewOptions([]internal_server.Option{WithGRPCReuseWriteBuffer(grpc.ReuseWriteBufferConfig{Enable: false})})
+	test.Assert(t, !opts.RemoteOpt.GRPCCfg.ReuseWriteBufferConfig.Enable, opts.RemoteOpt.GRPCCfg.ReuseWriteBufferConfig)
+	opts = internal_server.NewOptions([]internal_server.Option{WithGRPCReuseWriteBuffer(grpc.ReuseWriteBufferConfig{})})
+	test.Assert(t, !opts.RemoteOpt.GRPCCfg.ReuseWriteBufferConfig.Enable, opts.RemoteOpt.GRPCCfg.ReuseWriteBufferConfig)
 }

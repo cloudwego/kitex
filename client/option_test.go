@@ -755,6 +755,17 @@ func TestWithGRPCTLSConfig(t *testing.T) {
 	test.Assert(t, opts.GRPCConnectOpts != nil)
 }
 
+func TestWithGRPCReuseWriteBuffer(t *testing.T) {
+	opts := client.NewOptions([]client.Option{})
+	test.Assert(t, !opts.GRPCConnectOpts.ReuseWriteBufferConfig.Enable, opts.GRPCConnectOpts)
+	opts = client.NewOptions([]client.Option{WithGRPCReuseWriteBuffer(grpc.ReuseWriteBufferConfig{Enable: true})})
+	test.Assert(t, opts.GRPCConnectOpts.ReuseWriteBufferConfig.Enable, opts.GRPCConnectOpts)
+	opts = client.NewOptions([]client.Option{WithGRPCReuseWriteBuffer(grpc.ReuseWriteBufferConfig{Enable: false})})
+	test.Assert(t, !opts.GRPCConnectOpts.ReuseWriteBufferConfig.Enable, opts.GRPCConnectOpts)
+	opts = client.NewOptions([]client.Option{WithGRPCReuseWriteBuffer(grpc.ReuseWriteBufferConfig{})})
+	test.Assert(t, !opts.GRPCConnectOpts.ReuseWriteBufferConfig.Enable, opts.GRPCConnectOpts)
+}
+
 func TestTailOption(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

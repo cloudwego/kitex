@@ -148,7 +148,7 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		maxHeaderListSize = *config.MaxHeaderListSize
 	}
 
-	framer := newFramer(conn, config.WriteBufferSize, config.ReadBufferSize, maxHeaderListSize)
+	framer := newFramer(conn, config.WriteBufferSize, config.ReadBufferSize, maxHeaderListSize, config.ReuseWriteBufferConfig)
 	// Send initial settings as connection preface to client.
 	isettings := []http2.Setting{{
 		ID:  http2.SettingMaxFrameSize,

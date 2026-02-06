@@ -612,6 +612,8 @@ type ServerConfig struct {
 	WriteBufferSize            uint32
 	ReadBufferSize             uint32
 	MaxHeaderListSize          *uint32
+	// ReuseWriteBufferConfig configures reusing write buffer for each connection.
+	ReuseWriteBufferConfig ReuseWriteBufferConfig
 }
 
 func DefaultServerConfig() *ServerConfig {
@@ -641,6 +643,8 @@ type ConnectOptions struct {
 	TLSConfig *tls.Config
 	// TraceController is responsible for report detailed streaming events
 	TraceController *rpcinfo.TraceController
+	// ReuseWriteBufferConfig configures reusing write buffer for each connection.
+	ReuseWriteBufferConfig ReuseWriteBufferConfig
 }
 
 // NewServerTransport creates a ServerTransport with conn or non-nil error

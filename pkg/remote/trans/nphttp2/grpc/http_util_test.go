@@ -19,6 +19,7 @@ package grpc
 import (
 	"bytes"
 	"context"
+	"io"
 	"testing"
 	"time"
 
@@ -145,14 +146,302 @@ func TestTimeUnit(t *testing.T) {
 }
 
 func TestBufferWriter(t *testing.T) {
-	bytes := []byte("hello")
-	br := newBufWriter(newMockNpConn(mockAddr0), len(bytes)*5)
-	for i := 0; i < 6; i++ {
-		_, err := br.Write(bytes)
+	t.Run("keep", func(t *testing.T) {
+		bytes := []byte("hello")
+		br := newBufWriter(newMockNpConn(mockAddr0), len(bytes)*5, ReuseWriteBufferConfig{})
+		for i := 0; i < 6; i++ {
+			_, err := br.Write(bytes)
+			test.Assert(t, err == nil, err)
+		}
+		err := br.Flush()
 		test.Assert(t, err == nil, err)
-	}
-	err := br.Flush()
-	test.Assert(t, err == nil, err)
+	})
+	t.Run("keep-flush-error-on-large-write", func(t *testing.T) {
+		writeErr := io.ErrShortWrite
+		var writeCount int
+		mockWriter := &mockConn{
+			WriteFunc: func(b []byte) (int, error) {
+				writeCount++
+				return 0, writeErr
+			},
+		}
+
+		batchSize := 50
+		br := newBufWriter(mockWriter, batchSize, ReuseWriteBufferConfig{Enable: false}).(*keepBufWriter)
+
+		// Write large data that would trigger multiple flushes if not stopped
+		largeData := make([]byte, 500)
+		for i := range largeData {
+			largeData[i] = byte(i % 256)
+		}
+
+		n, err := br.Write(largeData)
+		test.Assert(t, err == writeErr, err)
+		test.Assert(t, n == 100, n)
+		test.Assert(t, writeCount == 1, writeCount)
+		test.Assert(t, br.err == writeErr, br.err)
+
+		n, err = br.Write([]byte("more"))
+		test.Assert(t, err == writeErr, err)
+		test.Assert(t, n == 0, n)
+		test.Assert(t, writeCount == 1, writeCount)
+	})
+	t.Run("reuse", func(t *testing.T) {
+		t.Run("normal", func(t *testing.T) {
+			var writtenData []byte
+			mockWriter := &mockConn{
+				WriteFunc: func(b []byte) (int, error) {
+					writtenData = append(writtenData, b...)
+					return len(b), nil
+				},
+			}
+
+			batchSize := 100
+			br := newBufWriter(mockWriter, batchSize, ReuseWriteBufferConfig{Enable: true}).(*reuseBufWriter)
+
+			data1 := []byte("test data")
+			n, err := br.Write(data1)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, n == len(data1), n)
+			test.Assert(t, br.buf != nil)
+			test.Assert(t, len(writtenData) == 0, len(writtenData))
+
+			err = br.Flush()
+			test.Assert(t, err == nil, err)
+			test.Assert(t, string(writtenData) == string(data1), string(writtenData))
+			test.Assert(t, br.buf == nil, br.buf)
+
+			writtenData = nil
+			data2 := []byte("new data")
+			n, err = br.Write(data2)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, n == len(data2), n)
+			test.Assert(t, br.buf != nil)
+
+			err = br.Flush()
+			test.Assert(t, err == nil, err)
+			test.Assert(t, string(writtenData) == string(data2), string(writtenData))
+			test.Assert(t, br.buf == nil, br.buf)
+		})
+		t.Run("auto-flush", func(t *testing.T) {
+			var flushCount int
+			var totalWritten int
+			mockWriter := &mockConn{
+				WriteFunc: func(b []byte) (int, error) {
+					flushCount++
+					totalWritten += len(b)
+					return len(b), nil
+				},
+			}
+
+			batchSize := 50
+			br := newBufWriter(mockWriter, batchSize, ReuseWriteBufferConfig{Enable: true}).(*reuseBufWriter)
+
+			data := make([]byte, batchSize)
+			for i := range data {
+				data[i] = byte(i % 256)
+			}
+
+			n, err := br.Write(data)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, n == batchSize)
+			test.Assert(t, flushCount == 1, flushCount)
+			test.Assert(t, totalWritten == batchSize, totalWritten)
+			test.Assert(t, br.GetOffset() == 0, br.GetOffset())
+
+			data2 := make([]byte, 60)
+			n, err = br.Write(data2)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, n == len(data2))
+			test.Assert(t, flushCount == 2, flushCount)
+			test.Assert(t, br.GetOffset() == 0, br.GetOffset())
+
+			data3 := make([]byte, 30)
+			n, err = br.Write(data3)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, n == len(data3), n)
+			test.Assert(t, flushCount == 2, flushCount)
+			test.Assert(t, br.GetOffset() == 30, br.GetOffset())
+
+			err = br.Flush()
+			test.Assert(t, err == nil, err)
+			test.Assert(t, flushCount == 3, flushCount)
+			test.Assert(t, totalWritten == batchSize+60+30, totalWritten)
+		})
+		t.Run("large-write", func(t *testing.T) {
+			var chunks [][]byte
+			mockWriter := &mockConn{
+				WriteFunc: func(b []byte) (int, error) {
+					chunk := make([]byte, len(b))
+					copy(chunk, b)
+					chunks = append(chunks, chunk)
+					return len(b), nil
+				},
+			}
+
+			batchSize := 100
+			br := newBufWriter(mockWriter, batchSize, ReuseWriteBufferConfig{Enable: true}).(*reuseBufWriter)
+
+			largeData := make([]byte, 250)
+			for i := range largeData {
+				largeData[i] = byte(i % 256)
+			}
+
+			n, err := br.Write(largeData)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, n == len(largeData), n)
+
+			test.Assert(t, len(chunks) == 1, len(chunks))
+			test.Assert(t, len(chunks[0]) == 200, len(chunks[0]))
+			test.Assert(t, br.GetOffset() == 50, br.GetOffset())
+
+			err = br.Flush()
+			test.Assert(t, err == nil, err)
+			test.Assert(t, len(chunks) == 2, len(chunks))
+
+			var reconstructed []byte
+			for _, chunk := range chunks {
+				reconstructed = append(reconstructed, chunk...)
+			}
+			test.Assert(t, len(reconstructed) == len(largeData))
+			for i := range largeData {
+				test.Assert(t, reconstructed[i] == largeData[i], reconstructed, largeData)
+			}
+		})
+		t.Run("empty-write", func(t *testing.T) {
+			mockWriter := &mockConn{
+				WriteFunc: func(b []byte) (int, error) {
+					return len(b), nil
+				},
+			}
+
+			br := newBufWriter(mockWriter, 100, ReuseWriteBufferConfig{Enable: true}).(*reuseBufWriter)
+
+			n, err := br.Write([]byte{})
+			test.Assert(t, err == nil, err)
+			test.Assert(t, n == 0, n)
+			test.Assert(t, br.GetOffset() == 0, br.GetOffset())
+
+			err = br.Flush()
+			test.Assert(t, err == nil, err)
+
+			for i := 0; i < 5; i++ {
+				n, err = br.Write(nil)
+				test.Assert(t, err == nil, err)
+				test.Assert(t, n == 0, n)
+			}
+		})
+		t.Run("disabled-buffering", func(t *testing.T) {
+			var writeCount int
+			mockWriter := &mockConn{
+				WriteFunc: func(b []byte) (int, error) {
+					writeCount++
+					return len(b), nil
+				},
+			}
+
+			br := newBufWriter(mockWriter, 0, ReuseWriteBufferConfig{Enable: true})
+
+			data := []byte("test")
+			n, err := br.Write(data)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, n == len(data), n)
+			test.Assert(t, writeCount == 1, writeCount)
+
+			n, err = br.Write(data)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, n == len(data), n)
+			test.Assert(t, writeCount == 2, writeCount)
+		})
+		t.Run("write-error", func(t *testing.T) {
+			writeErr := io.ErrShortWrite
+			mockWriter := &mockConn{
+				WriteFunc: func(b []byte) (int, error) {
+					return 0, writeErr
+				},
+			}
+
+			batchSize := 50
+			br := newBufWriter(mockWriter, batchSize, ReuseWriteBufferConfig{Enable: true}).(*reuseBufWriter)
+
+			data := make([]byte, batchSize)
+			_, err := br.Write(data)
+			test.Assert(t, err == writeErr, err)
+			test.Assert(t, br.err == writeErr, br.err)
+
+			_, err = br.Write([]byte("more"))
+			test.Assert(t, err == writeErr, err)
+
+			err = br.Flush()
+			test.Assert(t, err == writeErr, err)
+		})
+		t.Run("flush-error-on-large-write", func(t *testing.T) {
+			writeErr := io.ErrShortWrite
+			var writeCount int
+			mockWriter := &mockConn{
+				WriteFunc: func(b []byte) (int, error) {
+					writeCount++
+					return 0, writeErr
+				},
+			}
+
+			batchSize := 50
+			br := newBufWriter(mockWriter, batchSize, ReuseWriteBufferConfig{Enable: true}).(*reuseBufWriter)
+
+			largeData := make([]byte, 500)
+			for i := range largeData {
+				largeData[i] = byte(i % 256)
+			}
+
+			n, err := br.Write(largeData)
+			test.Assert(t, err == writeErr, err)
+			test.Assert(t, n == 100, n)
+			test.Assert(t, writeCount == 1, writeCount)
+			test.Assert(t, br.err == writeErr, br.err)
+			test.Assert(t, br.buf != nil, br.buf)
+
+			n, err = br.Write([]byte("more"))
+			test.Assert(t, err == writeErr, err)
+			test.Assert(t, n == 0, n)
+			test.Assert(t, writeCount == 1, writeCount)
+
+			err = br.Flush()
+			test.Assert(t, err == writeErr, err)
+			test.Assert(t, br.buf != nil, "buffer should not be freed on flush error")
+		})
+		t.Run("multiple-flushes", func(t *testing.T) {
+			var flushCount int
+			mockWriter := &mockConn{
+				WriteFunc: func(b []byte) (int, error) {
+					if len(b) > 0 {
+						flushCount++
+					}
+					return len(b), nil
+				},
+			}
+
+			br := newBufWriter(mockWriter, 100, ReuseWriteBufferConfig{Enable: true})
+
+			err := br.Flush()
+			test.Assert(t, err == nil, err)
+			test.Assert(t, flushCount == 0, flushCount)
+
+			br.Write([]byte("data"))
+			err = br.Flush()
+			test.Assert(t, err == nil, err)
+			test.Assert(t, flushCount == 1, flushCount)
+
+			err = br.Flush()
+			test.Assert(t, err == nil, err)
+			test.Assert(t, flushCount == 1, flushCount)
+
+			br.Write([]byte("more"))
+			br.Flush()
+			br.Write([]byte("data"))
+			br.Flush()
+			test.Assert(t, flushCount == 3)
+		})
+	})
 }
 
 func TestBufferPool(t *testing.T) {
