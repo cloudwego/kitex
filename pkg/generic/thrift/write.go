@@ -62,22 +62,27 @@ func typeOf(sample interface{}, t *descriptor.TypeDescriptor, opt *writerOption)
 	case int8, byte:
 		switch tt {
 		case descriptor.I08, descriptor.I16, descriptor.I32, descriptor.I64:
-			return tt, writeInt8, nil
+			return tt, writeIntSeries[int8], nil
 		}
 	case int16:
 		switch tt {
 		case descriptor.I08, descriptor.I16, descriptor.I32, descriptor.I64:
-			return tt, writeInt16, nil
+			return tt, writeIntSeries[int16], nil
 		}
 	case int32:
 		switch tt {
 		case descriptor.I08, descriptor.I16, descriptor.I32, descriptor.I64:
-			return tt, writeInt32, nil
+			return tt, writeIntSeries[int32], nil
 		}
 	case int64:
 		switch tt {
 		case descriptor.I08, descriptor.I16, descriptor.I32, descriptor.I64:
-			return tt, writeInt64, nil
+			return tt, writeIntSeries[int64], nil
+		}
+	case int:
+		switch tt {
+		case descriptor.I08, descriptor.I16, descriptor.I32, descriptor.I64:
+			return tt, writeIntSeries[int], nil
 		}
 	case float64:
 		// maybe come from json decode
@@ -123,6 +128,16 @@ func typeOf(sample interface{}, t *descriptor.TypeDescriptor, opt *writerOption)
 		return descriptor.STRUCT, writeJSON, nil
 	case nil, descriptor.Void: // nil and Void
 		return descriptor.VOID, writeVoid, nil
+	case map[int8]interface{}: // these branches are uncommon, so placed in the rear of the switch clause, avoiding testing them early
+		return descriptor.MAP, writeVariousComparableMap[int8], nil
+	case map[int16]interface{}:
+		return descriptor.MAP, writeVariousComparableMap[int16], nil
+	case map[int32]interface{}:
+		return descriptor.MAP, writeVariousComparableMap[int32], nil
+	case map[int64]interface{}:
+		return descriptor.MAP, writeVariousComparableMap[int64], nil
+	case map[int]interface{}:
+		return descriptor.MAP, writeVariousComparableMap[int], nil
 	}
 	return 0, nil, fmt.Errorf("unsupported type:%T, expected type:%s", sample, tt)
 }
@@ -141,19 +156,19 @@ func typeJSONOf(data *gjson.Result, t *descriptor.TypeDescriptor, opt *writerOpt
 		return
 	case descriptor.I08:
 		v = int8(data.Int())
-		w = writeInt8
+		w = writeIntSeries[int8]
 		return
 	case descriptor.I16:
 		v = int16(data.Int())
-		w = writeInt16
+		w = writeIntSeries[int16]
 		return
 	case descriptor.I32:
 		v = int32(data.Int())
-		w = writeInt32
+		w = writeIntSeries[int32]
 		return
 	case descriptor.I64:
 		v = data.Int()
-		w = writeInt64
+		w = writeIntSeries[int64]
 		return
 	case descriptor.DOUBLE:
 		v = data.Float()
@@ -311,6 +326,37 @@ func writeBool(ctx context.Context, val interface{}, out *thrift.BufferWriter, t
 	return out.WriteBool(val.(bool))
 }
 
+func writeIntSeries[T ~int | ~int8 | ~uint8 | ~int16 | ~int32 | ~int64](ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+	// compatible with lossless conversion
+	i, isT := val.(T)
+	if !isT {
+		return fmt.Errorf("unsupported type: %T", val)
+	}
+	switch t.Type {
+	case descriptor.I08:
+		// uint8 will never exceed the range
+		if _, ok := val.(uint8); !ok && (int64(i) < math.MinInt8 || int64(i) > math.MaxInt8) {
+			return fmt.Errorf("value is beyond range of i8: %v", i)
+		}
+		return out.WriteByte(int8(i))
+	case descriptor.I16:
+		if int64(i) < math.MinInt16 || int64(i) > math.MaxInt16 {
+			return fmt.Errorf("value is beyond range of i16: %v", i)
+		}
+		return out.WriteI16(int16(i))
+	case descriptor.I32:
+		// for int on 32-bit architectures: this branch is considered dead hence removed by go compiler
+		// for int on 64-bit architectures: this branch functions as writeInt64() does
+		if int64(i) < math.MinInt32 || int64(i) > math.MaxInt32 {
+			return fmt.Errorf("value is beyond range of i32: %v", i)
+		}
+		return out.WriteI32(int32(i))
+	case descriptor.I64:
+		return out.WriteI64(int64(i))
+	}
+	return fmt.Errorf("need int type, but got: %s", t.Type)
+}
+
 func writeInt8(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	var i int8
 	switch val := val.(type) {
@@ -409,25 +455,25 @@ func writeJSONNumber(ctx context.Context, val interface{}, out *thrift.BufferWri
 		if err != nil {
 			return err
 		}
-		return writeInt8(ctx, int8(i), out, t, opt)
+		return writeIntSeries[int8](ctx, int8(i), out, t, opt)
 	case descriptor.I16:
 		i, err := jn.Int64()
 		if err != nil {
 			return err
 		}
-		return writeInt16(ctx, int16(i), out, t, opt)
+		return writeIntSeries[int16](ctx, int16(i), out, t, opt)
 	case descriptor.I32:
 		i, err := jn.Int64()
 		if err != nil {
 			return err
 		}
-		return writeInt32(ctx, int32(i), out, t, opt)
+		return writeIntSeries[int32](ctx, int32(i), out, t, opt)
 	case descriptor.I64:
 		i, err := jn.Int64()
 		if err != nil {
 			return err
 		}
-		return writeInt64(ctx, i, out, t, opt)
+		return writeIntSeries[int64](ctx, i, out, t, opt)
 	case descriptor.DOUBLE:
 		i, err := jn.Float64()
 		if err != nil {
@@ -442,13 +488,13 @@ func writeJSONFloat64(ctx context.Context, val interface{}, out *thrift.BufferWr
 	i := val.(float64)
 	switch t.Type {
 	case descriptor.I08:
-		return writeInt8(ctx, int8(i), out, t, opt)
+		return writeIntSeries[int8](ctx, int8(i), out, t, opt)
 	case descriptor.I16:
-		return writeInt16(ctx, int16(i), out, t, opt)
+		return writeIntSeries[int16](ctx, int16(i), out, t, opt)
 	case descriptor.I32:
-		return writeInt32(ctx, int32(i), out, t, opt)
+		return writeIntSeries[int32](ctx, int32(i), out, t, opt)
 	case descriptor.I64:
-		return writeInt64(ctx, int64(i), out, t, opt)
+		return writeIntSeries[int64](ctx, int64(i), out, t, opt)
 	case descriptor.DOUBLE:
 		return writeFloat64(ctx, i, out, t, opt)
 	}
@@ -544,6 +590,50 @@ func writeJSONList(ctx context.Context, val interface{}, out *thrift.BufferWrite
 
 func writeInterfaceMap(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	m := val.(map[interface{}]interface{})
+	length := len(m)
+	if err := out.WriteMapBegin(thrift.TType(t.Key.Type), thrift.TType(t.Elem.Type), length); err != nil {
+		return err
+	}
+	if length == 0 {
+		return nil
+	}
+	var (
+		keyWriter  writer
+		elemWriter writer
+		err        error
+	)
+	for key, elem := range m {
+		if keyWriter == nil {
+			if keyWriter, err = nextWriter(key, t.Key, opt); err != nil {
+				return err
+			}
+		}
+		if err := keyWriter(ctx, key, out, t.Key, opt); err != nil {
+			return err
+		}
+		if elem == nil {
+			if err = writeEmptyValue(out, t.Elem, opt); err != nil {
+				return err
+			}
+		} else {
+			if elemWriter == nil {
+				if elemWriter, err = nextWriter(elem, t.Elem, opt); err != nil {
+					return err
+				}
+			}
+			if err := elemWriter(ctx, elem, out, t.Elem, opt); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// writeVariousComparableMap moved most code from writeInterfaceMap.
+// writeInterfaceMap can be simplified to one line: return writeVariousComparableMap[interface{}](ctx, val, out, t, opt)
+// However this causes incompatibility with go 1.18 since it does not consider interface{} to be comparable. So code was copied
+func writeVariousComparableMap[K comparable](ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+	m := val.(map[K]interface{})
 	length := len(m)
 	if err := out.WriteMapBegin(thrift.TType(t.Key.Type), thrift.TType(t.Elem.Type), length); err != nil {
 		return err

@@ -46,6 +46,9 @@ const (
 	UTF16  Type = 17
 	// BINARY Type = 18   wrong and unused
 	JSON Type = 19
+
+	MAX_TYPE        // indicates max type, so it has the value of previous one
+	TYPE_UPPERBOUND = MAX_TYPE + 1
 )
 
 var typeNames = map[Type]string{
