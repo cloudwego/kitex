@@ -1622,3 +1622,87 @@ func testSendFailedBidiStreaming(t *testing.T) {
 
 	wg.Wait()
 }
+
+func Test_handlerReturnCauseCascadedCancel(t *testing.T) {
+	cliStA, srvStA := initTestStreams(t, context.Background(), "BidiStreaming", "ClientA", "ServerA")
+	cliStB, srvStB := initTestStreams(t, srvStA.ctx, "BidiStreaming", "ServerA-AsClient", "ServerB")
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	go func() {
+		defer wg.Done()
+		req := new(testRequest)
+		req.A = 1
+		req.B = "hello"
+		sErr := cliStA.SendMsg(cliStA.ctx, req)
+		test.Assert(t, sErr == nil, sErr)
+	}()
+
+	go func() {
+		defer wg.Done()
+		req := new(testRequest)
+		rErr := srvStA.RecvMsg(srvStA.ctx, req)
+		test.Assert(t, rErr == nil, rErr)
+		test.Assert(t, req.A == 1)
+		test.Assert(t, req.B == "hello")
+
+		downReq := new(testRequest)
+		downReq.A = 2
+		downReq.B = "world"
+		sErr := cliStB.SendMsg(srvStA.ctx, downReq)
+		test.Assert(t, sErr == nil, sErr)
+
+		// mock handler returning
+		time.Sleep(50 * time.Millisecond)
+		err := srvStA.CloseSend(nil)
+		test.Assert(t, err == nil, err)
+
+		resp := new(testResponse)
+		resp.A = 3
+		sErr = srvStA.SendMsg(srvStA.ctx, resp)
+		test.Assert(t, sErr != nil, sErr)
+		test.Assert(t, errors.Is(sErr, errBizHandlerReturnCancel), sErr)
+		sEx := sErr.(*Exception)
+		test.Assert(t, sEx.side == serverSide, sEx)
+		t.Logf("server-side stream A Send err: %v", sErr)
+
+		newReq := new(testRequest)
+		rErr = srvStA.RecvMsg(srvStA.ctx, newReq)
+		test.Assert(t, rErr != nil, rErr)
+		test.Assert(t, errors.Is(rErr, errBizHandlerReturnCancel), rErr)
+		rEx := rErr.(*Exception)
+		test.Assert(t, rEx.side == serverSide, rEx)
+		t.Logf("server-side stream A Recv err: %v", rErr)
+	}()
+
+	go func() {
+		defer wg.Done()
+		req := new(testRequest)
+		rErr := srvStB.RecvMsg(srvStB.ctx, req)
+		test.Assert(t, rErr == nil, rErr)
+		test.Assert(t, req.A == 2)
+		test.Assert(t, req.B == "world")
+
+		time.Sleep(100 * time.Millisecond)
+
+		downReq := new(testRequest)
+		downReq.A = 4
+		sErr := cliStB.SendMsg(srvStA.ctx, downReq)
+		test.Assert(t, sErr != nil, sErr)
+		test.Assert(t, errors.Is(sErr, errBizHandlerReturnCancel), sErr)
+		sEx := sErr.(*Exception)
+		test.Assert(t, sEx.side == clientSide, sEx)
+		t.Logf("client-side stream B Send err: %v", sErr)
+
+		resp := new(testResponse)
+		rErr = cliStB.RecvMsg(srvStA.ctx, resp)
+		test.Assert(t, rErr != nil, rErr)
+		test.Assert(t, errors.Is(rErr, errBizHandlerReturnCancel), rErr)
+		rEx := rErr.(*Exception)
+		test.Assert(t, rEx.side == clientSide, rEx)
+		t.Logf("client-side stream B Recv err: %v", rErr)
+	}()
+
+	wg.Wait()
+}
