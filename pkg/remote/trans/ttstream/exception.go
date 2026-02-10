@@ -43,6 +43,8 @@ var (
 	errConnectionClosedCancel = newException("canceled by connection closed", kerrors.ErrStreamingCanceled, 12013)
 )
 
+var errServerSideBizHandlerReturnCancel = errBizHandlerReturnCancel.newBuilder().withSide(serverSide)
+
 func newStreamRecvTimeoutException(cfg streaming.TimeoutConfig) *Exception {
 	return newException(fmt.Sprintf("stream Recv timeout, timeout config=%+v", cfg), kerrors.ErrStreamingTimeout, 12014).withSide(clientSide)
 }
