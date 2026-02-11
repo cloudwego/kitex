@@ -485,5 +485,4 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	}
 	t.opt.TracerCtl.HandleStreamFinishEvent(ctx, ri, rpcinfo.StreamFinishEvent{})
 	t.opt.TracerCtl.DoFinish(ctx, ri, err)
-	rpcStats.Reset()
 }
