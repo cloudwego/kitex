@@ -18,16 +18,18 @@ package loadbalance
 
 import (
 	"context"
+	"hash/maphash"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/bytedance/gopkg/util/xxhash3"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
+
+var hashSeed = maphash.MakeSeed()
 
 /*
   type hints for sync.Map：
@@ -156,7 +158,7 @@ func (cp *consistPicker) Next(ctx context.Context, request interface{}) discover
 	if key == "" {
 		return nil
 	}
-	res := buildConsistResult(cp.info, xxhash3.HashString(key))
+	res := buildConsistResult(cp.info, maphash.String(hashSeed, key))
 	return res.Primary
 	// Todo(DMwangnima): Optimise Replica-related logic
 	// This comment part is previous implementation considering connecting to Replica
@@ -326,7 +328,7 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 			}
 			// At this point, the index inside ret should be cur + j.
 			index := cur + j
-			ret[index].hash = xxhash3.Hash(b)
+			ret[index].hash = maphash.Bytes(hashSeed, b)
 			ret[index].RealNode = &rNodes[i]
 		}
 		cur += vLen
