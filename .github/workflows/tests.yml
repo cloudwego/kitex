@@ -6,7 +6,7 @@ jobs:
   unit-scenario-test:
     strategy:
       matrix:
-        go: [ "1.18", "1.25" ]
+        go: [ "1.18", "1.26" ]
     runs-on: [ Linux, X64 ]
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version: stable
       - name: Benchmark
         # we only use this CI to verify bench code works
         # setting benchtime=100ms is saving our time...
@@ -79,7 +79,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version: stable
       - name: Prepare
         run: |  
           go install github.com/cloudwego/thriftgo@main
@@ -108,7 +108,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version: stable
           cache: false # don't use cache for self-hosted runners
       - name: Windows compatibility test
         run: go test -run=^$ ./...
@@ -121,7 +121,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25"
+          go-version: stable
           cache: false # don't use cache for self-hosted runners
       - name: Run coverage
         run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
