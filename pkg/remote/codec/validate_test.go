@@ -19,10 +19,9 @@ package codec
 import (
 	"context"
 	"errors"
+	"hash/maphash"
 	"strconv"
 	"testing"
-
-	"github.com/bytedance/gopkg/util/xxhash3"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -44,6 +43,8 @@ func (m *mockPayloadValidator) Key(ctx context.Context) string {
 	return "mockValidator"
 }
 
+var hashSeed = maphash.MakeSeed()
+
 func (m *mockPayloadValidator) Generate(ctx context.Context, outPayload []byte) (need bool, value string, err error) {
 	if l := ctx.Value(mockGenerateSkipKey); l != nil {
 		return false, "", nil
@@ -55,7 +56,7 @@ func (m *mockPayloadValidator) Generate(ctx context.Context, outPayload []byte) 
 	if l := ctx.Value(mockGenerateErrorKey); l != nil {
 		return false, "", errors.New("mockGenerateError")
 	}
-	hash := xxhash3.Hash(outPayload)
+	hash := maphash.Bytes(hashSeed, outPayload)
 	return true, strconv.FormatInt(int64(hash), 10), nil
 }
 
