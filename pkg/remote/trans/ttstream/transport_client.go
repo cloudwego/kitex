@@ -21,7 +21,6 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
@@ -29,16 +28,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
-
-// ticker is used to manage cleaning canceled stream task.
-// it triggers and cleans up actively cancelled streams every 5s.
-// Streaming QPS is generally not too high so that using the Sync SharedTicker to reduce
-// the overhead of goroutines in a multi-connection scenario.
-//
-// This is a workaround: when the minimum Go version supports 1.21, use `context.AfterFunc` instead.
-var ticker = utils.NewSyncSharedTicker(5 * time.Second)
 
 type clientTransport struct {
 	conn    netpoll.Connection
@@ -82,9 +72,6 @@ func newClientTransport(conn netpoll.Connection, pool transPool) *clientTranspor
 		}()
 		err = t.loopRead()
 	}, gofunc.NewBasicInfo("", addr))
-
-	// add to stream cleanup ticker
-	ticker.Add(t)
 
 	return t
 }
@@ -130,9 +117,6 @@ func (t *clientTransport) releaseResources(err error) {
 	if cErr := t.conn.Close(); cErr != nil {
 		klog.Infof("KITEX: ttstream clientTransport Close Connection failed, err: %v", cErr)
 	}
-
-	// remove cleanup stream task from ticker to avoid goroutine leak
-	ticker.Delete(t)
 }
 
 // WaitClosed waits for send loop and recv loop closed

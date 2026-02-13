@@ -87,8 +87,14 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	cs.setRecvTimeoutConfig(rconfig)
 	cs.setMetaFrameHandler(c.metaHandler)
 	cs.setTraceController(c.traceCtl)
+	stop := context.AfterFunc(cs.ctx, func() {
+		cs.ctxDoneCallback(cs.ctx)
+	})
+	cs.setCtxCleanup(stop)
 
 	if err = trans.WriteStream(ctx, cs, intHeader, strHeader); err != nil {
+		// execute stop to prevent leak
+		stop()
 		return nil, err
 	}
 

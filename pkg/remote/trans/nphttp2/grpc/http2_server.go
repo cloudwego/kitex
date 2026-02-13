@@ -38,6 +38,7 @@ import (
 	"golang.org/x/net/http2/hpack"
 	"google.golang.org/protobuf/proto"
 
+	internal_stream "github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 
@@ -343,13 +344,23 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 		// s is just created by the caller. No lock needed.
 		s.state = streamReadDone
 	}
-	var cancel context.CancelFunc
+
 	if state.data.timeoutSet {
+		var cancel context.CancelFunc
+		var cancelCause context.CancelCauseFunc
 		s.ctx, cancel = context.WithTimeout(t.ctx, state.data.timeout)
+		s.ctx, cancelCause = context.WithCancelCause(s.ctx)
+		s.cancel = func(cause error) {
+			cancelCause(cause)
+			cancel()
+		}
 	} else {
-		s.ctx, cancel = context.WithCancel(t.ctx)
+		s.ctx, s.cancel = context.WithCancelCause(t.ctx)
 	}
-	s.ctx, s.cancel = newContextWithCancelReason(s.ctx, cancel)
+	// The semantics of `ctx.Err()` have changed. It now returns gRPC internal status error.
+	// If we just use context.WithCancelCause, users must use context.Cause to retrieve the previous error. This results a breaking change.
+	// Therefore, we need to encapsulate a Context that automatically executes `context.Cause` when `ctx.Err` is called.
+	s.ctx = internal_stream.NewContextWithCancelReason(s.ctx)
 	// Attach the received metadata to the context.
 	if len(state.data.mdata) > 0 {
 		s.ctx = metadata.NewIncomingContext(s.ctx, state.data.mdata)

@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	internal_stream "github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
@@ -109,8 +110,8 @@ func Test_clientStream_parseCtxErr(t *testing.T) {
 			ctxFunc: func() (context.Context, context.CancelFunc) {
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
 					rpcinfo.NewEndpointInfo("serviceB", "testMethod", nil, nil), nil, nil, rpcinfo.NewRPCConfig(), nil))
-				ctx, cancel := context.WithCancel(ctx)
-				ctx, cancelFunc := newContextWithCancelReason(ctx, cancel)
+				ctx, cancelFunc := context.WithCancelCause(ctx)
+				ctx = internal_stream.NewContextWithCancelReason(ctx)
 				cause := defaultRstException
 				return ctx, func() {
 					cancelFunc(errUpstreamCancel.newBuilder().withSide(serverSide).setOrAppendCancelPath("serviceA").withCauseAndTypeId(cause, cause.TypeId()))
@@ -156,8 +157,8 @@ func Test_clientStream_parseCtxErr(t *testing.T) {
 			ctxFunc: func() (context.Context, context.CancelFunc) {
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
 					rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, rpcinfo.NewRPCConfig(), nil))
-				ctx, cancel := context.WithCancel(ctx)
-				ctx, cancelFunc := newContextWithCancelReason(ctx, cancel)
+				ctx, cancelFunc := context.WithCancelCause(ctx)
+				ctx = internal_stream.NewContextWithCancelReason(ctx)
 				return ctx, func() {
 					cancelFunc(errors.New("test"))
 				}

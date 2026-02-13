@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 CloudWeGo Authors
+ * Copyright 2026 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,41 +14,22 @@
  * limitations under the License.
  */
 
-package ttstream
+package stream
 
-import (
-	"context"
-	"sync/atomic"
-)
+import "context"
 
 // contextWithCancelReason implements context.Context
-// with a cancel func for passing cancel reason
-// NOTE: use context.WithCancelCause when go1.20?
+// with Err() retrieving cause err with context.Cause automatically.
+// Whether using gRPC or ttstream, the ctx.Err() returns protocol-specific errors rather than context.Canceled or context.DeadlineExceeded.
+// When using context.WithCancelCause, an additional layer of encapsulation is still required to avoid breaking changes.
 type contextWithCancelReason struct {
 	context.Context
-
-	cancel context.CancelFunc
-	reason atomic.Value
 }
 
 func (c *contextWithCancelReason) Err() error {
-	err := c.reason.Load()
-	if err != nil {
-		return err.(error)
-	}
-	return c.Context.Err()
+	return context.Cause(c.Context)
 }
 
-func (c *contextWithCancelReason) CancelWithReason(reason error) {
-	if reason != nil {
-		c.reason.CompareAndSwap(nil, reason)
-	}
-	c.cancel()
-}
-
-type cancelWithReason func(reason error)
-
-func newContextWithCancelReason(ctx context.Context, cancel context.CancelFunc) (context.Context, cancelWithReason) {
-	ret := &contextWithCancelReason{Context: ctx, cancel: cancel}
-	return ret, ret.CancelWithReason
+func NewContextWithCancelReason(ctx context.Context) context.Context {
+	return &contextWithCancelReason{Context: ctx}
 }
