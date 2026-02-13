@@ -50,7 +50,7 @@ func newServerStream(ctx context.Context, writer streamWriter, smeta streamFrame
 type serverStream struct {
 	*stream
 	state      int32
-	cancelFunc cancelWithReason
+	cancelFunc context.CancelCauseFunc
 }
 
 func (s *serverStream) SetHeader(hd streaming.Header) error {

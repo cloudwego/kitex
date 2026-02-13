@@ -40,7 +40,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 var testServiceInfo = &serviceinfo.ServiceInfo{
@@ -56,12 +55,6 @@ var testServiceInfo = &serviceinfo.ServiceInfo{
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
 		),
 	},
-}
-
-func TestMain(m *testing.M) {
-	// reduce cleanup interval to speed up unit tests
-	ticker = utils.NewSyncSharedTicker(50 * time.Millisecond)
-	m.Run()
 }
 
 func TestTransportBasic(t *testing.T) {
@@ -574,6 +567,10 @@ func initTestStreams(t *testing.T, cCtx context.Context, method, cliNodeName, sr
 	cs := newClientStream(cCtx, ctrans, streamFrame{sid: genStreamID(), method: method})
 	cs.rpcInfo = rpcinfo.NewRPCInfo(
 		rpcinfo.NewEndpointInfo(cliNodeName, method, nil, nil), nil, nil, nil, nil)
+	stop := context.AfterFunc(cs.ctx, func() {
+		cs.ctxDoneCallback(cs.ctx)
+	})
+	cs.ctxCleanup = stop
 	err = ctrans.WriteStream(cCtx, cs, intHeader, strHeader)
 	test.Assert(t, err == nil, err)
 	strans := newServerTransport(sconn)

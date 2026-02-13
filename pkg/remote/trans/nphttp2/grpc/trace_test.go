@@ -23,6 +23,7 @@ import (
 	"math"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -622,6 +623,7 @@ func Test_trace(t *testing.T) {
 			req := []byte("hello")
 			err = cli.Write(s, nil, req, &Options{})
 			test.Assert(t, err == nil, err)
+			time.Sleep(50 * time.Millisecond)
 			cancelFunc()
 
 			<-srv.srvReady
@@ -643,6 +645,7 @@ func Test_trace(t *testing.T) {
 			test.Assert(t, err == nil, err)
 			err = cli.Write(s, nil, nil, &Options{Last: true})
 			test.Assert(t, err == nil, err)
+			time.Sleep(50 * time.Millisecond)
 			cancelFunc()
 
 			<-srv.srvReady

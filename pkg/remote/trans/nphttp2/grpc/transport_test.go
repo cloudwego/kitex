@@ -48,7 +48,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/testutils"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 type server struct {
@@ -371,7 +370,7 @@ func (h *testStreamHandler) handleStreamCancel(t *testing.T, s *Stream) {
 func verifyCancelError(t *testing.T, err error) {
 	test.Assert(t, err != nil, err)
 	st, ok := status.FromError(err)
-	test.Assert(t, ok)
+	test.Assert(t, ok, err)
 	test.Assert(t, st.Code() == codes.Canceled, st.Code())
 	test.Assert(t, strings.Contains(st.Message(), "transport: RSTStream Frame received with error code"), st.Message())
 }
@@ -853,14 +852,6 @@ func setUpWithOnGoAway(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 		t.Fatalf("failed to create transport: %v", connErr)
 	}
 	return server, ct.(*http2Client)
-}
-
-func TestMain(m *testing.M) {
-	// set the ticker to make tests running fast
-	oldTicker := ticker
-	ticker = utils.NewSyncSharedTicker(10 * time.Millisecond)
-	m.Run()
-	ticker = oldTicker
 }
 
 // TestInflightStreamClosing ensures that closing in-flight stream

@@ -63,6 +63,7 @@ type clientStream struct {
 	// exception as Recv
 	closeStreamException atomic.Value // type must be of *Exception
 	storeExceptionOnce   sync.Once
+	ctxCleanup           func() bool
 
 	// for Header()/Trailer()
 	headerSig  chan int32
@@ -206,6 +207,10 @@ func (s *clientStream) close(exception error, sendRst bool, cancelPath string, t
 		s.sendTrailer(nil)
 	}
 	s.runCloseCallback(exception)
+	// invoke stop func of ctx.AfterFunc to avoid leak
+	if s.ctxCleanup != nil {
+		s.ctxCleanup()
+	}
 }
 
 func (s *clientStream) closeSignalMeta(trailer streaming.Trailer) {
@@ -237,6 +242,10 @@ func (s *clientStream) setMetaFrameHandler(metaHandler MetaFrameHandler) {
 
 func (s *clientStream) setTraceController(traceCtl *rpcinfo.TraceController) {
 	s.traceCtl = traceCtl
+}
+
+func (s *clientStream) setCtxCleanup(clean func() bool) {
+	s.ctxCleanup = clean
 }
 
 func (s *clientStream) handleStreamStartEvent(event rpcinfo.StreamStartEvent) {
