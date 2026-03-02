@@ -189,6 +189,14 @@ func typeJSONOf(data *gjson.Result, t *descriptor.TypeDescriptor, opt *writerOpt
 	return 0, nil, fmt.Errorf("data:%#v, expected type:%s, err:%#v", data, tt, err)
 }
 
+func getWriterAndWrite(ctx context.Context, elem interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+	w, err := nextWriter(elem, t, opt)
+	if err != nil {
+		return err
+	}
+	return w(ctx, elem, out, t, opt)
+}
+
 func nextWriter(sample interface{}, t *descriptor.TypeDescriptor, opt *writerOption) (writer, error) {
 	tt, fn, err := typeOf(sample, t, opt)
 	if err != nil {
@@ -498,23 +506,14 @@ func writeList(ctx context.Context, val interface{}, out *thrift.BufferWriter, t
 	if length == 0 {
 		return nil
 	}
-	var (
-		writer writer
-		err    error
-	)
-	for _, elem := range l {
+	for i, elem := range l {
 		if elem == nil {
-			if err = writeEmptyValue(out, t.Elem, opt); err != nil {
+			if err := writeEmptyValue(out, t.Elem, opt); err != nil {
 				return err
 			}
 		} else {
-			if writer == nil {
-				if writer, err = nextWriter(elem, t.Elem, opt); err != nil {
-					return err
-				}
-			}
-			if err := writer(ctx, elem, out, t.Elem, opt); err != nil {
-				return err
+			if err := getWriterAndWrite(ctx, elem, out, t.Elem, opt); err != nil {
+				return fmt.Errorf("list element (%v) at index %d: %w", elem, i, err)
 			}
 		}
 	}
@@ -551,33 +550,17 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out *thrift.BufferW
 	if length == 0 {
 		return nil
 	}
-	var (
-		keyWriter  writer
-		elemWriter writer
-		err        error
-	)
+
 	for key, elem := range m {
-		if keyWriter == nil {
-			if keyWriter, err = nextWriter(key, t.Key, opt); err != nil {
-				return err
-			}
-		}
-		if err := keyWriter(ctx, key, out, t.Key, opt); err != nil {
-			return err
+		if err := getWriterAndWrite(ctx, key, out, t.Key, opt); err != nil {
+			return fmt.Errorf("map key (%v): %w", key, err)
 		}
 		if elem == nil {
-			if err = writeEmptyValue(out, t.Elem, opt); err != nil {
+			if err := writeEmptyValue(out, t.Elem, opt); err != nil {
 				return err
 			}
-		} else {
-			if elemWriter == nil {
-				if elemWriter, err = nextWriter(elem, t.Elem, opt); err != nil {
-					return err
-				}
-			}
-			if err := elemWriter(ctx, elem, out, t.Elem, opt); err != nil {
-				return err
-			}
+		} else if err := getWriterAndWrite(ctx, elem, out, t.Elem, opt); err != nil {
+			return fmt.Errorf("map value (%v) for key (%v): %w", elem, key, err)
 		}
 	}
 	return nil
@@ -593,36 +576,20 @@ func writeStringMap(ctx context.Context, val interface{}, out *thrift.BufferWrit
 		return nil
 	}
 
-	var (
-		keyWriter  writer
-		elemWriter writer
-	)
 	for key, elem := range m {
 		_key, err := buildinTypeFromString(key, t.Key)
 		if err != nil {
 			return err
 		}
-		if keyWriter == nil {
-			if keyWriter, err = nextWriter(_key, t.Key, opt); err != nil {
-				return err
-			}
-		}
-		if err := keyWriter(ctx, _key, out, t.Key, opt); err != nil {
-			return err
+		if err = getWriterAndWrite(ctx, _key, out, t.Key, opt); err != nil {
+			return fmt.Errorf("map key (%v): %w", key, err)
 		}
 		if elem == nil {
 			if err = writeEmptyValue(out, t.Elem, opt); err != nil {
 				return err
 			}
-		} else {
-			if elemWriter == nil {
-				if elemWriter, err = nextWriter(elem, t.Elem, opt); err != nil {
-					return err
-				}
-			}
-			if err := elemWriter(ctx, elem, out, t.Elem, opt); err != nil {
-				return err
-			}
+		} else if err = getWriterAndWrite(ctx, elem, out, t.Elem, opt); err != nil {
+			return fmt.Errorf("map value (%v) for key (%v): %w", elem, key, err)
 		}
 	}
 	return nil
