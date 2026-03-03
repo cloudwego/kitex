@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/cloudwego/gopkg/bufiox"
@@ -974,9 +975,10 @@ func Test_writeList(t *testing.T) {
 		opt *writerOption
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name           string
+		args           args
+		wantErr        bool
+		errMsgContains string
 	}{
 		// TODO: Add test cases.
 		{
@@ -991,6 +993,7 @@ func Test_writeList(t *testing.T) {
 				},
 			},
 			false,
+			"",
 		},
 		{
 			"writeListWithNil",
@@ -1004,6 +1007,7 @@ func Test_writeList(t *testing.T) {
 				},
 			},
 			false,
+			"",
 		},
 		{
 			"writeListWithNilOnly",
@@ -1017,6 +1021,7 @@ func Test_writeList(t *testing.T) {
 				},
 			},
 			false,
+			"",
 		},
 		{
 			"writeListWithNextWriterError",
@@ -1030,12 +1035,53 @@ func Test_writeList(t *testing.T) {
 				},
 			},
 			true,
+			"at index 0",
+		},
+		{
+			"int8 then string",
+			args{
+				val: []interface{}{int8(1), "hello"},
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.LIST,
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.I08},
+				},
+			},
+			true,
+			"at index 1",
+		},
+		{
+			"string then int32",
+			args{
+				val: []interface{}{"hello", int32(100)},
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.LIST,
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+				},
+			},
+			true,
+			"at index 1",
+		},
+		{
+			"nil then non-nil",
+			args{
+				val: []interface{}{nil, int32(100)},
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.LIST,
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+				},
+			},
+			true,
+			"at index 1",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeList(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
-				t.Errorf("writeList() error = %v, wantErr %v", err, tt.wantErr)
+			err := writeList(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt)
+			if tt.wantErr {
+				test.Assert(t, err != nil)
+				test.Assert(t, strings.Contains(err.Error(), tt.errMsgContains), err)
+			} else {
+				test.Assert(t, err == nil, err)
 			}
 		})
 	}
@@ -1049,9 +1095,10 @@ func Test_writeInterfaceMap(t *testing.T) {
 		opt *writerOption
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name           string
+		args           args
+		wantErr        bool
+		errMsgContains string
 	}{
 		// TODO: Add test cases.
 		{
@@ -1067,6 +1114,7 @@ func Test_writeInterfaceMap(t *testing.T) {
 				},
 			},
 			false,
+			"",
 		},
 		{
 			"writeInterfaceMapWithNil",
@@ -1081,6 +1129,7 @@ func Test_writeInterfaceMap(t *testing.T) {
 				},
 			},
 			false,
+			"",
 		},
 		{
 			"writeInterfaceMapWithNilOnly",
@@ -1095,6 +1144,7 @@ func Test_writeInterfaceMap(t *testing.T) {
 				},
 			},
 			false,
+			"",
 		},
 		{
 			"writeInterfaceMapWithElemNextWriterError",
@@ -1109,6 +1159,7 @@ func Test_writeInterfaceMap(t *testing.T) {
 				},
 			},
 			true,
+			"",
 		},
 		{
 			"writeInterfaceMapWithKeyWriterError",
@@ -1123,13 +1174,69 @@ func Test_writeInterfaceMap(t *testing.T) {
 				},
 			},
 			true,
+			"map key",
+		},
+		{
+			"different key types only",
+			args{
+				val: map[interface{}]interface{}{int8(1): "value1", "key2": "value2"},
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.MAP,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.I08},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+				},
+			},
+			true,
+			"map key",
+		},
+		{
+			"different val types only",
+			args{
+				val: map[interface{}]interface{}{"key1": int8(1), "key2": "hello"},
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.MAP,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.I08},
+				},
+			},
+			true,
+			"map value",
+		},
+		{
+			"different key types and val types",
+			args{
+				val: map[interface{}]interface{}{int8(1): int8(10), "key2": "hello"},
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.MAP,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.I08},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.I08},
+				},
+			},
+			true,
+			"map key",
+		},
+		{
+			"nil and non-nil val types",
+			args{
+				val: map[interface{}]interface{}{"key1": nil, "key2": "hello"},
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.MAP,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.I08},
+				},
+			},
+			true,
+			"map value",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeInterfaceMap(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t,
-				tt.args.opt); (err != nil) != tt.wantErr {
-				t.Errorf("writeInterfaceMap() error = %v, wantErr %v", err, tt.wantErr)
+			err := writeInterfaceMap(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt)
+			if tt.wantErr {
+				test.Assert(t, err != nil)
+				test.Assert(t, strings.Contains(err.Error(), tt.errMsgContains), err)
+			} else {
+				test.Assert(t, err == nil, err)
 			}
 		})
 	}
@@ -1143,9 +1250,10 @@ func Test_writeStringMap(t *testing.T) {
 		opt *writerOption
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name           string
+		args           args
+		wantErr        bool
+		errMsgContains string
 	}{
 		// TODO: Add test cases.
 		{
@@ -1161,6 +1269,7 @@ func Test_writeStringMap(t *testing.T) {
 				},
 			},
 			false,
+			"",
 		},
 		{
 			"writeStringMapWithNil",
@@ -1175,6 +1284,7 @@ func Test_writeStringMap(t *testing.T) {
 				},
 			},
 			false,
+			"",
 		},
 		{
 			"writeStringMapWithNilOnly",
@@ -1189,6 +1299,7 @@ func Test_writeStringMap(t *testing.T) {
 				},
 			},
 			false,
+			"",
 		},
 		{
 			"writeStringMapWithElemNextWriterError",
@@ -1203,12 +1314,56 @@ func Test_writeStringMap(t *testing.T) {
 				},
 			},
 			true,
+			"map value",
+		},
+		{
+			"val int8 then string",
+			args{
+				val: map[string]interface{}{"key1": int8(1), "key2": "hello"},
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.MAP,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.I08},
+				},
+			},
+			true,
+			"map value",
+		},
+		{
+			"val string then int32",
+			args{
+				val: map[string]interface{}{"key1": "hello", "key2": int32(100)},
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.MAP,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+				},
+			},
+			true,
+			"map value",
+		},
+		{
+			"val nil then non-nil",
+			args{
+				val: map[string]interface{}{"key1": nil, "key2": int32(100)},
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.MAP,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+				},
+			},
+			true,
+			"map value",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeStringMap(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
-				t.Errorf("writeStringMap() error = %v, wantErr %v", err, tt.wantErr)
+			err := writeStringMap(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt)
+			if tt.wantErr {
+				test.Assert(t, err != nil)
+				test.Assert(t, strings.Contains(err.Error(), tt.errMsgContains), err)
+			} else {
+				test.Assert(t, err == nil, err)
 			}
 		})
 	}
