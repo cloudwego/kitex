@@ -86,3 +86,24 @@ func WithRecvTimeoutConfig(cfg streaming.TimeoutConfig) Option {
 		o.StreamOptions.RecvTimeoutConfig = cfg
 	}}
 }
+
+// WithBinaryGenericIDLService specifies the target IDL Service Name that
+// binary generic streaming call would visit.
+// Empty svcName would not take effect.
+//
+// Example:
+//
+//	stream, err := cli.ServerStreaming(ctx, method, req,
+//	    streamcall.WithBinaryGenericIDLService("TestService"))
+//
+// Note: Only effective for BinaryThriftGenericV2 and BinaryPbGeneric.
+// For other generic types, this option will be ignored.
+func WithBinaryGenericIDLService(svcName string) Option {
+	return Option{f: func(o *callopt.CallOptions, di *strings.Builder) {
+		di.WriteString("WithBinaryGenericIDLService")
+		di.WriteByte('(')
+		di.WriteString(svcName)
+		di.WriteByte(')')
+		o.BinaryGenericIDLService = svcName
+	}}
+}

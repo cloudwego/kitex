@@ -30,6 +30,7 @@ import (
 
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
+	igeneric "github.com/cloudwego/kitex/internal/generic"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -842,6 +843,10 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 		}
 		if callOpts.StreamOptions.RecvTimeoutConfig.Timeout > 0 {
 			cfg.SetStreamRecvTimeoutConfig(callOpts.StreamOptions.RecvTimeoutConfig)
+		}
+		// WithBinaryGenericIDLService only take effect for BinaryThriftGenericV2 and BinaryPbGeneric
+		if callOpts.BinaryGenericIDLService != "" && igeneric.BinaryGenericSupportsMultiService(svcInfo) {
+			inkSetter.SetServiceName(callOpts.BinaryGenericIDLService)
 		}
 	}
 

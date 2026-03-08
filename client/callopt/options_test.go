@@ -128,6 +128,11 @@ func TestApply(t *testing.T) {
 	option = WithFallback(nil)
 	_, co = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
 	test.Assert(t, co.Fallback == nil)
+
+	// WithBinaryGenericIDLService
+	option = WithBinaryGenericIDLService("test_idl")
+	_, co = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
+	test.Assert(t, co.BinaryGenericIDLService == "test_idl")
 }
 
 func BenchmarkStringsBuilder(b *testing.B) {

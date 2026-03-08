@@ -55,3 +55,16 @@ func TestWithRecvTimeoutConfig(t *testing.T) {
 	test.Assert(t, callOpts.StreamOptions.RecvTimeoutConfig.Timeout == 1*time.Second, callOpts)
 	test.Assert(t, callOpts.StreamOptions.RecvTimeoutConfig.DisableCancelRemote, callOpts)
 }
+
+func TestWithBinaryGenericIDLService(t *testing.T) {
+	// config empty IDL Service
+	sb := strings.Builder{}
+	callOpts := callopt.CallOptions{}
+	WithBinaryGenericIDLService("").f(&callOpts, &sb)
+	test.Assert(t, callOpts.BinaryGenericIDLService == "", callOpts.BinaryGenericIDLService)
+	// config IDL Service
+	sb = strings.Builder{}
+	callOpts = callopt.CallOptions{}
+	WithBinaryGenericIDLService("test_idl").f(&callOpts, &sb)
+	test.Assert(t, callOpts.BinaryGenericIDLService == "test_idl", callOpts.BinaryGenericIDLService)
+}

@@ -44,10 +44,11 @@ type CallOptions struct {
 	httpResolver http.Resolver
 
 	// export field for using in client
-	RetryPolicy    retry.Policy
-	Fallback       *fallback.Policy
-	CompressorName string
-	StreamOptions  client.StreamOptions
+	RetryPolicy             retry.Policy
+	Fallback                *fallback.Policy
+	CompressorName          string
+	StreamOptions           client.StreamOptions
+	BinaryGenericIDLService string
 }
 
 func newOptions() interface{} {
@@ -240,6 +241,27 @@ func WithGRPCCompressor(compressorName string) Option {
 		di.WriteString(compressorName)
 		di.WriteByte(')')
 		o.CompressorName = compressorName
+	}}
+}
+
+// WithBinaryGenericIDLService specifies the target IDL Service Name that
+// binary generic call would visit.
+// Empty svcName would not take effect.
+//
+// Example:
+//
+//	resp, err := cli.GenericCall(ctx, method, req,
+//	    callopt.WithBinaryGenericIDLService("TestService"))
+//
+// Note: Only effective for BinaryThriftGenericV2 and BinaryPbGeneric.
+// For other generic types, this option will be ignored.
+func WithBinaryGenericIDLService(svcName string) Option {
+	return Option{f: func(o *CallOptions, di *strings.Builder) {
+		di.WriteString("WithBinaryGenericIDLService")
+		di.WriteByte('(')
+		di.WriteString(svcName)
+		di.WriteByte(')')
+		o.BinaryGenericIDLService = svcName
 	}}
 }
 
