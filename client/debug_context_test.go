@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -28,13 +29,17 @@ import (
 
 // noCancelContext simulates a noCancel wrapper
 type noCancelContext struct {
-	Context context.Context // Exported field name
+	ctx context.Context
 }
 
 func (c noCancelContext) Deadline() (time.Time, bool)       { return time.Time{}, false }
 func (c noCancelContext) Done() <-chan struct{}             { return nil }
 func (c noCancelContext) Err() error                        { return nil }
-func (c noCancelContext) Value(key interface{}) interface{} { return c.Context.Value(key) }
+func (c noCancelContext) Value(key interface{}) interface{} { return c.ctx.Value(key) }
+
+func withoutCancel(ctx context.Context) context.Context {
+	return noCancelContext{ctx: ctx}
+}
 
 // customContext with non-standard field name
 type customContext struct {
@@ -270,9 +275,10 @@ func TestDumpContext_NoCancel(t *testing.T) {
 	cancel() // Cancel the base
 
 	// Wrap with noCancel
-	noCancelCtx := noCancelContext{Context: baseCtx}
+	noCancelCtx := withoutCancel(baseCtx)
 
 	output := dumpContext(noCancelCtx)
+	t.Log(output)
 
 	// noCancel should show nil Done
 	if !strings.Contains(output, "Done: nil (will block forever)") {
@@ -312,8 +318,8 @@ func TestDumpContext_ComplexChain(t *testing.T) {
 	defer cancel()
 	ctx, cancel2 := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel2()
-	ctx = context.WithValue(ctx, "layer2", "top")
-	ctx = noCancelContext{Context: ctx}
+	ctx = context.WithValue(ctx, "layer2", "middle")
+	ctx = withoutCancel(ctx)
 
 	output := dumpContext(ctx)
 
@@ -444,4 +450,43 @@ func TestDumpContext_OutputFormat(t *testing.T) {
 	if strings.Count(output, "\n") < 3 {
 		t.Errorf("Expected multi-line output, got: %s", output)
 	}
+}
+
+// TestDumpContext_ConcurrentMapAccess tests that dumpContext doesn't panic
+// when context values contain maps being concurrently modified
+func TestDumpContext_ConcurrentMapAccess(t *testing.T) {
+	// Create a map that will be concurrently modified
+	testMap := make(map[string]int)
+	ctx := context.WithValue(context.Background(), "concurrent-map", testMap)
+
+	done := make(chan bool)
+
+	// Start a goroutine that continuously modifies the map
+	go func() {
+		for i := 0; ; i++ {
+			select {
+			case <-done:
+				return
+			default:
+				testMap[fmt.Sprintf("key-%d", i)] = i
+				if i > 0 && i%10 == 0 {
+					// Occasionally delete some keys
+					delete(testMap, fmt.Sprintf("key-%d", i-5))
+				}
+			}
+		}
+	}()
+
+	// Try to dump the context multiple times while map is being modified
+	// This should not cause a fatal error
+	for i := 0; i < 100; i++ {
+		output := dumpContext(ctx)
+		// Should contain map type information
+		if !strings.Contains(output, "map") && !strings.Contains(output, "concurrent-map") {
+			t.Errorf("Expected output to contain map info, got: %s", output)
+		}
+	}
+
+	close(done)
+	time.Sleep(10 * time.Millisecond) // Give goroutine time to exit
 }

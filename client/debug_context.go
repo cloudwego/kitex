@@ -127,7 +127,8 @@ func doPrintValueCtx(ctx context.Context, sb *strings.Builder, indent string) {
 	keyStr := fmt.Sprintf("%v", key)
 	if keyStr != "" && keyStr != "<unreadable>" {
 		// Truncate very long values
-		valStr := fmt.Sprintf("%v", val)
+		// Avoid formatting maps directly to prevent concurrent map iteration fatal errors
+		valStr := safeFormatValue(val)
 		if len(valStr) > 100 {
 			valStr = valStr[:97] + "..."
 		}
@@ -138,6 +139,7 @@ func doPrintValueCtx(ctx context.Context, sb *strings.Builder, indent string) {
 func extractParentContext(ctx context.Context) context.Context {
 	v := reflect.ValueOf(ctx)
 
+	// If it's a pointer, dereference it
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
 			return nil
@@ -147,6 +149,15 @@ func extractParentContext(ctx context.Context) context.Context {
 
 	if v.Kind() != reflect.Struct {
 		return nil
+	}
+
+	// If the value is not addressable, create an addressable copy
+	// This is needed to read unexported fields from value-type contexts
+	if !v.CanAddr() {
+		// Create a pointer to a copy of the value
+		ptr := reflect.New(v.Type())
+		ptr.Elem().Set(v)
+		v = ptr.Elem()
 	}
 
 	// First try common field names (more efficient for known types)
@@ -220,4 +231,31 @@ func readUnexported(field reflect.Value) interface{} {
 	}
 
 	return "<unreadable>"
+}
+
+// safeFormatValue safely formats a value, avoiding concurrent map access issues
+// by checking the type before formatting
+func safeFormatValue(val interface{}) string {
+	if val == nil {
+		return "<nil>"
+	}
+
+	// Use reflection to check the type
+	v := reflect.ValueOf(val)
+	kind := v.Kind()
+
+	// For map types, avoid direct formatting to prevent concurrent access fatal errors
+	// Don't even call Len() as it might not be safe during concurrent modifications
+	if kind == reflect.Map {
+		return fmt.Sprintf("<map[%v]%v>", v.Type().Key(), v.Type().Elem())
+	}
+
+	// For pointer to map, dereference and check
+	if kind == reflect.Ptr && !v.IsNil() && v.Elem().Kind() == reflect.Map {
+		elem := v.Elem()
+		return fmt.Sprintf("<*map[%v]%v>", elem.Type().Key(), elem.Type().Elem())
+	}
+
+	// For other types, format normally
+	return fmt.Sprintf("%v", val)
 }

@@ -55,7 +55,7 @@ func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration)
 	}
 	if ddl, ok := ctx.Deadline(); !ok {
 		ctxChain := dumpContext(ctx)
-		klog.Infof("KITEX: ctx.Err(): %+v, ctx.Done(): %+v\nComplete Context Chain:\n%s", ctx.Err(), ctx.Done() != nil, ctxChain)
+		klog.CtxInfof(ctx, "KITEX: ctx.Err(): %+v, ctx.Done(): %+v\nComplete Context Chain:\n%s", ctx.Err(), ctx.Done() != nil, ctxChain)
 		errMsg = fmt.Sprintf("%s, %s", errMsg, "unknown error: context deadline not set?")
 	} else {
 		// Go's timer implementation is not so accurate,
