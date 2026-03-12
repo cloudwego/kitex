@@ -331,8 +331,18 @@ func (s *server) unaryOrStreamEndpoint(ctx context.Context) endpoint.Endpoint {
 	streamEp := sep.StreamChain(s.opt.StreamOptions.StreamMiddlewares...)(s.streamHandleEndpoint())
 
 	return func(ctx context.Context, req, resp interface{}) (err error) {
-		if st, ok := req.(*streaming.Args); ok {
-			return streamEp(ctx, st.ServerStream)
+		if args, ok := req.(*streaming.Args); ok {
+			// keep the Stream for being compatible with old streaming interface
+			//
+			// when args.Stream is nil(set by users), we should not retrieve Stream from ServerStream for fallback:
+			//
+			// if getter, ok := args.ServerStream.(streaming.GRPCStreamGetter); ok {
+			//     st = getter.GetGRPCStream()
+			// }
+			return streamEp(ctx, gRPCCompatibleServerStream{
+				ServerStream: args.ServerStream,
+				st:           args.Stream,
+			})
 		} else {
 			return unaryEp(ctx, req, resp)
 		}

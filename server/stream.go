@@ -152,3 +152,23 @@ type contextStream struct {
 func (cs contextStream) Context() context.Context {
 	return cs.ctx
 }
+
+var (
+	_ streaming.ServerStream     = (*gRPCCompatibleServerStream)(nil)
+	_ streaming.GRPCStreamGetter = (*gRPCCompatibleServerStream)(nil)
+)
+
+// gRPCCompatibleServerStream is responsible for being compatible with old streaming interface.
+// For users with old Streaming Interface, they may retrieve streaming.Stream from streaming.Args in Server MW
+// and wrap it to make extensions, then set back to streaming.Args.
+//
+// We need to preserve this wrapped Stream instead of discarding it.
+// This ensures middleware extensions on st.Stream are not lost when passing to streamHandleEndpoint.
+type gRPCCompatibleServerStream struct {
+	streaming.ServerStream
+	st streaming.Stream // store the gRPC Stream processed by Users' Server MW possibly
+}
+
+func (gs gRPCCompatibleServerStream) GetGRPCStream() streaming.Stream {
+	return gs.st
+}
