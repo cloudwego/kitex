@@ -27,6 +27,8 @@ import (
 )
 
 // InvokeCaller is the abstraction for invoker call.
+//
+// Deprecated: Use LocalCaller instead.
 type InvokeCaller interface {
 	Call(invoke.Message) error
 }

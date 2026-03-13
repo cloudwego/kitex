@@ -3,6 +3,7 @@ github_checks:
 
 ignore:
   - "tool/**/*.go"
+  - "internal/mocks/thrift/**/*"
 
 coverage:
   status:
