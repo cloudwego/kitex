@@ -79,6 +79,7 @@ func (p *timeoutPool) createTicker() {
 			d = 10 * time.Millisecond
 		}
 		tk := time.NewTicker(d)
+		defer tk.Stop()
 		for p.Size() > 0 {
 			select {
 			case <-tk.C:
