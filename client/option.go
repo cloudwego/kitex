@@ -214,6 +214,7 @@ func WithLongConnection(cfg connpool.IdleConfig) Option {
 }
 
 // WithMuxConnection specifies the transport type to be mux.
+// Deprecated: Mux Connection is no longer being maintained.
 func WithMuxConnection(connNum int) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push("WithMuxConnection")

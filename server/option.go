@@ -81,6 +81,7 @@ func WithSuite(suite Suite) Option {
 }
 
 // WithMuxTransport specifies the transport type to be mux.
+// Deprecated: Mux Transport is no longer being maintained.
 func WithMuxTransport() Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push("WithMuxTransport()")
