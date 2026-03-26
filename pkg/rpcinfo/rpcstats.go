@@ -40,10 +40,11 @@ var (
 )
 
 type event struct {
-	event  stats.Event
+	state  uint32 // atomic: eventUnset, eventUpdating, eventRecorded, eventStale
 	status stats.Status
 	info   string
-	time   time.Time
+	event  stats.Event
+	time   int64
 }
 
 // Event implements the Event interface.
@@ -63,7 +64,7 @@ func (e *event) Info() string {
 
 // Time implements the Event interface.
 func (e *event) Time() time.Time {
-	return e.time
+	return time.Unix(0, e.time)
 }
 
 // IsNil implements the Event interface.
@@ -72,10 +73,11 @@ func (e *event) IsNil() bool {
 }
 
 func (e *event) zero() {
+	e.state = eventUnset
 	e.event = nil
 	e.status = 0
 	e.info = ""
-	e.time = time.Time{}
+	e.time = 0
 }
 
 // Recycle reuses the event.
@@ -84,33 +86,24 @@ func (e *event) Recycle() {
 	eventPool.Put(e)
 }
 
-type atomicErr struct {
-	err error
-}
-
-type atomicPanicErr struct {
-	panicErr interface{}
-}
-
 type rpcStats struct {
 	level stats.Level
 
-	eventStatus []uint32 // see comments of eventXXX consts below
-	eventMap    []event
+	eventMap []event
 
 	sendSize     uint64
 	lastSendSize uint64 // for Streaming APIs, record the size of the last sent message
 	recvSize     uint64
 	lastRecvSize uint64 // for Streaming APIs, record the size of the last received message
 
-	err      atomic.Value
-	panicErr atomic.Value
+	// err and panicErr are not on hot path, use atomic.Pointer to save space
+	err      atomic.Pointer[error]
+	panicErr atomic.Pointer[any]
 
-	// true if rpcStats is from CopyForRetry
-	copied bool
+	copied bool // true if rpcStats is from CopyForRetry
 }
 
-const ( // for (*rpcStats).eventStatus
+const ( // for event.state
 	eventUnset    uint32 = 0b0000 // unset
 	eventUpdating uint32 = 0b0001 // updating, it's considered to be unset
 	eventRecorded uint32 = 0b0010 // updated, GetEvent will return the event
@@ -129,8 +122,7 @@ const ( // for (*rpcStats).eventStatus
 
 func newRPCStats() *rpcStats {
 	return &rpcStats{
-		eventStatus: make([]uint32, maxEventNum),
-		eventMap:    make([]event, maxEventNum),
+		eventMap: make([]event, maxEventNum),
 	}
 }
 
@@ -150,10 +142,14 @@ func (r *rpcStats) Record(ctx context.Context, e stats.Event, status stats.Statu
 		return
 	}
 	idx := e.Index()
-	p := &r.eventStatus[idx]
+	p := &r.eventMap[idx].state
 	if atomic.CompareAndSwapUint32(p, eventUnset, eventUpdating) ||
 		(r.copied && atomic.CompareAndSwapUint32(p, eventStale, eventUpdating)) {
-		r.eventMap[idx] = event{event: e, status: status, info: info, time: time.Now()}
+		ev := &r.eventMap[idx]
+		ev.event = e
+		ev.status = status
+		ev.info = info
+		ev.time = time.Now().UnixNano()
 		atomic.StoreUint32(p, eventRecorded) // done, make it visible to GetEvent
 	} else {
 		// eventRecorded? panic?
@@ -163,12 +159,12 @@ func (r *rpcStats) Record(ctx context.Context, e stats.Event, status stats.Statu
 // NewEvent creates a new Event based on the given event, status and info.
 //
 // It's only used by ReportStreamEvent
-func NewEvent(statsEvent stats.Event, status stats.Status, info string) Event {
+func NewEvent(e stats.Event, status stats.Status, info string) Event {
 	eve := eventPool.Get().(*event)
-	eve.event = statsEvent
+	eve.event = e
 	eve.status = status
 	eve.info = info
-	eve.time = time.Now()
+	eve.time = time.Now().UnixNano()
 	return eve
 }
 
@@ -194,20 +190,24 @@ func (r *rpcStats) LastRecvSize() uint64 {
 
 // Error implements the RPCStats interface.
 func (r *rpcStats) Error() error {
-	ae, _ := r.err.Load().(atomicErr)
-	return ae.err
+	if p := r.err.Load(); p != nil {
+		return *p
+	}
+	return nil
 }
 
 // Panicked implements the RPCStats interface.
-func (r *rpcStats) Panicked() (bool, interface{}) {
-	ape, _ := r.panicErr.Load().(atomicPanicErr)
-	return ape.panicErr != nil, ape.panicErr
+func (r *rpcStats) Panicked() (bool, any) {
+	if p := r.panicErr.Load(); p != nil {
+		return *p != nil, *p
+	}
+	return false, nil
 }
 
 // GetEvent implements the RPCStats interface.
 func (r *rpcStats) GetEvent(e stats.Event) Event {
 	idx := e.Index()
-	if atomic.LoadUint32(&r.eventStatus[idx])&eventRecorded != 0 {
+	if atomic.LoadUint32(&r.eventMap[idx].state)&eventRecorded != 0 {
 		// no need to check (*event).IsNil() ... it's useless
 		return &r.eventMap[idx]
 	}
@@ -234,9 +234,9 @@ func (r *rpcStats) CopyForRetry() RPCStats {
 	for i := 0; i < len(nr.eventMap); i++ {
 		// Ignore none RPCStart events to avoid incorrect tracing.
 		if i == startIdx || i >= userIdx {
-			if atomic.LoadUint32(&r.eventStatus[i]) == eventRecorded {
+			if atomic.LoadUint32(&r.eventMap[i].state) == eventRecorded {
 				nr.eventMap[i] = r.eventMap[i]
-				nr.eventStatus[i] = eventStale
+				nr.eventMap[i].state = eventStale
 			}
 		}
 	}
@@ -271,12 +271,20 @@ func (r *rpcStats) IncrRecvSize(size uint64) {
 
 // SetError sets error.
 func (r *rpcStats) SetError(err error) {
-	r.err.Store(atomicErr{err: err})
+	if err == nil {
+		r.err.Store(nil)
+	} else {
+		r.err.Store(&err)
+	}
 }
 
 // SetPanicked sets if panicked.
-func (r *rpcStats) SetPanicked(x interface{}) {
-	r.panicErr.Store(atomicPanicErr{panicErr: x})
+func (r *rpcStats) SetPanicked(x any) {
+	if x == nil {
+		r.panicErr.Store(nil)
+	} else {
+		r.panicErr.Store(&x)
+	}
 }
 
 // SetLevel sets the level.
@@ -287,16 +295,16 @@ func (r *rpcStats) SetLevel(level stats.Level) {
 // Reset resets the stats.
 func (r *rpcStats) Reset() {
 	r.level = 0
-	if ae, _ := r.err.Load().(atomicErr); ae.err != nil {
-		r.err.Store(atomicErr{})
+	if r.err.Load() != nil {
+		r.err.Store(nil)
 	}
-	if ape, _ := r.panicErr.Load().(atomicPanicErr); ape.panicErr != nil {
-		r.panicErr.Store(atomicPanicErr{})
+	if r.panicErr.Load() != nil {
+		r.panicErr.Store(nil)
 	}
 	atomic.StoreUint64(&r.recvSize, 0)
 	atomic.StoreUint64(&r.sendSize, 0)
 	for i := range r.eventMap {
-		r.eventStatus[i] = eventUnset // no need atomic.StoreUint32?
+		r.eventMap[i].state = eventUnset
 	}
 }
 

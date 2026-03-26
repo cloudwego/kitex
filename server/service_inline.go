@@ -55,18 +55,14 @@ func constructServerCtxWithMetadata(cliCtx context.Context) (serverCtx context.C
 }
 
 func (s *server) constructServerRPCInfo(svrCtx context.Context, cliRPCInfo rpcinfo.RPCInfo) (newServerCtx context.Context, svrRPCInfo rpcinfo.RPCInfo) {
-	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
+	// Use inlined fields to avoid separate pool allocations.
+	svrRPCInfo = rpcinfo.NewRPCInfoWithInlineFields()
+	rpcinfo.AsMutableEndpointInfo(svrRPCInfo.To()).ResetFromBasicInfo(s.opt.Svr)
+	rpcinfo.AsMutableRPCConfig(svrRPCInfo.Config()).CopyFrom(s.opt.Configs)
+	rpcStats := rpcinfo.AsMutableRPCStats(svrRPCInfo.Stats())
 	if s.opt.StatsLevel != nil {
 		rpcStats.SetLevel(*s.opt.StatsLevel)
 	}
-	// Export read-only views to external users and keep a mapping for internal users.
-	svrRPCInfo = rpcinfo.NewRPCInfo(
-		rpcinfo.EmptyEndpointInfo(),
-		rpcinfo.FromBasicInfo(s.opt.Svr),
-		rpcinfo.NewServerInvocation(),
-		rpcinfo.AsMutableRPCConfig(s.opt.Configs).Clone().ImmutableView(),
-		rpcStats.ImmutableView(),
-	)
 	rpcinfo.AsMutableEndpointInfo(svrRPCInfo.From()).SetAddress(localAddr)
 	svrCtx = rpcinfo.NewCtxWithRPCInfo(svrCtx, svrRPCInfo)
 

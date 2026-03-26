@@ -91,6 +91,9 @@ func (ei *endpointInfo) SetAddress(addr net.Addr) error {
 
 // SetTag implements the MutableEndpointInfo interface.
 func (ei *endpointInfo) SetTag(key, value string) error {
+	if ei.tags == nil {
+		ei.tags = make(map[string]string)
+	}
 	ei.tags[key] = value
 	return nil
 }
@@ -112,6 +115,9 @@ func (ei *endpointInfo) ResetFromBasicInfo(bi *EndpointBasicInfo) {
 	ei.address = nil
 	for k := range ei.tags {
 		delete(ei.tags, k)
+	}
+	if ei.tags == nil && len(bi.Tags) > 0 {
+		ei.tags = make(map[string]string, len(bi.Tags))
 	}
 	for k, v := range bi.Tags {
 		ei.tags[k] = v
@@ -139,6 +145,9 @@ func NewMutableEndpointInfo(serviceName, method string, address net.Addr, tags m
 	ei.serviceName = serviceName
 	ei.method = method
 	ei.address = address
+	if ei.tags == nil && len(tags) > 0 {
+		ei.tags = make(map[string]string, len(tags))
+	}
 	for k, v := range tags {
 		ei.tags[k] = v
 	}

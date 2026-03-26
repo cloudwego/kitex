@@ -19,7 +19,6 @@ package rpcinfo
 import (
 	"sync"
 	"sync/atomic"
-	"unsafe"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -54,7 +53,6 @@ type InvocationSetter interface {
 	Reset()
 }
 type invocation struct {
-	sync.Mutex
 	packageName   string
 	serviceName   string
 	methodInfo    serviceinfo.MethodInfo
@@ -63,8 +61,10 @@ type invocation struct {
 	seqID         int32
 	// bizErr and extra should be protected by lock or atomic operation, because they might be read by the client calling goroutine,
 	// but at the same time, written by the real rpc goroutine which is started by timeout middleware.
-	bizErr unsafe.Pointer // of type *kerrors.BizStatusErrorIface
-	extra  map[string]interface{}
+	bizErr atomic.Pointer[kerrors.BizStatusErrorIface]
+
+	mu    sync.Mutex
+	extra map[string]any
 }
 
 // NewInvocation creates a new Invocation with the given service, method and optional package.
@@ -157,25 +157,24 @@ func (i *invocation) SetStreamingMode(mode serviceinfo.StreamingMode) {
 
 // BizStatusErr implements the Invocation interface.
 func (i *invocation) BizStatusErr() kerrors.BizStatusErrorIface {
-	bizErr := (*kerrors.BizStatusErrorIface)(atomic.LoadPointer(&i.bizErr))
-	if bizErr == nil {
-		return nil
+	if p := i.bizErr.Load(); p != nil {
+		return *p
 	}
-	return *bizErr
+	return nil
 }
 
 // SetBizStatusErr implements the InvocationSetter interface.
 func (i *invocation) SetBizStatusErr(err kerrors.BizStatusErrorIface) {
 	if err == nil {
-		atomic.StorePointer(&i.bizErr, nil)
+		i.bizErr.Store(nil)
 		return
 	}
-	atomic.StorePointer(&i.bizErr, unsafe.Pointer(&err))
+	i.bizErr.Store(&err)
 }
 
 func (i *invocation) SetExtra(key string, value interface{}) {
-	i.Lock()
-	defer i.Unlock()
+	i.mu.Lock()
+	defer i.mu.Unlock()
 	if i.extra == nil {
 		i.extra = map[string]interface{}{}
 	}
@@ -183,8 +182,8 @@ func (i *invocation) SetExtra(key string, value interface{}) {
 }
 
 func (i *invocation) Extra(key string) interface{} {
-	i.Lock()
-	defer i.Unlock()
+	i.mu.Lock()
+	defer i.mu.Unlock()
 	if i.extra == nil {
 		return nil
 	}
@@ -208,10 +207,12 @@ func (i *invocation) zero() {
 	i.serviceName = ""
 	i.methodName = ""
 	i.methodInfo = nil
-	atomic.StorePointer(&i.bizErr, nil)
-	i.Lock()
-	defer i.Unlock()
+	if i.bizErr.Load() != nil {
+		i.bizErr.Store(nil)
+	}
+	i.mu.Lock()
 	for key := range i.extra {
 		delete(i.extra, key)
 	}
+	i.mu.Unlock()
 }

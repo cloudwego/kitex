@@ -234,6 +234,9 @@ func (r *rpcConfig) initialize() {
 	r.ioBufferSize = defaultBufferSize
 	r.transportProtocol = 0
 	r.interactionMode = defaultInteractionMode
+	r.payloadCodec = 0
+	r.streamRecvTimeout = 0
+	r.streamRecvTimeoutConfig = streaming.TimeoutConfig{}
 }
 
 // Recycle reuses the rpcConfig.

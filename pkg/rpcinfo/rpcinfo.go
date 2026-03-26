@@ -34,6 +34,7 @@ func init() {
 	if os.Getenv("KITEX_DISABLE_RPCINFO_POOL") != "" {
 		EnablePool(false)
 	}
+	rpcInfoPool.New = newRPCInfo
 }
 
 // EnablePool allows user to enable/disable rpcInfoPool.
@@ -109,10 +110,6 @@ func (r *rpcInfo) Recycle() {
 	}
 	r.zero()
 	rpcInfoPool.Put(r)
-}
-
-func init() {
-	rpcInfoPool.New = newRPCInfo
 }
 
 // NewRPCInfo creates a new RPCInfo using the given information.

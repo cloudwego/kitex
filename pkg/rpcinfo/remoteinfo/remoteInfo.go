@@ -27,20 +27,20 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-// RemoteInfo implements a rpcinfo.EndpointInfo with mutable address and connection.
-// It is typically used to represent server info on client side or client info on server side.
+// RemoteInfo implements rpcinfo.EndpointInfo for remote peer metadata backed by a discovery instance.
+// It is primarily used as RPCInfo.To() on the client side.
 type RemoteInfo interface {
 	rpcinfo.EndpointInfo
 	SetServiceName(name string)
 	SetTag(key, value string) error
 	ForceSetTag(key, value string)
 
-	// SetTagLock freezes a key of the tags and refuses further modification on its value.
+	// SetTagLock freezes a tag key and makes future SetTag calls fail for that key.
 	SetTagLock(key string)
 	GetInstance() discovery.Instance
 	SetInstance(ins discovery.Instance)
 
-	// SetRemoteAddr tries to set the network address of the discovery.Instance hold by RemoteInfo.
+	// SetRemoteAddr tries to set the network address of the discovery.Instance held by RemoteInfo.
 	// The result indicates whether the modification is successful.
 	SetRemoteAddr(addr net.Addr) (ok bool)
 	ImmutableView() rpcinfo.EndpointInfo
@@ -150,7 +150,7 @@ func (ri *remoteInfo) Address() net.Addr {
 	return nil
 }
 
-// SetTagLocks locks tag.
+// SetTagLock freezes key and prevents future SetTag calls from modifying it.
 func (ri *remoteInfo) SetTagLock(key string) {
 	ri.Lock()
 	ri.tagLocks[key] = struct{}{}
@@ -175,7 +175,7 @@ func (ri *remoteInfo) ForceSetTag(key, value string) {
 	ri.tags[key] = value
 }
 
-// ImmutableView implements rpcinfo.MutableEndpointInfo.
+// ImmutableView returns ri as an rpcinfo.EndpointInfo view.
 func (ri *remoteInfo) ImmutableView() rpcinfo.EndpointInfo {
 	return ri
 }
@@ -203,7 +203,7 @@ func (ri *remoteInfo) Recycle() {
 	remoteInfoPool.Put(ri)
 }
 
-// NewRemoteInfo creates a remoteInfo wrapping the given endpointInfo.
+// NewRemoteInfo creates a remoteInfo from the given EndpointBasicInfo.
 // The return value of the created RemoteInfo's Method method will be the `method` argument
 // instead of the Method field in `basicInfo`.
 // If the given basicInfo is nil, this function will panic.

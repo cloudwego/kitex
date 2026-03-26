@@ -126,19 +126,14 @@ func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinf
 		}
 
 		// allocate a new rpcinfo if it's the connection's first request or rpcInfoPool is disabled
-		rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
+		// Use inlined fields to avoid separate pool allocations.
+		ri = rpcinfo.NewRPCInfoWithInlineFields()
+		rpcinfo.AsMutableEndpointInfo(ri.To()).ResetFromBasicInfo(s.opt.Svr)
+		rpcinfo.AsMutableRPCConfig(ri.Config()).CopyFrom(s.opt.Configs)
+		rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
 		if s.opt.StatsLevel != nil {
 			rpcStats.SetLevel(*s.opt.StatsLevel)
 		}
-
-		// Export read-only views to external users and keep a mapping for internal users.
-		ri = rpcinfo.NewRPCInfo(
-			rpcinfo.EmptyEndpointInfo(),
-			rpcinfo.FromBasicInfo(s.opt.Svr),
-			rpcinfo.NewServerInvocation(),
-			rpcinfo.AsMutableRPCConfig(s.opt.Configs).Clone().ImmutableView(),
-			rpcStats.ImmutableView(),
-		)
 		rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(rAddr)
 		return ri
 	}
