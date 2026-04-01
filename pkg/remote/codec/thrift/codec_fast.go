@@ -27,6 +27,24 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
+const (
+	adaptiveFastMarshalMinLength      = 16 << 10
+	adaptiveFastMarshalMinDirectCount = 32
+	adaptiveFastMarshalMinDirectBytes = 256 << 10
+)
+
+type adaptiveNocopyInfo struct {
+	Length      int
+	DirectCount int
+	DirectBytes int
+}
+
+type streamingFastCodec interface {
+	thrift.FastCodec
+	FastNocopyInfo() (length int, directCount int, directBytes int)
+	FastWriteTo(out bufiox.Writer) error
+}
+
 // ThriftMsgFastCodec ...
 // Deprecated: use `github.com/cloudwego/gopkg/protocol/thrift.FastCodec`
 type ThriftMsgFastCodec = thrift.FastCodec
@@ -39,9 +57,37 @@ func fastCodecAvailable(data interface{}) bool {
 // encodeFastThrift encode with the FastCodec way
 func fastMarshal(out bufiox.Writer, methodName string, msgType remote.MessageType, seqID int32, msg thrift.FastCodec) error {
 	nw, _ := out.(remote.NocopyWrite)
+	if nw != nil {
+		if smsg, ok := msg.(streamingFastCodec); ok {
+			length, directCount, directBytes := smsg.FastNocopyInfo()
+			info := adaptiveNocopyInfo{
+				Length:      length,
+				DirectCount: directCount,
+				DirectBytes: directBytes,
+			}
+			if shouldUseStreamingFastMarshal(info) {
+				return streamingFastMarshal(out, methodName, msgType, seqID, smsg)
+			}
+			payloadLen := info.Length
+			if payloadLen <= 0 {
+				payloadLen = msg.BLength()
+			}
+			return legacyFastMarshal(out, nw, methodName, msgType, seqID, msg, payloadLen)
+		}
+	}
+	return legacyFastMarshal(out, nw, methodName, msgType, seqID, msg, msg.BLength())
+}
+
+func shouldUseStreamingFastMarshal(info adaptiveNocopyInfo) bool {
+	return info.Length >= adaptiveFastMarshalMinLength &&
+		info.DirectCount >= adaptiveFastMarshalMinDirectCount &&
+		info.DirectBytes >= adaptiveFastMarshalMinDirectBytes
+}
+
+func legacyFastMarshal(out bufiox.Writer, nw remote.NocopyWrite, methodName string, msgType remote.MessageType, seqID int32, msg thrift.FastCodec, payloadLen int) error {
 	// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
 	msgBeginLen := thrift.Binary.MessageBeginLength(methodName)
-	buf, err := out.Malloc(msgBeginLen + msg.BLength())
+	buf, err := out.Malloc(msgBeginLen + payloadLen)
 	if err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
 	}
@@ -55,6 +101,18 @@ func fastMarshal(out bufiox.Writer, methodName string, msgType remote.MessageTyp
 		return nil
 	}
 	return nw.MallocAck(mallocLen)
+}
+
+func streamingFastMarshal(out bufiox.Writer, methodName string, msgType remote.MessageType, seqID int32, msg streamingFastCodec) error {
+	buf, err := out.Malloc(thrift.Binary.MessageBeginLength(methodName))
+	if err != nil {
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, write message begin failed: %s", err.Error()))
+	}
+	thrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
+	if err := msg.FastWriteTo(out); err != nil {
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, fast write failed: %s", err.Error()))
+	}
+	return nil
 }
 
 func fastUnmarshal(trans bufiox.Reader, data interface{}, dataLen int) error {
