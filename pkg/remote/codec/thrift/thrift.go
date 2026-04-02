@@ -215,7 +215,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 			err = remote.NewTransError(remote.ProtocolError, err)
 		}
 	} else {
-		err = c.unmarshalThriftData(in, data, dataLen)
+		err = c.unmarshalThriftData(ctx, in, data, dataLen)
 	}
 	rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
 	if err != nil {

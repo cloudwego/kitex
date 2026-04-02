@@ -223,7 +223,7 @@ func TestThriftCodec_unmarshalThriftDataFrugal(t *testing.T) {
 		codec := &thriftCodec{FrugalRead | EnableSkipDecoder}
 		trans := bufiox.NewBytesReader(mockReqThrift)
 		// specify dataLen with 0 so that skipDecoder works
-		err := codec.unmarshalThriftData(trans, req, 0)
+		err := codec.unmarshalThriftData(context.Background(), trans, req, 0)
 		checkDecodeResult(t, err, &mocks.MockReq{
 			Msg:     req.Msg,
 			StrList: req.StrList,
@@ -246,7 +246,7 @@ func TestThriftCodec_unmarshalThriftDataFrugal(t *testing.T) {
 		}
 		trans := bufiox.NewBytesReader(faultMockReqThrift)
 		// specify dataLen with 0 so that skipDecoder works
-		err := codec.unmarshalThriftData(trans, req, 0)
+		err := codec.unmarshalThriftData(context.Background(), trans, req, 0)
 		test.Assert(t, err != nil, err)
 		test.Assert(t, strings.Contains(err.Error(), "caught in Frugal using SkipDecoder Buffer"))
 	})

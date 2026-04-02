@@ -23,6 +23,7 @@ import (
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
@@ -97,12 +98,12 @@ func UnmarshalThriftData(ctx context.Context, codec remote.PayloadCodec, method 
 	}
 	trans := bufiox.NewBytesReader(buf)
 	defer trans.Release(nil)
-	return c.unmarshalThriftData(trans, data, len(buf))
+	return c.unmarshalThriftData(ctx, trans, data, len(buf))
 }
 
 // unmarshalThriftData only decodes the data (after methodName, msgType and seqId)
 // method is only used for generic calls
-func (c thriftCodec) unmarshalThriftData(trans bufiox.Reader, data interface{}, dataLen int) error {
+func (c thriftCodec) unmarshalThriftData(ctx context.Context, trans bufiox.Reader, data interface{}, dataLen int) error {
 	dataLenOK := c.IsDataLenDeterministic(dataLen)
 	typecodec := getTypeCodec(data)
 	if dataLenOK && c.IsSet(FrugalRead) && typecodec.Frugal {
@@ -121,5 +122,6 @@ func (c thriftCodec) unmarshalThriftData(trans bufiox.Reader, data interface{}, 
 	if typecodec.Frugal {
 		return frugalUnmarshal(trans, data, dataLen)
 	}
+	klog.CtxErrorf(ctx, "KITEX: decode failed, msg type not match with thriftCodec, data type: %T", data)
 	return errDecodeMismatchMsgType
 }
