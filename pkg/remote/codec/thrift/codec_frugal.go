@@ -31,7 +31,16 @@ import (
 
 func frugalAvailable(data interface{}) bool {
 	rt := reflect.TypeOf(data).Elem()
-	return rt.NumField() <= 0 || rt.Field(0).Tag.Get("frugal") != ""
+	n := rt.NumField()
+	if n <= 0 {
+		return true
+	}
+	f0 := rt.Field(0)
+	if f0.Tag.Get("frugal") != "" {
+		return true
+	}
+	// for void func, the result struct may only have one _unknownFields field
+	return n == 1 && f0.Name == "_unknownFields"
 }
 
 func frugalMarshal(out bufiox.Writer, methodName string, msgType remote.MessageType,

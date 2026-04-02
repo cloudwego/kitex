@@ -33,6 +33,40 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
+func TestFrugalAvailable(t *testing.T) {
+	type withFrugalTag struct {
+		Msg string `frugal:"1,default,string"`
+	}
+	type noTag struct {
+		Msg string
+	}
+	type empty struct{}
+	type onlyUnknownFields struct {
+		_unknownFields []byte //nolint:unused // accessed via reflection by frugal
+	}
+	type unknownFieldsWithTag struct {
+		_unknownFields []byte //nolint:unused // accessed via reflection by frugal
+		Msg            string `frugal:"1,default,string"`
+	}
+
+	tests := []struct {
+		name string
+		data any
+		want bool
+	}{
+		{"with frugal tag", &withFrugalTag{}, true},
+		{"no tag", &noTag{}, false},
+		{"empty struct", &empty{}, true},
+		{"only _unknownFields", &onlyUnknownFields{}, true},
+		{"_unknownFields with tagged field", &unknownFieldsWithTag{}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			test.Assert(t, frugalAvailable(tt.data) == tt.want)
+		})
+	}
+}
+
 type MockFrugalTagReq struct {
 	Msg     string            `frugal:"1,default,string"`
 	StrMap  map[string]string `frugal:"2,default,map<string:string>"`
