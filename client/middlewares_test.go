@@ -19,8 +19,10 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 
@@ -278,24 +280,243 @@ func BenchmarkResolverMWParallel(b *testing.B) {
 }
 
 func TestDiscoveryEventHandler(t *testing.T) {
-	bus, queue := event.NewEventBus(), event.NewQueue(200)
-	h := discoveryEventHandler(discovery.ChangeEventName, bus, queue)
-	ins := []discovery.Instance{discovery.NewInstance("tcp", "addr", 10, nil)}
-	cacheKey := "testCacheKey"
-	c := &discovery.Change{
+	t.Run("Added", func(t *testing.T) {
+		bus, queue := event.NewEventBus(), event.NewQueue(200)
+		h := discoveryEventHandler(discovery.ChangeEventName, bus, queue)
+		ins := []discovery.Instance{discovery.NewInstance("tcp", "addr", 10, nil)}
+		cacheKey := "testCacheKey"
+		c := &discovery.Change{
+			Result: discovery.Result{
+				Cacheable: true,
+				CacheKey:  cacheKey,
+			},
+			Added: ins,
+		}
+		h(c)
+		events := queue.Dump().([]*event.Event)
+		test.Assert(t, len(events) == 1)
+		extra, ok := events[0].Extra.(map[string]interface{})
+		test.Assert(t, ok)
+		test.Assert(t, extra["Cacheable"] == true)
+		test.Assert(t, extra["CacheKey"] == cacheKey)
+		added := extra["Added"].([]*instInfo)
+		test.Assert(t, len(added) == 1)
+		test.Assert(t, added[0].Address == "tcp://addr")
+		test.Assert(t, added[0].Weight == 10)
+		test.Assert(t, len(extra["Updated"].([]*instInfo)) == 0)
+		test.Assert(t, len(extra["Removed"].([]*instInfo)) == 0)
+	})
+
+	t.Run("Updated", func(t *testing.T) {
+		bus, queue := event.NewEventBus(), event.NewQueue(200)
+		h := discoveryEventHandler(discovery.ChangeEventName, bus, queue)
+		c := &discovery.Change{
+			Result:  discovery.Result{Cacheable: true, CacheKey: "key"},
+			Updated: []discovery.Instance{discovery.NewInstance("tcp", "10.0.0.1:8080", 20, nil)},
+		}
+		h(c)
+		extra := queue.Dump().([]*event.Event)[0].Extra.(map[string]interface{})
+		test.Assert(t, len(extra["Added"].([]*instInfo)) == 0)
+		updated := extra["Updated"].([]*instInfo)
+		test.Assert(t, len(updated) == 1)
+		test.Assert(t, updated[0].Address == "tcp://10.0.0.1:8080")
+		test.Assert(t, updated[0].Weight == 20)
+		test.Assert(t, len(extra["Removed"].([]*instInfo)) == 0)
+	})
+
+	t.Run("Removed", func(t *testing.T) {
+		bus, queue := event.NewEventBus(), event.NewQueue(200)
+		h := discoveryEventHandler(discovery.ChangeEventName, bus, queue)
+		c := &discovery.Change{
+			Result:  discovery.Result{Cacheable: false, CacheKey: "key"},
+			Removed: []discovery.Instance{discovery.NewInstance("tcp", "10.0.0.2:9090", 30, nil)},
+		}
+		h(c)
+		extra := queue.Dump().([]*event.Event)[0].Extra.(map[string]interface{})
+		test.Assert(t, extra["Cacheable"] == false)
+		test.Assert(t, len(extra["Added"].([]*instInfo)) == 0)
+		test.Assert(t, len(extra["Updated"].([]*instInfo)) == 0)
+		removed := extra["Removed"].([]*instInfo)
+		test.Assert(t, len(removed) == 1)
+		test.Assert(t, removed[0].Address == "tcp://10.0.0.2:9090")
+		test.Assert(t, removed[0].Weight == 30)
+	})
+
+	t.Run("AllEmpty", func(t *testing.T) {
+		bus, queue := event.NewEventBus(), event.NewQueue(200)
+		h := discoveryEventHandler(discovery.ChangeEventName, bus, queue)
+		c := &discovery.Change{
+			Result: discovery.Result{Cacheable: true, CacheKey: "empty"},
+		}
+		h(c)
+		extra := queue.Dump().([]*event.Event)[0].Extra.(map[string]interface{})
+		test.Assert(t, extra["CacheKey"] == "empty")
+		test.Assert(t, len(extra["Added"].([]*instInfo)) == 0)
+		test.Assert(t, len(extra["Updated"].([]*instInfo)) == 0)
+		test.Assert(t, len(extra["Removed"].([]*instInfo)) == 0)
+	})
+
+	t.Run("Mixed", func(t *testing.T) {
+		bus, queue := event.NewEventBus(), event.NewQueue(200)
+		h := discoveryEventHandler(discovery.ChangeEventName, bus, queue)
+		c := &discovery.Change{
+			Result: discovery.Result{Cacheable: true, CacheKey: "mixed"},
+			Added:  []discovery.Instance{discovery.NewInstance("tcp", "10.0.0.1:9090", 1, nil)},
+			Updated: []discovery.Instance{
+				discovery.NewInstance("tcp", "10.0.0.2:9090", 2, nil),
+				discovery.NewInstance("tcp", "10.0.0.3:9090", 3, nil),
+			},
+			Removed: []discovery.Instance{discovery.NewInstance("tcp", "10.0.0.4:9090", 4, nil)},
+		}
+		h(c)
+		extra := queue.Dump().([]*event.Event)[0].Extra.(map[string]interface{})
+		added := extra["Added"].([]*instInfo)
+		updated := extra["Updated"].([]*instInfo)
+		removed := extra["Removed"].([]*instInfo)
+		test.Assert(t, len(added) == 1)
+		test.Assert(t, len(updated) == 2)
+		test.Assert(t, len(removed) == 1)
+		test.Assert(t, updated[0].Address == "tcp://10.0.0.2:9090")
+		test.Assert(t, updated[1].Address == "tcp://10.0.0.3:9090")
+	})
+}
+
+// oldWrapInstances is the original implementation for benchmark comparison.
+func oldWrapInstances(insts []discovery.Instance) []*instInfo {
+	if len(insts) == 0 {
+		return nil
+	}
+	instInfos := make([]*instInfo, 0, len(insts))
+	for i := range insts {
+		inst := insts[i]
+		addr := fmt.Sprintf("%s://%s", inst.Address().Network(), inst.Address().String())
+		instInfos = append(instInfos, &instInfo{Address: addr, Weight: inst.Weight()})
+	}
+	return instInfos
+}
+
+func makeInstances(n int) []discovery.Instance {
+	insts := make([]discovery.Instance, n)
+	for i := 0; i < n; i++ {
+		tags := map[string]string{
+			"cluster":      "default",
+			"dc":           "dc",
+			"zone":         "zone-a",
+			"env":          "production",
+			"canary":       "false",
+			"version":      "v1.2.3",
+			"container_id": fmt.Sprintf("container-%06d", i),
+			"pod_name":     fmt.Sprintf("svc-abcdef-%06d", i),
+			"namespace":    "default",
+			"deploy_stage": "stable",
+		}
+		insts[i] = discovery.NewInstance("tcp", fmt.Sprintf("10.0.%d.%d:8080", i/256, i%256), 100, tags)
+	}
+	return insts
+}
+
+func makeChange(insts []discovery.Instance) *discovery.Change {
+	return &discovery.Change{
 		Result: discovery.Result{
 			Cacheable: true,
-			CacheKey:  cacheKey,
+			CacheKey:  "bench-service",
+			Instances: insts,
 		},
-		Added: ins,
+		Updated: insts,
 	}
-	h(c)
-	events := queue.Dump().([]*event.Event)
-	test.Assert(t, len(events) == 1)
-	extra, ok := events[0].Extra.(map[string]interface{})
-	test.Assert(t, ok)
-	test.Assert(t, extra["Cacheable"] == true)
-	test.Assert(t, extra["CacheKey"] == cacheKey)
-	added := extra["Added"].([]*instInfo)
-	test.Assert(t, len(added) == 1)
+}
+
+func BenchmarkDiscoveryEventPush(b *testing.B) {
+	sizes := []int{10, 100, 1000, 10000}
+	for _, n := range sizes {
+		insts := makeInstances(n)
+		change := makeChange(insts)
+
+		b.Run(fmt.Sprintf("Old/%d", n), func(b *testing.B) {
+			queue := event.NewQueue(event.GetDefaultEventNum())
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				queue.Push(&event.Event{
+					Name: "test",
+					Time: time.Now(),
+					Extra: map[string]interface{}{
+						"Cacheable": change.Result.Cacheable,
+						"CacheKey":  change.Result.CacheKey,
+						"Added":     oldWrapInstances(change.Added),
+						"Updated":   oldWrapInstances(change.Updated),
+						"Removed":   oldWrapInstances(change.Removed),
+					},
+				})
+			}
+		})
+		b.Run(fmt.Sprintf("New/%d", n), func(b *testing.B) {
+			queue := event.NewQueue(event.GetDefaultEventNum())
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				queue.Push(&event.Event{
+					Name: "test",
+					Time: time.Now(),
+					Extra: &discoveryEventExtra{
+						cacheable: change.Result.Cacheable,
+						cacheKey:  change.Result.CacheKey,
+						added:     snapshotInstances(change.Added),
+						updated:   snapshotInstances(change.Updated),
+						removed:   snapshotInstances(change.Removed),
+					},
+				})
+			}
+		})
+	}
+}
+
+func BenchmarkDiscoveryEventDump(b *testing.B) {
+	insts := makeInstances(1000)
+	change := makeChange(insts)
+
+	b.Run("Old/1000", func(b *testing.B) {
+		defEvtNum := event.GetDefaultEventNum()
+		queue := event.NewQueue(defEvtNum)
+		for i := 0; i < defEvtNum; i++ {
+			queue.Push(&event.Event{
+				Name: "test",
+				Time: time.Now(),
+				Extra: map[string]interface{}{
+					"Cacheable": change.Result.Cacheable,
+					"CacheKey":  change.Result.CacheKey,
+					"Added":     oldWrapInstances(change.Added),
+					"Updated":   oldWrapInstances(change.Updated),
+					"Removed":   oldWrapInstances(change.Removed),
+				},
+			})
+		}
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			queue.Dump()
+		}
+	})
+	b.Run("New/1000", func(b *testing.B) {
+		defEvtNum := event.GetDefaultEventNum()
+		queue := event.NewQueue(defEvtNum)
+		for i := 0; i < defEvtNum; i++ {
+			queue.Push(&event.Event{
+				Name: "test",
+				Time: time.Now(),
+				Extra: &discoveryEventExtra{
+					cacheable: change.Result.Cacheable,
+					cacheKey:  change.Result.CacheKey,
+					added:     snapshotInstances(change.Added),
+					updated:   snapshotInstances(change.Updated),
+					removed:   snapshotInstances(change.Removed),
+				},
+			})
+		}
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			queue.Dump()
+		}
+	})
 }

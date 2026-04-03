@@ -204,7 +204,7 @@ func NewOptions(opts []Option) *Options {
 		ExitSignal:   DefaultSysExitSignal,
 
 		Bus:    event.NewEventBus(),
-		Events: event.NewQueue(event.MaxEventNum),
+		Events: event.NewQueue(event.GetDefaultEventNum()),
 
 		TracerCtl: &rpcinfo.TraceController{},
 		Registry:  registry.NoopRegistry,

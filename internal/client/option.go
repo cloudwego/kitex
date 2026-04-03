@@ -240,7 +240,7 @@ func NewOptions(opts []Option) *Options {
 		DebugService: diagnosis.NoopService,
 
 		Bus:    event.NewEventBus(),
-		Events: event.NewQueue(event.MaxEventNum),
+		Events: event.NewQueue(event.GetDefaultEventNum()),
 
 		TracerCtl: &rpcinfo.TraceController{},
 

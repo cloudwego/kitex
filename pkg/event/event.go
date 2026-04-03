@@ -25,3 +25,13 @@ type Event struct {
 	Detail string
 	Extra  interface{}
 }
+
+// lazyExtra is an interface for deferred materialization of Event.Extra.
+// Implementations MUST be safe for concurrent read access from multiple goroutines,
+// because KitexDumpLazyExtra() is called outside the queue lock.
+// In practice this means the struct should be immutable after construction.
+//
+// Use KitexDumpLazyExtra as the method name to minimize the risk of accidental interface satisfaction.
+type lazyExtra interface {
+	KitexDumpLazyExtra() interface{}
+}
