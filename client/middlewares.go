@@ -58,6 +58,33 @@ func newProxyMW(prx proxy.ForwardProxy) endpoint.Middleware {
 	}
 }
 
+// instSnapshot captures the essential instance data as value types during Push,
+// avoiding holding references to discovery.Instance (which may carry large tags maps).
+type instSnapshot struct {
+	network string
+	address string
+	weight  int
+}
+
+type discoveryEventExtra struct {
+	cacheable bool
+	cacheKey  string
+	added     []instSnapshot
+	updated   []instSnapshot
+	removed   []instSnapshot
+}
+
+// KitexDumpLazyExtra implements lazyExtra interface in pkg/event
+func (e *discoveryEventExtra) KitexDumpLazyExtra() interface{} {
+	return map[string]interface{}{
+		"Cacheable": e.cacheable,
+		"CacheKey":  e.cacheKey,
+		"Added":     formatSnapshots(e.added),
+		"Updated":   formatSnapshots(e.updated),
+		"Removed":   formatSnapshots(e.removed),
+	}
+}
+
 func discoveryEventHandler(name string, bus event.Bus, queue event.Queue) func(d *discovery.Change) {
 	return func(d *discovery.Change) {
 		now := time.Now()
@@ -69,12 +96,12 @@ func discoveryEventHandler(name string, bus event.Bus, queue event.Queue) func(d
 		queue.Push(&event.Event{
 			Name: name,
 			Time: now,
-			Extra: map[string]interface{}{
-				"Cacheable": d.Result.Cacheable,
-				"CacheKey":  d.Result.CacheKey,
-				"Added":     wrapInstances(d.Added),
-				"Updated":   wrapInstances(d.Updated),
-				"Removed":   wrapInstances(d.Removed),
+			Extra: &discoveryEventExtra{
+				cacheable: d.Result.Cacheable,
+				cacheKey:  d.Result.CacheKey,
+				added:     snapshotInstances(d.Added),
+				updated:   snapshotInstances(d.Updated),
+				removed:   snapshotInstances(d.Removed),
 			},
 		})
 	}
@@ -209,17 +236,37 @@ type instInfo struct {
 	Weight  int
 }
 
-func wrapInstances(insts []discovery.Instance) []*instInfo {
+// snapshotInstances captures instance data as value types in a single slice allocation.
+// This avoids holding discovery.Instance references (and their potentially large tags maps).
+func snapshotInstances(insts []discovery.Instance) []instSnapshot {
 	if len(insts) == 0 {
 		return nil
 	}
-	instInfos := make([]*instInfo, 0, len(insts))
-	for i := range insts {
-		inst := insts[i]
-		addr := fmt.Sprintf("%s://%s", inst.Address().Network(), inst.Address().String())
-		instInfos = append(instInfos, &instInfo{Address: addr, Weight: inst.Weight()})
+	snapshots := make([]instSnapshot, len(insts))
+	for i, inst := range insts {
+		addr := inst.Address()
+		snapshots[i] = instSnapshot{
+			network: addr.Network(),
+			address: addr.String(),
+			weight:  inst.Weight(),
+		}
 	}
-	return instInfos
+	return snapshots
+}
+
+// formatSnapshots converts snapshots to []*instInfo during Dump (cold path).
+func formatSnapshots(snapshots []instSnapshot) []*instInfo {
+	if len(snapshots) == 0 {
+		return nil
+	}
+	infos := make([]*instInfo, len(snapshots))
+	for i := range snapshots {
+		infos[i] = &instInfo{
+			Address: snapshots[i].network + "://" + snapshots[i].address,
+			Weight:  snapshots[i].weight,
+		}
+	}
+	return infos
 }
 
 func retryable(err error) bool {

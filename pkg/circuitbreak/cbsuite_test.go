@@ -304,7 +304,7 @@ func TestInstanceCB(t *testing.T) {
 
 func TestCBSuite_AddEvent4CB(t *testing.T) {
 	cb := NewCBSuite(RPCInfo2Key)
-	cb.SetEventBusAndQueue(event.NewEventBus(), event.NewQueue(event.MaxEventNum))
+	cb.SetEventBusAndQueue(event.NewEventBus(), event.NewQueue(event.GetDefaultEventNum()))
 	var mws []endpoint.Middleware
 	mws = append(mws, cb.InstanceCBMW())
 	ctx := prepareCtx()
@@ -329,7 +329,7 @@ func TestCBSuite_AddEvent4CB(t *testing.T) {
 func TestRemoveInstBreaker(t *testing.T) {
 	cb := NewCBSuite(RPCInfo2Key)
 	bus := event.NewEventBus()
-	queue := event.NewQueue(event.MaxEventNum)
+	queue := event.NewQueue(event.GetDefaultEventNum())
 	cb.SetEventBusAndQueue(bus, queue)
 
 	var mws []endpoint.Middleware
@@ -373,7 +373,7 @@ func TestRemoveInstBreaker(t *testing.T) {
 func TestCBSuite_Dump(t *testing.T) {
 	cb := NewCBSuite(RPCInfo2Key)
 	bus := event.NewEventBus()
-	queue := event.NewQueue(event.MaxEventNum)
+	queue := event.NewQueue(event.GetDefaultEventNum())
 	cb.SetEventBusAndQueue(bus, queue)
 
 	var mws []endpoint.Middleware
