@@ -277,18 +277,18 @@ func (lc *localCaller) doResolve(method string) (*cachedResult, error) {
 // the normal server-side allocation in initOrResetRPCInfoFunc (server.go).
 func (lc *localCaller) newLocalRPCInfo(svcInfo *serviceinfo.ServiceInfo, mi serviceinfo.MethodInfo, methodName, callerMethod string) rpcinfo.RPCInfo {
 	s := lc.svr
-	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
+	// Use inlined fields to avoid separate pool allocations.
+	ri := rpcinfo.NewRPCInfoWithInlineFields()
+	rpcinfo.AsMutableEndpointInfo(ri.To()).ResetFromBasicInfo(s.opt.Svr)
+	rpcinfo.AsMutableRPCConfig(ri.Config()).CopyFrom(s.opt.Configs)
+	rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
 	if s.opt.StatsLevel != nil {
 		rpcStats.SetLevel(*s.opt.StatsLevel)
 	}
-	from := rpcinfo.NewMutableEndpointInfo(lc.caller, callerMethod, localCallerAddr, nil)
-	ri := rpcinfo.NewRPCInfo(
-		from.ImmutableView(),
-		rpcinfo.FromBasicInfo(s.opt.Svr),
-		rpcinfo.NewServerInvocation(),
-		rpcinfo.AsMutableRPCConfig(s.opt.Configs).Clone().ImmutableView(),
-		rpcStats.ImmutableView(),
-	)
+	from := rpcinfo.AsMutableEndpointInfo(ri.From())
+	from.SetServiceName(lc.caller)
+	from.SetMethod(callerMethod)
+	from.SetAddress(localCallerAddr)
 	rpcinfo.AsMutableEndpointInfo(ri.To()).SetMethod(methodName)
 
 	if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
