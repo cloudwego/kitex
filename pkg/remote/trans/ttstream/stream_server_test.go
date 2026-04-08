@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	internal_stream "github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
@@ -34,8 +35,8 @@ func newTestServerStream() *serverStream {
 }
 
 func newTestServerStreamWithStreamWriter(w streamWriter) *serverStream {
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx, cancelFunc := newContextWithCancelReason(ctx, cancel)
+	ctx, cancelFunc := context.WithCancelCause(context.Background())
+	ctx = internal_stream.NewContextWithCancelReason(ctx)
 	srvSt := newServerStream(ctx, w, streamFrame{})
 	srvSt.cancelFunc = cancelFunc
 	return srvSt

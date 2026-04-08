@@ -34,6 +34,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	internal_stream "github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
@@ -234,13 +235,14 @@ const (
 // Stream represents an RPC in the transport layer.
 type Stream struct {
 	id           uint32
-	st           ServerTransport  // nil for client side Stream
-	ct           *http2Client     // nil for server side Stream
-	ctx          context.Context  // the associated context of the stream
-	cancel       cancelWithReason // always nil for client side Stream
-	done         chan struct{}    // closed at the end of stream to unblock writers. On the client side.
-	ctxDone      <-chan struct{}  // same as done chan but for server side. Cache of ctx.Done() (for performance)
-	method       string           // the associated RPC method of the stream
+	st           ServerTransport // nil for client side Stream
+	ct           *http2Client    // nil for server side Stream
+	ctx          context.Context // the associated context of the stream
+	cancel       context.CancelCauseFunc
+	done         chan struct{}   // closed at the end of stream to unblock writers. On the client side.
+	ctxDone      <-chan struct{} // same as done chan but for server side. Cache of ctx.Done() (for performance)
+	ctxCleanUp   func() bool     // the stop func of context.AfterFunc, nil for server side Stream
+	method       string          // the associated RPC method of the stream
 	recvCompress string
 	sendCompress string
 	buf          *recvBuffer
@@ -555,8 +557,8 @@ func CreateStream(ctx context.Context, id uint32, requestRead func(i int), metho
 		hdrMu:       sync.Mutex{},
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	stream.ctx, stream.cancel = newContextWithCancelReason(ctx, cancel)
+	stream.ctx, stream.cancel = context.WithCancelCause(ctx)
+	stream.ctx = internal_stream.NewContextWithCancelReason(stream.ctx)
 	return stream
 }
 

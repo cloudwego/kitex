@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
+	internal_stream "github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/container"
@@ -167,10 +168,10 @@ func (t *serverTransport) readFrame(reader bufiox.Reader) error {
 	var s *serverStream
 	if fr.typ == headerFrameType {
 		// server recv a header frame, we should create a new stream
-		ctx, cancel := context.WithCancel(context.Background())
-		ctx, cFunc := newContextWithCancelReason(ctx, cancel)
+		ctx, cancelFunc := context.WithCancelCause(context.Background())
+		ctx = internal_stream.NewContextWithCancelReason(ctx)
 		s = newServerStream(ctx, t, fr.streamFrame)
-		s.cancelFunc = cFunc
+		s.cancelFunc = cancelFunc
 		t.storeStream(s)
 		err = t.spipe.Write(context.Background(), s)
 	} else {

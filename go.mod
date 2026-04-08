@@ -1,6 +1,6 @@
 module github.com/cloudwego/kitex
 
-go 1.20
+go 1.21
 
 require (
 	github.com/bytedance/gopkg v0.1.3
