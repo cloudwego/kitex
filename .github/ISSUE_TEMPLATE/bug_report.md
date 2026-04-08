@@ -13,28 +13,43 @@ A clear and concise description of what the bug is.
 
 **To Reproduce**
 
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+Minimal code or configuration to reproduce the issue:
+
+```go
+// paste your code here
+```
+
+Steps:
+1. ...
+2. ...
 
 **Expected behavior**
 
 A clear and concise description of what you expected to happen.
 
-**Screenshots**
+**Actual behavior**
 
-If applicable, add screenshots to help explain your problem.
+What actually happened. Include error messages, logs, or panic stack traces if available.
 
-**Kitex version:**
-
-Please provide the version of Kitex you are using.
+```
+// paste error output or logs here
+```
 
 **Environment:**
 
-The output of `go env`.
+- Kitex version: (e.g. v0.12.1)
+- Protocol: (Thrift / Protobuf / gRPC)
+- Transport: (TTHeader / HTTP2 / Framed / ...)
+
+<details>
+<summary>output of <code>go env</code></summary>
+
+```
+// paste the output of `go env` here
+```
+
+</details>
 
 **Additional context**
 
-Add any other context about the problem here.
+Any other context such as IDL definitions, network topology, proxy/mesh setup, or service governance configuration (retry, circuit breaker, load balancer, etc.).
