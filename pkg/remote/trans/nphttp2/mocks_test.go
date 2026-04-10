@@ -68,6 +68,12 @@ func (mc *mockNetpollConn) mockReader(b []byte) (n int, err error) {
 	if bLen == frameHeaderLen || bLen == defaultMockReadWriteBufferSize {
 		b = b[0:0]
 		if mc.queueCounter >= len(mc.mockQueue) {
+			if mc.blockOnQueueEmpty != nil {
+				mc.counterLock.Unlock()
+				<-mc.blockOnQueueEmpty
+				mc.counterLock.Lock()
+				return 0, errors.New("mock connection closed")
+			}
 			return
 		}
 		fr := mc.mockQueue[mc.queueCounter]
@@ -103,12 +109,34 @@ var (
 	headerPayload    = []byte{131, 134, 69, 147, 99, 21, 149, 146, 249, 105, 58, 248, 172, 41, 82, 91, 24, 220, 63, 88, 203, 69, 7, 65, 139, 234, 100, 151, 202, 243, 89, 89, 23, 144, 180, 159, 95, 139, 29, 117, 208, 98, 13, 38, 61, 76, 77, 101, 100, 122, 137, 234, 100, 151, 203, 29, 192, 184, 151, 7, 64, 2, 116, 101, 134, 77, 131, 53, 5, 177, 31, 64, 137, 154, 202, 200, 178, 77, 73, 79, 106, 127, 134, 125, 247, 217, 124, 86, 255, 64, 138, 65, 237, 176, 133, 89, 5, 179, 185, 136, 95, 139, 234, 100, 151, 202, 243, 89, 89, 23, 144, 180, 159, 64, 137, 65, 237, 176, 133, 90, 146, 166, 115, 201, 0, 64, 136, 242, 178, 82, 181, 7, 152, 210, 127, 164, 0, 130, 227, 96, 109, 150, 93, 105, 151, 157, 124, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 150, 89, 64, 48, 54, 228, 146, 190, 16, 134, 50, 203, 64, 135, 65, 237, 176, 133, 88, 181, 119, 131, 174, 195, 201, 64, 143, 143, 210, 75, 73, 81, 58, 210, 154, 132, 150, 197, 147, 234, 178, 255, 131, 154, 202, 201, 64, 141, 144, 168, 73, 170, 26, 76, 122, 150, 65, 108, 238, 98, 23, 139, 234, 100, 151, 202, 243, 89, 89, 23, 144, 180, 159, 64, 141, 144, 168, 73, 170, 26, 76, 122, 150, 164, 169, 156, 242, 127, 134, 220, 63, 88, 203, 69, 7, 64, 138, 144, 168, 73, 170, 26, 76, 122, 150, 52, 132, 1, 45, 64, 138, 65, 237, 176, 133, 88, 148, 90, 132, 150, 207, 133, 144, 178, 142, 218, 19, 64, 135, 65, 237, 176, 133, 88, 210, 19, 1, 45}
 	mockHeaderFrame  = []byte{0, 1, 42, 1, 4, 0, 0, 0, 1}
 	mockSettingFrame = []byte{0, 0, 6, 4, 0, 0, 0, 0, 0}
+	// GOAWAY frame: length=8, type=7, flags=0, streamID=0.
+	// Payload: lastStreamID=0 (4 bytes) + errorCode=NO_ERROR (4 bytes).
+	mockGoAwayFrame   = []byte{0, 0, 8, 7, 0, 0, 0, 0, 0}
+	mockGoAwayPayload = []byte{0, 0, 0, 0, 0, 0, 0, 0}
 )
 
 func (mc *mockNetpollConn) mockSettingFrame() {
 	mc.counterLock.Lock()
 	defer mc.counterLock.Unlock()
 	mc.mockQueue = append(mc.mockQueue, mockFrame{mockSettingFrame, nil})
+}
+
+// mockSettingFrameWithMaxStreams queues a SETTINGS frame that sets
+// MaxConcurrentStreams to the given value (SettingID=0x3).
+func (mc *mockNetpollConn) mockSettingFrameWithMaxStreams(maxStreams uint32) {
+	mc.counterLock.Lock()
+	defer mc.counterLock.Unlock()
+	payload := []byte{
+		0, 3, // http2.SettingMaxConcurrentStreams
+		byte(maxStreams >> 24), byte(maxStreams >> 16), byte(maxStreams >> 8), byte(maxStreams),
+	}
+	mc.mockQueue = append(mc.mockQueue, mockFrame{mockSettingFrame, payload})
+}
+
+func (mc *mockNetpollConn) mockGoAwayFrame() {
+	mc.counterLock.Lock()
+	defer mc.counterLock.Unlock()
+	mc.mockQueue = append(mc.mockQueue, mockFrame{mockGoAwayFrame, mockGoAwayPayload})
 }
 
 func (mc *mockNetpollConn) mockMetaHeaderFrame() {
@@ -126,6 +154,14 @@ type mockNetpollConn struct {
 	queueCounter int
 	counterLock  sync.Mutex
 	reader       *mockNetpollReader
+	// autoStartReader: when true, SetOnRequest spawns a goroutine that
+	// immediately invokes the registered callback, simulating netpoll's
+	// event loop. Defaults to false to preserve existing test behavior.
+	autoStartReader bool
+	// blockOnQueueEmpty: when non-nil, the mock reader blocks on this channel
+	// instead of returning zero bytes when the frame queue is exhausted.
+	// This keeps the reader goroutine alive without triggering PROTOCOL_ERROR.
+	blockOnQueueEmpty chan struct{}
 }
 
 func (m *mockNetpollConn) Reader() netpoll.Reader {
@@ -153,6 +189,11 @@ func (m *mockNetpollConn) SetIdleTimeout(timeout time.Duration) error {
 }
 
 func (m *mockNetpollConn) SetOnRequest(on netpoll.OnRequest) error {
+	if m.autoStartReader {
+		go func() {
+			_ = on(context.Background(), m)
+		}()
+	}
 	return nil
 }
 

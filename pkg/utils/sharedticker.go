@@ -38,7 +38,7 @@ func NewSharedTicker(interval time.Duration) *SharedTicker {
 }
 
 // NewSyncSharedTicker constructs a SharedTicker with specified interval.
-// The Tick method will run tasks synchronously.
+// The Tick method will run tasks synchronously without lock held.
 func NewSyncSharedTicker(interval time.Duration) *SharedTicker {
 	t := NewSharedTicker(interval)
 	t.sync = true
