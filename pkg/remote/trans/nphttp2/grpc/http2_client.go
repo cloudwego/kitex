@@ -115,9 +115,9 @@ type http2Client struct {
 	// This is checked before attempting to signal the above condition
 	// variable.
 	kpDormant bool
-	onGoAway  func(GoAwayReason)
-	// Important: when onClose is invoked, the http2Client.mu is held
-	onClose func()
+	onGoAway  func(context.Context, ClientTransport, GoAwayReason)
+	// when onClose is invoked, the http2Client.mu is not held
+	onClose func(context.Context, ClientTransport, error)
 
 	bufferPool *bufferPool
 
@@ -128,7 +128,7 @@ type http2Client struct {
 // and starts to receive messages on it. Non-nil error returns if construction
 // fails.
 func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
-	remoteService string, onGoAway func(GoAwayReason), onClose func(),
+	cfg ClientConfig,
 ) (_ *http2Client, err error) {
 	scheme := "http"
 	if opts.TLSConfig != nil {
@@ -196,8 +196,6 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		maxConcurrentStreams:  defaultMaxStreamsClient,
 		streamQuota:           defaultMaxStreamsClient,
 		streamsQuotaAvailable: make(chan struct{}, 1),
-		onGoAway:              onGoAway,
-		onClose:               onClose,
 		bufferPool:            newBufferPool(),
 		traceCtl:              opts.TraceController,
 	}
@@ -214,10 +212,26 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	}
 	t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst)
 	task := &closeStreamTask{t: t}
-	t.onClose = func() {
-		onClose()
-		// when http2Client has been closed, remove this task
-		ticker.Delete(task)
+	t.onGoAway = func(ctx context.Context, trans ClientTransport, reason GoAwayReason) {
+		defer func() {
+			if r := recover(); r != nil {
+				klog.Warnf("KITEX: gRPC http2Client onGoAway panic, goaway reason: %+v, recover reason: %+v", reason, r)
+			}
+			// Unlike onClose, onGoAway must not remove the task when it is invoked.
+			// If there are still active streams at that point, they still need to be handled by task.
+			// We will check in task.Tick() whether the http2Client is in a draining state and the number of active streams is 0;
+			// if so, remove this task directly.
+		}()
+		cfg.OnGoAway(ctx, trans, reason)
+	}
+	t.onClose = func(ctx context.Context, trans ClientTransport, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				klog.Warnf("KITEX: gRPC http2Client onClose panic, err: %+v, recover reason: %+v", err, r)
+			}
+			ticker.Delete(task)
+		}()
+		cfg.OnClose(ctx, trans, err)
 	}
 	ticker.Add(task)
 
@@ -230,12 +244,12 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 			return nil
 		})
 	} else {
-		gofunc.RecoverGoFuncWithInfo(ctx, t.reader, gofunc.NewBasicInfo(remoteService, conn.RemoteAddr().String()))
+		gofunc.RecoverGoFuncWithInfo(ctx, t.reader, gofunc.NewBasicInfo(cfg.RemoteService, conn.RemoteAddr().String()))
 	}
 
 	if t.keepaliveEnabled {
 		t.kpDormancyCond = sync.NewCond(&t.mu)
-		gofunc.RecoverGoFuncWithInfo(ctx, t.keepalive, gofunc.NewBasicInfo(remoteService, conn.RemoteAddr().String()))
+		gofunc.RecoverGoFuncWithInfo(ctx, t.keepalive, gofunc.NewBasicInfo(cfg.RemoteService, conn.RemoteAddr().String()))
 	}
 
 	// Send connection preface to server.
@@ -274,6 +288,8 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	}
 
 	if err := t.framer.writer.Flush(); err != nil {
+		err = connectionErrorf(true, err, "transport: failed to Flush initial settings frame: %v", err)
+		t.Close(err)
 		return nil, err
 	}
 	gofunc.RecoverGoFuncWithInfo(ctx, func() {
@@ -287,7 +303,7 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 			t.conn.Close()
 		}
 		close(t.writerDone)
-	}, gofunc.NewBasicInfo(remoteService, conn.RemoteAddr().String()))
+	}, gofunc.NewBasicInfo(cfg.RemoteService, conn.RemoteAddr().String()))
 
 	return t, nil
 }
@@ -301,6 +317,8 @@ type closeStreamTask struct {
 func (task *closeStreamTask) Tick() {
 	trans := task.t
 	trans.mu.Lock()
+	state := trans.state
+	activeStreamsNum := len(trans.activeStreams)
 	for _, stream := range trans.activeStreams {
 		select {
 		// judge whether stream has been canceled
@@ -311,6 +329,13 @@ func (task *closeStreamTask) Tick() {
 	}
 	trans.mu.Unlock()
 
+	// http2Client has invoked GracefulClose() or received GoAway Frame, and there are no active streams
+	// remove current task from global ticker so that this http2Client could be GCed.
+	// Note: ticker.Delete may also be called by onClose's defer. This is safe because
+	// SharedTicker.Delete is idempotent — deleting an already-removed key is a map no-op.
+	if state == draining && activeStreamsNum == 0 {
+		ticker.Delete(task)
+	}
 	for i, stream := range task.toCloseStreams {
 		if !trans.casStreamDone(stream) {
 			// stream has been closed.
@@ -703,21 +728,12 @@ func (t *http2Client) doCloseStream(s *Stream, err error, rst bool, rstCode http
 // Close kicks off the shutdown process of the transport. This should be called
 // only once on a transport. Once it is called, the transport should not be
 // accessed any more.
-//
-// This method blocks until the addrConn that initiated this transport is
-// re-connected. This happens because t.onClose() begins reconnect logic at the
-// addrConn level and blocks until the addrConn is successfully connected.
 func (t *http2Client) Close(err error) error {
 	t.mu.Lock()
 	// Make sure we only Close once.
 	if t.state == closing {
 		t.mu.Unlock()
 		return nil
-	}
-	// Call t.onClose before setting the state to closing to prevent the client
-	// from attempting to create new streams ASAP.
-	if t.onClose != nil {
-		t.onClose()
 	}
 	t.state = closing
 	streams := t.activeStreams
@@ -728,6 +744,9 @@ func (t *http2Client) Close(err error) error {
 		t.kpDormancyCond.Signal()
 	}
 	t.mu.Unlock()
+	// Invoke onClose after releasing t.mu.
+	// Avoid deadlock caused by onClose attempting to acquire t.mu (for example, by calling http2Client.IsActive to get the connection state).
+	t.onClose(t.ctx, t, err)
 	t.controlBuf.finish(err)
 	t.cancel()
 	cErr := t.conn.Close()
@@ -1020,6 +1039,8 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 	// streams. While in case of second GoAway we close all streams created after
 	// the GoAwayId. This way streams that were in-flight while the GoAway from
 	// server was being sent don't get killed.
+	var invokeOnGoAway bool
+	var goAwayReason GoAwayReason
 	select {
 	case <-t.goAway: // t.goAway has been closed (i.e.,multiple GoAways).
 		// If there are multiple GoAways the first one should always have an ID greater than the following ones.
@@ -1030,15 +1051,11 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 		}
 	default:
 		t.setGoAwayReason(f)
+		goAwayReason = t.goAwayReason
 		close(t.goAway)
 		defer t.controlBuf.put(&incomingGoAway{}) // Defer as t.mu is currently held.
-		// Notify the clientconn about the GOAWAY before we set the state to
-		// draining, to allow the client to stop attempting to create streams
-		// before disallowing new streams on this connection.
 		if t.state != draining {
-			if t.onGoAway != nil {
-				t.onGoAway(t.goAwayReason)
-			}
+			invokeOnGoAway = true
 			t.state = draining
 		}
 	}
@@ -1052,6 +1069,11 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 	active := len(t.activeStreams)
 	if active <= 0 {
 		t.mu.Unlock()
+		// Invoke onGoAway after releasing t.mu.
+		// Avoid deadlock caused by onGoAway attempting to acquire t.mu (for example, by calling http2Client.IsActive to get the connection state).
+		if invokeOnGoAway {
+			t.onGoAway(t.ctx, t, goAwayReason)
+		}
 		t.Close(connectionErrorfWithIgnorable(true, nil, "received goaway and there are no active streams"))
 		return
 	}
@@ -1065,6 +1087,12 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 		}
 	}
 	t.mu.Unlock()
+
+	// Invoke onGoAway after releasing t.mu.
+	// Avoid deadlock caused by onGoAway attempting to acquire t.mu (for example, by calling http2Client.IsActive to get the connection state).
+	if invokeOnGoAway {
+		t.onGoAway(t.ctx, t, goAwayReason)
+	}
 
 	// we should not access controlBuf with t.mu held since it will cause deadlock.
 	// Pls refer to checkForStreamQuota in NewStream, it gets the controlbuf.mu and

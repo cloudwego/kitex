@@ -653,6 +653,13 @@ type ConnectOptions struct {
 	ReuseWriteBufferConfig ReuseWriteBufferConfig
 }
 
+// ClientConfig consists of all the helper configurations to establish a client transport.
+type ClientConfig struct {
+	RemoteService string
+	OnGoAway      func(ctx context.Context, trans ClientTransport, reason GoAwayReason)
+	OnClose       func(ctx context.Context, trans ClientTransport, err error)
+}
+
 // NewServerTransport creates a ServerTransport with conn or non-nil error
 // if it fails.
 func NewServerTransport(ctx context.Context, conn net.Conn, cfg *ServerConfig) (ServerTransport, error) {
@@ -661,10 +668,54 @@ func NewServerTransport(ctx context.Context, conn net.Conn, cfg *ServerConfig) (
 
 // NewClientTransport establishes the transport with the required ConnectOptions
 // and returns it to the caller.
+//
+// Deprecated: please use NewClientTransportWithConfig.
+//
+// Note: the timing of the onClose and onGoAway callback has changed.
+// Historically onClose and onGoAway were invoked while http2Client.mu was held and
+// before the transport state was set to closing/draining.
+// They are now invoked after the state has been set to closing/draining
+// and after http2Client.mu has been released.
+//
+// Callers that rely on the old ordering (for example, to observe the transport in a "reachable" state from
+// inside onClose or onGoAway) must migrate to NewClientTransportWithConfig and update
+// their callbacks accordingly.
 func NewClientTransport(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	remoteService string, onGoAway func(GoAwayReason), onClose func(),
 ) (ClientTransport, error) {
-	return newHTTP2Client(ctx, conn, opts, remoteService, onGoAway, onClose)
+	return newHTTP2Client(ctx, conn, opts, ClientConfig{
+		RemoteService: remoteService,
+		OnGoAway: func(ctx context.Context, trans ClientTransport, reason GoAwayReason) {
+			if onGoAway != nil {
+				onGoAway(reason)
+			}
+		},
+		OnClose: func(ctx context.Context, trans ClientTransport, err error) {
+			if onClose != nil {
+				onClose()
+			}
+		},
+	})
+}
+
+var (
+	noopOnClose  = func(ctx context.Context, trans ClientTransport, err error) {}
+	noopOnGoAway = func(ctx context.Context, trans ClientTransport, reason GoAwayReason) {}
+)
+
+// NewClientTransportWithConfig establishes the transport with the required ConnectOptions
+// and returns it to the caller.
+func NewClientTransportWithConfig(ctx context.Context, conn net.Conn, opts ConnectOptions,
+	cfg ClientConfig,
+) (ClientTransport, error) {
+	// OnClose and OnGoAway should not be nil
+	if cfg.OnClose == nil {
+		cfg.OnClose = noopOnClose
+	}
+	if cfg.OnGoAway == nil {
+		cfg.OnGoAway = noopOnGoAway
+	}
+	return newHTTP2Client(ctx, conn, opts, cfg)
 }
 
 // Options provides additional hints and information for message

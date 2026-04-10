@@ -790,7 +790,7 @@ func setUpWithOptions(t *testing.T, port int, serverConfig *ServerConfig, ht hTy
 	if err != nil {
 		t.Fatalf("failed to dial connection: %v", err)
 	}
-	ct, connErr := NewClientTransport(context.Background(), conn.(netpoll.Connection), copts, "", func(GoAwayReason) {}, func() {})
+	ct, connErr := NewClientTransportWithConfig(context.Background(), conn.(netpoll.Connection), copts, ClientConfig{})
 	if connErr != nil {
 		t.Fatalf("failed to create transport: %v", connErr)
 	}
@@ -831,7 +831,9 @@ func setUpWithNoPingServer(t *testing.T, copts ConnectOptions, connCh chan net.C
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
 	}
-	tr, err := NewClientTransport(context.Background(), conn.(netpoll.Connection), copts, "mockDestService", func(GoAwayReason) {}, func() {})
+	tr, err := NewClientTransportWithConfig(context.Background(), conn.(netpoll.Connection), copts, ClientConfig{
+		RemoteService: "mockDestService",
+	})
 	if err != nil {
 		// Server clean-up.
 		if conn, ok := <-connCh; ok {
@@ -848,7 +850,11 @@ func setUpWithOnGoAway(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 	if err != nil {
 		t.Fatalf("failed to dial connection: %v", err)
 	}
-	ct, connErr := NewClientTransport(context.Background(), conn.(netpoll.Connection), copts, "", onGoAway, func() {})
+	ct, connErr := NewClientTransportWithConfig(context.Background(), conn.(netpoll.Connection), copts, ClientConfig{
+		OnGoAway: func(ctx context.Context, trans ClientTransport, reason GoAwayReason) {
+			onGoAway(reason)
+		},
+	})
 	if connErr != nil {
 		t.Fatalf("failed to create transport: %v", connErr)
 	}
