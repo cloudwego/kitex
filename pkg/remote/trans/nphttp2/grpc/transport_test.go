@@ -2340,6 +2340,43 @@ func runPingPongTest(t *testing.T, msgSize int) {
 				return setUpWithOptions(t, 0, &ServerConfig{ReuseWriteBufferConfig: ReuseWriteBufferConfig{Enable: true}}, pingpong, ConnectOptions{ReuseWriteBufferConfig: ReuseWriteBufferConfig{Enable: true}})
 			},
 		},
+		{
+			desc: "client enables framer buffer pooling",
+			setupFunc: func(t *testing.T) (*server, *http2Client) {
+				return setUpWithOptions(t, 0, &ServerConfig{}, pingpong, ConnectOptions{ReuseWriteBufferConfig: ReuseWriteBufferConfig{EnableReuseHTTP2FramerBuffer: true}})
+			},
+		},
+		{
+			desc: "server enables framer buffer pooling",
+			setupFunc: func(t *testing.T) (*server, *http2Client) {
+				return setUpWithOptions(t, 0, &ServerConfig{ReuseWriteBufferConfig: ReuseWriteBufferConfig{EnableReuseHTTP2FramerBuffer: true}}, pingpong, ConnectOptions{})
+			},
+		},
+		{
+			desc: "client and server enables framer buffer pooling",
+			setupFunc: func(t *testing.T) (*server, *http2Client) {
+				return setUpWithOptions(t, 0, &ServerConfig{ReuseWriteBufferConfig: ReuseWriteBufferConfig{EnableReuseHTTP2FramerBuffer: true}}, pingpong, ConnectOptions{ReuseWriteBufferConfig: ReuseWriteBufferConfig{EnableReuseHTTP2FramerBuffer: true}})
+			},
+		},
+		{
+			desc: "client enables writer buffer sharing and framer buffer pooling",
+			setupFunc: func(t *testing.T) (*server, *http2Client) {
+				return setUpWithOptions(t, 0, &ServerConfig{}, pingpong, ConnectOptions{ReuseWriteBufferConfig: ReuseWriteBufferConfig{Enable: true, EnableReuseHTTP2FramerBuffer: true}})
+			},
+		},
+		{
+			desc: "server enables writer buffer sharing and framer buffer pooling",
+			setupFunc: func(t *testing.T) (*server, *http2Client) {
+				return setUpWithOptions(t, 0, &ServerConfig{ReuseWriteBufferConfig: ReuseWriteBufferConfig{Enable: true, EnableReuseHTTP2FramerBuffer: true}}, pingpong, ConnectOptions{})
+			},
+		},
+		{
+			desc: "client and server enable all buffer pooling",
+			setupFunc: func(t *testing.T) (*server, *http2Client) {
+				cfg := ReuseWriteBufferConfig{Enable: true, EnableReuseHTTP2FramerBuffer: true}
+				return setUpWithOptions(t, 0, &ServerConfig{ReuseWriteBufferConfig: cfg}, pingpong, ConnectOptions{ReuseWriteBufferConfig: cfg})
+			},
+		},
 	}
 
 	for _, tc := range testcases {

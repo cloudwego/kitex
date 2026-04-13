@@ -15,6 +15,7 @@ package grpcframe
 import (
 	"errors"
 
+	"github.com/bytedance/gopkg/lang/mcache"
 	"golang.org/x/net/http2"
 )
 
@@ -27,9 +28,13 @@ var (
 	errDepStreamID = errors.New("invalid dependent stream ID")
 )
 
+// During the write cycle from startWrite to endWrite, the actual length of payload written must equal payloadLen
 func (fr *Framer) startWrite(ftype http2.FrameType, flags http2.Flags, streamID uint32, payloadLen int) (err error) {
 	if payloadLen >= (1 << 24) {
 		return http2.ErrFrameTooLarge
+	}
+	if fr.reuseWriteBuffer {
+		fr.wbuf = mcache.Malloc(frameHeaderLen + payloadLen)
 	}
 	fr.wbuf = append(fr.wbuf[:0],
 		byte(payloadLen>>16),
@@ -41,11 +46,19 @@ func (fr *Framer) startWrite(ftype http2.FrameType, flags http2.Flags, streamID 
 		byte(streamID>>16),
 		byte(streamID>>8),
 		byte(streamID))
+
 	return nil
 }
 
 func (fr *Framer) endWrite() (err error) {
 	_, err = fr.writer.Write(fr.wbuf)
+	if fr.reuseWriteBuffer {
+		// Reuse only when err is nil, to prevent the underlying connection from still holding buf after a Write failure.
+		if err == nil {
+			mcache.Free(fr.wbuf)
+		}
+		fr.wbuf = nil
+	}
 	return err
 }
 

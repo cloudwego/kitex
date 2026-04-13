@@ -38,7 +38,10 @@ type Framer struct {
 	maxReadSize uint32
 
 	writer io.Writer
-	wbuf   []byte
+	// when enabled, wbuf is allocated from pool in startWrite and returned after a successful endWrite.
+	// On write failure the buffer is intentionally not returned, as the underlying writer may still hold a reference.
+	reuseWriteBuffer bool
+	wbuf             []byte
 	// maxWriteSize uint32 // zero means unlimited; TODO: implement
 
 	// AllowIllegalWrites permits the Framer's Write methods to
@@ -122,6 +125,14 @@ func (fr *Framer) SetMaxReadFrameSize(v uint32) {
 		v = maxFrameSize
 	}
 	fr.maxReadSize = v
+}
+
+// SetWriteBufferPoolEnabled sets whether the write buffer should be pooled.
+// When enabled, wbuf is allocated from pool in startWrite and returned after a successful endWrite.
+// On write failure the buffer is not returned, as the underlying writer may still hold a reference.
+// It is the caller's responsibility to not call other Write methods and SetWriteBufferPoolEnabled concurrently.
+func (fr *Framer) SetWriteBufferPoolEnabled(enabled bool) {
+	fr.reuseWriteBuffer = enabled
 }
 
 // ErrorDetail returns a more detailed error of the last error

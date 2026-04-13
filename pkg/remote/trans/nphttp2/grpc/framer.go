@@ -53,11 +53,28 @@ func newFramer(conn net.Conn, writeBufferSize, readBufferSize, maxHeaderListSize
 	fr.SetReuseFrames()
 	fr.MaxHeaderListSize = maxHeaderListSize
 	fr.ReadMetaHeaders = hpack.NewDecoder(http2InitHeaderTableSize, nil)
+	if reuseCfg.EnableReuseHTTP2FramerBuffer {
+		fr.SetWriteBufferPoolEnabled(true)
+	}
 	return fr
 }
 
+// ReuseWriteBufferConfig controls whether reusing gRPC write buffers with pool.
+// Used to address high memory usage caused by a large number of idle connections in scenarios with massive connections.
+//
+// By default both options are false: each connection keeps its write buffers for its entire
+// lifetime. Enabling pooling reduces idle memory at the cost of a small per-write pool overhead.
+// Enabling both options together yields the best memory savings.
+//
+// Callers MUST use keyed literals (e.g. ReuseWriteBufferConfig{Enable: true}) to remain
+// compatible with future field additions.
 type ReuseWriteBufferConfig struct {
+	// Enable pools the flush buffer used to batch small writes before sending to the network.
 	Enable bool
+
+	// EnableReuseHTTP2FramerBuffer pools the per-frame encoding buffer used to assemble
+	// individual HTTP/2 frames. Can be enabled independently of Enable.
+	EnableReuseHTTP2FramerBuffer bool
 }
 
 type bufWriter interface {

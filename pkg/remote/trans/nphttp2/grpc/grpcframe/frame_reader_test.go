@@ -101,3 +101,12 @@ func Test_Framer_readAndCheckFrameHeader(t *testing.T) {
 		})
 	}
 }
+
+func Test_Framer_SetWriteBufferPoolEnabled(t *testing.T) {
+	fr := NewFramer(nil, nil)
+	test.Assert(t, !fr.reuseWriteBuffer, fr)
+	fr.SetWriteBufferPoolEnabled(true)
+	test.Assert(t, fr.reuseWriteBuffer, fr)
+	fr.SetWriteBufferPoolEnabled(false)
+	test.Assert(t, !fr.reuseWriteBuffer, fr)
+}

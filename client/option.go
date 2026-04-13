@@ -548,21 +548,21 @@ func WithGRPCKeepaliveParams(kp grpc.ClientKeepalive) Option {
 	}}
 }
 
-// WithGRPCReuseWriteBuffer enables write buffer reusing across connection lifecycle.
-// When enabled, a fixed-size buffer allocation (default 64KB) is no longer assigned to each connection.
-// Instead, buffers are allocated on-demand from buffer pool and put back to buffer pool after each flush.
-// Trading CPU overhead (malloc/free) for reduced memory usage.
+// WithGRPCReuseWriteBuffer enables write buffer pooling to reduce idle connection memory.
+//
+// The config has two independent switches:
+//   - Enable: pools the flush buffer (default 64KB per connection saved).
+//   - EnableReuseHTTP2FramerBuffer: pools the per-frame encoding buffer (at most 32 KB in large-payload scenarios).
+//
+// Enabling both yields the best memory savings. Both are disabled by default.
 //
 // Use cases:
 //   - Scenarios with thousands of idle/low-traffic connections
 //   - Memory-constrained environments
 //
 // Trade-offs:
-//   - Reduces memory: ~2*WriteBufferSize per connection
-//   - Increases CPU: buffer pool malloc/free overhead on each write=>flush cycle
+//   - Reduces memory at the cost of per-write buffer pool overhead
 //   - Slightly higher GC pressure
-//
-// This feature is disabled by default. (optimized for throughput)
 func WithGRPCReuseWriteBuffer(cfg grpc.ReuseWriteBufferConfig) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCReuseWriteBuffer(%+v)", cfg))
