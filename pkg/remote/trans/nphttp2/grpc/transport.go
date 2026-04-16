@@ -278,6 +278,7 @@ type Stream struct {
 	// On client-side it is the status error received from the server.
 	// On server-side it is unused.
 	status       *status.Status
+	reuseStatus  bool
 	bizStatusErr kerrors.BizStatusErrorIface
 
 	bytesReceived uint32 // indicates whether any bytes have been received on this stream
@@ -454,6 +455,11 @@ func (s *Stream) Method() string {
 // Status can be read safely only after the stream has ended,
 // that is, after Done() is closed.
 func (s *Stream) Status() *status.Status {
+	// When the internal status is a shared pre-defined instance (reuseStatus == true),
+	// a deep copy is returned to prevent callers from mutating the shared object via AppendMessage().
+	if s.reuseStatus && s.status != nil {
+		return status.FromProto(s.status.Proto())
+	}
 	return s.status
 }
 
@@ -875,19 +881,46 @@ const (
 	GoAwayTooManyPings GoAwayReason = 2
 )
 
+var (
+	statusDeadlineExceeded = status.New(codes.DeadlineExceeded, context.DeadlineExceeded.Error())
+	errDeadlineExceeded    = statusDeadlineExceeded.Err()
+	statusCanceled         = status.New(codes.Canceled, context.Canceled.Error())
+	errCanceled            = statusCanceled.Err()
+)
+
 // ContextErr converts the error from context package into a status error.
 func ContextErr(err error) error {
 	switch err {
 	case context.DeadlineExceeded:
-		return status.New(codes.DeadlineExceeded, err.Error()).Err()
+		return errDeadlineExceeded
 	case context.Canceled:
-		return status.New(codes.Canceled, err.Error()).Err()
+		return errCanceled
 	}
 	statusErr, ok := err.(*status.Error)
 	if ok { // only returned by contextWithCancelReason
 		return statusErr
 	}
 	return status.Errorf(codes.Internal, "Unexpected error from context packet: %v", err)
+}
+
+// contextStatusAndErr converts err to (*status.Status, reused, error).
+// For context.Canceled / context.DeadlineExceeded, both the *status.Status and *status.Error
+// are pre-defined shared singletons (reused=true).
+// The caller must use reused flag to ensure Stream.Status() returns a copy instead of the shared instance,
+// preventing mutation via AppendMessage().
+func contextStatusAndErr(err error) (*status.Status, bool, error) {
+	switch err {
+	case context.DeadlineExceeded:
+		return statusDeadlineExceeded, true, errDeadlineExceeded
+	case context.Canceled:
+		return statusCanceled, true, errCanceled
+	}
+	stErr, ok := err.(*status.Error)
+	if ok {
+		return stErr.GRPCStatus(), false, stErr
+	}
+	st := status.Newf(codes.Internal, "Unexpected error from context packet: %v", err)
+	return st, false, st.Err()
 }
 
 // IsStreamDoneErr returns true if the error indicates that the stream is done.

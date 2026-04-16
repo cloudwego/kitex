@@ -312,9 +312,15 @@ func (task *closeStreamTask) Tick() {
 	trans.mu.Unlock()
 
 	for i, stream := range task.toCloseStreams {
-		// uniformly converted to status error
-		sErr := ContextErr(stream.Context().Err())
-		trans.closeStream(stream, sErr, true, http2.ErrCodeCancel, status.Convert(sErr), nil, false)
+		if !trans.casStreamDone(stream) {
+			// stream has been closed.
+			// there is no need to do following processing to reduce objects allocation
+			task.toCloseStreams[i] = nil
+			continue
+		}
+		// uniformly converted to *status.Status and related error
+		st, stReused, sErr := contextStatusAndErr(stream.Context().Err())
+		trans.doCloseStream(stream, sErr, true, http2.ErrCodeCancel, st, stReused, nil)
 		task.toCloseStreams[i] = nil
 	}
 	task.toCloseStreams = task.toCloseStreams[:0]
@@ -612,23 +618,38 @@ func (t *http2Client) CloseStream(s *Stream, err error) {
 		}
 		klog.CtxInfof(s.ctx, "KITEX: stream closed by ctx canceled, err: %v, rstCode: %d"+sendRSTStreamFrameSuffix, err, rstCode)
 	}
-	t.closeStream(s, err, rst, rstCode, status.Convert(err), nil, false)
+	t.closeStream(s, err, rst, rstCode, status.Convert(err), nil)
 }
 
 // before invoking closeStream, pls do not hold the t.mu
 // because accessing the controlbuf while holding t.mu will cause a deadlock.
-func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.ErrCode, st *status.Status, mdata map[string][]string, eosReceived bool) {
-	// Set stream status to done.
+func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.ErrCode, st *status.Status, mdata map[string][]string) {
+	if !t.casStreamDone(s) {
+		return
+	}
+	t.doCloseStream(s, err, rst, rstCode, st, false, mdata)
+}
+
+// casStreamDone atomically marks s as done. Returns true if the caller wins the race
+// and should proceed with doCloseStream; false if another goroutine already closed it.
+func (t *http2Client) casStreamDone(s *Stream) bool {
 	if s.swapState(streamDone) == streamDone {
 		// If it was already done, return.  If multiple closeStream calls
 		// happen simultaneously, wait for the first to finish.
 		<-s.done
-		return
+		return false
 	}
+	return true
+}
+
+// doCloseStream performs the actual stream cleanup. Caller must have won casStreamDone first.
+func (t *http2Client) doCloseStream(s *Stream, err error, rst bool, rstCode http2.ErrCode, st *status.Status, reuseSt bool, mdata map[string][]string) {
 	// status and trailers can be updated here without any synchronization because the stream goroutine will
 	// only read it after it sees an io.EOF error from read or write and we'll write those errors
 	// only after updating this.
 	s.status = st
+	// if reuseSt == true, retrieves status by Stream.Status() must copy a new one
+	s.reuseStatus = reuseSt
 	if len(mdata) > 0 {
 		s.trailer = mdata
 	}
@@ -713,7 +734,7 @@ func (t *http2Client) Close(err error) error {
 
 	// Notify all active streams.
 	for _, s := range streams {
-		t.closeStream(s, err, false, http2.ErrCodeNo, status.New(codes.Unavailable, ErrConnClosing.Desc), nil, false)
+		t.closeStream(s, err, false, http2.ErrCodeNo, status.New(codes.Unavailable, ErrConnClosing.Desc), nil)
 	}
 	return cErr
 }
@@ -857,7 +878,7 @@ func (t *http2Client) handleData(f *grpcframe.DataFrame) {
 	if size > 0 {
 		if err := s.fc.onData(size); err != nil {
 			klog.CtxInfof(s.ctx, "KITEX: http2Client.handleData inflow control err: %v, rstCode: %d"+sendRSTStreamFrameSuffix, err, http2.ErrCodeFlowControl)
-			t.closeStream(s, io.EOF, true, http2.ErrCodeFlowControl, status.New(codes.Internal, err.Error()), nil, false)
+			t.closeStream(s, io.EOF, true, http2.ErrCodeFlowControl, status.New(codes.Internal, err.Error()), nil)
 			return
 		}
 		if f.Header().Flags.Has(http2.FlagDataPadded) {
@@ -878,7 +899,7 @@ func (t *http2Client) handleData(f *grpcframe.DataFrame) {
 	// The server has closed the stream without sending trailers.  Record that
 	// the read direction is closed, and set the status appropriately.
 	if f.FrameHeader.Flags.Has(http2.FlagDataEndStream) {
-		t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.New(codes.Internal, "server closed the stream without sending trailers"), nil, true)
+		t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.New(codes.Internal, "server closed the stream without sending trailers"), nil)
 	}
 }
 
@@ -909,7 +930,7 @@ func (t *http2Client) handleRSTStream(f *http2.RSTStreamFrame) {
 	} else {
 		msg = fmt.Sprintf("stream terminated by RST_STREAM with error code: %v", f.ErrCode)
 	}
-	t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.New(statusCode, msg), nil, false)
+	t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.New(statusCode, msg), nil)
 }
 
 func (t *http2Client) handleSettings(f *grpcframe.SettingsFrame, isFirst bool) {
@@ -1049,7 +1070,7 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 	// Pls refer to checkForStreamQuota in NewStream, it gets the controlbuf.mu and
 	// wants to get the t.mu.
 	for _, stream := range unprocessedStream {
-		t.closeStream(stream, errStreamDrain, false, http2.ErrCodeNo, statusGoAway, nil, false)
+		t.closeStream(stream, errStreamDrain, false, http2.ErrCodeNo, statusGoAway, nil)
 	}
 }
 
@@ -1094,7 +1115,7 @@ func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 		// As specified by gRPC over HTTP2, a HEADERS frame (and associated CONTINUATION frames) can only appear at the start or end of a stream. Therefore, second HEADERS frame must have EOS bit set.
 		st := status.New(codes.Internal, "a HEADERS frame cannot appear in the middle of a stream")
 		klog.CtxInfof(s.ctx, "KITEX: http2Client.operateHeaders received HEADERS frame in the middle of a stream, rstCode: %d"+sendRSTStreamFrameSuffix, http2.ErrCodeProtocol)
-		t.closeStream(s, st.Err(), true, http2.ErrCodeProtocol, st, nil, false)
+		t.closeStream(s, st.Err(), true, http2.ErrCodeProtocol, st, nil)
 		return
 	}
 
@@ -1103,7 +1124,7 @@ func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 	state.data.isGRPC = !initialHeader
 	if err := state.decodeHeader(frame); err != nil {
 		klog.CtxInfof(s.ctx, "KITEX: http2Client.operateHeaders decode HEADERS frame failed, err: %v, rstCode: %d"+sendRSTStreamFrameSuffix, err, http2.ErrCodeProtocol)
-		t.closeStream(s, err, true, http2.ErrCodeProtocol, status.Convert(err), nil, endStream)
+		t.closeStream(s, err, true, http2.ErrCodeProtocol, status.Convert(err), nil)
 		return
 	}
 
@@ -1134,7 +1155,7 @@ func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 	// if client received END_STREAM from server while stream was still active, send RST_STREAM
 	rst := s.getState() == streamActive
 	s.SetBizStatusErr(state.bizStatusErr())
-	t.closeStream(s, io.EOF, rst, http2.ErrCodeNo, state.status(), state.data.mdata, true)
+	t.closeStream(s, io.EOF, rst, http2.ErrCodeNo, state.status(), state.data.mdata)
 }
 
 // reader runs as a separate goroutine in charge of reading data from network
@@ -1188,7 +1209,7 @@ func (t *http2Client) reader() {
 						msg = err.Error()
 					}
 					klog.CtxInfof(s.ctx, "KITEX: http2Client.reader encountered http2.StreamError: %v, rstCode: %d"+sendRSTStreamFrameSuffix, se, http2.ErrCodeProtocol)
-					t.closeStream(s, status.New(code, msg).Err(), true, http2.ErrCodeProtocol, status.New(code, msg), nil, false)
+					t.closeStream(s, status.New(code, msg).Err(), true, http2.ErrCodeProtocol, status.New(code, msg), nil)
 				}
 				continue
 			} else {

@@ -2607,3 +2607,214 @@ func TestStreamGetHeaderValid(t *testing.T) {
 	close(s.headerChan)
 	test.Assert(t, s.getHeaderValid() == s.headerValid)
 }
+
+func Test_contextStatusAndErr(t *testing.T) {
+	t.Run("predefined status and err", func(t *testing.T) {
+		// canceled
+		st, stReused, err := contextStatusAndErr(context.Canceled)
+		test.Assert(t, st.Code() == codes.Canceled, st)
+		test.Assert(t, st.Message() == context.Canceled.Error(), st)
+		test.Assert(t, stReused)
+		test.Assert(t, err == errCanceled, err)
+		// reuse
+		st1, stReused1, err1 := contextStatusAndErr(context.Canceled)
+		test.Assert(t, st1 == st, st1)
+		test.Assert(t, stReused1)
+		test.Assert(t, err1 == err, err1)
+
+		// deadline exceeded
+		st2, stReused2, err2 := contextStatusAndErr(context.DeadlineExceeded)
+		test.Assert(t, st2.Code() == codes.DeadlineExceeded, st2)
+		test.Assert(t, st2.Message() == context.DeadlineExceeded.Error(), st2)
+		test.Assert(t, stReused2)
+		test.Assert(t, err2 == errDeadlineExceeded, err2)
+		// reuse
+		st3, stReused3, err3 := contextStatusAndErr(context.DeadlineExceeded)
+		test.Assert(t, st3 == st2, st3)
+		test.Assert(t, stReused3)
+		test.Assert(t, err3 == errDeadlineExceeded, err3)
+	})
+	t.Run("*status.Error", func(t *testing.T) {
+		stErr := status.Err(codes.Internal, "test")
+		st, stReused, err := contextStatusAndErr(stErr)
+		test.Assert(t, st.Code() == codes.Internal, st)
+		test.Assert(t, st.Message() == "test", st)
+		test.Assert(t, !stReused)
+		test.Assert(t, err == stErr, err)
+
+		st1, stReused1, err1 := contextStatusAndErr(stErr)
+		// create a new *status.Status
+		test.Assert(t, st1 != st, st1)
+		test.Assert(t, st1.Code() == codes.Internal, st1)
+		test.Assert(t, st1.Message() == "test", st1)
+		test.Assert(t, !stReused1)
+		test.Assert(t, err1 == err, err1)
+	})
+	t.Run("non *status.Error", func(t *testing.T) {
+		testErr := errors.New("test")
+		st, stReused, err := contextStatusAndErr(testErr)
+		test.Assert(t, st.Code() == codes.Internal, st)
+		test.Assert(t, strings.Contains(st.Message(), testErr.Error()), st)
+		test.Assert(t, !stReused)
+		test.Assert(t, strings.Contains(err.Error(), testErr.Error()), err)
+
+		st1, stReused1, err1 := contextStatusAndErr(testErr)
+		// create new *status.Status and *status.Error
+		test.Assert(t, st1 != st, st1)
+		test.Assert(t, st1.Code() == codes.Internal, st1)
+		test.Assert(t, strings.Contains(st1.Message(), testErr.Error()), st1)
+		test.Assert(t, !stReused1)
+		test.Assert(t, err1 != err, err1)
+		test.Assert(t, strings.Contains(err1.Error(), testErr.Error()), err1)
+	})
+}
+
+func Test_reuseStatus(t *testing.T) {
+	origCanceledMsg := statusCanceled.Message()
+	origDeadlineMsg := statusDeadlineExceeded.Message()
+
+	// reuseStatus=true: Stream.Status() should return a copy, AppendMessage must not pollute singleton
+	for _, tc := range []struct {
+		name    string
+		st      *status.Status
+		origMsg string
+	}{
+		{"Canceled", statusCanceled, origCanceledMsg},
+		{"DeadlineExceeded", statusDeadlineExceeded, origDeadlineMsg},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &Stream{status: tc.st, reuseStatus: true}
+			got := s.Status()
+			test.Assert(t, got != tc.st, "Status() should return a copy, not the singleton")
+			test.Assert(t, got.Code() == tc.st.Code())
+			test.Assert(t, got.Message() == tc.origMsg)
+
+			// mutate the copy
+			got.AppendMessage("extra")
+			// singleton must remain unchanged
+			test.Assert(t, tc.st.Message() == tc.origMsg, tc.st.Message())
+		})
+	}
+
+	// reuseStatus=false: Stream.Status() returns the original pointer
+	t.Run("non-reuse", func(t *testing.T) {
+		st := status.New(codes.Internal, "test")
+		s := &Stream{status: st, reuseStatus: false}
+		got := s.Status()
+		test.Assert(t, got == st, "Status() should return the original pointer when reuseStatus=false")
+	})
+
+	// nil defense: reuseStatus=true but status is nil
+	t.Run("nil-status", func(t *testing.T) {
+		s := &Stream{status: nil, reuseStatus: true}
+		got := s.Status()
+		test.Assert(t, got == nil, got)
+	})
+}
+
+// Benchmark_closeStreamTask_Tick measures per-Tick allocations on the client-side
+// unified cancel cleanup path, covering the full casStreamDone + contextStatusAndErr
+// + doCloseStream pipeline.
+// Each iteration includes stream state reset (fixed overhead);
+// any regression in contextStatusAndErr or doCloseStream will show as an allocs/op increase.
+func Benchmark_closeStreamTask_Tick(b *testing.B) {
+	canceledCtx := func() context.Context {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		return ctx
+	}
+	deadlineCtx := func() context.Context {
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+		cancel()
+		return ctx
+	}
+	statusErrCtx := func() context.Context {
+		parent, cancel := context.WithCancel(context.Background())
+		ctx, cancelReason := newContextWithCancelReason(parent, cancel)
+		cancelReason(status.Err(codes.Canceled, "user reason"))
+		return ctx
+	}
+
+	cases := []struct {
+		name    string
+		ctxFunc func() context.Context
+	}{
+		{"Canceled", canceledCtx},
+		{"DeadlineExceeded", deadlineCtx},
+		{"StatusError", statusErrCtx},
+	}
+	for _, c := range cases {
+		for _, n := range []int{100, 1000} {
+			b.Run(fmt.Sprintf("%s/streams=%d", c.name, n), func(b *testing.B) {
+				clientDone := make(chan struct{})
+				ct := &http2Client{
+					activeStreams:         make(map[uint32]*Stream, n),
+					controlBuf:            newControlBuffer(clientDone),
+					streamsQuotaAvailable: make(chan struct{}, 1),
+				}
+				streams := make([]*Stream, 0, n)
+				for i := 0; i < n; i++ {
+					s := &Stream{
+						id:         uint32(i + 1),
+						ctx:        c.ctxFunc(),
+						done:       make(chan struct{}),
+						buf:        newRecvBuffer(),
+						headerChan: make(chan struct{}),
+					}
+					ct.activeStreams[s.id] = s
+					streams = append(streams, s)
+				}
+				task := &closeStreamTask{t: ct}
+
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					task.Tick()
+
+					// Reset stream state for next iteration.
+					// These reset allocations are included in allocs/op as fixed overhead.
+					ct.controlBuf = newControlBuffer(clientDone)
+					for _, s := range streams {
+						s.swapState(streamActive)
+						s.done = make(chan struct{})
+						s.buf = newRecvBuffer()
+						s.headerChan = make(chan struct{})
+						s.headerChanClosed = 0
+					}
+				}
+			})
+		}
+	}
+
+	// AlreadyClosed: all streams are pre-marked as streamDone with closed done channel.
+	// casStreamDone returns false for every stream, so contextStatusAndErr and doCloseStream
+	// are skipped entirely. This verifies zero extra allocations on the skip path.
+	for _, n := range []int{100, 1000} {
+		b.Run(fmt.Sprintf("AlreadyClosed/streams=%d", n), func(b *testing.B) {
+			ct := &http2Client{
+				activeStreams: make(map[uint32]*Stream, n),
+			}
+			for i := 0; i < n; i++ {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				s := &Stream{
+					id:   uint32(i + 1),
+					ctx:  ctx,
+					done: make(chan struct{}),
+				}
+				s.swapState(streamDone)
+				close(s.done)
+				ct.activeStreams[s.id] = s
+			}
+			task := &closeStreamTask{t: ct}
+			// warm up so toCloseStreams capacity stops growing
+			task.Tick()
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				task.Tick()
+			}
+		})
+	}
+}
