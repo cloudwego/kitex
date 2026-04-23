@@ -20,11 +20,12 @@ package ttstream
 
 import (
 	"context"
-	"strings"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
@@ -61,24 +62,54 @@ func TestGenericStreaming(t *testing.T) {
 
 // TestStreamRecvTimeout tests that RecvMsg correctly handles timeout scenarios
 func TestStreamRecvTimeout(t *testing.T) {
-	_, ss, err := newTestStreamPipe(testServiceInfo, "Bidi")
+	cs, _, err := newTestStreamPipe(testServiceInfo, "Bidi")
 	test.Assert(t, err == nil, err)
 
 	// Set a very short timeout for testing
 	cfg := rpcinfo.NewRPCConfig()
 	rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeout(time.Millisecond * 10)
-	ss.setRecvTimeoutConfig(cfg)
+	cs.setRecvTimeoutConfig(cfg, cs.recvTimeoutCallback)
 
 	// Create a context that won't expire
 	ctx := context.Background()
 
 	// Try to receive message - should timeout quickly
 	res := new(testResponse)
-	err = ss.RecvMsg(ctx, res)
+	err = cs.RecvMsg(ctx, res)
 	test.Assert(t, err != nil, "RecvMsg should timeout")
-	test.Assert(t, strings.Contains(err.Error(), "timeout") ||
-		strings.Contains(err.Error(), "deadline exceeded"),
-		"Error should be timeout related")
+	test.Assert(t, errors.Is(err, kerrors.ErrStreamingTimeout), err)
+}
+
+func Test_streamRecvTimeoutWithDisableCancelRemote(t *testing.T) {
+	cs, ss, err := newTestStreamPipe(testServiceInfo, "Bidi")
+	test.Assert(t, err == nil, err)
+
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+		Timeout:             50 * time.Millisecond,
+		DisableCancelRemote: true,
+	})
+	cs.setRecvTimeoutConfig(cfg, cs.recvTimeoutCallback)
+
+	ctx := context.Background()
+
+	res := new(testResponse)
+	err = cs.RecvMsg(ctx, res)
+	test.Assert(t, err != nil)
+	test.Assert(t, errors.Is(err, kerrors.ErrStreamingTimeout), err)
+	test.Assert(t, checkCanRetry(err))
+
+	resp := new(testResponse)
+	resp.A = 42
+	resp.B = "retry_success"
+	sErr := ss.SendMsg(ctx, resp)
+	test.Assert(t, sErr == nil, sErr)
+
+	res = new(testResponse)
+	err = cs.RecvMsg(ctx, res)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, res.A == 42)
+	test.Assert(t, res.B == "retry_success")
 }
 
 // TestStreamRecvWithCancellation tests that RecvMsg respects context cancellation
@@ -112,21 +143,21 @@ func TestStreamRecvWithCancellation(t *testing.T) {
 // TestSetRecvTimeoutConfig tests setRecvTimeoutConfig method with different configuration scenarios
 func TestSetRecvTimeoutConfig(t *testing.T) {
 	t.Run("only set StreamRecvTimeout", func(t *testing.T) {
-		_, ss, err := newTestStreamPipe(testServiceInfo, "Bidi")
+		cs, _, err := newTestStreamPipe(testServiceInfo, "Bidi")
 		test.Assert(t, err == nil, err)
 
 		cfg := rpcinfo.NewRPCConfig()
 		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeout(100 * time.Millisecond)
 
-		ss.setRecvTimeoutConfig(cfg)
+		cs.setRecvTimeoutConfig(cfg, cs.recvTimeoutCallback)
 
 		// verify timeout config is set from StreamRecvTimeout
-		test.Assert(t, ss.recvTimeoutConfig.Timeout == 100*time.Millisecond, ss.recvTimeoutConfig)
-		test.Assert(t, ss.recvTimeoutConfig.DisableCancelRemote == false, ss.recvTimeoutConfig)
+		test.Assert(t, cs.recvTimeoutConfig.Timeout == 100*time.Millisecond, cs.recvTimeoutConfig)
+		test.Assert(t, cs.recvTimeoutConfig.DisableCancelRemote == false, cs.recvTimeoutConfig)
 	})
 
 	t.Run("only set StreamRecvTimeoutConfig", func(t *testing.T) {
-		_, ss, err := newTestStreamPipe(testServiceInfo, "Bidi")
+		cs, _, err := newTestStreamPipe(testServiceInfo, "Bidi")
 		test.Assert(t, err == nil, err)
 
 		cfg := rpcinfo.NewRPCConfig()
@@ -135,15 +166,15 @@ func TestSetRecvTimeoutConfig(t *testing.T) {
 			DisableCancelRemote: true,
 		})
 
-		ss.setRecvTimeoutConfig(cfg)
+		cs.setRecvTimeoutConfig(cfg, cs.recvTimeoutCallback)
 
 		// verify timeout config is set from StreamRecvTimeoutConfig
-		test.Assert(t, ss.recvTimeoutConfig.Timeout == 200*time.Millisecond, ss.recvTimeoutConfig)
-		test.Assert(t, ss.recvTimeoutConfig.DisableCancelRemote == true, ss.recvTimeoutConfig)
+		test.Assert(t, cs.recvTimeoutConfig.Timeout == 200*time.Millisecond, cs.recvTimeoutConfig)
+		test.Assert(t, cs.recvTimeoutConfig.DisableCancelRemote == true, cs.recvTimeoutConfig)
 	})
 
 	t.Run("both set, StreamRecvTimeoutConfig has higher priority", func(t *testing.T) {
-		_, ss, err := newTestStreamPipe(testServiceInfo, "Bidi")
+		cs, _, err := newTestStreamPipe(testServiceInfo, "Bidi")
 		test.Assert(t, err == nil, err)
 
 		cfg := rpcinfo.NewRPCConfig()
@@ -155,10 +186,10 @@ func TestSetRecvTimeoutConfig(t *testing.T) {
 			DisableCancelRemote: true,
 		})
 
-		ss.setRecvTimeoutConfig(cfg)
+		cs.setRecvTimeoutConfig(cfg, cs.recvTimeoutCallback)
 
 		// verify StreamRecvTimeoutConfig takes priority over StreamRecvTimeout
-		test.Assert(t, ss.recvTimeoutConfig.Timeout == 50*time.Millisecond, ss.recvTimeoutConfig)
-		test.Assert(t, ss.recvTimeoutConfig.DisableCancelRemote == true, ss.recvTimeoutConfig)
+		test.Assert(t, cs.recvTimeoutConfig.Timeout == 50*time.Millisecond, cs.recvTimeoutConfig)
+		test.Assert(t, cs.recvTimeoutConfig.DisableCancelRemote == true, cs.recvTimeoutConfig)
 	})
 }

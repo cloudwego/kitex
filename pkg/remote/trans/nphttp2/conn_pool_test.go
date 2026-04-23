@@ -32,7 +32,9 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -162,6 +164,13 @@ func getAndReleaseStream(pool *connPool, parent context.Context, network, addres
 func isExpectedShutdownErr(err error) bool {
 	if err == nil || err == errTransportsClosed || err == errConnPoolClosed || err == grpc.ErrConnClosing {
 		return true
+	}
+	st, ok := status.FromError(err)
+	if ok {
+		// create stream timeouts
+		if st.Code() == codes.DeadlineExceeded && st.Message() == context.DeadlineExceeded.Error() {
+			return true
+		}
 	}
 	return false
 }

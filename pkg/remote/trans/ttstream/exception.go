@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/streaming"
@@ -46,13 +47,27 @@ var (
 var errServerSideBizHandlerReturnCancel = errBizHandlerReturnCancel.newBuilder().withSide(serverSide)
 
 func newStreamRecvTimeoutException(cfg streaming.TimeoutConfig) *Exception {
-	return newException(fmt.Sprintf("stream Recv timeout, timeout config=%+v", cfg), kerrors.ErrStreamingTimeout, 12014).withSide(clientSide)
+	res := newException(fmt.Sprintf("stream Recv timeout, timeout config=%+v", cfg), kerrors.ErrStreamingTimeout, 12014).withSide(clientSide)
+	if cfg.DisableCancelRemote {
+		res = res.withCanRetry()
+	}
+	return res
+}
+
+var notSetStreamTimeout = time.Duration(-1)
+
+func newStreamTimeoutException(tm time.Duration) *Exception {
+	if tm >= 0 {
+		return newException(fmt.Sprintf("stream timeout, timeout in ctx: %+v", tm), kerrors.ErrStreamingTimeout, 12015).withSide(clientSide)
+	}
+	return newException("stream timeout, no explicit timeout set in stream ctx", kerrors.ErrStreamingTimeout, 12015).withSide(clientSide)
 }
 
 const (
 	setSide = 1 << iota
 	setCancelPath
 	setCause
+	setCanRetry
 )
 
 type Exception struct {
@@ -68,6 +83,8 @@ type Exception struct {
 	parent error
 	// when cause is set, replace message to cause.Error() when displaying error information
 	cause error
+
+	canRetry bool
 
 	bitSet uint8
 }
@@ -150,6 +167,16 @@ func (e *Exception) isCancelPathSet() bool {
 	return e.bitSet&setCancelPath != 0
 }
 
+func (e *Exception) withCanRetry() *Exception {
+	e.canRetry = true
+	e.bitSet |= setCanRetry
+	return e
+}
+
+func (e *Exception) isCanRetrySet() bool {
+	return e.bitSet&setCanRetry != 0
+}
+
 func (e *Exception) Is(target error) bool {
 	if rawEx, ok := target.(*Exception); ok {
 		return rawEx.message == e.message
@@ -182,4 +209,12 @@ func formatCancelPath(cancelPath string) string {
 	}
 	parts := strings.Split(cancelPath, ",")
 	return strings.Join(parts, " -> ")
+}
+
+func checkCanRetry(err error) bool {
+	ex, ok := err.(*Exception)
+	if !ok {
+		return false
+	}
+	return ex.isCanRetrySet()
 }

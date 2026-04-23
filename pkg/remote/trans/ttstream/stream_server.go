@@ -33,7 +33,7 @@ var _ ServerStreamMeta = (*serverStream)(nil)
 
 func newServerStream(ctx context.Context, writer streamWriter, smeta streamFrame) *serverStream {
 	s := newBasicStream(ctx, writer, smeta)
-	s.reader = newStreamReader()
+	s.reader = newStreamReader(ctx, nil)
 	return &serverStream{stream: s}
 }
 

@@ -24,6 +24,8 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/internal/container"
+
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	ktransport "github.com/cloudwego/kitex/transport"
@@ -83,8 +85,9 @@ type stream struct {
 	wheader  streaming.Header  // wheader == nil means it already be sent
 	wtrailer streaming.Trailer // wtrailer == nil means it already be sent
 
-	recvTimeoutConfig streaming.TimeoutConfig
-	closeCallback     []func(error)
+	recvTimeoutConfig   streaming.TimeoutConfig
+	recvTimeoutCallback container.CtxDoneCallback
+	closeCallback       []func(error)
 }
 
 func (s *stream) Service() string {
@@ -92,6 +95,13 @@ func (s *stream) Service() string {
 		return ""
 	}
 	return s.header[ttheader.HeaderIDLServiceName]
+}
+
+func (s *stream) fromService() string {
+	if s.rpcInfo != nil && s.rpcInfo.From() != nil {
+		return s.rpcInfo.From().ServiceName()
+	}
+	return ""
 }
 
 func (s *stream) Method() string {
@@ -124,17 +134,23 @@ func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
 }
 
 func (s *stream) RecvMsg(ctx context.Context, data any) error {
-	nctx := s.ctx
+	var payload []byte
+	var err error
 	if s.recvTimeoutConfig.Timeout > 0 {
+		var tCtx context.Context
 		var cancel context.CancelFunc
-		nctx, cancel = context.WithTimeout(nctx, s.recvTimeoutConfig.Timeout)
+		// Use context.Background() so it is clear whether the Done() triggered from RecvTimeout or StreamTimeout.
+		tCtx, cancel = context.WithTimeout(context.Background(), s.recvTimeoutConfig.Timeout)
 		defer cancel()
+		payload, err = s.reader.outputWithCtx(tCtx, s.recvTimeoutCallback)
+	} else {
+		payload, err = s.reader.output()
 	}
-	payload, err := s.reader.output(nctx)
 	if err != nil {
 		return err
 	}
-	err = DecodePayload(nctx, payload, data)
+	err = DecodePayload(s.ctx, payload, data)
+	recvSize := len(payload)
 	// payload will not be access after decode
 	mcache.Free(payload)
 
@@ -142,7 +158,7 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 	ri := s.rpcInfo
 	if ri != nil && ri.Stats() != nil {
 		if rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats()); rpcStats != nil {
-			rpcStats.IncrRecvSize(uint64(len(payload)))
+			rpcStats.IncrRecvSize(uint64(recvSize))
 		}
 	}
 	return err
@@ -152,7 +168,9 @@ func (s *stream) RegisterCloseCallback(cb func(error)) {
 	s.closeCallback = append(s.closeCallback, cb)
 }
 
-func (s *stream) setRecvTimeoutConfig(cfg rpcinfo.RPCConfig) {
+func (s *stream) setRecvTimeoutConfig(cfg rpcinfo.RPCConfig, cb container.CtxDoneCallback) {
+	// set timeout callback
+	s.recvTimeoutCallback = cb
 	tmCfg := cfg.StreamRecvTimeoutConfig()
 	// WithStreamRecvTimeoutConfig has higher priority
 	if tmCfg.Timeout > 0 {
@@ -225,6 +243,6 @@ func (s *stream) sendRst(exception error, cancelPath string) (err error) {
 // === Frame OnRead callback
 
 func (s *stream) onReadDataFrame(fr *Frame) (err error) {
-	s.reader.input(context.Background(), fr.payload)
+	s.reader.input(fr.payload)
 	return nil
 }

@@ -18,11 +18,9 @@ package ttstream
 
 import (
 	"context"
-	"errors"
 	"io"
 
-	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/container"
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream/internal/container"
 )
 
 // streamReader is an abstraction layer for stream level IO operations
@@ -37,38 +35,44 @@ type streamMsg struct {
 	exception error
 }
 
-func newStreamReader() *streamReader {
+func newStreamReader(ctx context.Context, callback container.CtxDoneCallback) *streamReader {
 	sio := new(streamReader)
-	sio.pipe = container.NewPipe[streamMsg]()
+	sio.pipe = container.NewPipe[streamMsg](ctx, callback)
 	return sio
 }
 
-func newStreamReaderWithCtxDoneCallback(callback container.CtxDoneCallback) *streamReader {
-	sio := new(streamReader)
-	sio.pipe = container.NewPipe[streamMsg](container.WithCtxDoneCallback(callback))
-	return sio
-}
-
-func (s *streamReader) input(ctx context.Context, payload []byte) {
-	err := s.pipe.Write(ctx, streamMsg{payload: payload})
-	if err != nil {
-		klog.Errorf("stream pipe input failed: %v", err)
-	}
+func (s *streamReader) input(payload []byte) {
+	s.pipe.Write(streamMsg{payload: payload})
 }
 
 // output would return err in the following scenarios:
-// - pipe finished: container.ErrPipeEOF, container.ErrPipeCanceled
-// - ctx Done() triggered: ctx.Err()
+// - pipe finished: io.EOF
+// - ctx Done() triggered: callback error or ctx.Err()
 // - trailer frame contains err: streamMsg.exception
-func (s *streamReader) output(ctx context.Context) (payload []byte, err error) {
+func (s *streamReader) output() (payload []byte, err error) {
 	if s.exception != nil {
 		return nil, s.exception
 	}
 
-	n, err := s.pipe.Read(ctx, s.cache[:])
+	n, err := s.pipe.Read(s.cache[:])
+	return s.handleReadResult(n, err)
+}
+
+// outputWithCtx additionally checks a per-read ctx alongside the pipe's own ctx.
+func (s *streamReader) outputWithCtx(ctx context.Context, perReadCallback container.CtxDoneCallback) (payload []byte, err error) {
+	if s.exception != nil {
+		return nil, s.exception
+	}
+
+	n, err := s.pipe.ReadCtx(ctx, perReadCallback, s.cache[:])
+	return s.handleReadResult(n, err)
+}
+
+func (s *streamReader) handleReadResult(n int, err error) ([]byte, error) {
 	if err != nil {
-		if errors.Is(err, container.ErrPipeEOF) {
-			err = io.EOF
+		if checkCanRetry(err) {
+			// do not set s.exception so that users can continue recv
+			return nil, err
 		}
 		s.exception = err
 		return nil, s.exception
@@ -87,7 +91,7 @@ func (s *streamReader) output(ctx context.Context) (payload []byte, err error) {
 
 func (s *streamReader) close(exception error) {
 	if exception != nil {
-		_ = s.pipe.Write(context.Background(), streamMsg{exception: exception})
+		s.pipe.Write(streamMsg{exception: exception})
 	}
 	s.pipe.Close()
 }

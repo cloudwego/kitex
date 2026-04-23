@@ -171,6 +171,137 @@ func TestCanceledException(t *testing.T) {
 	})
 }
 
+func Test_newStreamRecvTimeoutException(t *testing.T) {
+	t.Run("DisableCancelRemote=false should not be retryable", func(t *testing.T) {
+		cfg := streaming.TimeoutConfig{Timeout: 100 * time.Millisecond}
+		ex := newStreamRecvTimeoutException(cfg)
+		test.Assert(t, ex.TypeId() == 12014, ex.TypeId())
+		test.Assert(t, ex.isSideSet())
+		test.Assert(t, ex.side == clientSide, ex.side)
+		test.Assert(t, strings.Contains(ex.Error(), "[client-side stream]"), ex)
+		test.Assert(t, errors.Is(ex, kerrors.ErrStreamingTimeout), ex)
+		test.Assert(t, !ex.isCanRetrySet(), ex)
+		test.Assert(t, !checkCanRetry(ex))
+		test.Assert(t, strings.Contains(ex.Error(), "stream Recv timeout"), ex)
+		test.Assert(t, strings.Contains(ex.Error(), "100ms"), ex)
+	})
+	t.Run("DisableCancelRemote=true should be retryable", func(t *testing.T) {
+		cfg := streaming.TimeoutConfig{
+			Timeout:             200 * time.Millisecond,
+			DisableCancelRemote: true,
+		}
+		ex := newStreamRecvTimeoutException(cfg)
+		test.Assert(t, ex.TypeId() == 12014, ex.TypeId())
+		test.Assert(t, ex.isSideSet())
+		test.Assert(t, ex.side == clientSide, ex.side)
+		test.Assert(t, strings.Contains(ex.Error(), "[client-side stream]"), ex)
+		test.Assert(t, errors.Is(ex, kerrors.ErrStreamingTimeout), ex)
+		test.Assert(t, ex.isCanRetrySet(), ex)
+		test.Assert(t, checkCanRetry(ex))
+		test.Assert(t, strings.Contains(ex.Error(), "DisableCancelRemote:true"), ex)
+	})
+	t.Run("zero timeout", func(t *testing.T) {
+		cfg := streaming.TimeoutConfig{Timeout: 0}
+		ex := newStreamRecvTimeoutException(cfg)
+		test.Assert(t, ex.TypeId() == 12014, ex.TypeId())
+		test.Assert(t, errors.Is(ex, kerrors.ErrStreamingTimeout), ex)
+		test.Assert(t, !checkCanRetry(ex))
+		test.Assert(t, strings.Contains(ex.Error(), "stream Recv timeout"), ex)
+	})
+}
+
+func Test_newStreamTimeoutException(t *testing.T) {
+	t.Run("tm > 0 returns new exception with duration", func(t *testing.T) {
+		ex := newStreamTimeoutException(500 * time.Millisecond)
+		test.Assert(t, ex.TypeId() == 12015, ex.TypeId())
+		test.Assert(t, ex.isSideSet())
+		test.Assert(t, ex.side == clientSide, ex.side)
+		test.Assert(t, strings.Contains(ex.Error(), "[client-side stream]"), ex)
+		test.Assert(t, errors.Is(ex, kerrors.ErrStreamingTimeout), ex)
+		test.Assert(t, strings.Contains(ex.Error(), "500ms"), ex)
+		test.Assert(t, strings.Contains(ex.Error(), "stream timeout, timeout in ctx"), ex)
+	})
+	t.Run("tm = 0 means deadline already expired", func(t *testing.T) {
+		ex := newStreamTimeoutException(0)
+		test.Assert(t, ex.TypeId() == 12015, ex.TypeId())
+		test.Assert(t, ex.isSideSet())
+		test.Assert(t, ex.side == clientSide, ex.side)
+		test.Assert(t, strings.Contains(ex.Error(), "[client-side stream]"), ex)
+		test.Assert(t, errors.Is(ex, kerrors.ErrStreamingTimeout), ex)
+		test.Assert(t, strings.Contains(ex.Error(), "stream timeout, timeout in ctx"), ex)
+	})
+	t.Run("negative tm means no explicit timeout", func(t *testing.T) {
+		ex := newStreamTimeoutException(notSetStreamTimeout)
+		test.Assert(t, ex.TypeId() == 12015, ex.TypeId())
+		test.Assert(t, errors.Is(ex, kerrors.ErrStreamingTimeout), ex)
+		test.Assert(t, strings.Contains(ex.Error(), "no explicit timeout"), ex)
+	})
+	t.Run("multiple calls with tm > 0 return independent instances", func(t *testing.T) {
+		ex1 := newStreamTimeoutException(100 * time.Millisecond)
+		ex2 := newStreamTimeoutException(100 * time.Millisecond)
+		test.Assert(t, ex1 != ex2, "should be different pointers")
+		test.DeepEqual(t, ex1, ex2)
+	})
+}
+
+func TestCanRetry(t *testing.T) {
+	t.Run("withCanRetry sets the flag and returns same pointer", func(t *testing.T) {
+		ex := newException("test", nil, 1000)
+		test.Assert(t, !ex.isCanRetrySet())
+		original := ex
+		ex = ex.withCanRetry()
+		test.Assert(t, ex == original, "withCanRetry should return same pointer")
+		test.Assert(t, ex.isCanRetrySet())
+		test.Assert(t, checkCanRetry(ex))
+	})
+	t.Run("newBuilder preserves canRetry", func(t *testing.T) {
+		ex := newException("test", nil, 1000).withCanRetry()
+		cloned := ex.newBuilder()
+		test.Assert(t, cloned.isCanRetrySet())
+		test.Assert(t, checkCanRetry(cloned))
+		test.Assert(t, cloned != ex, "should be different pointer")
+	})
+}
+
+func TestCheckCanRetry(t *testing.T) {
+	t.Run("non-Exception error returns false", func(t *testing.T) {
+		test.Assert(t, !checkCanRetry(errors.New("plain error")))
+	})
+	t.Run("nil error returns false", func(t *testing.T) {
+		test.Assert(t, !checkCanRetry(nil))
+	})
+	t.Run("Exception without canRetry returns false", func(t *testing.T) {
+		ex := newException("test", nil, 1000)
+		test.Assert(t, !checkCanRetry(ex))
+	})
+	t.Run("Exception with canRetry returns true", func(t *testing.T) {
+		ex := newException("test", nil, 1000).withCanRetry()
+		test.Assert(t, checkCanRetry(ex))
+	})
+	t.Run("recv timeout with DisableCancelRemote=true is retryable", func(t *testing.T) {
+		ex := newStreamRecvTimeoutException(streaming.TimeoutConfig{
+			Timeout:             100 * time.Millisecond,
+			DisableCancelRemote: true,
+		})
+		test.Assert(t, checkCanRetry(ex))
+	})
+	t.Run("recv timeout with DisableCancelRemote=false is not retryable", func(t *testing.T) {
+		ex := newStreamRecvTimeoutException(streaming.TimeoutConfig{
+			Timeout: 100 * time.Millisecond,
+		})
+		test.Assert(t, !checkCanRetry(ex))
+	})
+	t.Run("stream timeout is never retryable", func(t *testing.T) {
+		test.Assert(t, !checkCanRetry(newStreamTimeoutException(100*time.Millisecond)))
+		test.Assert(t, !checkCanRetry(newStreamTimeoutException(0)))
+	})
+	t.Run("wrapped Exception returns false", func(t *testing.T) {
+		ex := newException("test", nil, 1000).withCanRetry()
+		wrapped := fmt.Errorf("wrap: %w", ex)
+		test.Assert(t, !checkCanRetry(wrapped))
+	})
+}
+
 func Test_utilFuncs(t *testing.T) {
 	// test formatCancelPath
 	t.Run("formatCancelPath", func(t *testing.T) {

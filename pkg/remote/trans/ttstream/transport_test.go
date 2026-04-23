@@ -1178,6 +1178,9 @@ func TestRecvTimeout(t *testing.T) {
 	t.Run("ClientStreaming - both set, StreamRecvTimeoutConfig has higher priority", func(t *testing.T) {
 		testRecvTimeoutClientStreaming(t, true, true, 200*time.Millisecond, 50*time.Millisecond)
 	})
+	t.Run("ClientStreaming - DisableCancelRemote allows retry", func(t *testing.T) {
+		testRecvTimeoutDisableCancelRemoteClientStreaming(t)
+	})
 	t.Run("ServerStreaming - only StreamRecvTimeout", func(t *testing.T) {
 		testRecvTimeoutServerStreaming(t, false, true, 50*time.Millisecond, 0)
 	})
@@ -1187,6 +1190,9 @@ func TestRecvTimeout(t *testing.T) {
 	t.Run("ServerStreaming - both set, StreamRecvTimeoutConfig has higher priority", func(t *testing.T) {
 		testRecvTimeoutServerStreaming(t, true, true, 200*time.Millisecond, 50*time.Millisecond)
 	})
+	t.Run("ServerStreaming - DisableCancelRemote allows retry", func(t *testing.T) {
+		testRecvTimeoutDisableCancelRemoteServerStreaming(t)
+	})
 	t.Run("BidiStreaming - only StreamRecvTimeout", func(t *testing.T) {
 		testRecvTimeoutBidiStreaming(t, false, true, 50*time.Millisecond, 0)
 	})
@@ -1195,6 +1201,9 @@ func TestRecvTimeout(t *testing.T) {
 	})
 	t.Run("BidiStreaming - both set, StreamRecvTimeoutConfig has higher priority", func(t *testing.T) {
 		testRecvTimeoutBidiStreaming(t, true, true, 200*time.Millisecond, 50*time.Millisecond)
+	})
+	t.Run("BidiStreaming - DisableCancelRemote allows retry", func(t *testing.T) {
+		testRecvTimeoutDisableCancelRemoteBidi(t)
 	})
 }
 
@@ -1214,7 +1223,7 @@ func testRecvTimeoutClientStreaming(t *testing.T, setTimeoutConfig, setRecvTimeo
 			Timeout: configTimeout,
 		})
 	}
-	cliSt.setRecvTimeoutConfig(cfg)
+	cliSt.setRecvTimeoutConfig(cfg, cliSt.recvTimeoutCallback)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -1267,7 +1276,7 @@ func testRecvTimeoutServerStreaming(t *testing.T, setTimeoutConfig, setRecvTimeo
 			DisableCancelRemote: false,
 		})
 	}
-	cliSt.setRecvTimeoutConfig(cfg)
+	cliSt.setRecvTimeoutConfig(cfg, cliSt.recvTimeoutCallback)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -1321,7 +1330,7 @@ func testRecvTimeoutBidiStreaming(t *testing.T, setTimeoutConfig, setRecvTimeout
 			Timeout: configTimeout,
 		})
 	}
-	cliSt.setRecvTimeoutConfig(cfg)
+	cliSt.setRecvTimeoutConfig(cfg, cliSt.recvTimeoutCallback)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -1703,6 +1712,171 @@ func Test_handlerReturnCauseCascadedCancel(t *testing.T) {
 		test.Assert(t, rEx.side == clientSide, rEx)
 		t.Logf("client-side stream B Recv err: %v", rErr)
 	}()
+
+	wg.Wait()
+}
+
+func testRecvTimeoutDisableCancelRemoteBidi(t *testing.T) {
+	cliNodeName := "ttstream client"
+	srvNodeName := "ttstream server"
+	method := "BidiStreaming"
+
+	cliSt, srvSt := initTestStreams(t, context.Background(), method, cliNodeName, srvNodeName)
+
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+		Timeout:             50 * time.Millisecond,
+		DisableCancelRemote: true,
+	})
+	cliSt.setRecvTimeoutConfig(cfg, cliSt.recvTimeoutCallback)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		res := new(testResponse)
+		rErr := cliSt.RecvMsg(cliSt.ctx, res)
+		test.Assert(t, rErr != nil)
+		test.Assert(t, errors.Is(rErr, kerrors.ErrStreamingTimeout), rErr)
+		test.Assert(t, checkCanRetry(rErr))
+		t.Logf("client-side stream Recv timeout (retryable): %v", rErr)
+
+		req := new(testRequest)
+		req.A = 1
+		req.B = "after_timeout"
+		sErr := cliSt.SendMsg(cliSt.ctx, req)
+		test.Assert(t, sErr == nil, sErr)
+
+		res = new(testResponse)
+		rErr = cliSt.RecvMsg(cliSt.ctx, res)
+		test.Assert(t, rErr == nil, rErr)
+		test.Assert(t, res.A == 1)
+		test.Assert(t, res.B == "echo")
+		t.Logf("client-side stream Recv success after retry")
+	}()
+
+	req := new(testRequest)
+	sErr := srvSt.RecvMsg(srvSt.ctx, req)
+	test.Assert(t, sErr == nil, sErr)
+	test.Assert(t, req.A == 1)
+	test.Assert(t, req.B == "after_timeout")
+
+	res := new(testResponse)
+	res.A = 1
+	res.B = "echo"
+	sErr = srvSt.SendMsg(srvSt.ctx, res)
+	test.Assert(t, sErr == nil, sErr)
+
+	wg.Wait()
+}
+
+func testRecvTimeoutDisableCancelRemoteServerStreaming(t *testing.T) {
+	cliNodeName := "ttstream client"
+	srvNodeName := "ttstream server"
+	method := "ServerStreaming"
+
+	cliSt, srvSt := initTestStreams(t, context.Background(), method, cliNodeName, srvNodeName)
+
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+		Timeout:             50 * time.Millisecond,
+		DisableCancelRemote: true,
+	})
+	cliSt.setRecvTimeoutConfig(cfg, cliSt.recvTimeoutCallback)
+
+	firstTimeoutDone := make(chan struct{})
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		req := new(testRequest)
+		req.A = 1
+		req.B = "hello"
+		sErr := cliSt.SendMsg(cliSt.ctx, req)
+		test.Assert(t, sErr == nil, sErr)
+		sErr = cliSt.CloseSend(cliSt.ctx)
+		test.Assert(t, sErr == nil, sErr)
+
+		res := new(testResponse)
+		rErr := cliSt.RecvMsg(cliSt.ctx, res)
+		test.Assert(t, rErr != nil)
+		test.Assert(t, errors.Is(rErr, kerrors.ErrStreamingTimeout), rErr)
+		test.Assert(t, checkCanRetry(rErr))
+		t.Logf("client-side stream Recv timeout (retryable): %v", rErr)
+		close(firstTimeoutDone)
+
+		res = new(testResponse)
+		rErr = cliSt.RecvMsg(cliSt.ctx, res)
+		test.Assert(t, rErr == nil, rErr)
+		test.Assert(t, res.A == 1)
+		test.Assert(t, res.B == "echo")
+		t.Logf("client-side stream Recv success after retry")
+	}()
+
+	req := new(testRequest)
+	sErr := srvSt.RecvMsg(srvSt.ctx, req)
+	test.Assert(t, sErr == nil, sErr)
+	test.Assert(t, req.A == 1)
+
+	<-firstTimeoutDone
+
+	res := new(testResponse)
+	res.A = 1
+	res.B = "echo"
+	sErr = srvSt.SendMsg(srvSt.ctx, res)
+	test.Assert(t, sErr == nil, sErr)
+
+	wg.Wait()
+}
+
+func testRecvTimeoutDisableCancelRemoteClientStreaming(t *testing.T) {
+	cliNodeName := "ttstream client"
+	srvNodeName := "ttstream server"
+	method := "ClientStreaming"
+
+	cliSt, srvSt := initTestStreams(t, context.Background(), method, cliNodeName, srvNodeName)
+
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+		Timeout:             50 * time.Millisecond,
+		DisableCancelRemote: true,
+	})
+	cliSt.setRecvTimeoutConfig(cfg, cliSt.recvTimeoutCallback)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := int32(1); i <= 2; i++ {
+			req := new(testRequest)
+			req.A = i
+			req.B = "hello"
+			sErr := cliSt.SendMsg(cliSt.ctx, req)
+			test.Assert(t, sErr == nil, sErr)
+		}
+
+		res := new(testResponse)
+		rErr := cliSt.RecvMsg(cliSt.ctx, res)
+		test.Assert(t, rErr != nil)
+		test.Assert(t, errors.Is(rErr, kerrors.ErrStreamingTimeout), rErr)
+		test.Assert(t, checkCanRetry(rErr))
+		t.Logf("client-side stream Recv timeout (retryable): %v", rErr)
+
+		req := new(testRequest)
+		req.A = 3
+		req.B = "after_timeout"
+		sErr := cliSt.SendMsg(cliSt.ctx, req)
+		test.Assert(t, sErr == nil, sErr)
+	}()
+
+	for i := int32(1); i <= 3; i++ {
+		req := new(testRequest)
+		sErr := srvSt.RecvMsg(srvSt.ctx, req)
+		test.Assert(t, sErr == nil, sErr)
+		test.Assert(t, req.A == i, req.A)
+		t.Logf("server-side stream Recv msg: A=%d B=%s", req.A, req.B)
+	}
 
 	wg.Wait()
 }

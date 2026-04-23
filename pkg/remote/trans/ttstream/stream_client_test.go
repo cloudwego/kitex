@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
@@ -90,6 +91,7 @@ func Test_clientStream_parseCtxErr(t *testing.T) {
 	testcases := []struct {
 		desc             string
 		ctxFunc          func() (context.Context, context.CancelFunc)
+		streamTimeout    time.Duration
 		expectEx         *Exception
 		expectNoCancel   bool
 		expectCancelPath string
@@ -120,36 +122,25 @@ func Test_clientStream_parseCtxErr(t *testing.T) {
 			expectCancelPath: "serviceA,serviceB",
 		},
 		{
-			desc: "recv timeout",
+			desc: "stream ctx deadline exceeded with explicit timeout",
 			ctxFunc: func() (context.Context, context.CancelFunc) {
-				cfg := rpcinfo.NewRPCConfig()
-				tm := 100 * time.Millisecond
-				rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
-					Timeout: tm,
-				})
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
-					rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, cfg, nil))
-				return context.WithTimeout(ctx, tm)
+					rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, rpcinfo.NewRPCConfig(), nil))
+				return context.WithTimeout(ctx, 100*time.Millisecond)
 			},
-			expectEx:         newStreamRecvTimeoutException(streaming.TimeoutConfig{Timeout: 100 * time.Millisecond}),
+			streamTimeout:    100 * time.Millisecond,
+			expectEx:         newStreamTimeoutException(100 * time.Millisecond),
 			expectCancelPath: "serviceA",
 		},
 		{
-			desc: "recv timeout with DisableCancelRemote",
+			desc: "stream ctx deadline exceeded without explicit timeout",
 			ctxFunc: func() (context.Context, context.CancelFunc) {
-				cfg := rpcinfo.NewRPCConfig()
-				tm := 100 * time.Millisecond
-				rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
-					Timeout:             tm,
-					DisableCancelRemote: true,
-				})
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
-					rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, cfg, nil))
-				return context.WithTimeout(ctx, tm)
+					rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, rpcinfo.NewRPCConfig(), nil))
+				return context.WithTimeout(ctx, 100*time.Millisecond)
 			},
-			expectEx:         newStreamRecvTimeoutException(streaming.TimeoutConfig{Timeout: 100 * time.Millisecond, DisableCancelRemote: true}),
-			expectNoCancel:   true,
-			expectCancelPath: "",
+			expectEx:         newStreamTimeoutException(notSetStreamTimeout),
+			expectCancelPath: "serviceA",
 		},
 		{
 			desc: "other customized ctx Err",
@@ -171,13 +162,12 @@ func Test_clientStream_parseCtxErr(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx, cancel := tc.ctxFunc()
 			cs := newClientStream(ctx, nil, streamFrame{})
-			ri := rpcinfo.GetRPCInfo(ctx)
-			if ri.Config().StreamRecvTimeoutConfig().Timeout > 0 {
-				cs.setRecvTimeoutConfig(ri.Config())
-				// wait for timeout
+			if tc.streamTimeout > 0 {
+				cs.setStreamTimeout(tc.streamTimeout)
+			}
+			if _, ok := ctx.Deadline(); ok {
 				<-ctx.Done()
 			} else {
-				// cancel directly
 				cancel()
 			}
 			finalEx, noCancel, cancelPath := cs.parseCtxErr(ctx)
@@ -186,6 +176,90 @@ func Test_clientStream_parseCtxErr(t *testing.T) {
 			test.Assert(t, tc.expectNoCancel == noCancel, noCancel)
 		})
 	}
+}
+
+func Test_clientStream_recvTimeoutCallback(t *testing.T) {
+	t.Run("recv timeout sends rst when DisableCancelRemote=false", func(t *testing.T) {
+		var rstSent bool
+		writer := &mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				if f.typ == rstFrameType {
+					rstSent = true
+				}
+				return nil
+			},
+		}
+		ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
+			rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, rpcinfo.NewRPCConfig(), nil))
+		cs := newClientStream(ctx, writer, streamFrame{method: "testMethod"})
+		cfg := rpcinfo.NewRPCConfig()
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+			Timeout: 50 * time.Millisecond,
+		})
+		cs.setRecvTimeoutConfig(cfg, cs.recvTimeoutCallback)
+
+		readCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+		<-readCtx.Done()
+
+		err := cs.recvTimeoutCallback(readCtx)
+		test.Assert(t, err != nil)
+		test.Assert(t, errors.Is(err, kerrors.ErrStreamingTimeout), err)
+		ex := err.(*Exception)
+		test.Assert(t, ex.TypeId() == 12014, ex.TypeId())
+		test.Assert(t, !checkCanRetry(err), err)
+		test.Assert(t, rstSent, "rst frame should be sent")
+	})
+	t.Run("recv timeout does not send rst when DisableCancelRemote=true", func(t *testing.T) {
+		var rstSent bool
+		writer := &mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				if f.typ == rstFrameType {
+					rstSent = true
+				}
+				return nil
+			},
+		}
+		ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
+			rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, rpcinfo.NewRPCConfig(), nil))
+		cs := newClientStream(ctx, writer, streamFrame{})
+		cfg := rpcinfo.NewRPCConfig()
+		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
+			Timeout:             50 * time.Millisecond,
+			DisableCancelRemote: true,
+		})
+		cs.setRecvTimeoutConfig(cfg, cs.recvTimeoutCallback)
+
+		readCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+		<-readCtx.Done()
+
+		err := cs.recvTimeoutCallback(readCtx)
+		test.Assert(t, err != nil)
+		test.Assert(t, errors.Is(err, kerrors.ErrStreamingTimeout), err)
+		ex := err.(*Exception)
+		test.Assert(t, ex.TypeId() == 12014, ex.TypeId())
+		test.Assert(t, checkCanRetry(err), err)
+		test.Assert(t, !rstSent, "rst frame should NOT be sent")
+	})
+	t.Run("canceled ctx returns internal cancel error", func(t *testing.T) {
+		writer := &mockStreamWriter{}
+		ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcinfo.NewRPCInfo(
+			rpcinfo.NewEndpointInfo("serviceA", "testMethod", nil, nil), nil, nil, rpcinfo.NewRPCConfig(), nil))
+		cs := newClientStream(ctx, writer, streamFrame{})
+		cs.recvTimeoutConfig = streaming.TimeoutConfig{
+			Timeout:             50 * time.Millisecond,
+			DisableCancelRemote: true,
+		}
+
+		readCtx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := cs.recvTimeoutCallback(readCtx)
+		test.Assert(t, err != nil)
+		test.Assert(t, errors.Is(err, errInternalCancel), err)
+		test.Assert(t, !checkCanRetry(err), err)
+	})
 }
 
 func Test_clientStream_SendMsg(t *testing.T) {

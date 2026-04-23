@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
@@ -37,11 +38,12 @@ var _ ClientStreamMeta = (*clientStream)(nil)
 func newClientStream(ctx context.Context, writer streamWriter, smeta streamFrame) *clientStream {
 	s := newBasicStream(ctx, writer, smeta)
 	cs := &clientStream{
-		stream:     s,
-		headerSig:  make(chan int32, 1),
-		trailerSig: make(chan int32, 1),
+		stream:        s,
+		headerSig:     make(chan int32, 1),
+		trailerSig:    make(chan int32, 1),
+		streamTimeout: notSetStreamTimeout,
 	}
-	s.reader = newStreamReaderWithCtxDoneCallback(cs.ctxDoneCallback)
+	s.reader = newStreamReader(ctx, cs.ctxDoneCallback)
 	return cs
 }
 
@@ -69,6 +71,10 @@ type clientStream struct {
 	trailerSig chan int32
 
 	traceCtl *rpcinfo.TraceController
+	// streamTimeout records the timeout value carried in the ctx when the stream was created
+	// it is used to return a more detailed error when the stream times out.
+	// -1 means timeout not set
+	streamTimeout time.Duration
 }
 
 func (s *clientStream) Header() (streaming.Header, error) {
@@ -130,15 +136,34 @@ func (s *clientStream) Context() context.Context {
 
 // ctxDoneCallback convert ctx.Err() to ttstream related err and close client-side stream.
 // it is invoked in container.Pipe
-func (s *clientStream) ctxDoneCallback(ctx context.Context) {
+func (s *clientStream) ctxDoneCallback(ctx context.Context) error {
 	finalEx, noCancel, cancelPath := s.parseCtxErr(ctx)
 
 	s.close(finalEx, !noCancel, cancelPath, nil)
+	return finalEx
+}
+
+func (s *clientStream) recvTimeoutCallback(ctx context.Context) error {
+	var ex *Exception
+	if cErr := ctx.Err(); cErr != context.DeadlineExceeded {
+		ex = errInternalCancel.newBuilder().withSide(clientSide).withCause(cErr)
+	} else {
+		ex = newStreamRecvTimeoutException(s.recvTimeoutConfig)
+	}
+
+	if s.recvTimeoutConfig.DisableCancelRemote {
+		return ex
+	}
+	svcName := s.fromService()
+	cancelPath := appendCancelPath("", svcName)
+	// send Rst Frame to finish the stream lifecycle
+	s.close(ex, true, cancelPath, nil)
+	return ex
 }
 
 // parseCtxErr parses information in ctx.Err and returning ttstream Exception and cascading cancelPath
 func (s *clientStream) parseCtxErr(ctx context.Context) (finalEx *Exception, noCancel bool, cancelPath string) {
-	svcName := s.rpcInfo.From().ServiceName()
+	svcName := s.fromService()
 	cErr := ctx.Err()
 	switch cErr {
 	// biz code invokes cancel()
@@ -147,13 +172,9 @@ func (s *clientStream) parseCtxErr(ctx context.Context) (finalEx *Exception, noC
 		// the initial node sending rst, the original cancelPath is empty
 		cancelPath = appendCancelPath("", svcName)
 	case context.DeadlineExceeded:
-		finalEx = newStreamRecvTimeoutException(s.recvTimeoutConfig)
-		if s.recvTimeoutConfig.DisableCancelRemote {
-			noCancel = true
-		} else {
-			// the initial node sending rst, the original cancelPath is empty
-			cancelPath = appendCancelPath("", svcName)
-		}
+		finalEx = newStreamTimeoutException(s.streamTimeout)
+		// the initial node sending rst, the original cancelPath is empty
+		cancelPath = appendCancelPath("", svcName)
 	default:
 		if tEx, ok := cErr.(*Exception); ok {
 			// for cascading cancel case, we need to change the side from server to client
@@ -237,6 +258,10 @@ func (s *clientStream) setMetaFrameHandler(metaHandler MetaFrameHandler) {
 
 func (s *clientStream) setTraceController(traceCtl *rpcinfo.TraceController) {
 	s.traceCtl = traceCtl
+}
+
+func (s *clientStream) setStreamTimeout(tm time.Duration) {
+	s.streamTimeout = tm
 }
 
 func (s *clientStream) handleStreamStartEvent(event rpcinfo.StreamStartEvent) {

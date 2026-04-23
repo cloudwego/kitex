@@ -18,6 +18,7 @@ package ttstream
 
 import (
 	"context"
+	"time"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
@@ -74,6 +75,11 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	}
 	strHeader[ttheader.HeaderIDLServiceName] = invocation.ServiceName()
 	metainfo.SaveMetaInfoToMap(ctx, strHeader)
+	// -1 means timeout not set
+	tm := notSetStreamTimeout
+	if ddl, ok := ctx.Deadline(); ok {
+		tm = time.Until(ddl)
+	}
 
 	trans, err := c.transPool.Get(addr.Network(), addr.String())
 	if err != nil {
@@ -84,9 +90,10 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	cs := newClientStream(ctx, trans, streamFrame{sid: genStreamID(), method: method})
 	// stream should be configured before WriteStream or there would be a race condition for metaFrameHandler
 
-	cs.setRecvTimeoutConfig(rconfig)
+	cs.setRecvTimeoutConfig(rconfig, cs.recvTimeoutCallback)
 	cs.setMetaFrameHandler(c.metaHandler)
 	cs.setTraceController(c.traceCtl)
+	cs.setStreamTimeout(tm)
 
 	if err = trans.WriteStream(ctx, cs, intHeader, strHeader); err != nil {
 		return nil, err
