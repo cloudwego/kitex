@@ -50,7 +50,7 @@ func TestGetSkippedStructBuffer(t *testing.T) {
 	_, err = skipThriftStruct(trans)
 	test.Assert(t, err != nil, err)
 	test.Assert(t, strings.Contains(err.Error(), "skipThriftStruct"))
-	test.Assert(t, strings.Contains(err.Error(), "EOF"))
+	test.Assert(t, strings.Contains(err.Error(), "EOF") || strings.Contains(err.Error(), "no remaining data"))
 }
 
 func TestApacheMarshalUnmarshal(t *testing.T) {

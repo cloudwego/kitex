@@ -43,9 +43,9 @@ var (
 
 	ErrRetry = &basicError{"retry error"}
 	// Deprecated: ErrRPCFinish was used to indicate that the result of this retry
-    // call should be discarded because another attempt has already received and
-    // started decoding the response.
-    // No longer needed since v0.15.0, but kept for backward compatibility.
+	// call should be discarded because another attempt has already received and
+	// started decoding the response.
+	// No longer needed since v0.15.0, but kept for backward compatibility.
 	ErrRPCFinish = &basicError{"rpc call finished"}
 	// ErrRoute happens when router fail to route this call
 	ErrRoute = &basicError{"rpc route failed"}

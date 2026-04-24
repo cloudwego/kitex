@@ -63,6 +63,7 @@ func TestRawWriter_Write(t *testing.T) {
 
 	// normal message
 	buf = buf[:0]
+	out = bufiox.NewBytesWriter(&buf)
 	err = w.Write(context.Background(), out, []byte("hello world"), "method", true, nil)
 	test.Assert(t, err == nil)
 	err = out.Flush()
