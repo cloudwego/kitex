@@ -42,9 +42,10 @@ var (
 	ErrBiz                = &basicError{"biz error"}
 
 	ErrRetry = &basicError{"retry error"}
-	// ErrRPCFinish happens when retry enabled and there is one call has finished
-	//
-	// Deprecated: no longer use this definition, but we still keep it to avoid breaking changes.
+	// Deprecated: ErrRPCFinish was used to indicate that the result of this retry
+    // call should be discarded because another attempt has already received and
+    // started decoding the response.
+    // No longer needed since v0.15.0, but kept for backward compatibility.
 	ErrRPCFinish = &basicError{"rpc call finished"}
 	// ErrRoute happens when router fail to route this call
 	ErrRoute = &basicError{"rpc route failed"}
