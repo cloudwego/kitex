@@ -42,6 +42,10 @@ var (
 	ErrBiz                = &basicError{"biz error"}
 
 	ErrRetry = &basicError{"retry error"}
+	// ErrRPCFinish happens when retry enabled and there is one call has finished
+	//
+	// Deprecated: no longer use this definition, but we still keep it to avoid breaking changes.
+	ErrRPCFinish = &basicError{"rpc call finished"}
 	// ErrRoute happens when router fail to route this call
 	ErrRoute = &basicError{"rpc route failed"}
 	// ErrPayloadValidation happens when payload validation failed

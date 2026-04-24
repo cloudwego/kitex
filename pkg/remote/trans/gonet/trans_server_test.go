@@ -215,6 +215,12 @@ func TestServeConn(t *testing.T) {
 
 	// OnRead Error
 	expectedErr = fmt.Errorf("OnReadError")
+	// ReadFunc must return data so that Peek(1) in serveConn succeeds,
+	// otherwise bufiox.DefaultReader returns "multiple Read calls return no data or error".
+	mockConn.ReadFunc = func(b []byte) (n int, err error) {
+		b[0] = 0
+		return 1, nil
+	}
 	transSvr.transHdlr = &mocks.MockSvrTransHandler{
 		OnActiveFunc: svrTransHdlr.OnActive,
 		OnReadFunc: func(ctx context.Context, conn net.Conn) error {

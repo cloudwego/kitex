@@ -3,13 +3,13 @@ module github.com/cloudwego/kitex
 go 1.20
 
 require (
-	github.com/bytedance/gopkg v0.1.3
+	github.com/bytedance/gopkg v0.1.4
 	github.com/bytedance/sonic v1.15.0
 	github.com/cloudwego/configmanager v0.2.3
 	github.com/cloudwego/dynamicgo v0.8.0
 	github.com/cloudwego/fastpb v0.0.5
 	github.com/cloudwego/frugal v0.3.1
-	github.com/cloudwego/gopkg v0.1.8
+	github.com/cloudwego/gopkg v0.2.0
 	github.com/cloudwego/localsession v0.2.1
 	github.com/cloudwego/netpoll v0.7.2
 	github.com/cloudwego/prutal v0.1.3
@@ -21,7 +21,7 @@ require (
 	github.com/json-iterator/go v1.1.12
 	github.com/tidwall/gjson v1.17.3
 	golang.org/x/net v0.24.0
-	golang.org/x/sync v0.8.0
+	golang.org/x/sync v0.11.0
 	golang.org/x/sys v0.30.0
 	golang.org/x/tools v0.6.0
 	google.golang.org/genproto v0.0.0-20210513213006-bf773b8c8384
