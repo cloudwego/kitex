@@ -30,8 +30,8 @@ github.com/cloudwego/prutal v0.1.3 h1:Q0FeohplP/TuvdQqKsBn0BiPdqdE8nQZXc/XXl3Hyc
 github.com/cloudwego/prutal v0.1.3/go.mod h1:PHt8jxqWkVFv7VcXGVy5IJA/6CTbAtagHZGwCfNSMVA=
 github.com/cloudwego/runtimex v0.1.1 h1:lheZjFOyKpsq8TsGGfmX9/4O7F0TKpWmB8on83k7GE8=
 github.com/cloudwego/runtimex v0.1.1/go.mod h1:23vL/HGV0W8nSCHbe084AgEBdDV4rvXenEUMnUNvUd8=
-github.com/cloudwego/thriftgo v0.4.3 h1:Ig80u/nQdOiB4K36BG4oqud2f8LMykZkbnk4R4QywiM=
-github.com/cloudwego/thriftgo v0.4.3/go.mod h1:/D4zRAEj1t3/Tq1bVGDMnRt3wxpHfalXfZWvq/n4YmY=
+github.com/cloudwego/thriftgo v0.4.5 h1:Htm0lcftvSPEmnPzE+nWccVhOB13A/GAWfA4kQXTzVw=
+github.com/cloudwego/thriftgo v0.4.5/go.mod h1:Oqr3KTSBNhfnAIsU/wzDFEp5Kltfvxld8tmYwa+avhY=
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
