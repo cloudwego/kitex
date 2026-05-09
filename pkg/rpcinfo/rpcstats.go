@@ -21,6 +21,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -96,9 +97,9 @@ type rpcStats struct {
 	recvSize     uint64
 	lastRecvSize uint64 // for Streaming APIs, record the size of the last received message
 
-	// err and panicErr are not on hot path, use atomic.Pointer to save space
-	err      atomic.Pointer[error]
-	panicErr atomic.Pointer[any]
+	// err and panicErr are not on hot path, use atomic pointer to save space
+	err      unsafe.Pointer // *error
+	panicErr unsafe.Pointer // *any
 
 	copied bool // true if rpcStats is from CopyForRetry
 }
@@ -190,7 +191,7 @@ func (r *rpcStats) LastRecvSize() uint64 {
 
 // Error implements the RPCStats interface.
 func (r *rpcStats) Error() error {
-	if p := r.err.Load(); p != nil {
+	if p := (*error)(atomic.LoadPointer(&r.err)); p != nil {
 		return *p
 	}
 	return nil
@@ -198,7 +199,7 @@ func (r *rpcStats) Error() error {
 
 // Panicked implements the RPCStats interface.
 func (r *rpcStats) Panicked() (bool, any) {
-	if p := r.panicErr.Load(); p != nil {
+	if p := (*any)(atomic.LoadPointer(&r.panicErr)); p != nil {
 		return *p != nil, *p
 	}
 	return false, nil
@@ -272,18 +273,18 @@ func (r *rpcStats) IncrRecvSize(size uint64) {
 // SetError sets error.
 func (r *rpcStats) SetError(err error) {
 	if err == nil {
-		r.err.Store(nil)
+		atomic.StorePointer(&r.err, nil)
 	} else {
-		r.err.Store(&err)
+		atomic.StorePointer(&r.err, unsafe.Pointer(&err))
 	}
 }
 
 // SetPanicked sets if panicked.
 func (r *rpcStats) SetPanicked(x any) {
 	if x == nil {
-		r.panicErr.Store(nil)
+		atomic.StorePointer(&r.panicErr, nil)
 	} else {
-		r.panicErr.Store(&x)
+		atomic.StorePointer(&r.panicErr, unsafe.Pointer(&x))
 	}
 }
 
@@ -295,11 +296,11 @@ func (r *rpcStats) SetLevel(level stats.Level) {
 // Reset resets the stats.
 func (r *rpcStats) Reset() {
 	r.level = 0
-	if r.err.Load() != nil {
-		r.err.Store(nil)
+	if atomic.LoadPointer(&r.err) != nil {
+		atomic.StorePointer(&r.err, nil)
 	}
-	if r.panicErr.Load() != nil {
-		r.panicErr.Store(nil)
+	if atomic.LoadPointer(&r.panicErr) != nil {
+		atomic.StorePointer(&r.panicErr, nil)
 	}
 	atomic.StoreUint64(&r.recvSize, 0)
 	atomic.StoreUint64(&r.sendSize, 0)

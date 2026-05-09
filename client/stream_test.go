@@ -894,7 +894,7 @@ func TestRecvTimeout(t *testing.T) {
 
 	t.Run("timeout and cancel remote", func(t *testing.T) {
 		// timeout set to 50ms, recv takes 200ms, should timeout and cancel remote
-		var recvCalled, cancelCalled atomic.Bool
+		var recvCalled, cancelCalled int32
 		cfg := rpcinfo.NewRPCConfig()
 		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
 			Timeout:             50 * time.Millisecond,
@@ -904,12 +904,12 @@ func TestRecvTimeout(t *testing.T) {
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 			recv: func(ctx context.Context, msg interface{}) error {
-				recvCalled.Store(true)
+				atomic.StoreInt32(&recvCalled, 1)
 				time.Sleep(200 * time.Millisecond)
 				return nil
 			},
 			cancelWithErr: func(err error) {
-				cancelCalled.Store(true)
+				atomic.StoreInt32(&cancelCalled, 1)
 				test.Assert(t, err != nil, "cancel error should not be nil")
 			},
 		}
@@ -947,14 +947,14 @@ func TestRecvTimeout(t *testing.T) {
 		test.Assert(t, ok, err)
 		test.Assert(t, stat.Code() == codes.RecvDeadlineExceeded, stat)
 		test.Assert(t, strings.Contains(stat.Message(), "stream Recv timeout"), stat.Message())
-		test.Assert(t, cancelCalled.Load())
-		test.Assert(t, recvCalled.Load())
+		test.Assert(t, atomic.LoadInt32(&cancelCalled) == 1)
+		test.Assert(t, atomic.LoadInt32(&recvCalled) == 1)
 	})
 
 	t.Run("timeout but no cancel remote", func(t *testing.T) {
 		// timeout set to 50ms with DisableCancelRemote=true, recv takes 200ms
 		// should timeout but NOT cancel remote
-		var recvCalled, cancelCalled atomic.Bool
+		var recvCalled, cancelCalled int32
 		cfg := rpcinfo.NewRPCConfig()
 		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
 			Timeout:             50 * time.Millisecond,
@@ -964,12 +964,12 @@ func TestRecvTimeout(t *testing.T) {
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 			recv: func(ctx context.Context, msg interface{}) error {
-				recvCalled.Store(true)
+				atomic.StoreInt32(&recvCalled, 1)
 				time.Sleep(200 * time.Millisecond)
 				return nil
 			},
 			cancelWithErr: func(err error) {
-				cancelCalled.Store(true)
+				atomic.StoreInt32(&cancelCalled, 1)
 			},
 		}
 		cr := mock_remote.NewMockConnReleaser(ctrl)
@@ -1006,13 +1006,13 @@ func TestRecvTimeout(t *testing.T) {
 		test.Assert(t, stat.Code() == codes.RecvDeadlineExceeded, stat)
 		test.Assert(t, strings.Contains(stat.Message(), "stream Recv timeout"), stat.Message())
 		test.Assert(t, err != nil)
-		test.Assert(t, !cancelCalled.Load())
-		test.Assert(t, recvCalled.Load())
+		test.Assert(t, atomic.LoadInt32(&cancelCalled) == 0)
+		test.Assert(t, atomic.LoadInt32(&recvCalled) == 1)
 	})
 
 	t.Run("panic in recv and recovered", func(t *testing.T) {
 		// recv panics, should be recovered and converted to error
-		var recvCalled, cancelCalled atomic.Bool
+		var recvCalled, cancelCalled int32
 		cfg := rpcinfo.NewRPCConfig()
 		rpcinfo.AsMutableRPCConfig(cfg).SetStreamRecvTimeoutConfig(streaming.TimeoutConfig{
 			Timeout:             100 * time.Millisecond,
@@ -1022,11 +1022,11 @@ func TestRecvTimeout(t *testing.T) {
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 			recv: func(ctx context.Context, msg interface{}) error {
-				recvCalled.Store(true)
+				atomic.StoreInt32(&recvCalled, 1)
 				panic("test panic in recv")
 			},
 			cancelWithErr: func(err error) {
-				cancelCalled.Store(true)
+				atomic.StoreInt32(&cancelCalled, 1)
 				test.Assert(t, err != nil, "cancel error should not be nil")
 			},
 		}
@@ -1065,8 +1065,8 @@ func TestRecvTimeout(t *testing.T) {
 		test.Assert(t, stat.Code() == codes.Internal, stat)
 		test.Assert(t, strings.Contains(stat.Message(), "stream Recv panic"), stat.Message())
 		test.Assert(t, strings.Contains(stat.Message(), "test panic in recv"), stat.Message())
-		test.Assert(t, cancelCalled.Load())
-		test.Assert(t, recvCalled.Load())
+		test.Assert(t, atomic.LoadInt32(&cancelCalled) == 1)
+		test.Assert(t, atomic.LoadInt32(&recvCalled) == 1)
 	})
 }
 

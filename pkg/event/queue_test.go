@@ -88,7 +88,7 @@ func TestQueueLazyExtra(t *testing.T) {
 func TestQueueLazyExtraConcurrent(t *testing.T) {
 	t.Run("PushAndDump", func(t *testing.T) {
 		q := NewQueue(50)
-		var failures atomic.Int64
+		var failures int64
 		var wg sync.WaitGroup
 		wg.Add(2)
 		go func() {
@@ -103,13 +103,13 @@ func TestQueueLazyExtraConcurrent(t *testing.T) {
 				es := q.Dump().([]*Event)
 				for _, e := range es {
 					if _, ok := e.Extra.(map[string]interface{}); !ok {
-						failures.Add(1)
+						atomic.AddInt64(&failures, 1)
 					}
 				}
 			}
 		}()
 		wg.Wait()
-		test.Assert(t, failures.Load() == 0, failures.Load())
+		test.Assert(t, atomic.LoadInt64(&failures) == 0, atomic.LoadInt64(&failures))
 	})
 	t.Run("PushMixed", func(t *testing.T) {
 		q := NewQueue(50)
@@ -148,7 +148,7 @@ func TestQueueLazyExtraConcurrent(t *testing.T) {
 		for i := 0; i < 50; i++ {
 			q.Push(&Event{Name: "lazy", Extra: &mockLazyExtra{data: strconv.Itoa(i)}})
 		}
-		var failures atomic.Int64
+		var failures int64
 		var wg sync.WaitGroup
 		wg.Add(3)
 		for g := 0; g < 3; g++ {
@@ -157,13 +157,13 @@ func TestQueueLazyExtraConcurrent(t *testing.T) {
 				for i := 0; i < 500; i++ {
 					es := q.Dump().([]*Event)
 					if len(es) != 50 {
-						failures.Add(1)
+						atomic.AddInt64(&failures, 1)
 					}
 				}
 			}()
 		}
 		wg.Wait()
-		test.Assert(t, failures.Load() == 0, failures.Load())
+		test.Assert(t, atomic.LoadInt64(&failures) == 0, atomic.LoadInt64(&failures))
 	})
 }
 

@@ -118,17 +118,17 @@ func TestTransportSlot(t *testing.T) {
 		slot := &transportSlot{}
 		t.Cleanup(slot.close)
 
-		var nilTr, unexpectedErrs atomic.Int32
+		var nilTr, unexpectedErrs int32
 		for i := 0; i < nums; i++ {
 			go func() {
 				defer wg.Done()
 				tr, err := slot.createTransport("test", newMockDialer(), "tcp", mockAddr0, time.Second, slotTestOpts)
 				if err == nil {
 					if tr == nil {
-						nilTr.Add(1)
+						atomic.AddInt32(&nilTr, 1)
 					}
 				} else if err != errTransportsClosed {
-					unexpectedErrs.Add(1)
+					atomic.AddInt32(&unexpectedErrs, 1)
 				}
 			}()
 		}
@@ -142,8 +142,8 @@ func TestTransportSlot(t *testing.T) {
 
 		wg.Wait()
 		test.Assert(t, slot.load() == nil)
-		test.Assert(t, nilTr.Load() == 0, nilTr.Load())
-		test.Assert(t, unexpectedErrs.Load() == 0, unexpectedErrs.Load())
+		test.Assert(t, atomic.LoadInt32(&nilTr) == 0, atomic.LoadInt32(&nilTr))
+		test.Assert(t, atomic.LoadInt32(&unexpectedErrs) == 0, atomic.LoadInt32(&unexpectedErrs))
 	})
 }
 

@@ -187,7 +187,7 @@ func TestConnPoolConcurrent(t *testing.T) {
 
 		iterNum := 50
 		var wg sync.WaitGroup
-		var successNum, failNum, unexpectedErrs atomic.Int32
+		var successNum, failNum, unexpectedErrs int32
 
 		stopDone := make(chan struct{})
 		cleanerDone := make(chan struct{})
@@ -212,11 +212,11 @@ func TestConnPoolConcurrent(t *testing.T) {
 				ctx := newMockCtxWithRPCInfo(serviceinfo.StreamingBidirectional)
 				err := getAndReleaseStream(pool, ctx, "tcp", mockAddr0, opt)
 				if err == nil {
-					successNum.Add(1)
+					atomic.AddInt32(&successNum, 1)
 				} else {
-					failNum.Add(1)
+					atomic.AddInt32(&failNum, 1)
 					if !isExpectedShutdownErr(err) {
-						unexpectedErrs.Add(1)
+						atomic.AddInt32(&unexpectedErrs, 1)
 						t.Error(err)
 					}
 				}
@@ -226,10 +226,10 @@ func TestConnPoolConcurrent(t *testing.T) {
 		close(stopDone)
 		<-cleanerDone
 
-		test.Assert(t, successNum.Load() > 0)
-		test.Assert(t, successNum.Load()+failNum.Load() == int32(iterNum))
-		test.Assert(t, unexpectedErrs.Load() == 0, unexpectedErrs.Load())
-		t.Logf("success=%d fail=%d", successNum.Load(), failNum.Load())
+		test.Assert(t, atomic.LoadInt32(&successNum) > 0)
+		test.Assert(t, atomic.LoadInt32(&successNum)+atomic.LoadInt32(&failNum) == int32(iterNum))
+		test.Assert(t, atomic.LoadInt32(&unexpectedErrs) == 0, atomic.LoadInt32(&unexpectedErrs))
+		t.Logf("success=%d fail=%d", atomic.LoadInt32(&successNum), atomic.LoadInt32(&failNum))
 
 		// After cleaning, Get() with the same addr should still succeed
 		// (recovery). Use the helper so the stream quota is released too.
@@ -246,7 +246,7 @@ func TestConnPoolConcurrent(t *testing.T) {
 
 		iterNum := 50
 		var wg sync.WaitGroup
-		var unexpectedErrs atomic.Int32
+		var unexpectedErrs int32
 		wg.Add(iterNum)
 		for i := 0; i < iterNum; i++ {
 			go func() {
@@ -254,7 +254,7 @@ func TestConnPoolConcurrent(t *testing.T) {
 				ctx := newMockCtxWithRPCInfo(serviceinfo.StreamingBidirectional)
 				err := getAndReleaseStream(pool, ctx, "tcp", mockAddr0, opt)
 				if !isExpectedShutdownErr(err) {
-					unexpectedErrs.Add(1)
+					atomic.AddInt32(&unexpectedErrs, 1)
 					t.Error(err)
 				}
 			}()
@@ -273,7 +273,7 @@ func TestConnPoolConcurrent(t *testing.T) {
 		case <-time.After(3 * time.Second):
 			t.Fatal("goroutines did not exit after pool.Close")
 		}
-		test.Assert(t, unexpectedErrs.Load() == 0, "unexpected errs:", unexpectedErrs.Load())
+		test.Assert(t, atomic.LoadInt32(&unexpectedErrs) == 0, "unexpected errs:", atomic.LoadInt32(&unexpectedErrs))
 	})
 	t.Run("Dump() during concurrent Get", func(t *testing.T) {
 		// Observability hit while traffic is in-flight. Dump must not
@@ -284,7 +284,7 @@ func TestConnPoolConcurrent(t *testing.T) {
 
 		var wg sync.WaitGroup
 		stop := make(chan struct{})
-		var getErrs, dumpNilCount, dumpMarshalErrs atomic.Int32
+		var getErrs, dumpNilCount, dumpMarshalErrs int32
 		// Concurrent Get goroutines. Each loop iteration closes its stream
 		// to release the per-transport stream quota.
 		for i := 0; i < 50; i++ {
@@ -302,7 +302,7 @@ func TestConnPoolConcurrent(t *testing.T) {
 						return
 					default:
 						if err := getAndReleaseStream(pool, ctx, "tcp", addr, opt); err != nil {
-							getErrs.Add(1)
+							atomic.AddInt32(&getErrs, 1)
 						}
 					}
 				}
@@ -310,7 +310,7 @@ func TestConnPoolConcurrent(t *testing.T) {
 		}
 
 		// Concurrent Dump + Marshal.
-		var dumpCount atomic.Int32
+		var dumpCount int32
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
 			go func() {
@@ -322,13 +322,13 @@ func TestConnPoolConcurrent(t *testing.T) {
 					default:
 						dump := pool.Dump()
 						if dump == nil {
-							dumpNilCount.Add(1)
+							atomic.AddInt32(&dumpNilCount, 1)
 							continue
 						}
 						if _, err := sonic.Marshal(dump); err != nil {
-							dumpMarshalErrs.Add(1)
+							atomic.AddInt32(&dumpMarshalErrs, 1)
 						}
-						dumpCount.Add(1)
+						atomic.AddInt32(&dumpCount, 1)
 					}
 				}
 			}()
@@ -337,11 +337,11 @@ func TestConnPoolConcurrent(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 		close(stop)
 		wg.Wait()
-		test.Assert(t, dumpCount.Load() > 0)
-		test.Assert(t, dumpNilCount.Load() == 0, "Dump returned nil:", dumpNilCount.Load())
-		test.Assert(t, dumpMarshalErrs.Load() == 0, "Dump output not marshalable:", dumpMarshalErrs.Load())
-		test.Assert(t, getErrs.Load() == 0, "unexpected Get errors:", getErrs.Load())
-		t.Logf("dumped %d times", dumpCount.Load())
+		test.Assert(t, atomic.LoadInt32(&dumpCount) > 0)
+		test.Assert(t, atomic.LoadInt32(&dumpNilCount) == 0, "Dump returned nil:", atomic.LoadInt32(&dumpNilCount))
+		test.Assert(t, atomic.LoadInt32(&dumpMarshalErrs) == 0, "Dump output not marshalable:", atomic.LoadInt32(&dumpMarshalErrs))
+		test.Assert(t, atomic.LoadInt32(&getErrs) == 0, "unexpected Get errors:", atomic.LoadInt32(&getErrs))
+		t.Logf("dumped %d times", atomic.LoadInt32(&dumpCount))
 	})
 	t.Run("Get() across multiple addresses", func(t *testing.T) {
 		// Many addresses, many goroutines per address.
@@ -360,7 +360,7 @@ func TestConnPoolConcurrent(t *testing.T) {
 		}
 
 		var wg sync.WaitGroup
-		var successNum atomic.Int32
+		var successNum int32
 		for _, addr := range addrs {
 			for j := 0; j < perAddrGoroutines; j++ {
 				wg.Add(1)
@@ -368,15 +368,15 @@ func TestConnPoolConcurrent(t *testing.T) {
 					defer wg.Done()
 					ctx := newMockCtxWithRPCInfo(serviceinfo.StreamingBidirectional)
 					if err := getAndReleaseStream(pool, ctx, "tcp", a, opt); err == nil {
-						successNum.Add(1)
+						atomic.AddInt32(&successNum, 1)
 					}
 				}(addr)
 			}
 		}
 		wg.Wait()
 
-		test.Assert(t, successNum.Load() == int32(addrCount*perAddrGoroutines),
-			successNum.Load(), addrCount*perAddrGoroutines)
+		test.Assert(t, atomic.LoadInt32(&successNum) == int32(addrCount*perAddrGoroutines),
+			atomic.LoadInt32(&successNum), addrCount*perAddrGoroutines)
 
 		for _, addr := range addrs {
 			_, ok := pool.conns.Load(addr)
@@ -466,7 +466,7 @@ func TestConnPoolConcurrent(t *testing.T) {
 		}()
 
 		// Get loop. Each iteration releases its stream quota.
-		var successNum, failNum, unexpectedErrs atomic.Int32
+		var successNum, failNum, unexpectedErrs int32
 		for i := 0; i < 20; i++ {
 			getWG.Add(1)
 			go func() {
@@ -479,12 +479,12 @@ func TestConnPoolConcurrent(t *testing.T) {
 					default:
 						err := getAndReleaseStream(pool, ctx, "tcp", mockAddr0, opt)
 						if err == nil {
-							successNum.Add(1)
+							atomic.AddInt32(&successNum, 1)
 							continue
 						}
-						failNum.Add(1)
+						atomic.AddInt32(&failNum, 1)
 						if !isExpectedShutdownErr(err) {
-							unexpectedErrs.Add(1)
+							atomic.AddInt32(&unexpectedErrs, 1)
 							t.Error(err)
 						}
 					}
@@ -497,9 +497,9 @@ func TestConnPoolConcurrent(t *testing.T) {
 		<-closerDone
 		getWG.Wait()
 
-		test.Assert(t, successNum.Load() > 0)
-		test.Assert(t, unexpectedErrs.Load() == 0, unexpectedErrs.Load())
-		t.Logf("success=%d fail=%d", successNum.Load(), failNum.Load())
+		test.Assert(t, atomic.LoadInt32(&successNum) > 0)
+		test.Assert(t, atomic.LoadInt32(&unexpectedErrs) == 0, atomic.LoadInt32(&unexpectedErrs))
+		t.Logf("success=%d fail=%d", atomic.LoadInt32(&successNum), atomic.LoadInt32(&failNum))
 	})
 }
 
@@ -555,13 +555,13 @@ func TestReleaseConn(t *testing.T) {
 
 func Test_newTransport(t *testing.T) {
 	t.Run("tls handshake failure closes dialed conn", func(t *testing.T) {
-		var closed atomic.Int32
+		var closed int32
 		dialFunc := func(network, address string, timeout time.Duration) (net.Conn, error) {
 			return &mockConn{
 				RemoteAddrFunc: func() net.Addr { return utils.NewNetAddr("tcp", address) },
 				WriteFunc:      func(b []byte) (int, error) { return len(b), nil },
 				ReadFunc:       func(b []byte) (int, error) { return 0, errors.New("not a TLS server") },
-				CloseFunc:      func() error { closed.Add(1); return nil },
+				CloseFunc:      func() error { atomic.AddInt32(&closed, 1); return nil },
 			}, nil
 		}
 		dialer := newMockDialerWithDialFunc(dialFunc)
@@ -574,11 +574,11 @@ func Test_newTransport(t *testing.T) {
 		tr, err := newTransport("test", dialer, "tcp", mockAddr0, time.Second, opts, nil, nil)
 		test.Assert(t, err != nil)
 		test.Assert(t, tr == nil)
-		test.Assert(t, closed.Load() == 1, closed.Load())
+		test.Assert(t, atomic.LoadInt32(&closed) == 1, atomic.LoadInt32(&closed))
 	})
 	t.Run("flush failed during init closes conn", func(t *testing.T) {
-		var closed atomic.Int32
-		var writeCount atomic.Int32
+		var closed int32
+		var writeCount int32
 		closeCh := make(chan struct{})
 		dialFunc := func(network, address string, timeout time.Duration) (net.Conn, error) {
 			return &mockConn{
@@ -588,13 +588,13 @@ func Test_newTransport(t *testing.T) {
 					return 0, errors.New("closed")
 				},
 				WriteFunc: func(b []byte) (int, error) {
-					if writeCount.Add(1) >= 2 {
+					if atomic.AddInt32(&writeCount, 1) >= 2 {
 						return 0, errors.New("mock flush error")
 					}
 					return len(b), nil
 				},
 				CloseFunc: func() error {
-					closed.Add(1)
+					atomic.AddInt32(&closed, 1)
 					select {
 					case <-closeCh:
 					default:
@@ -611,11 +611,11 @@ func Test_newTransport(t *testing.T) {
 		// newHTTP2Client calls t.Close(err) on Flush failure, which calls conn.Close().
 		deadline := time.Now().Add(time.Second)
 		for time.Now().Before(deadline) {
-			if closed.Load() >= 1 {
+			if atomic.LoadInt32(&closed) >= 1 {
 				break
 			}
 			time.Sleep(10 * time.Millisecond)
 		}
-		test.Assert(t, closed.Load() == 1, closed.Load())
+		test.Assert(t, atomic.LoadInt32(&closed) == 1, atomic.LoadInt32(&closed))
 	})
 }

@@ -21,6 +21,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
@@ -103,8 +104,8 @@ func (t *transports) close() {
 
 var errTransportsClosed = status.Err(codes.Aborted, "transports have been closed due to instance offline")
 
-// transportRef wraps grpc.ClientTransport for use with atomic.Pointer,
-// which requires a non-interface type parameter.
+// transportRef wraps grpc.ClientTransport for use with atomic pointer operations
+// via unsafe.Pointer, since interfaces cannot be used directly with atomic.LoadPointer/StorePointer.
 // A nil *transportRef means the slot is empty.
 type transportRef struct {
 	ct grpc.ClientTransport
@@ -115,11 +116,11 @@ type transportSlot struct {
 	mu    sync.Mutex // serializes createTransport to prevent redundant dials for the same slot.
 	state int32      // closed flag, protected by mu. Once closed, createTransport is rejected
 
-	ref atomic.Pointer[transportRef]
+	ref unsafe.Pointer // *transportRef
 }
 
 func (slot *transportSlot) load() grpc.ClientTransport {
-	ref := slot.ref.Load()
+	ref := (*transportRef)(atomic.LoadPointer(&slot.ref))
 	if ref == nil {
 		return nil
 	}
@@ -141,7 +142,7 @@ func (slot *transportSlot) createTransport(
 	}
 
 	// Double-check: another goroutine may have filled this slot.
-	if ref := slot.ref.Load(); ref != nil && checkActive(ref.ct) {
+	if ref := (*transportRef)(atomic.LoadPointer(&slot.ref)); ref != nil && checkActive(ref.ct) {
 		slot.mu.Unlock()
 		return ref.ct, nil
 	}
@@ -159,10 +160,11 @@ func (slot *transportSlot) createTransport(
 		return nil, err
 	}
 
-	oldRef := slot.ref.Swap(&transportRef{ct: newTrans})
+	newRef := &transportRef{ct: newTrans}
+	oldRefPtr := atomic.SwapPointer(&slot.ref, unsafe.Pointer(newRef))
 	slot.mu.Unlock()
 
-	if oldRef != nil && oldRef.ct != nil {
+	if oldRef := (*transportRef)(oldRefPtr); oldRef != nil && oldRef.ct != nil {
 		oldRef.ct.GracefulClose()
 	}
 
@@ -172,11 +174,12 @@ func (slot *transportSlot) createTransport(
 // removeTransport atomically clears this slot if it currently holds the given transport.
 // Lock-free (CAS only). Called from onClose/onGoAway callbacks.
 func (slot *transportSlot) removeTransport(trans grpc.ClientTransport) {
-	ref := slot.ref.Load()
+	refPtr := atomic.LoadPointer(&slot.ref)
+	ref := (*transportRef)(refPtr)
 	if ref == nil || ref.ct != trans {
 		return
 	}
-	slot.ref.CompareAndSwap(ref, nil)
+	atomic.CompareAndSwapPointer(&slot.ref, refPtr, nil)
 }
 
 // close marks this slot as permanently closed and removes any stored transport.
@@ -188,7 +191,7 @@ func (slot *transportSlot) close() {
 		return
 	}
 	slot.state = slotClosed
-	ref := slot.ref.Swap(nil)
+	ref := (*transportRef)(atomic.SwapPointer(&slot.ref, nil))
 	slot.mu.Unlock()
 
 	if ref != nil && ref.ct != nil {

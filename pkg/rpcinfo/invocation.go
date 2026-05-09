@@ -19,6 +19,7 @@ package rpcinfo
 import (
 	"sync"
 	"sync/atomic"
+	"unsafe"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -61,7 +62,7 @@ type invocation struct {
 	seqID         int32
 	// bizErr and extra should be protected by lock or atomic operation, because they might be read by the client calling goroutine,
 	// but at the same time, written by the real rpc goroutine which is started by timeout middleware.
-	bizErr atomic.Pointer[kerrors.BizStatusErrorIface]
+	bizErr unsafe.Pointer // *kerrors.BizStatusErrorIface
 
 	mu    sync.Mutex
 	extra map[string]any
@@ -157,7 +158,7 @@ func (i *invocation) SetStreamingMode(mode serviceinfo.StreamingMode) {
 
 // BizStatusErr implements the Invocation interface.
 func (i *invocation) BizStatusErr() kerrors.BizStatusErrorIface {
-	if p := i.bizErr.Load(); p != nil {
+	if p := (*kerrors.BizStatusErrorIface)(atomic.LoadPointer(&i.bizErr)); p != nil {
 		return *p
 	}
 	return nil
@@ -166,10 +167,10 @@ func (i *invocation) BizStatusErr() kerrors.BizStatusErrorIface {
 // SetBizStatusErr implements the InvocationSetter interface.
 func (i *invocation) SetBizStatusErr(err kerrors.BizStatusErrorIface) {
 	if err == nil {
-		i.bizErr.Store(nil)
+		atomic.StorePointer(&i.bizErr, nil)
 		return
 	}
-	i.bizErr.Store(&err)
+	atomic.StorePointer(&i.bizErr, unsafe.Pointer(&err))
 }
 
 func (i *invocation) SetExtra(key string, value interface{}) {
@@ -207,8 +208,8 @@ func (i *invocation) zero() {
 	i.serviceName = ""
 	i.methodName = ""
 	i.methodInfo = nil
-	if i.bizErr.Load() != nil {
-		i.bizErr.Store(nil)
+	if atomic.LoadPointer(&i.bizErr) != nil {
+		atomic.StorePointer(&i.bizErr, nil)
 	}
 	i.mu.Lock()
 	for key := range i.extra {
