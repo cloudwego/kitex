@@ -63,6 +63,8 @@ func (c *serverConn) ReadFrame() (hdr, data []byte, err error) {
 
 // GetServerConn gets the GRPC Connection from server stream.
 // This function is only used in server handler for grpc unknown handler proxy: https://www.cloudwego.io/docs/kitex/tutorials/advanced-feature/grpcproxy/
+//
+// Deprecated: please refer to https://www.cloudwego.io/docs/kitex/tutorials/advanced-feature/proxy_application_development/ for easy-to-use new proxy application development
 func GetServerConn(st streaming.Stream) (GRPCConn, error) {
 	rawStream, ok := st.Context().Value(serverConnKey{}).(*serverStream)
 	if !ok {
