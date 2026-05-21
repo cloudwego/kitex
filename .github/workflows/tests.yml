@@ -53,7 +53,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
-          cache: false # don't use cache for self-hosted runners
+          cache: false # false for self-hosted runners
       - name: Unit Test
         run: go test -race ./...
 
@@ -68,7 +68,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
-          cache: false # don't use cache for self-hosted runners
+          cache: false # false for self-hosted runners
       - name: Unit Test
         run: go test -race ./...
 
@@ -102,14 +102,14 @@ jobs:
           bash ./codegen_run.sh        
 
   windows-test:
-    runs-on: [ Windows ]
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: stable
-          cache: false # don't use cache for self-hosted runners
+          cache: true # false for self-hosted runners
       - name: Windows compatibility test
         run: go test -run=^$ ./...
 
@@ -122,7 +122,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: stable
-          cache: false # don't use cache for self-hosted runners
+          cache: false # false for self-hosted runners
       - name: Run coverage
         run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage to Codecov
