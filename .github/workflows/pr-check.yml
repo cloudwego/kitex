@@ -24,10 +24,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: stable
-          # for self-hosted, the cache path is shared across projects
-          # and it works well without the cache of github actions
-          # Enable it if we're going to use Github only
-          cache: false
+          cache: false # false for self-hosted runners
 
       - name: Golangci Lint
         # https://golangci-lint.run/
