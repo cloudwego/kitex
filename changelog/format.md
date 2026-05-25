@@ -66,8 +66,7 @@ Example output:
 - Remove github.com/pkg/errors (#215)
 ```
 
-5. The diff range for each version is defined in `changelog_task.md`.
-   Use `git log --oneline <from>..<to>` to get all commits.
+5. Use `git log --oneline <from>..<to>` to get all commits.
 
 6. The last section `## Commits (<from>..<to>)` lists ALL commits (one per line)
    in the range, with the diff range in the heading:
