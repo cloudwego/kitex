@@ -130,7 +130,7 @@ func main() {
 	out := new(bytes.Buffer)
 	cmd, err := args.BuildCmd(out)
 	if err != nil {
-		log.Warn(err)
+		log.Error(err)
 		os.Exit(1)
 	}
 
@@ -142,7 +142,7 @@ func main() {
 	} else {
 		err = kargs.ValidateCMD(cmd.Path, args.IDLType)
 		if err != nil {
-			log.Warn(err)
+			log.Error(err)
 			os.Exit(1)
 		}
 		err = cmd.Run()
@@ -155,7 +155,7 @@ func main() {
 				goto NormalExit
 			}
 		}
-		log.Warn(err)
+		log.Error(err)
 		os.Exit(1)
 	}
 NormalExit:
