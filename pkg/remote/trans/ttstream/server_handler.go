@@ -233,16 +233,16 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *serve
 	}
 	if err = t.inkHdlFunc(stCtx, args, nil); err != nil {
 		// treat err thrown by invoking handler as the final err, ignore the err returned by OnStreamFinish
-		_, _ = t.OnStreamFinish(stCtx, st, err)
+		_ = t.OnStreamFinish(st, err)
 		return
 	}
 	if bizErr := ri.Invocation().BizStatusErr(); bizErr != nil {
 		// when biz err thrown, treat the err returned by OnStreamFinish as the final err
-		stCtx, err = t.OnStreamFinish(stCtx, st, bizErr)
+		err = t.OnStreamFinish(st, bizErr)
 		return
 	}
 	// there is no invoking handler err or biz err, treat the err returned by OnStreamFinish as the final err
-	stCtx, err = t.OnStreamFinish(stCtx, st, nil)
+	err = t.OnStreamFinish(st, nil)
 	return
 }
 
@@ -266,7 +266,7 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 	}
 }
 
-func (t *svrTransHandler) OnStreamFinish(ctx context.Context, ss streaming.ServerStream, err error) (context.Context, error) {
+func (t *svrTransHandler) OnStreamFinish(ss streaming.ServerStream, err error) error {
 	sst := ss.(*serverStream)
 	var exception error
 	if err != nil {
@@ -288,7 +288,7 @@ func (t *svrTransHandler) OnStreamFinish(ctx context.Context, ss streaming.Serve
 				})
 			}
 			if err != nil {
-				return nil, err
+				return err
 			}
 			exception = nil
 		case *thrift.ApplicationException:
@@ -301,10 +301,10 @@ func (t *svrTransHandler) OnStreamFinish(ctx context.Context, ss streaming.Serve
 	}
 	// server stream CloseSend will send the trailer with payload
 	if err = sst.CloseSend(exception); err != nil {
-		return nil, err
+		return err
 	}
 
-	return ctx, nil
+	return nil
 }
 
 func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {

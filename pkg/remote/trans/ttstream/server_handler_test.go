@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/netpoll"
 
@@ -413,5 +414,164 @@ func TestOnRead(t *testing.T) {
 		err = transHdl.OnRead(ctx, mockConn)
 		test.Assert(t, err == nil, err)
 		wg.Wait()
+	})
+}
+
+func TestOnStreamFinish(t *testing.T) {
+	hdl := &svrTransHandler{}
+
+	t.Run("no error", func(t *testing.T) {
+		var tl *Frame
+		ss := newTestServerStreamWithStreamWriter(mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				if f.typ == trailerFrameType {
+					tl = f
+				}
+				return nil
+			},
+		})
+		err := hdl.OnStreamFinish(ss, nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, tl != nil)
+		test.Assert(t, len(tl.payload) == 0, tl)
+	})
+	t.Run("biz status error without extra", func(t *testing.T) {
+		var tl *Frame
+		ss := newTestServerStreamWithStreamWriter(mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				if f.typ == trailerFrameType {
+					tl = f
+				}
+				return nil
+			},
+		})
+		err := hdl.OnStreamFinish(ss, kerrors.NewBizStatusError(10001, "biz error"))
+		test.Assert(t, err == nil, err)
+		test.Assert(t, tl != nil)
+		test.Assert(t, tl.trailer["biz-status"] == "10001", tl.trailer)
+		test.Assert(t, tl.trailer["biz-message"] == "biz error", tl.trailer)
+		test.Assert(t, len(tl.payload) == 0, tl)
+	})
+	t.Run("biz status error with extra", func(t *testing.T) {
+		var tl *Frame
+		ss := newTestServerStreamWithStreamWriter(mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				if f.typ == trailerFrameType {
+					tl = f
+				}
+				return nil
+			},
+		})
+		err := hdl.OnStreamFinish(ss, kerrors.NewBizStatusErrorWithExtra(10002, "biz extra", map[string]string{"k": "v"}))
+		test.Assert(t, err == nil, err)
+		test.Assert(t, tl != nil)
+		test.Assert(t, tl.trailer["biz-status"] == "10002", tl.trailer)
+		test.Assert(t, tl.trailer["biz-message"] == "biz extra", tl.trailer)
+		test.Assert(t, tl.trailer["biz-extra"] != "", tl.trailer)
+		test.Assert(t, len(tl.payload) == 0, tl)
+	})
+	t.Run("thrift application exception", func(t *testing.T) {
+		var tl *Frame
+		ss := newTestServerStreamWithStreamWriter(mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				if f.typ == trailerFrameType {
+					tl = f
+				}
+				return nil
+			},
+		})
+		ss.method = "testMethod"
+		err := hdl.OnStreamFinish(ss, thrift.NewApplicationException(thrift.UNKNOWN_METHOD, "unknown method"))
+		test.Assert(t, err == nil, err)
+		test.Assert(t, tl != nil)
+		test.Assert(t, len(tl.payload) > 0, tl)
+	})
+	t.Run("ttstream exception", func(t *testing.T) {
+		var tl *Frame
+		ss := newTestServerStreamWithStreamWriter(mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				if f.typ == trailerFrameType {
+					tl = f
+				}
+				return nil
+			},
+		})
+		ss.method = "testMethod"
+		err := hdl.OnStreamFinish(ss, errInternalCancel.newBuilder().withCause(errors.New("cancel")))
+		test.Assert(t, err == nil, err)
+		test.Assert(t, tl != nil)
+		test.Assert(t, len(tl.payload) > 0, tl)
+	})
+	t.Run("generic error", func(t *testing.T) {
+		var tl *Frame
+		ss := newTestServerStreamWithStreamWriter(mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				if f.typ == trailerFrameType {
+					tl = f
+				}
+				return nil
+			},
+		})
+		ss.method = "testMethod"
+		err := hdl.OnStreamFinish(ss, errors.New("some error"))
+		test.Assert(t, err == nil, err)
+		test.Assert(t, tl != nil)
+		test.Assert(t, len(tl.payload) > 0, tl)
+	})
+	t.Run("CloseSend write error", func(t *testing.T) {
+		writeErr := errors.New("write failed")
+		ss := newTestServerStreamWithStreamWriter(mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				return writeErr
+			},
+		})
+		err := hdl.OnStreamFinish(ss, nil)
+		test.Assert(t, err != nil)
+	})
+	t.Run("finishTracer receives valid ctx when OnStreamFinish fails", func(t *testing.T) {
+		tracer := &mockTracer{}
+		traceCtl := &rpcinfo.TraceController{}
+		traceCtl.Append(tracer)
+
+		transHdl := &svrTransHandler{
+			opt: &remote.ServerOption{
+				SvcSearcher: mock_remote.NewDefaultSvcSearcher(),
+				InitOrResetRPCInfoFunc: func(_ rpcinfo.RPCInfo, _ net.Addr) rpcinfo.RPCInfo {
+					return rpcinfo.NewRPCInfo(
+						rpcinfo.EmptyEndpointInfo(),
+						rpcinfo.EmptyEndpointInfo(),
+						rpcinfo.NewServerInvocation(),
+						rpcinfo.NewRPCConfig(),
+						rpcinfo.NewRPCStats())
+				},
+				TracerCtl: traceCtl,
+			},
+		}
+		transHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) error {
+			ri := rpcinfo.GetRPCInfo(ctx)
+			ri.Invocation().(rpcinfo.InvocationSetter).SetBizStatusErr(kerrors.NewBizStatusError(10000, "test"))
+			return nil
+		})
+
+		var tracerCtx context.Context
+		tracer.finishFunc = func(ctx context.Context) {
+			tracerCtx = ctx
+		}
+
+		ss := newTestServerStreamWithStreamWriter(mockStreamWriter{
+			writeFrameFunc: func(f *Frame) error {
+				return errors.New("write failed")
+			},
+		})
+		ss.method = mocks.MockStreamingMethod
+		ss.header = map[string]string{
+			ttheader.HeaderIDLServiceName: mocks.MockServiceName,
+		}
+
+		err := transHdl.OnStream(context.Background(), &mocks.Conn{}, ss)
+		test.Assert(t, err != nil)
+		test.Assert(t, tracerCtx != nil)
+		ri := rpcinfo.GetRPCInfo(tracerCtx)
+		test.Assert(t, ri != nil, tracerCtx)
 	})
 }
