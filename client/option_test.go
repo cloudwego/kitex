@@ -172,6 +172,23 @@ func TestWithHostPorts(t *testing.T) {
 	test.Assert(t, res.Instances[0].Address().String() == "127.0.0.1:8080")
 }
 
+func TestFormatWithHostPortsLog(t *testing.T) {
+	hostports := []string{"127.0.0.1:8080", "127.0.0.1:9090"}
+	instances := []discovery.Instance{
+		discovery.NewInstance("tcp", "127.0.0.1:8080", 10, nil),
+		discovery.NewInstance("tcp", "127.0.0.1:9090", 20, nil),
+	}
+
+	test.Assert(t, formatWithHostPortsLog(hostports, instances) ==
+		"hostports=[127.0.0.1:8080,127.0.0.1:9090], instances=[{addr:127.0.0.1:8080 weight:10},{addr:127.0.0.1:9090 weight:20}]")
+
+	m := map[string][]string{}
+	m["k1"] = []string{"v1.1", "v1.2"}
+	m["k2"] = []string{"v2.1", "v2.2"}
+	m["k3"] = []string{"v3.1", "v3.2"}
+	fmt.Printf("%v", m)
+}
+
 func TestForwardProxy(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

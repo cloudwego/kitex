@@ -160,6 +160,8 @@ func WithHostPorts(hostports ...string) Option {
 			panic("WithHostPorts() requires at least one argument")
 		}
 
+		klog.CtxInfof(context.Background(), "[DEBUG] WithHostPorts, %s", formatWithHostPortsLog(hostports, ins))
+
 		o.Targets = strings.Join(hostports, ",")
 		o.Resolver = &discovery.SynthesizedResolver{
 			ResolveFunc: func(ctx context.Context, key string) (discovery.Result, error) {
@@ -175,6 +177,29 @@ func WithHostPorts(hostports ...string) Option {
 			},
 		}
 	}}
+}
+
+func formatWithHostPortsLog(hostports []string, instances []discovery.Instance) string {
+	var b strings.Builder
+	b.WriteString("hostports=[")
+	b.WriteString(strings.Join(hostports, ","))
+	b.WriteString("], instances=[")
+	for i, ins := range instances {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		if ins == nil {
+			b.WriteString("<nil>")
+			continue
+		}
+		addr := "<nil>"
+		if ins.Address() != nil {
+			addr = ins.Address().String()
+		}
+		fmt.Fprintf(&b, "{addr:%s weight:%d}", addr, ins.Weight())
+	}
+	b.WriteByte(']')
+	return b.String()
 }
 
 // WithResolver provides the Resolver for kitex client.
