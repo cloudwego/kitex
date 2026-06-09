@@ -180,8 +180,15 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
 	if err != nil {
 		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true, true)
-		// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
-		return err
+		// Report the error here, while ctx/ri still carry the caller info decoded from the
+		// transport header. The deferred rpcinfo reset and the outer transServer's OnError
+		// both run later, by which point From() has been reset (when the rpcinfo pool is
+		// enabled) or a different rpcinfo is in ctx (when it is disabled), so the outer
+		// OnError would log an empty remoteService and a useless remoteAddr. This mirrors
+		// what netpollmux's task() already does. Wrap the error so the outer OnError skips a
+		// duplicate line; the connection is still closed because the error stays non-nil.
+		t.OnError(ctx, err, conn)
+		return reportedError{err}
 	}
 
 	// heartbeat processing
@@ -204,7 +211,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 			t.OnError(ctx, err, conn)
 			err = remote.NewTransError(remote.InternalError, err)
 			if closeConn := t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, false, false); closeConn {
-				return err
+				return reportedError{err}
 			}
 			// connection don't need to be closed when the error is return by the server handler
 			closeConnOutsideIfErr = false
@@ -214,8 +221,10 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 
 	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	if ctx, err = t.transPipe.Write(ctx, conn, sendMsg); err != nil {
-		// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
-		return err
+		// Same as the Read branch above: report here, before the deferred reset, so the
+		// caller info is still intact, and skip the outer OnError via the wrapper.
+		t.OnError(ctx, err, conn)
+		return reportedError{err}
 	}
 	return
 }
@@ -241,8 +250,20 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 	rpcinfo.PutRPCInfo(rpcinfo.GetRPCInfo(ctx))
 }
 
+// reportedError marks an error that OnRead already logged (while the per-request
+// rpcinfo still held the caller info), so the outer transServer's OnError does not log a
+// second, info-less line on the reset rpcinfo.
+type reportedError struct{ error }
+
+func (e reportedError) Unwrap() error { return e.error }
+
 // OnError implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
+	var reported reportedError
+	if errors.As(err, &reported) {
+		// already reported inside OnRead, with the caller info still intact
+		return
+	}
 	ri := rpcinfo.GetRPCInfo(ctx)
 	rService, rAddr := getRemoteInfo(ri, conn)
 	if t.ext.IsRemoteClosedErr(err) {
