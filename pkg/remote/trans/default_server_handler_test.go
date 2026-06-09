@@ -208,71 +208,82 @@ func TestSvrTransHandlerReadErr(t *testing.T) {
 }
 
 func TestSvrTransHandlerReadErrLoggedWithRemoteService(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	prevLogger := klog.DefaultLogger()
-	defer func() {
-		klog.SetLogger(prevLogger)
-		ctrl.Finish()
-	}()
+	poolEnabled := rpcinfo.PoolEnabled()
+	defer rpcinfo.EnablePool(poolEnabled)
 
-	buf := remote.NewReaderWriterBuffer(1024)
-	ext := &MockExtension{
-		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-			return buf
-		},
-		NewReadByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-			return buf
-		},
+	for _, enablePool := range []bool{true, false} {
+		t.Run(fmt.Sprintf("pool_enabled_%t", enablePool), func(t *testing.T) {
+			rpcinfo.EnablePool(enablePool)
+			ctrl := gomock.NewController(t)
+			prevLogger := klog.DefaultLogger()
+			defer func() {
+				klog.SetLogger(prevLogger)
+				ctrl.Finish()
+			}()
+
+			buf := remote.NewReaderWriterBuffer(1024)
+			ext := &MockExtension{
+				NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
+					return buf
+				},
+				NewReadByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
+					return buf
+				},
+			}
+
+			mockErr := errors.New("mock decode error")
+			const callerService = "mockCaller"
+			opt := &remote.ServerOption{
+				Codec: &MockCodec{
+					DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+						err := rpcinfo.AsMutableEndpointInfo(msg.RPCInfo().From()).SetServiceName(callerService)
+						test.Assert(t, err == nil, err)
+						return mockErr
+					},
+				},
+				SvcSearcher: svcSearcher,
+				InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+					if ri == nil {
+						ri = newMockRPCInfo()
+					}
+					remote := rpcinfo.AsMutableEndpointInfo(ri.From())
+					test.Assert(t, remote != nil)
+					_ = remote.SetServiceName("")
+					remote.SetAddress(addr)
+					return ri
+				},
+			}
+			ri := rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(), rpcinfo.FromBasicInfo(&rpcinfo.EndpointBasicInfo{}),
+				rpcinfo.NewInvocation("", mocks.MockMethod), nil, rpcinfo.NewRPCStats())
+			ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+			conn := &mocks.Conn{
+				RemoteAddrFunc: func() (r net.Addr) {
+					return &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8888}
+				},
+			}
+
+			mocklogger := mocksklog.NewMockFullLogger(ctrl)
+			klog.SetLogger(mocklogger)
+			var logs []string
+			mocklogger.EXPECT().CtxErrorf(gomock.Any(), gomock.Any(), gomock.Any()).Do(func(ctx context.Context, format string, v ...interface{}) {
+				logs = append(logs, fmt.Sprintf(format, v...))
+			}).Times(1)
+
+			svrHandler, err := NewDefaultSvrTransHandler(opt, ext)
+			test.Assert(t, err == nil)
+			pl := remote.NewTransPipeline(svrHandler)
+			svrHandler.SetPipeline(pl)
+			err = svrHandler.OnRead(ctx, conn)
+			test.Assert(t, err != nil)
+			test.Assert(t, errors.Is(err, mockErr))
+
+			svrHandler.OnError(ctx, err, conn)
+			test.Assert(t, len(logs) == 1, logs)
+			test.Assert(t, strings.Contains(logs[0], "remoteService="+callerService), logs[0])
+			test.Assert(t, strings.Contains(logs[0], "remoteAddr=127.0.0.1:8888"), logs[0])
+			test.Assert(t, strings.Contains(logs[0], "error="+mockErr.Error()), logs[0])
+		})
 	}
-
-	mockErr := errors.New("mock decode error")
-	const callerService = "mockCaller"
-	opt := &remote.ServerOption{
-		Codec: &MockCodec{
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-				err := rpcinfo.AsMutableEndpointInfo(msg.RPCInfo().From()).SetServiceName(callerService)
-				test.Assert(t, err == nil, err)
-				return mockErr
-			},
-		},
-		SvcSearcher: svcSearcher,
-		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-			remote := rpcinfo.AsMutableEndpointInfo(ri.From())
-			test.Assert(t, remote != nil)
-			_ = remote.SetServiceName("")
-			remote.SetAddress(addr)
-			return ri
-		},
-	}
-	ri := rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(), rpcinfo.FromBasicInfo(&rpcinfo.EndpointBasicInfo{}),
-		rpcinfo.NewInvocation("", mocks.MockMethod), nil, rpcinfo.NewRPCStats())
-	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-	conn := &mocks.Conn{
-		RemoteAddrFunc: func() (r net.Addr) {
-			return &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8888}
-		},
-	}
-
-	mocklogger := mocksklog.NewMockFullLogger(ctrl)
-	klog.SetLogger(mocklogger)
-	var logs []string
-	mocklogger.EXPECT().CtxErrorf(gomock.Any(), gomock.Any(), gomock.Any()).Do(func(ctx context.Context, format string, v ...interface{}) {
-		logs = append(logs, fmt.Sprintf(format, v...))
-	}).Times(1)
-
-	svrHandler, err := NewDefaultSvrTransHandler(opt, ext)
-	test.Assert(t, err == nil)
-	pl := remote.NewTransPipeline(svrHandler)
-	svrHandler.SetPipeline(pl)
-	err = svrHandler.OnRead(ctx, conn)
-	test.Assert(t, err != nil)
-	test.Assert(t, errors.Is(err, mockErr))
-
-	svrHandler.OnError(ctx, err, conn)
-	test.Assert(t, len(logs) == 1, logs)
-	test.Assert(t, strings.Contains(logs[0], "remoteService="+callerService), logs[0])
-	test.Assert(t, strings.Contains(logs[0], "remoteAddr=127.0.0.1:8888"), logs[0])
-	test.Assert(t, strings.Contains(logs[0], "error="+mockErr.Error()), logs[0])
 }
 
 func TestSvrTransHandlerReadPanic(t *testing.T) {
