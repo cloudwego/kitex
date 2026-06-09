@@ -180,13 +180,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
 	if err != nil {
 		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true, true)
-		// Report the error here, while ctx/ri still carry the caller info decoded from the
-		// transport header. The deferred rpcinfo reset and the outer transServer's OnError
-		// both run later, by which point From() has been reset (when the rpcinfo pool is
-		// enabled) or a different rpcinfo is in ctx (when it is disabled), so the outer
-		// OnError would log an empty remoteService and a useless remoteAddr. This mirrors
-		// what netpollmux's task() already does. Wrap the error so the outer OnError skips a
-		// duplicate line; the connection is still closed because the error stays non-nil.
+		// Log before returning, while rpcinfo still has the decoded caller info.
+		// The wrapper keeps the error non-nil but suppresses the later outer log.
 		t.OnError(ctx, err, conn)
 		return reportedError{err}
 	}
@@ -221,8 +216,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 
 	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	if ctx, err = t.transPipe.Write(ctx, conn, sendMsg); err != nil {
-		// Same as the Read branch above: report here, before the deferred reset, so the
-		// caller info is still intact, and skip the outer OnError via the wrapper.
+		// Log before the deferred rpcinfo reset; skip the duplicate outer log.
 		t.OnError(ctx, err, conn)
 		return reportedError{err}
 	}
@@ -250,9 +244,7 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 	rpcinfo.PutRPCInfo(rpcinfo.GetRPCInfo(ctx))
 }
 
-// reportedError marks an error that OnRead already logged (while the per-request
-// rpcinfo still held the caller info), so the outer transServer's OnError does not log a
-// second, info-less line on the reset rpcinfo.
+// reportedError marks errors already logged with the per-request rpcinfo.
 type reportedError struct{ error }
 
 func (e reportedError) Unwrap() error { return e.error }
@@ -261,7 +253,7 @@ func (e reportedError) Unwrap() error { return e.error }
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	var reported reportedError
 	if errors.As(err, &reported) {
-		// already reported inside OnRead, with the caller info still intact
+		// already reported inside OnRead
 		return
 	}
 	ri := rpcinfo.GetRPCInfo(ctx)
