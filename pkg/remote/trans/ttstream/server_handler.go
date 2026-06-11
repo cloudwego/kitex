@@ -41,6 +41,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
+	transmeta "github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -211,6 +212,7 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, st *serve
 	}
 	// register metainfo into ctx
 	stCtx = metainfo.SetMetaInfoFromMap(stCtx, st.header)
+	stCtx = transmeta.TransferForwardMetaInfo(stCtx)
 
 	stCtx = t.startTracer(stCtx, ri)
 	defer func() {

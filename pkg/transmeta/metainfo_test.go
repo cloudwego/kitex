@@ -58,6 +58,8 @@ func TestClientReadMetainfo(t *testing.T) {
 }
 
 func TestClientWriteMetainfo(t *testing.T) {
+	SetMetainfoPropagationMode(MetainfoPropagationLegacy)
+
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	ctx := context.Background()
 	ctx = metainfo.WithValue(ctx, "tk", "tv")
@@ -169,4 +171,108 @@ func Test_addStreamID(t *testing.T) {
 		logID := logid.GetStreamLogID(ctx)
 		test.Assert(t, logID == "test", logID)
 	})
+}
+
+func TestMetainfoPropagation(t *testing.T) {
+	defer SetMetainfoPropagationModeProvider(nil)
+	defer SetMetainfoPropagationMode(MetainfoPropagationLegacy)
+
+	ctxA := context.Background()
+	ctxA = metainfo.WithValue(ctxA, "TK", "tv")
+	ctxA = metainfo.WithPersistentValue(ctxA, "PK", "pv")
+
+	saveToMap := func(ctx context.Context) map[string]string {
+		h := make(map[string]string)
+		SaveOutboundMetaInfoToMap(ctx, h)
+		return h
+	}
+	newInboundCtx := func(h map[string]string) context.Context {
+		return TransferForwardMetaInfo(metainfo.SetMetaInfoFromMap(context.Background(), h))
+	}
+	connect := func(ctx context.Context) metadata.MD {
+		ctx, err := MetainfoClientHandler.OnConnectStream(ctx)
+		test.Assert(t, err == nil)
+		md, ok := metadata.FromOutgoingContext(ctx)
+		test.Assert(t, ok)
+		return md
+	}
+	writeMeta := func(ctx context.Context) map[string]string {
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+		msg := remote.NewMessage(nil, ri, remote.Call, remote.Client)
+		_, err := MetainfoClientHandler.WriteMeta(ctx, msg)
+		test.Assert(t, err == nil)
+		return msg.TransInfo().TransStrInfo()
+	}
+
+	headerAB := saveToMap(ctxA)
+	test.Assert(t, headerAB[metainfo.PrefixTransient+"TK"] == "tv", headerAB)
+
+	// Legacy mode preserves historical upstream transient forwarding.
+	SetMetainfoPropagationMode(MetainfoPropagationLegacy)
+	ctxB := newInboundCtx(headerAB)
+	got, ok := metainfo.GetValue(ctxB, "TK")
+	test.Assert(t, ok && got == "tv", got, ok)
+	headerBC := saveToMap(ctxB)
+	test.Assert(t, headerBC[metainfo.PrefixTransient+"TK"] == "tv",
+		"legacy mode should preserve historical upstream transient forwarding, headerBC=", headerBC)
+
+	// Single-hop mode filters upstream transient values unless B sets them again.
+	SetMetainfoPropagationMode(MetainfoPropagationSingleHop)
+	ctxB = newInboundCtx(headerAB)
+	ctxB = metainfo.WithPersistentValue(ctxB, "PK", "pv")
+	headerBC = saveToMap(ctxB)
+	_, leaked := headerBC[metainfo.PrefixTransient+"TK"]
+	test.Assert(t, !leaked, headerBC)
+	test.Assert(t, headerBC[metainfo.PrefixPersistent+"PK"] == "pv", headerBC)
+
+	ctxB = metainfo.WithValue(ctxB, "TK", "tv2")
+	headerBC = saveToMap(ctxB)
+	test.Assert(t, headerBC[metainfo.PrefixTransient+"TK"] == "tv2", headerBC)
+
+	ctxClient := context.Background()
+	ctxClient = metainfo.WithValue(ctxClient, "tk", "tv")
+	ctxClient = metainfo.WithPersistentValue(ctxClient, "pk", "pv")
+	ctxClient = metainfo.TransferForward(ctxClient)
+	kvs := writeMeta(ctxClient)
+	test.Assert(t, len(kvs) == 1, kvs)
+	test.Assert(t, kvs[metainfo.PrefixTransient+"tk"] == "", kvs)
+	test.Assert(t, kvs[metainfo.PrefixPersistent+"pk"] == "pv", kvs)
+
+	ctxClient = metainfo.WithValue(ctxClient, "tk", "tv2")
+	kvs = writeMeta(ctxClient)
+	test.Assert(t, len(kvs) == 2, kvs)
+	test.Assert(t, kvs[metainfo.PrefixTransient+"tk"] == "tv2", kvs)
+	test.Assert(t, kvs[metainfo.PrefixPersistent+"pk"] == "pv", kvs)
+
+	// HTTP/2 metadata follows the same single-hop rule and preserves
+	// unrelated outgoing metadata.
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), cfg, rpcinfo.NewRPCStats())
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs(
+		metainfo.HTTPPrefixTransient+"TK", "old",
+		"x-normal", "kept",
+	))
+	ctx = metainfo.WithValue(ctx, "TK", "tv")
+	ctx = metainfo.WithPersistentValue(ctx, "PK", "pv")
+	ctx = metainfo.TransferForward(ctx)
+
+	md := connect(ctx)
+	test.Assert(t, len(md.Get(metainfo.HTTPPrefixTransient+"TK")) == 0, md)
+	test.Assert(t, md.Get(metainfo.HTTPPrefixPersistent + "PK")[0] == "pv", md)
+	test.Assert(t, md.Get("x-normal")[0] == "kept", md)
+
+	ctx = metainfo.WithValue(ctx, "TK", "tv2")
+	md = connect(ctx)
+	test.Assert(t, md.Get(metainfo.HTTPPrefixTransient + "TK")[0] == "tv2", md)
+	test.Assert(t, md.Get(metainfo.HTTPPrefixPersistent + "PK")[0] == "pv", md)
+
+	// Operator-forced legacy acts as the emergency kill switch over the provider.
+	SetMetainfoPropagationMode(MetainfoPropagationLegacy)
+	SetMetainfoPropagationModeProvider(func(context.Context) MetainfoPropagationMode {
+		return MetainfoPropagationSingleHop
+	})
+	test.Assert(t, getMetainfoPropagationMode(context.Background()) == MetainfoPropagationLegacy,
+		"env/process kill switch should win over provider, effective=", getMetainfoPropagationMode(context.Background()))
 }

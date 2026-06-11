@@ -52,7 +52,7 @@ func (mi *metainfoClientHandler) OnConnectStream(ctx context.Context) (context.C
 		if !ok {
 			md = metadata.MD{}
 		}
-		metainfo.ToHTTPHeader(ctx, metainfo.HTTPHeader(md))
+		SaveOutboundMetaInfoToHTTPHeader(ctx, metainfo.HTTPHeader(md))
 		if streamLogID := logid.GetStreamLogID(ctx); streamLogID != "" {
 			md[transmeta.HTTPStreamLogID] = []string{streamLogID}
 		}

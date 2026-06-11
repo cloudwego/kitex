@@ -20,13 +20,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
+	transmeta "github.com/cloudwego/kitex/pkg/transmeta"
 )
 
 var _ remote.ClientStreamFactory = (*clientTransHandler)(nil)
@@ -74,7 +74,7 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 		strHeader = map[string]string{}
 	}
 	strHeader[ttheader.HeaderIDLServiceName] = invocation.ServiceName()
-	metainfo.SaveMetaInfoToMap(ctx, strHeader)
+	transmeta.SaveOutboundMetaInfoToMap(ctx, strHeader)
 	// -1 means timeout not set
 	tm := notSetStreamTimeout
 	if ddl, ok := ctx.Deadline(); ok {
