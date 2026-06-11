@@ -180,10 +180,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
 	if err != nil {
 		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true, true)
-		// Log before returning, while rpcinfo still has the decoded caller info.
-		// The wrapper keeps the error non-nil but suppresses the later outer log.
-		t.OnError(ctx, err, conn)
-		return reportedError{err}
+		// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
+		return err
 	}
 
 	// heartbeat processing
@@ -206,7 +204,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 			t.OnError(ctx, err, conn)
 			err = remote.NewTransError(remote.InternalError, err)
 			if closeConn := t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, false, false); closeConn {
-				return reportedError{err}
+				return err
 			}
 			// connection don't need to be closed when the error is return by the server handler
 			closeConnOutsideIfErr = false
@@ -216,9 +214,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 
 	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	if ctx, err = t.transPipe.Write(ctx, conn, sendMsg); err != nil {
-		// Log before the deferred rpcinfo reset; skip the duplicate outer log.
-		t.OnError(ctx, err, conn)
-		return reportedError{err}
+		// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
+		return err
 	}
 	return
 }
@@ -244,18 +241,8 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 	rpcinfo.PutRPCInfo(rpcinfo.GetRPCInfo(ctx))
 }
 
-// reportedError marks errors already logged with the per-request rpcinfo.
-type reportedError struct{ error }
-
-func (e reportedError) Unwrap() error { return e.error }
-
 // OnError implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
-	var reported reportedError
-	if errors.As(err, &reported) {
-		// already reported inside OnRead
-		return
-	}
 	ri := rpcinfo.GetRPCInfo(ctx)
 	rService, rAddr := getRemoteInfo(ri, conn)
 	if t.ext.IsRemoteClosedErr(err) {
