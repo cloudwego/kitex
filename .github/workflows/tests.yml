@@ -61,14 +61,14 @@ jobs:
     strategy:
       matrix:
         go: ["1.21", "1.22", "1.23", "1.24", "1.25", "1.26" ]
-    runs-on: [ ARM64 ] # It's OK under Linux or macOS
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
-          cache: false # false for self-hosted runners
+          cache: true # false for self-hosted runners
       - name: Unit Test
         run: go test -race ./...
 
