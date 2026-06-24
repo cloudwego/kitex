@@ -165,6 +165,10 @@ func isExpectedShutdownErr(err error) bool {
 	if err == nil || err == errTransportsClosed || err == errConnPoolClosed || err == grpc.ErrConnClosing {
 		return true
 	}
+	var connErr grpc.ConnectionError
+	if errors.As(err, &connErr) && connErr.Desc == "no active streams left to process while draining" {
+		return true
+	}
 	st, ok := status.FromError(err)
 	if ok {
 		// create stream timeouts
