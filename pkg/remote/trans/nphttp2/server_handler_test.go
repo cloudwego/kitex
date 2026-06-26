@@ -375,6 +375,10 @@ func Test_parseGraceAndPollTime(t *testing.T) {
 }
 
 func Test_RPCInfoReuse(t *testing.T) {
+	originState := rpcinfo.PoolEnabled()
+	rpcinfo.EnablePool(true)
+	defer rpcinfo.EnablePool(originState)
+
 	testcases := []struct {
 		desc         string
 		mode         serviceinfo.StreamingMode
@@ -418,8 +422,9 @@ func Test_RPCInfoReuse(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.desc, func(t *testing.T) {
 			if tc.disableReuse {
+				originState := rpcinfo.PoolEnabled()
 				rpcinfo.EnablePool(false)
-				defer rpcinfo.EnablePool(true)
+				defer rpcinfo.EnablePool(originState)
 			}
 
 			var poolPutCount int32

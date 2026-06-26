@@ -26,19 +26,27 @@ import (
 
 var (
 	rpcInfoPool sync.Pool
-	enablePool  int32 = 1
+	enablePool  int32 = 0
 )
 
 func init() {
+	initPoolEnabledFromEnv()
+	rpcInfoPool.New = newRPCInfo
+}
+
+func initPoolEnabledFromEnv() {
 	// allow disabling by env without modifying the code and recompiling
 	if os.Getenv("KITEX_DISABLE_RPCINFO_POOL") != "" {
 		EnablePool(false)
 	}
-	rpcInfoPool.New = newRPCInfo
+	if os.Getenv("KITEX_ENABLE_RPCINFO_POOL") != "" {
+		EnablePool(true)
+	}
 }
 
 // EnablePool allows user to enable/disable rpcInfoPool.
-// It's enabled by default for performance, but may cause trouble due to misuses:
+// It's disabled by default for safety, and can be enabled for performance.
+// When enabled, it may cause trouble due to misuses:
 //
 //	referencing RPCInfo in another goroutine other than the one running the handler.
 //
