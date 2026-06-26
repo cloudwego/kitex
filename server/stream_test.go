@@ -18,11 +18,14 @@ package server
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -198,4 +201,130 @@ func Test_gRPCCompatibleServerStream_with_middleware(t *testing.T) {
 // wrappedStreamByMiddleware simulates a user-wrapped stream in middleware
 type wrappedStreamByMiddleware struct {
 	streaming.Stream
+}
+
+// blockingServerStream is a mock ServerStream whose RecvMsg blocks until context is done.
+type blockingServerStream struct {
+	streaming.ServerStream
+	recvCh chan struct{} // closed when recv should unblock
+}
+
+func newBlockingServerStream() *blockingServerStream {
+	return &blockingServerStream{recvCh: make(chan struct{})}
+}
+
+func (s *blockingServerStream) RecvMsg(ctx context.Context, m interface{}) error {
+	<-s.recvCh
+	return nil
+}
+
+func (s *blockingServerStream) unblock() {
+	close(s.recvCh)
+}
+
+// immediateServerStream is a mock ServerStream whose RecvMsg returns immediately.
+type immediateServerStream struct {
+	streaming.ServerStream
+	err error
+}
+
+func (s *immediateServerStream) RecvMsg(ctx context.Context, m interface{}) error {
+	return s.err
+}
+
+func newTestStream(ss streaming.ServerStream, recvTmCfg streaming.TimeoutConfig) *stream {
+	recvEP := func(ctx context.Context, stream streaming.ServerStream, message interface{}) error {
+		return stream.RecvMsg(ctx, message)
+	}
+	sendEP := func(ctx context.Context, stream streaming.ServerStream, message interface{}) error {
+		return stream.SendMsg(ctx, message)
+	}
+	return &stream{
+		ServerStream: ss,
+		ctx:          context.Background(),
+		ri:           rpcinfo.NewRPCInfo(nil, nil, nil, nil, nil),
+		recv:         recvEP,
+		send:         sendEP,
+		traceCtl:     &rpcinfo.TraceController{},
+		recvTmCfg:    recvTmCfg,
+	}
+}
+
+func Test_stream_RecvMsg_withTimeout(t *testing.T) {
+	ss := newBlockingServerStream()
+	defer ss.unblock()
+	st := newTestStream(ss, streaming.TimeoutConfig{Timeout: 50 * time.Millisecond})
+
+	start := time.Now()
+	err := st.RecvMsg(context.Background(), nil)
+	elapsed := time.Since(start)
+
+	test.Assert(t, err != nil, "expected timeout error")
+	test.Assert(t, errors.Is(err, kerrors.ErrRPCTimeout), err)
+	test.Assert(t, elapsed >= 50*time.Millisecond, elapsed)
+	test.Assert(t, elapsed < 500*time.Millisecond, elapsed)
+}
+
+func Test_stream_RecvMsg_noTimeout(t *testing.T) {
+	expectedErr := errors.New("test recv error")
+	ss := &immediateServerStream{err: expectedErr}
+	st := newTestStream(ss, streaming.TimeoutConfig{}) // no timeout
+
+	err := st.RecvMsg(context.Background(), nil)
+	test.Assert(t, err == expectedErr, err)
+}
+
+func Test_stream_RecvMsg_noTimeout_success(t *testing.T) {
+	ss := &immediateServerStream{err: nil}
+	st := newTestStream(ss, streaming.TimeoutConfig{}) // no timeout
+
+	err := st.RecvMsg(context.Background(), nil)
+	test.Assert(t, err == nil, err)
+}
+
+func Test_stream_RecvMsg_withTimeout_noBlock(t *testing.T) {
+	ss := &immediateServerStream{err: nil}
+	st := newTestStream(ss, streaming.TimeoutConfig{Timeout: 1 * time.Second})
+
+	err := st.RecvMsg(context.Background(), nil)
+	test.Assert(t, err == nil, err)
+}
+
+func Test_stream_SetRecvTimeoutConfig(t *testing.T) {
+	ss := newBlockingServerStream()
+	defer ss.unblock()
+	st := newTestStream(ss, streaming.TimeoutConfig{}) // initially no timeout
+
+	// Set timeout dynamically
+	st.SetRecvTimeoutConfig(streaming.TimeoutConfig{Timeout: 50 * time.Millisecond})
+
+	start := time.Now()
+	err := st.RecvMsg(context.Background(), nil)
+	elapsed := time.Since(start)
+
+	test.Assert(t, errors.Is(err, kerrors.ErrRPCTimeout), err)
+	test.Assert(t, elapsed >= 50*time.Millisecond, elapsed)
+}
+
+func Test_streaming_SetRecvTimeoutConfig_helper(t *testing.T) {
+	ss := &immediateServerStream{}
+	st := newTestStream(ss, streaming.TimeoutConfig{})
+
+	// stream implements RecvTimeoutConfigSetter
+	ok := streaming.SetRecvTimeoutConfig(st, streaming.TimeoutConfig{Timeout: 1 * time.Second})
+	test.Assert(t, ok, "expected SetRecvTimeoutConfig to return true")
+	test.Assert(t, st.recvTmCfg.Timeout == 1*time.Second, st.recvTmCfg)
+
+	// plain ServerStream does not implement it
+	ok = streaming.SetRecvTimeoutConfig(ss, streaming.TimeoutConfig{Timeout: 1 * time.Second})
+	test.Assert(t, !ok, "expected SetRecvTimeoutConfig to return false for plain stream")
+}
+
+func Test_callWithTimeout_panic_recovery(t *testing.T) {
+	tmCfg := streaming.TimeoutConfig{Timeout: 1 * time.Second}
+	err := callWithTimeout(tmCfg, func() error {
+		panic("test panic")
+	})
+	test.Assert(t, err != nil, "expected error from panic")
+	test.Assert(t, !errors.Is(err, kerrors.ErrRPCTimeout), "panic error should not be ErrRPCTimeout")
 }
