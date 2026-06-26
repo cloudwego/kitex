@@ -155,6 +155,10 @@ func TestReusePortServerRun(t *testing.T) {
 }
 
 func TestInitOrResetRPCInfo(t *testing.T) {
+	originState := rpcinfo.PoolEnabled()
+	rpcinfo.EnablePool(true)
+	defer rpcinfo.EnablePool(originState)
+
 	var opts []Option
 	rwTimeout := time.Millisecond
 	opts = append(opts, WithReadWriteTimeout(rwTimeout))
