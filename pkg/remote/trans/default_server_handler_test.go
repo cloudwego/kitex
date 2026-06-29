@@ -40,6 +40,17 @@ var (
 	svcSearcher = remotemocks.NewDefaultSvcSearcher()
 )
 
+func initOrResetMockServerRPCInfo(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+	// When RPCInfo pooling is disabled, OnRead initializes a fresh RPCInfo by
+	// passing nil to InitOrResetRPCInfoFunc. Keep the mock compatible with both
+	// the pooled reset path and the non-pooled initialization path.
+	if ri == nil {
+		ri = newMockRPCInfo()
+	}
+	rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
+	return ri
+}
+
 func TestDefaultSvrTransHandler(t *testing.T) {
 	buf := remote.NewReaderWriterBuffer(1024)
 	ext := &MockExtension{
@@ -127,12 +138,9 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 				return nil
 			},
 		},
-		SvcSearcher: svcSearcher,
-		TracerCtl:   tracerCtl,
-		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
-			return ri
-		},
+		SvcSearcher:            svcSearcher,
+		TracerCtl:              tracerCtl,
+		InitOrResetRPCInfoFunc: initOrResetMockServerRPCInfo,
 	}
 	ri := rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(), rpcinfo.FromBasicInfo(&rpcinfo.EndpointBasicInfo{}),
 		rpcinfo.NewInvocation("", mocks.MockMethod), nil, rpcinfo.NewRPCStats())
@@ -184,12 +192,9 @@ func TestSvrTransHandlerReadErr(t *testing.T) {
 				return mockErr
 			},
 		},
-		SvcSearcher: svcSearcher,
-		TracerCtl:   tracerCtl,
-		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
-			return ri
-		},
+		SvcSearcher:            svcSearcher,
+		TracerCtl:              tracerCtl,
+		InitOrResetRPCInfoFunc: initOrResetMockServerRPCInfo,
 	}
 	ri := rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(), rpcinfo.FromBasicInfo(&rpcinfo.EndpointBasicInfo{}),
 		rpcinfo.NewInvocation("", mocks.MockMethod), nil, rpcinfo.NewRPCStats())
@@ -236,12 +241,9 @@ func TestSvrTransHandlerReadPanic(t *testing.T) {
 				panic("mock")
 			},
 		},
-		SvcSearcher: svcSearcher,
-		TracerCtl:   tracerCtl,
-		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
-			return ri
-		},
+		SvcSearcher:            svcSearcher,
+		TracerCtl:              tracerCtl,
+		InitOrResetRPCInfoFunc: initOrResetMockServerRPCInfo,
 	}
 	ri := rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(), rpcinfo.FromBasicInfo(&rpcinfo.EndpointBasicInfo{}),
 		rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
@@ -292,12 +294,9 @@ func TestSvrTransHandlerOnReadHeartbeat(t *testing.T) {
 				return nil
 			},
 		},
-		SvcSearcher: svcSearcher,
-		TracerCtl:   tracerCtl,
-		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
-			return ri
-		},
+		SvcSearcher:            svcSearcher,
+		TracerCtl:              tracerCtl,
+		InitOrResetRPCInfoFunc: initOrResetMockServerRPCInfo,
 	}
 	ri := rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(), rpcinfo.FromBasicInfo(&rpcinfo.EndpointBasicInfo{}),
 		rpcinfo.NewInvocation("", mocks.MockMethod), nil, rpcinfo.NewRPCStats())
