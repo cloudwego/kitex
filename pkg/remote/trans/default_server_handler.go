@@ -326,10 +326,14 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 		err = nil
 	}
 	t.opt.TracerCtl.DoFinish(ctx, ri, err)
-	// for server side, rpcinfo is reused on connection, clear the rpc stats info but keep the level config
-	sl := ri.Stats().Level()
-	rpcStats.Reset()
-	rpcStats.SetLevel(sl)
+	if rpcinfo.PoolEnabled() {
+		// The stats reset is only needed when the connection-level RPCInfo will be reused.
+		// When pooling is disabled, the request RPCInfo is left to GC; resetting it here
+		// would race with user goroutines that still read RPCInfo after the handler returns.
+		sl := ri.Stats().Level()
+		rpcStats.Reset()
+		rpcStats.SetLevel(sl)
+	}
 }
 
 func (t *svrTransHandler) startProfiler(ctx context.Context) context.Context {

@@ -471,9 +471,11 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	}
 	t.opt.TracerCtl.DoFinish(ctx, ri, err)
 	// for server side, rpcinfo is reused on connection, clear the rpc stats info but keep the level config
-	sl := ri.Stats().Level()
-	rpcStats.Reset()
-	rpcStats.SetLevel(sl)
+	if rpcinfo.PoolEnabled() {
+		sl := ri.Stats().Level()
+		rpcStats.Reset()
+		rpcStats.SetLevel(sl)
+	}
 }
 
 func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
