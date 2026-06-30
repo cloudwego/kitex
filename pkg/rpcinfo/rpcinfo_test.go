@@ -36,8 +36,8 @@ func TestEnablePool(t *testing.T) {
 }
 
 func TestInitPoolEnabledFromEnv(t *testing.T) {
-	old := PoolEnabled()
-	defer EnablePool(old)
+	originState := PoolEnabled()
+	defer EnablePool(originState)
 
 	t.Run("disable", func(t *testing.T) {
 		t.Setenv("KITEX_DISABLE_RPCINFO_POOL", "1")

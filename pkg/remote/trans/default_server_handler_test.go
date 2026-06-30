@@ -51,6 +51,58 @@ func initOrResetMockServerRPCInfo(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPC
 	return ri
 }
 
+func mustReadDefaultServerRPCInfoAsync(t *testing.T, ctx context.Context) {
+	t.Helper()
+
+	done := make(chan interface{}, 1)
+	go func() {
+		defer func() {
+			done <- recover()
+		}()
+		readDefaultServerRPCInfoForAsyncTest(ctx)
+	}()
+	if panicInfo := <-done; panicInfo != nil {
+		t.Fatalf("async RPCInfo read panicked: %v", panicInfo)
+	}
+}
+
+func readDefaultServerRPCInfoForAsyncTest(ctx context.Context) {
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri == nil {
+		panic("nil RPCInfo")
+	}
+	if from := ri.From(); from == nil {
+		panic("nil From endpoint")
+	} else {
+		_ = from.ServiceName()
+		_ = from.Method()
+		_ = from.Address()
+	}
+	if to := ri.To(); to == nil {
+		panic("nil To endpoint")
+	} else {
+		_ = to.ServiceName()
+		_ = to.Method()
+		_ = to.Address()
+	}
+	if inv := ri.Invocation(); inv == nil {
+		panic("nil Invocation")
+	} else {
+		_ = inv.ServiceName()
+		_ = inv.MethodName()
+		_ = inv.StreamingMode()
+	}
+	if cfg := ri.Config(); cfg != nil {
+		_ = cfg.RPCTimeout()
+	}
+	if stats := ri.Stats(); stats == nil {
+		panic("nil RPCStats")
+	} else {
+		_ = stats.Level()
+		_ = stats.Error()
+	}
+}
+
 func TestDefaultSvrTransHandler(t *testing.T) {
 	buf := remote.NewReaderWriterBuffer(1024)
 	ext := &MockExtension{
@@ -157,6 +209,52 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 	test.Assert(t, err == nil)
 	err = svrHandler.OnRead(ctx, &mocks.Conn{})
 	test.Assert(t, err == nil)
+}
+
+func TestDefaultSvrTransHandlerDisablePoolKeepsRPCInfoReadableAfterOnRead(t *testing.T) {
+	buf := remote.NewReaderWriterBuffer(1024)
+	ext := &MockExtension{
+		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
+			return buf
+		},
+		NewReadByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
+			return buf
+		},
+	}
+	opt := &remote.ServerOption{
+		Codec: &MockCodec{
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+				return nil
+			},
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				mink := msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter)
+				mink.SetServiceName(mocks.MockServiceName)
+				mink.SetMethodName(mocks.MockMethod)
+				mink.SetMethodInfo(svcInfo.MethodInfo(context.Background(), mocks.MockMethod))
+				return nil
+			},
+		},
+		SvcSearcher:            svcSearcher,
+		TracerCtl:              &rpcinfo.TraceController{},
+		InitOrResetRPCInfoFunc: initOrResetMockServerRPCInfo,
+	}
+
+	var captured context.Context
+	svrHandler, err := NewDefaultSvrTransHandler(opt, ext)
+	test.Assert(t, err == nil)
+	pl := remote.NewTransPipeline(svrHandler)
+	svrHandler.SetPipeline(pl)
+	if setter, ok := svrHandler.(remote.InvokeHandleFuncSetter); ok {
+		setter.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) error {
+			captured = ctx
+			return nil
+		})
+	}
+
+	err = svrHandler.OnRead(context.Background(), &mocks.Conn{})
+	test.Assert(t, err == nil, err)
+	test.Assert(t, captured != nil)
+	mustReadDefaultServerRPCInfoAsync(t, captured)
 }
 
 func TestSvrTransHandlerReadErr(t *testing.T) {

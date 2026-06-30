@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"errors"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -44,6 +45,79 @@ func pass(ctx context.Context, request, response interface{}) (err error) {
 
 func panicEp(ctx context.Context, request, response interface{}) (err error) {
 	panic(panicMsg)
+}
+
+func mustReadRPCInfoAsync(t *testing.T, ctx context.Context) {
+	t.Helper()
+
+	done := make(chan any, 1)
+	go func() {
+		defer func() {
+			done <- recover()
+		}()
+		readRPCInfoForAsyncTest(ctx)
+	}()
+	if panicInfo := <-done; panicInfo != nil {
+		t.Fatalf("async RPCInfo read panicked: %v", panicInfo)
+	}
+}
+
+// readRPCInfoForAsyncTest touches RPCInfo fields commonly reset by framework
+// recycle paths. Normal test runs catch nil/reset panics; -race catches hidden
+// framework writes racing with an asynchronous user reader.
+func readRPCInfoForAsyncTest(ctx context.Context) {
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri == nil {
+		panic("nil RPCInfo")
+	}
+	if from := ri.From(); from == nil {
+		panic("nil From endpoint")
+	} else {
+		_ = from.ServiceName()
+		_ = from.Method()
+		_ = from.Address()
+	}
+	if to := ri.To(); to == nil {
+		panic("nil To endpoint")
+	} else {
+		_ = to.ServiceName()
+		_ = to.Method()
+		_ = to.Address()
+	}
+	if inv := ri.Invocation(); inv == nil {
+		panic("nil Invocation")
+	} else {
+		_ = inv.ServiceName()
+		_ = inv.MethodName()
+		_ = inv.StreamingMode()
+	}
+	if cfg := ri.Config(); cfg == nil {
+		panic("nil RPCConfig")
+	} else {
+		_ = cfg.RPCTimeout()
+	}
+	if stats := ri.Stats(); stats == nil {
+		panic("nil RPCStats")
+	} else {
+		_ = stats.Level()
+		_ = stats.Error()
+	}
+}
+
+func readRPCInfoUntilStopped(ctx context.Context, stop <-chan struct{}, started chan<- struct{}, done chan<- any) {
+	close(started)
+	defer func() {
+		done <- recover()
+	}()
+	for {
+		select {
+		case <-stop:
+			return
+		default:
+			readRPCInfoForAsyncTest(ctx)
+			runtime.Gosched()
+		}
+	}
 }
 
 func TestNewRPCTimeoutMW(t *testing.T) {
@@ -112,6 +186,41 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
 	mw2 = rpcTimeoutMW(mwCtx).ToMiddleware()
 	test.Panic(t, func() { mw1(mw2(panicEp))(ctx, nil, nil) })
+}
+
+func TestRpcTimeoutMWDisablePoolKeepsRPCInfoReadableAfterTimeout(t *testing.T) {
+	timeoutCtxCh := make(chan context.Context, 1)
+	stop := make(chan struct{})
+	started := make(chan struct{})
+	done := make(chan any, 1)
+	mw := rpcTimeoutMW(context.Background())
+	processor := mw(func(ctx context.Context, req, rsp interface{}) error {
+		select {
+		case timeoutCtxCh <- ctx:
+		default:
+		}
+		go readRPCInfoUntilStopped(ctx, stop, started, done)
+		<-started
+		time.Sleep(80 * time.Millisecond)
+		return nil
+	})
+
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), mockFullRPCInfo(20*time.Millisecond))
+	err := processor(ctx, nil, nil)
+	test.Assert(t, errors.Is(err, kerrors.ErrRPCTimeout), err)
+
+	var timeoutCtx context.Context
+	select {
+	case timeoutCtx = <-timeoutCtxCh:
+	case <-time.After(time.Second):
+		t.Fatal("rpcTimeoutMW did not execute the background endpoint")
+	}
+	mustReadRPCInfoAsync(t, timeoutCtx)
+
+	close(stop)
+	if panicInfo := <-done; panicInfo != nil {
+		t.Fatalf("async RPCInfo read panicked: %v", panicInfo)
+	}
 }
 
 func TestIsBusinessTimeout(t *testing.T) {
@@ -248,6 +357,19 @@ func mockRPCInfo(timeout time.Duration) rpcinfo.RPCInfo {
 	mc := rpcinfo.AsMutableRPCConfig(c)
 	_ = mc.SetRPCTimeout(timeout)
 	return rpcinfo.NewRPCInfo(nil, s, nil, c, rpcinfo.NewRPCStats())
+}
+
+func mockFullRPCInfo(timeout time.Duration) rpcinfo.RPCInfo {
+	c := rpcinfo.NewRPCConfig()
+	mc := rpcinfo.AsMutableRPCConfig(c)
+	_ = mc.SetRPCTimeout(timeout)
+	return rpcinfo.NewRPCInfo(
+		rpcinfo.NewEndpointInfo("mockCaller", "mockCallerMethod", nil, nil),
+		rpcinfo.NewEndpointInfo("mockService", "mockMethod", nil, nil),
+		rpcinfo.NewInvocation("mockService", "mockMethod"),
+		c,
+		rpcinfo.NewRPCStats(),
+	)
 }
 
 func Test_isBusinessTimeout(t *testing.T) {

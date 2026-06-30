@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"testing"
 	"unsafe"
 
@@ -114,6 +115,61 @@ func mockHandler(ctx context.Context, handler, args, result interface{}) error {
 	return nil
 }
 
+func readServiceInlineRPCInfoForAsyncTest(ctx context.Context) {
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri == nil {
+		panic("nil RPCInfo")
+	}
+	if from := ri.From(); from == nil {
+		panic("nil From endpoint")
+	} else {
+		_ = from.ServiceName()
+		_ = from.Method()
+		_ = from.Address()
+	}
+	if to := ri.To(); to == nil {
+		panic("nil To endpoint")
+	} else {
+		_ = to.ServiceName()
+		_ = to.Method()
+		_ = to.Address()
+	}
+	if inv := ri.Invocation(); inv == nil {
+		panic("nil Invocation")
+	} else {
+		_ = inv.ServiceName()
+		_ = inv.MethodName()
+		_ = inv.StreamingMode()
+	}
+	if cfg := ri.Config(); cfg == nil {
+		panic("nil RPCConfig")
+	} else {
+		_ = cfg.RPCTimeout()
+	}
+	if stats := ri.Stats(); stats == nil {
+		panic("nil RPCStats")
+	} else {
+		_ = stats.Level()
+		_ = stats.Error()
+	}
+}
+
+func readServiceInlineRPCInfoUntilStopped(ctx context.Context, stop <-chan struct{}, started chan<- struct{}, done chan<- any) {
+	close(started)
+	defer func() {
+		done <- recover()
+	}()
+	for {
+		select {
+		case <-stop:
+			return
+		default:
+			readServiceInlineRPCInfoForAsyncTest(ctx)
+			runtime.Gosched()
+		}
+	}
+}
+
 func TestServiceInline(t *testing.T) {
 	svr := NewServer()
 	err := svr.RegisterService(newServiceInfo(), mocks.MyServiceHandler())
@@ -136,5 +192,40 @@ func TestServiceInline(t *testing.T) {
 		if val, ok := metainfo.GetBackwardValue(cliCtx, "BackwardKey"); !ok || val != "BackwardValue" {
 			test.Assert(t, val == "BackwardValue", fmt.Errorf("backward info[%s] is not right, expect=%s, actual=%s", "BackwardKey", "BackwardValue", val))
 		}
+	}
+}
+
+func TestServiceInlineDisablePoolNoRaceWithAsyncServerRPCInfoReadDuringFinish(t *testing.T) {
+	stop := make(chan struct{})
+	started := make(chan struct{})
+	done := make(chan any, 1)
+	svr := NewServer(WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp interface{}) error {
+			go readServiceInlineRPCInfoUntilStopped(ctx, stop, started, done)
+			<-started
+			return next(ctx, req, resp)
+		}
+	}))
+	err := svr.RegisterService(newServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+
+	if iface, ok := svr.(serviceInline); ok {
+		cliCtx := context.Background()
+		cliRPCInfo := constructClientRPCInfo()
+		cliCtx = context.WithValue(cliCtx, consts.SERVICE_INLINE_RPCINFO_KEY, unsafe.Pointer(&cliRPCInfo))
+		cliCtx = context.WithValue(cliCtx, consts.SERVICE_INLINE_CUSTOM_CTX_KEY, "custom_ctx_key")
+		cliCtx = metainfo.WithBackwardValues(cliCtx)
+		cliCtx = metainfo.WithValue(cliCtx, "KeyTmp", "ValueTmp")
+		cliCtx = metainfo.WithPersistentValue(cliCtx, "KeyPersist", "ValuePersist")
+
+		err = iface.BuildServiceInlineInvokeChain()(cliCtx, nil, nil)
+		test.Assert(t, err == nil, err)
+	} else {
+		t.Fatalf("server does not implement serviceInline")
+	}
+
+	close(stop)
+	if panicInfo := <-done; panicInfo != nil {
+		t.Fatalf("async service_inline server RPCInfo read panicked: %v", panicInfo)
 	}
 }

@@ -23,6 +23,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -150,6 +151,186 @@ func TestCall(t *testing.T) {
 
 	err := cli.Call(ctx, mtd, req, res)
 	test.Assert(t, err == nil, err)
+}
+
+type asyncRPCInfoReadTracker struct {
+	mu    sync.Mutex
+	stops []chan struct{}
+	dones []chan any
+}
+
+func (r *asyncRPCInfoReadTracker) middleware(next endpoint.Endpoint) endpoint.Endpoint {
+	return func(ctx context.Context, req, resp interface{}) error {
+		stop := make(chan struct{})
+		started := make(chan struct{})
+		done := make(chan any, 1)
+
+		r.mu.Lock()
+		r.stops = append(r.stops, stop)
+		r.dones = append(r.dones, done)
+		r.mu.Unlock()
+
+		go readRPCInfoUntilStopped(ctx, stop, started, done)
+		<-started
+		return next(ctx, req, resp)
+	}
+}
+
+func (r *asyncRPCInfoReadTracker) stopAndAssert(t *testing.T) {
+	t.Helper()
+
+	r.mu.Lock()
+	stops := append([]chan struct{}(nil), r.stops...)
+	dones := append([]chan any(nil), r.dones...)
+	r.mu.Unlock()
+
+	for _, stop := range stops {
+		close(stop)
+	}
+	for _, done := range dones {
+		if panicInfo := <-done; panicInfo != nil {
+			t.Fatalf("async RPCInfo read panicked: %v", panicInfo)
+		}
+	}
+}
+
+func TestCallDisablePoolKeepsRPCInfoReadableAcrossLifecycle(t *testing.T) {
+	mockErr := errors.New("mock")
+	testcases := []struct {
+		name      string
+		options   func(*asyncRPCInfoReadTracker) []Option
+		assertErr func(error)
+	}{
+		{
+			name: "no retry success recycles",
+			options: func(reader *asyncRPCInfoReadTracker) []Option {
+				return []Option{WithMiddleware(reader.middleware)}
+			},
+			assertErr: func(err error) {
+				test.Assert(t, err == nil, err)
+			},
+		},
+		{
+			name: "no retry error skips recycle",
+			options: func(reader *asyncRPCInfoReadTracker) []Option {
+				errMW := func(next endpoint.Endpoint) endpoint.Endpoint {
+					return func(ctx context.Context, req, resp interface{}) error {
+						return mockErr
+					}
+				}
+				return []Option{WithMiddleware(reader.middleware), WithMiddleware(errMW)}
+			},
+			assertErr: func(err error) {
+				test.Assert(t, errors.Is(err, mockErr), err)
+			},
+		},
+		{
+			name: "failure retry configured without retry recycles",
+			options: func(reader *asyncRPCInfoReadTracker) []Option {
+				return []Option{
+					WithMiddleware(reader.middleware),
+					WithFailureRetry(&retry.FailurePolicy{
+						StopPolicy: retry.StopPolicy{
+							MaxRetryTimes: 1,
+							CBPolicy:      retry.CBPolicy{ErrorRate: 0.1},
+						},
+					}),
+				}
+			},
+			assertErr: func(err error) {
+				test.Assert(t, err == nil, err)
+			},
+		},
+		{
+			name: "failure retry actual retry skips recycle",
+			options: func(reader *asyncRPCInfoReadTracker) []Option {
+				var callTimes int32
+				errMW := func(next endpoint.Endpoint) endpoint.Endpoint {
+					return func(ctx context.Context, req, resp interface{}) error {
+						if atomic.AddInt32(&callTimes, 1) == 1 {
+							return mockErr
+						}
+						return next(ctx, req, resp)
+					}
+				}
+				return []Option{
+					WithMiddleware(reader.middleware),
+					WithMiddleware(errMW),
+					WithFailureRetry(&retry.FailurePolicy{
+						StopPolicy: retry.StopPolicy{
+							MaxRetryTimes: 1,
+							CBPolicy:      retry.CBPolicy{ErrorRate: 0.1},
+						},
+						ShouldResultRetry: &retry.ShouldResultRetry{
+							ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+								return errors.Is(err, mockErr)
+							},
+						},
+					}),
+				}
+			},
+			assertErr: func(err error) {
+				test.Assert(t, err == nil, err)
+			},
+		},
+		{
+			name: "backup retry skips recycle",
+			options: func(reader *asyncRPCInfoReadTracker) []Option {
+				var callTimes int32
+				slowFirstCallMW := func(next endpoint.Endpoint) endpoint.Endpoint {
+					return func(ctx context.Context, req, resp interface{}) error {
+						if atomic.AddInt32(&callTimes, 1) == 1 {
+							time.Sleep(20 * time.Millisecond)
+						}
+						return next(ctx, req, resp)
+					}
+				}
+				return []Option{
+					WithMiddleware(reader.middleware),
+					WithMiddleware(slowFirstCallMW),
+					WithBackupRequest(retry.NewBackupPolicy(1)),
+				}
+			},
+			assertErr: func(err error) {
+				test.Assert(t, err == nil, err)
+			},
+		},
+		{
+			name: "mixed retry skips recycle",
+			options: func(reader *asyncRPCInfoReadTracker) []Option {
+				var callTimes int32
+				slowFirstCallMW := func(next endpoint.Endpoint) endpoint.Endpoint {
+					return func(ctx context.Context, req, resp interface{}) error {
+						if atomic.AddInt32(&callTimes, 1) == 1 {
+							time.Sleep(20 * time.Millisecond)
+						}
+						return next(ctx, req, resp)
+					}
+				}
+				return []Option{
+					WithMiddleware(reader.middleware),
+					WithMiddleware(slowFirstCallMW),
+					WithMixedRetry(retry.NewMixedPolicy(1)),
+				}
+			},
+			assertErr: func(err error) {
+				test.Assert(t, err == nil, err)
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			reader := &asyncRPCInfoReadTracker{}
+			cli := newMockClient(t, ctrl, tc.options(reader)...)
+			err := cli.Call(context.Background(), mocks.MockMethod, mocks.NewMockArgs(), mocks.NewMockResult())
+			tc.assertErr(err)
+			reader.stopAndAssert(t)
+		})
+	}
 }
 
 func TestCallWithContextBackup(t *testing.T) {

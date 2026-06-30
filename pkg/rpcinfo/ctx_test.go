@@ -25,6 +25,21 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
+func newCtxTestRPCInfo() rpcinfo.RPCInfo {
+	method := "TestMethod"
+	svcName := "TestServiceName"
+	netAddr := utils.NewNetAddr("TestNetWork", "TestAddress")
+	tags := map[string]string{"MapTestKey": "MapTestValue"}
+
+	return rpcinfo.NewRPCInfo(
+		rpcinfo.NewEndpointInfo(svcName, method, netAddr, tags),
+		rpcinfo.NewEndpointInfo(svcName, method, netAddr, tags),
+		rpcinfo.NewInvocation(svcName, method),
+		rpcinfo.NewRPCConfig(),
+		rpcinfo.NewRPCStats(),
+	)
+}
+
 func TestNewCtxWithRPCInfo(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, nil)
 	ctx0 := context.Background()
@@ -50,27 +65,37 @@ func TestGetCtxRPCInfo(t *testing.T) {
 }
 
 func TestPutRPCInfo(t *testing.T) {
-	// pre-declared variables and initialization to ensure readability
-	method := "TestMethod"
-	svcName := "TestServiceName"
-	netAddr := utils.NewNetAddr("TestNetWork", "TestAddress")
-	tags := map[string]string{"MapTestKey": "MapTestValue"}
+	originState := rpcinfo.PoolEnabled()
+	defer rpcinfo.EnablePool(originState)
 
-	ri := rpcinfo.NewRPCInfo(
-		rpcinfo.NewEndpointInfo(svcName, method, netAddr, tags),
-		rpcinfo.NewEndpointInfo(svcName, method, netAddr, tags),
-		rpcinfo.NewInvocation(svcName, method),
-		rpcinfo.NewRPCConfig(),
-		rpcinfo.NewRPCStats(),
-	)
+	t.Run("pool enabled recycles", func(t *testing.T) {
+		rpcinfo.EnablePool(true)
+		ri := newCtxTestRPCInfo()
 
-	// nil safe
-	rpcinfo.PutRPCInfo(nil)
-	rpcinfo.PutRPCInfo(ri)
+		// nil safe
+		rpcinfo.PutRPCInfo(nil)
+		rpcinfo.PutRPCInfo(ri)
 
-	test.Assert(t, ri.From() == nil)
-	test.Assert(t, ri.To() == nil)
-	test.Assert(t, ri.Invocation() == nil)
-	test.Assert(t, ri.Config() == nil)
-	test.Assert(t, ri.Stats() == nil)
+		test.Assert(t, ri.From() == nil)
+		test.Assert(t, ri.To() == nil)
+		test.Assert(t, ri.Invocation() == nil)
+		test.Assert(t, ri.Config() == nil)
+		test.Assert(t, ri.Stats() == nil)
+	})
+
+	t.Run("pool disabled keeps readable", func(t *testing.T) {
+		rpcinfo.EnablePool(false)
+		ri := newCtxTestRPCInfo()
+
+		rpcinfo.PutRPCInfo(nil)
+		rpcinfo.PutRPCInfo(ri)
+
+		test.Assert(t, ri.From() != nil)
+		test.Assert(t, ri.To() != nil)
+		test.Assert(t, ri.Invocation() != nil)
+		test.Assert(t, ri.Config() != nil)
+		test.Assert(t, ri.Stats() != nil)
+		test.Assert(t, ri.From().ServiceName() == "TestServiceName")
+		test.Assert(t, ri.To().Method() == "TestMethod")
+	})
 }
