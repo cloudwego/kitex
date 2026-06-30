@@ -63,6 +63,58 @@ func newTestRpcInfo() rpcinfo.RPCInfo {
 	return rpcInfo
 }
 
+func mustReadMuxServerRPCInfoAsync(t *testing.T, ctx context.Context) {
+	t.Helper()
+
+	done := make(chan interface{}, 1)
+	go func() {
+		defer func() {
+			done <- recover()
+		}()
+		readMuxServerRPCInfoForAsyncTest(ctx)
+	}()
+	if panicInfo := <-done; panicInfo != nil {
+		t.Fatalf("async RPCInfo read panicked: %v", panicInfo)
+	}
+}
+
+func readMuxServerRPCInfoForAsyncTest(ctx context.Context) {
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri == nil {
+		panic("nil RPCInfo")
+	}
+	if from := ri.From(); from == nil {
+		panic("nil From endpoint")
+	} else {
+		_ = from.ServiceName()
+		_ = from.Method()
+		_ = from.Address()
+	}
+	if to := ri.To(); to == nil {
+		panic("nil To endpoint")
+	} else {
+		_ = to.ServiceName()
+		_ = to.Method()
+		_ = to.Address()
+	}
+	if inv := ri.Invocation(); inv == nil {
+		panic("nil Invocation")
+	} else {
+		_ = inv.ServiceName()
+		_ = inv.MethodName()
+		_ = inv.StreamingMode()
+	}
+	if cfg := ri.Config(); cfg != nil {
+		_ = cfg.RPCTimeout()
+	}
+	if stats := ri.Stats(); stats == nil {
+		panic("nil RPCStats")
+	} else {
+		_ = stats.Level()
+		_ = stats.Error()
+	}
+}
+
 func init() {
 	body := "hello world"
 	rpcInfo := newTestRpcInfo()
@@ -238,6 +290,90 @@ func TestMuxSvrOnRead(t *testing.T) {
 	test.Assert(t, isReaderBufReleased.Load() == 1)
 	test.Assert(t, isWriteBufFlushed.Load() == 1)
 	test.Assert(t, isInvoked.Load() == 1)
+}
+
+func TestMuxSvrOnReadDisablePoolKeepsRPCInfoReadableAfterFinish(t *testing.T) {
+	const body = "hello world"
+	buf := netpoll.NewLinkBuffer(1024)
+	npconn := &MockNetpollConn{
+		ReaderFunc: func() (r netpoll.Reader) {
+			return buf
+		},
+		WriterFunc: func() (r netpoll.Writer) {
+			return buf
+		},
+		Conn: mocks.Conn{
+			RemoteAddrFunc: func() (r net.Addr) {
+				return addr
+			},
+		},
+	}
+	serverOpt := &remote.ServerOption{
+		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+			ri = newTestRpcInfo()
+			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
+			return ri
+		},
+		Codec: &MockCodec{
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), body)
+				_, err := out.WriteBinary(r.Bytes())
+				return err
+			},
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				in.Skip(3 * codec.Size32)
+				_, err := in.ReadString(len(body))
+				if err != nil {
+					return err
+				}
+				msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter).SetServiceName(mocks.MockServiceName)
+				return codec.SetOrCheckMethodName(ctx, mocks.MockMethod, msg)
+			},
+		},
+		SvcSearcher:      svcSearcher,
+		TracerCtl:        &rpcinfo.TraceController{},
+		ReadWriteTimeout: rwTimeout,
+	}
+	rawHandler, err := NewSvrTransHandlerFactory().NewTransHandler(serverOpt)
+	test.Assert(t, err == nil, err)
+	svrTransHdlr := rawHandler.(*svrTransHandler)
+
+	rpcInfo := newTestRpcInfo()
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcInfo)
+	msg := &mockmessage.MockMessage{
+		RPCInfoFunc: func() rpcinfo.RPCInfo {
+			return rpcInfo
+		},
+	}
+	muxSvrCon := newMuxSvrConn(npconn, &sync.Pool{})
+	ctx, err = svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	test.Assert(t, err == nil, err)
+	time.Sleep(10 * time.Millisecond)
+	buf.Flush()
+
+	ctx, err = svrTransHdlr.OnActive(ctx, muxSvrCon)
+	test.Assert(t, err == nil, err)
+	pl := remote.NewTransPipeline(svrTransHdlr)
+	svrTransHdlr.SetPipeline(pl)
+
+	handled := make(chan struct{})
+	var captured context.Context
+	svrTransHdlr.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) error {
+		captured = ctx
+		close(handled)
+		return nil
+	})
+
+	err = svrTransHdlr.OnRead(ctx, npconn)
+	test.Assert(t, err == nil, err)
+	select {
+	case <-handled:
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for mux server handler")
+	}
+	svrTransHdlr.tasks.Wait()
+	test.Assert(t, captured != nil)
+	mustReadMuxServerRPCInfoAsync(t, captured)
 }
 
 // TestPanicAfterMuxSvrOnRead test have panic after read

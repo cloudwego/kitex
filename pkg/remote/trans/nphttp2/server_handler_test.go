@@ -57,6 +57,76 @@ func (m mockMetaHandler) OnReadStream(ctx context.Context) (context.Context, err
 	return m.onReadStream(ctx)
 }
 
+func mustReadNPHTTP2ServerRPCInfoAsync(t *testing.T, ctx context.Context) {
+	t.Helper()
+
+	done := make(chan interface{}, 1)
+	go func() {
+		defer func() {
+			done <- recover()
+		}()
+		readNPHTTP2ServerRPCInfoForAsyncTest(ctx)
+	}()
+	if panicInfo := <-done; panicInfo != nil {
+		t.Fatalf("async RPCInfo read panicked: %v", panicInfo)
+	}
+}
+
+func readNPHTTP2ServerRPCInfoForAsyncTest(ctx context.Context) {
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri == nil {
+		panic("nil RPCInfo")
+	}
+	if from := ri.From(); from == nil {
+		panic("nil From endpoint")
+	} else {
+		_ = from.ServiceName()
+		_ = from.Method()
+		_ = from.Address()
+	}
+	if to := ri.To(); to == nil {
+		panic("nil To endpoint")
+	} else {
+		_ = to.ServiceName()
+		_ = to.Method()
+		_ = to.Address()
+	}
+	if inv := ri.Invocation(); inv == nil {
+		panic("nil Invocation")
+	} else {
+		_ = inv.ServiceName()
+		_ = inv.MethodName()
+		_ = inv.StreamingMode()
+	}
+	if cfg := ri.Config(); cfg != nil {
+		_ = cfg.RPCTimeout()
+	}
+	if stats := ri.Stats(); stats == nil {
+		panic("nil RPCStats")
+	} else {
+		_ = stats.Level()
+		_ = stats.Error()
+	}
+}
+
+func waitNPHTTP2ServerHandlersDone(t *testing.T, svrTrans *SvrTrans) {
+	t.Helper()
+
+	deadline := time.After(time.Second)
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if atomic.LoadInt32(&svrTrans.handlerNum) == 0 {
+			return
+		}
+		select {
+		case <-ticker.C:
+		case <-deadline:
+			t.Fatal("timeout waiting for nphttp2 server handler")
+		}
+	}
+}
+
 func TestServerHandler(t *testing.T) {
 	var serviceName, methodName atomic.Value
 	serviceName.Store("")
@@ -375,6 +445,10 @@ func Test_parseGraceAndPollTime(t *testing.T) {
 }
 
 func Test_RPCInfoReuse(t *testing.T) {
+	originState := rpcinfo.PoolEnabled()
+	rpcinfo.EnablePool(true)
+	defer rpcinfo.EnablePool(originState)
+
 	testcases := []struct {
 		desc         string
 		mode         serviceinfo.StreamingMode
@@ -418,8 +492,9 @@ func Test_RPCInfoReuse(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.desc, func(t *testing.T) {
 			if tc.disableReuse {
+				originState := rpcinfo.PoolEnabled()
 				rpcinfo.EnablePool(false)
-				defer rpcinfo.EnablePool(true)
+				defer rpcinfo.EnablePool(originState)
 			}
 
 			var poolPutCount int32
@@ -478,4 +553,50 @@ func Test_RPCInfoReuse(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDisablePoolKeepsRPCInfoReadableAfterUnaryFinish(t *testing.T) {
+	opt := newMockServerOption()
+	opt.SvcSearcher = mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+		"Greeter": {
+			Methods: map[string]serviceinfo.MethodInfo{
+				"SayHello": serviceinfo.NewMethodInfo(func(ctx context.Context, handler, args, result interface{}) error {
+					return nil
+				}, func() interface{} { return nil }, func() interface{} { return nil }, false,
+					serviceinfo.WithStreamingMode(serviceinfo.StreamingUnary),
+				),
+			},
+		},
+	})
+
+	handler, err := NewSvrTransHandlerFactory().NewTransHandler(opt)
+	test.Assert(t, err == nil, err)
+
+	handled := make(chan struct{})
+	var captured context.Context
+	handler.(remote.InvokeHandleFuncSetter).SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) error {
+		captured = ctx
+		close(handled)
+		return nil
+	})
+
+	npConn := newMockNpConn(mockAddr0)
+	npConn.mockSettingFrame()
+	npConn.mockMetaHeaderFrame()
+
+	ctx, err := handler.OnActive(newMockCtxWithRPCInfo(serviceinfo.StreamingUnary), npConn)
+	test.Assert(t, err == nil, err)
+	svrTrans := ctx.Value(ctxKeySvrTransport).(*SvrTrans)
+	go func() {
+		handler.OnRead(ctx, npConn)
+	}()
+
+	select {
+	case <-handled:
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for nphttp2 server handler")
+	}
+	waitNPHTTP2ServerHandlersDone(t, svrTrans)
+	test.Assert(t, captured != nil)
+	mustReadNPHTTP2ServerRPCInfoAsync(t, captured)
 }

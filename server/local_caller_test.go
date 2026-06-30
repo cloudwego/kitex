@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -162,6 +163,61 @@ func assertPanicErr(t *testing.T, err error) {
 	test.Assert(t, errors.Is(err, kerrors.ErrPanic), err)
 }
 
+func readLocalCallerRPCInfoForAsyncTest(ctx context.Context) {
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri == nil {
+		panic("nil RPCInfo")
+	}
+	if from := ri.From(); from == nil {
+		panic("nil From endpoint")
+	} else {
+		_ = from.ServiceName()
+		_ = from.Method()
+		_ = from.Address()
+	}
+	if to := ri.To(); to == nil {
+		panic("nil To endpoint")
+	} else {
+		_ = to.ServiceName()
+		_ = to.Method()
+		_ = to.Address()
+	}
+	if inv := ri.Invocation(); inv == nil {
+		panic("nil Invocation")
+	} else {
+		_ = inv.ServiceName()
+		_ = inv.MethodName()
+		_ = inv.StreamingMode()
+	}
+	if cfg := ri.Config(); cfg == nil {
+		panic("nil RPCConfig")
+	} else {
+		_ = cfg.RPCTimeout()
+	}
+	if stats := ri.Stats(); stats == nil {
+		panic("nil RPCStats")
+	} else {
+		_ = stats.Level()
+		_ = stats.Error()
+	}
+}
+
+func readLocalCallerRPCInfoUntilStopped(ctx context.Context, stop <-chan struct{}, started chan<- struct{}, done chan<- any) {
+	close(started)
+	defer func() {
+		done <- recover()
+	}()
+	for {
+		select {
+		case <-stop:
+			return
+		default:
+			readLocalCallerRPCInfoForAsyncTest(ctx)
+			runtime.Gosched()
+		}
+	}
+}
+
 // --- second service for multi-service tests ---
 
 type testService2 interface {
@@ -249,6 +305,34 @@ func TestLocalCaller_MiddlewareExecution(t *testing.T) {
 		&thrift.TestServiceEchoPingPongResult{})
 	test.Assert(t, err == nil, err)
 	test.Assert(t, called, "middleware was not called")
+}
+
+func TestLocalCallerDisablePoolNoRaceWithAsyncRPCInfoReadDuringFinish(t *testing.T) {
+	stop := make(chan struct{})
+	started := make(chan struct{})
+	done := make(chan any, 1)
+	mw := func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp any) error {
+			go readLocalCallerRPCInfoUntilStopped(ctx, stop, started, done)
+			<-started
+			return next(ctx, req, resp)
+		}
+	}
+	svr := server.NewServer(server.WithMiddleware(mw))
+	err := svr.RegisterService(testservice.NewServiceInfo(), &baseHandler{})
+	test.Assert(t, err == nil, err)
+	lc, err := server.NewLocalCaller("test-caller", svr)
+	test.Assert(t, err == nil, err)
+
+	err = lc.Call(context.Background(), "EchoPingPong",
+		&thrift.TestServiceEchoPingPongArgs{Req: &thrift.Request{}},
+		&thrift.TestServiceEchoPingPongResult{})
+	test.Assert(t, err == nil, err)
+
+	close(stop)
+	if panicInfo := <-done; panicInfo != nil {
+		t.Fatalf("async RPCInfo read panicked: %v", panicInfo)
+	}
 }
 
 func TestLocalCaller_MultipleMiddlewaresOrdering(t *testing.T) {

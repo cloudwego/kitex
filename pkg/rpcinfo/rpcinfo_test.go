@@ -34,3 +34,28 @@ func TestEnablePool(t *testing.T) {
 		test.Assert(t, PoolEnabled())
 	})
 }
+
+func TestInitPoolEnabledFromEnv(t *testing.T) {
+	originState := PoolEnabled()
+	defer EnablePool(originState)
+
+	t.Run("disable", func(t *testing.T) {
+		t.Setenv("KITEX_DISABLE_RPCINFO_POOL", "1")
+		t.Setenv("KITEX_ENABLE_RPCINFO_POOL", "")
+		EnablePool(true)
+
+		initPoolEnabledFromEnv()
+
+		test.Assert(t, !PoolEnabled())
+	})
+
+	t.Run("enable overrides disable", func(t *testing.T) {
+		t.Setenv("KITEX_DISABLE_RPCINFO_POOL", "1")
+		t.Setenv("KITEX_ENABLE_RPCINFO_POOL", "1")
+		EnablePool(false)
+
+		initPoolEnabledFromEnv()
+
+		test.Assert(t, PoolEnabled())
+	})
+}

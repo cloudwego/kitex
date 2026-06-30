@@ -26,24 +26,38 @@ import (
 
 var (
 	rpcInfoPool sync.Pool
-	enablePool  int32 = 1
+	enablePool  int32 = 0
 )
 
 func init() {
-	// allow disabling by env without modifying the code and recompiling
-	if os.Getenv("KITEX_DISABLE_RPCINFO_POOL") != "" {
-		EnablePool(false)
-	}
+	initPoolEnabledFromEnv()
 	rpcInfoPool.New = newRPCInfo
 }
 
+func initPoolEnabledFromEnv() {
+	// Keep migration-only env switches for compatibility with existing
+	// deployments while RPCInfo pooling is being phased out.
+	if os.Getenv("KITEX_DISABLE_RPCINFO_POOL") != "" {
+		EnablePool(false)
+	}
+	if os.Getenv("KITEX_ENABLE_RPCINFO_POOL") != "" {
+		EnablePool(true)
+	}
+}
+
 // EnablePool allows user to enable/disable rpcInfoPool.
-// It's enabled by default for performance, but may cause trouble due to misuses:
+// It's disabled by default for safety, and can be enabled for performance.
+// When enabled, it may cause trouble due to misuses:
 //
 //	referencing RPCInfo in another goroutine other than the one running the handler.
 //
 // By turning off the pool, we can quickly confirm whether the concurrency issues is
 // caused by such cases, but do remember there's a PERFORMANCE LOSS.
+//
+// Deprecated: RPCInfo pooling is a legacy mechanism under migration. It may
+// cause panic or data races when RPCInfo is accessed asynchronously after
+// framework cleanup. Kitex is gradually removing this pooling mechanism; this
+// API is kept only for compatibility during the migration.
 func EnablePool(enable bool) {
 	if enable {
 		atomic.StoreInt32(&enablePool, 1)
@@ -53,6 +67,11 @@ func EnablePool(enable bool) {
 }
 
 // PoolEnabled returns true if rpcInfoPool is enabled.
+//
+// Deprecated: RPCInfo pooling is a legacy mechanism under migration. It may
+// cause panic or data races when RPCInfo is accessed asynchronously after
+// framework cleanup. Kitex is gradually removing this pooling mechanism; this
+// API is kept only for compatibility during the migration.
 func PoolEnabled() bool {
 	return atomic.LoadInt32(&enablePool) == 1
 }
@@ -89,6 +108,12 @@ func (r *rpcInfo) zero() {
 }
 
 // Recycle reuses the rpcInfo.
+//
+// Deprecated: RPCInfo recycling is part of the legacy RPCInfo pooling mechanism
+// under migration. It may cause panic or data races when RPCInfo is accessed
+// asynchronously after framework cleanup. Kitex is gradually removing this
+// pooling mechanism; this method is kept only for compatibility during the
+// migration.
 func (r *rpcInfo) Recycle() {
 	if !PoolEnabled() {
 		return
