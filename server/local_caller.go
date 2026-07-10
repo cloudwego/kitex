@@ -24,10 +24,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/cloudwego/kitex/internal/clientstream"
+	"github.com/cloudwego/kitex/internal/localstream"
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -35,10 +38,13 @@ import (
 // since there is no real network connection for in-process calls.
 var localCallerAddr = utils.NewNetAddr("tcp", "127.0.0.1:0")
 
-// LocalCaller calls a registered unary Kitex service handler in-process through
-// the normal server unary middleware chain (timeout, ACL, user MWs, core MW).
-// No network connection or codec is involved.
-// Only non-streaming methods present in ServiceInfo.Methods are supported.
+// LocalCaller calls registered Kitex service handlers in-process through the
+// normal server middleware chain (timeout, ACL, user MWs, core MW). No network
+// connection or codec is involved.
+//
+// Call supports non-streaming unary methods and streaming-unary methods. Stream
+// and StreamX support true streaming methods. Only methods present in
+// ServiceInfo.Methods are supported.
 // Services that rely on ServiceInfo.GenericMethod are not supported.
 //
 // In a normal Kitex server, pkg/remote/trans (the transport layer) reads bytes
@@ -53,8 +59,8 @@ var localCallerAddr = utils.NewNetAddr("tcp", "127.0.0.1:0")
 //     method-only lookup used for service-less server traffic
 //     (fallback service first, otherwise the matching service)
 //
-// args and result must be the generated arg/result wrapper types from kitex_gen
-// for the resolved unary method.
+// For Call, args and result must be the generated arg/result wrapper types from
+// kitex_gen for the resolved method.
 type LocalCaller interface {
 	// Call resolves method and invokes the unary handler through the normal
 	// server middleware chain using the caller-provided generated args/result
@@ -72,6 +78,15 @@ type LocalCaller interface {
 	// typed wrapper values ahead of time can use ResolveMethod first, then
 	// construct args/result from the returned MethodInfo.
 	Call(ctx context.Context, method string, args, result any) error
+
+	// Stream creates an in-process stream for old generated gRPC-compatible
+	// streaming code. The response must be *streaming.Result.
+	Stream(ctx context.Context, method string, request, response interface{}) error
+
+	// StreamX creates an in-process ClientStream for a streaming method and
+	// invokes the registered server streaming handler through the normal server
+	// streaming middleware chain.
+	StreamX(ctx context.Context, method string) (streaming.ClientStream, error)
 
 	// ResolveMethod looks up the method info for the given method string.
 	//
@@ -156,8 +171,8 @@ func (lc *localCaller) Call(ctx context.Context, method string, args, result any
 	}
 	svcInfo, mi, methodName := cr.svcInfo, cr.mi, cr.methodName
 
-	if sm := mi.StreamingMode(); sm != serviceinfo.StreamingNone {
-		return fmt.Errorf("LocalCaller: streaming method %q is not supported (mode=%d); only non-streaming unary methods are allowed", method, sm)
+	if sm := mi.StreamingMode(); sm != serviceinfo.StreamingNone && sm != serviceinfo.StreamingUnary {
+		return fmt.Errorf("LocalCaller: streaming method %q is not supported by Call (mode=%d); use StreamX/Stream for streaming methods", method, sm)
 	}
 
 	// validate args/result types using cached reflect.Type (zero alloc)
@@ -180,6 +195,10 @@ func (lc *localCaller) Call(ctx context.Context, method string, args, result any
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	//nolint:staticcheck
 	ctx = context.WithValue(ctx, consts.CtxKeyMethod, methodName)
+	if mi.StreamingMode() == serviceinfo.StreamingUnary {
+		_, st := localstream.NewPair(ctx, ri)
+		ctx = streaming.NewCtxWithStream(ctx, st.GetGRPCStream())
+	}
 	ctx = lc.traceCtl.DoStart(ctx, ri)
 	var callErr error
 
@@ -208,6 +227,81 @@ func (lc *localCaller) Call(ctx context.Context, method string, args, result any
 		retErr = bizErr
 	}
 	return retErr
+}
+
+func (lc *localCaller) Stream(ctx context.Context, method string, request, response interface{}) error {
+	cs, err := lc.StreamX(ctx, method)
+	if err != nil {
+		return err
+	}
+	result, ok := response.(*streaming.Result)
+	if !ok {
+		return fmt.Errorf("LocalCaller: streaming response type mismatch for method %q: got %T, want *streaming.Result", method, response)
+	}
+	result.ClientStream = cs
+	if getter, ok := cs.(streaming.GRPCStreamGetter); ok {
+		result.Stream = getter.GetGRPCStream()
+	}
+	if result.Stream == nil {
+		return fmt.Errorf("LocalCaller: ClientStream does not expose gRPC-compatible Stream: %T", cs)
+	}
+	return nil
+}
+
+func (lc *localCaller) StreamX(ctx context.Context, method string) (streaming.ClientStream, error) {
+	cr, err := lc.resolve(method)
+	if err != nil {
+		return nil, err
+	}
+	svcInfo, mi, methodName := cr.svcInfo, cr.mi, cr.methodName
+	sm := mi.StreamingMode()
+	if sm == serviceinfo.StreamingNone || sm == serviceinfo.StreamingUnary {
+		return nil, fmt.Errorf("LocalCaller: method %q is not a streaming method (mode=%d)", method, sm)
+	}
+
+	callerMethod := "unknown"
+	if m, _ := ctx.Value(consts.CtxKeyMethod).(string); m != "" {
+		callerMethod = m
+	}
+
+	ri := lc.newLocalRPCInfo(svcInfo, mi, methodName, callerMethod)
+	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
+	//nolint:staticcheck
+	ctx = context.WithValue(ctx, consts.CtxKeyMethod, methodName)
+	ctx = lc.traceCtl.DoStart(ctx, ri)
+
+	clientSt, serverSt := localstream.NewPair(ctx, ri)
+	clientStream := clientstream.New(ctx, clientSt, lc.traceCtl, ri, sm, clientstream.Options{})
+	clientStream.SetGRPCStream(clientstream.NewGRPCForwardStream(clientSt.GetGRPCStream(), clientStream))
+
+	go func() {
+		var callErr error
+		defer func() {
+			if panicErr := recover(); panicErr != nil {
+				callErr = kerrors.ErrPanic.WithCauseAndStack(
+					fmt.Errorf("[happened in LocalCaller stream, method=%s.%s] %v", svcInfo.ServiceName, methodName, panicErr),
+					string(debug.Stack()),
+				)
+				rpcinfo.AsMutableRPCStats(ri.Stats()).SetPanicked(callErr)
+			}
+			// FinishServer closes the server->client direction, which unblocks the
+			// client's RecvMsg with io.EOF (or callErr). Only after lc.svr.eps has
+			// fully returned is the server side done reading/writing ri, so the
+			// trace finish must happen here in the handler goroutine, not from the
+			// client side. RPCInfo is intentionally NOT recycled to the pool: like a
+			// normal streaming client, the RPCInfo outlives a single request/response
+			// and is shared by both ends of the in-process stream, so pool reuse
+			// would risk use-after-recycle.
+			lc.traceCtl.DoFinish(ctx, ri, callErr)
+			serverSt.FinishServer(callErr)
+		}()
+
+		args := &streaming.Args{ServerStream: serverSt}
+		args.Stream = serverSt.GetGRPCStream()
+		callErr = lc.svr.eps(ctx, args, nil)
+	}()
+
+	return clientStream, nil
 }
 
 func (lc *localCaller) ResolveMethod(_ context.Context, method string) (serviceinfo.MethodInfo, error) {

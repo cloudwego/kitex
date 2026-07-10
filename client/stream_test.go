@@ -33,6 +33,7 @@ import (
 	mocksnet "github.com/cloudwego/kitex/internal/mocks/net"
 	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/endpoint/cep"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -289,11 +290,10 @@ func Test_newStream(t *testing.T) {
 
 	test.Assert(t, s.ClientStream == st)
 	test.Assert(t, s.kc == kc)
-	test.Assert(t, s.streamingMode == serviceinfo.StreamingClient)
+	test.Assert(t, s.StreamingMode() == serviceinfo.StreamingClient)
 	test.Assert(t, s.SendMsg(context.Background(), nil) == sendErr)
 	test.Assert(t, s.RecvMsg(context.Background(), nil) == recvErr)
-	test.Assert(t, s.recvTmCfg.Timeout == 0, s.recvTmCfg)
-	test.Assert(t, !s.recvTmCfg.DisableCancelRemote, s.recvTmCfg)
+	test.Assert(t, !s.RecvTimeoutEnabled())
 }
 
 type mockTracer struct {
@@ -324,7 +324,7 @@ func Test_stream_Header(t *testing.T) {
 		cr := mock_remote.NewMockConnReleaser(ctrl)
 		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(0)
 		scr := remotecli.NewStreamConnManager(cr)
-		s := newStream(ctx, st, scr, &kClient{}, rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), nil), serviceinfo.StreamingBidirectional, nil, nil, nil, nil)
+		s := newStream(ctx, st, scr, &kClient{opt: client.NewOptions(nil)}, rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), nil), serviceinfo.StreamingBidirectional, nil, nil, nil, nil)
 		md, err := s.Header()
 
 		test.Assert(t, err == nil)
@@ -539,7 +539,7 @@ func Test_stream_Close(t *testing.T) {
 			called = true
 			return nil
 		},
-	}, scm, &kClient{}, rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), nil), serviceinfo.StreamingBidirectional, nil, nil, nil, nil)
+	}, scm, &kClient{opt: client.NewOptions(nil)}, rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), nil), serviceinfo.StreamingBidirectional, nil, nil, nil, nil)
 
 	err := s.CloseSend(context.Background())
 
@@ -1125,4 +1125,137 @@ func (s *mockGRPCInnerStream) SendMsg(m interface{}) error {
 
 func (s *mockGRPCInnerStream) Close() error {
 	return nil
+}
+
+func newBenchmarkStream(b *testing.B, sendEP cep.StreamSendEndpoint, recvEP cep.StreamRecvEndpoint,
+	grpcSendEP endpoint.SendEndpoint, grpcRecvEP endpoint.RecvEndpoint,
+) *stream {
+	b.Helper()
+
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	st := &mockStream{
+		ctx: ctx,
+		header: func() (streaming.Header, error) {
+			return nil, nil
+		},
+		recv: func(ctx context.Context, msg interface{}) error {
+			return nil
+		},
+		send: func(ctx context.Context, msg interface{}) error {
+			return nil
+		},
+		close: func() error {
+			return nil
+		},
+		cancelWithErr: func(err error) {},
+	}
+	kc := &kClient{opt: &client.Options{TracerCtl: &rpcinfo.TraceController{}}}
+	return newStream(ctx, st, nil, kc, ri, serviceinfo.StreamingBidirectional, sendEP, recvEP, grpcSendEP, grpcRecvEP)
+}
+
+func BenchmarkClientStreamNewStream(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		s := newBenchmarkStream(b, sendEndpoint, recvEndpoint, nil, nil)
+		if s == nil {
+			b.Fatal("nil stream")
+		}
+	}
+}
+
+func BenchmarkClientStreamSendRecvDefault(b *testing.B) {
+	s := newBenchmarkStream(b, sendEndpoint, recvEndpoint, nil, nil)
+	ctx := context.Background()
+	var msg struct{}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if err := s.SendMsg(ctx, &msg); err != nil {
+			b.Fatal(err)
+		}
+		if err := s.RecvMsg(ctx, &msg); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkClientStreamSendRecvCustomMiddleware(b *testing.B) {
+	sendEP := func(ctx context.Context, stream streaming.ClientStream, message interface{}) error {
+		if rpcinfo.GetRPCInfo(ctx) == nil {
+			b.Fatal("missing rpcinfo")
+		}
+		return sendEndpoint(ctx, stream, message)
+	}
+	recvEP := func(ctx context.Context, stream streaming.ClientStream, message interface{}) error {
+		if rpcinfo.GetRPCInfo(ctx) == nil {
+			b.Fatal("missing rpcinfo")
+		}
+		return recvEndpoint(ctx, stream, message)
+	}
+	s := newBenchmarkStream(b, sendEP, recvEP, nil, nil)
+	ctx := context.Background()
+	var msg struct{}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if err := s.SendMsg(ctx, &msg); err != nil {
+			b.Fatal(err)
+		}
+		if err := s.RecvMsg(ctx, &msg); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkClientStreamGRPCSendRecv(b *testing.B) {
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	grpcInner := &mockGRPCInnerStream{ctx: ctx}
+	st := &mockGRPCStreamWrapper{
+		mockStream: &mockStream{
+			ctx: ctx,
+			header: func() (streaming.Header, error) {
+				return nil, nil
+			},
+			recv: func(ctx context.Context, msg interface{}) error {
+				return nil
+			},
+			send: func(ctx context.Context, msg interface{}) error {
+				return nil
+			},
+			close:         func() error { return nil },
+			cancelWithErr: func(err error) {},
+		},
+		grpcStream: grpcInner,
+	}
+	kc := &kClient{opt: &client.Options{TracerCtl: &rpcinfo.TraceController{}}}
+	s := newStream(ctx, st, nil, kc, ri, serviceinfo.StreamingBidirectional,
+		sendEndpoint,
+		recvEndpoint,
+		func(stream streaming.Stream, message interface{}) error {
+			return stream.SendMsg(message)
+		},
+		func(stream streaming.Stream, message interface{}) error {
+			return stream.RecvMsg(message)
+		},
+	)
+	gs := s.GetGRPCStream()
+	if gs == nil {
+		b.Fatal("nil grpc stream")
+	}
+	var msg struct{}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if err := gs.SendMsg(&msg); err != nil {
+			b.Fatal(err)
+		}
+		if err := gs.RecvMsg(&msg); err != nil {
+			b.Fatal(err)
+		}
+	}
 }
