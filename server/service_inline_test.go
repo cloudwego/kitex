@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"unsafe"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/consts"
+	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -108,6 +110,51 @@ func mockHandler(ctx context.Context, handler, args, result interface{}) error {
 	}
 
 	return nil
+}
+
+type mapProbeService struct {
+	probes map[diagnosis.ProbeName]diagnosis.ProbeFunc
+}
+
+func newMapProbeService() *mapProbeService {
+	return &mapProbeService{probes: make(map[diagnosis.ProbeName]diagnosis.ProbeFunc)}
+}
+
+func (m *mapProbeService) RegisterProbeFunc(name diagnosis.ProbeName, pf diagnosis.ProbeFunc) {
+	m.probes[name] = pf // intentionally unsynchronized to expose init races
+}
+
+// TestServiceInlineConcurrentInit reproduces the concurrent-init crash: in service
+// inline mode a single inlined server is shared by multiple upstream clients that may
+// be constructed concurrently, so BuildServiceInlineInvokeChain / server.init run in
+// parallel on the same server. Run with -race to catch the data race on isInit; the
+// map-backed DebugService additionally triggers a "concurrent map writes" fatal error.
+func TestServiceInlineConcurrentInit(t *testing.T) {
+	svr := NewServer(WithDiagnosisService(newMapProbeService()))
+	err := svr.RegisterService(newServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+
+	iface, ok := svr.(serviceInline)
+	test.Assert(t, ok)
+
+	const concurrency = 32
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	eps := make([]endpoint.Endpoint, concurrency)
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			<-start // release all goroutines at once to maximize contention
+			eps[idx] = iface.BuildServiceInlineInvokeChain()
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	for i := 0; i < concurrency; i++ {
+		test.Assert(t, eps[i] != nil, "nil endpoint from concurrent build")
+	}
 }
 
 func TestServiceInline(t *testing.T) {

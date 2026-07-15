@@ -67,8 +67,17 @@ type server struct {
 	eps     endpoint.Endpoint
 	svr     remotesvr.Server
 	stopped sync.Once
-	isInit  bool
-	isRun   bool
+
+	isRun bool
+
+	// initOnce guards server.init so it is idempotent and safe under concurrent
+	// callers. In service inline mode a single inlined server is shared by multiple
+	// upstream clients that may be constructed concurrently.
+	initOnce sync.Once
+	// inlineOnce/inlineChain cache the service inline invoke chain so it is built
+	// exactly once and reused across all clients targeting this inlined server.
+	inlineOnce  sync.Once
+	inlineChain endpoint.Endpoint
 
 	sync.Mutex
 }
@@ -83,20 +92,18 @@ func NewServer(ops ...Option) Server {
 }
 
 func (s *server) init() {
-	if s.isInit {
-		return
-	}
-	s.isInit = true
-	ctx := fillContext(s.opt)
-	if ds := s.opt.DebugService; ds != nil {
-		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(s.opt.DebugInfo))
-		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, s.opt.Events.Dump)
-	}
-	backup.Init(s.opt.BackupOpt)
+	s.initOnce.Do(func() {
+		ctx := fillContext(s.opt)
+		if ds := s.opt.DebugService; ds != nil {
+			ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(s.opt.DebugInfo))
+			ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, s.opt.Events.Dump)
+		}
+		backup.Init(s.opt.BackupOpt)
 
-	// init invoker chain here since we need to get some svc information to add MW
-	// register stream recv/send middlewares
-	s.buildInvokeChain(ctx)
+		// init invoker chain here since we need to get some svc information to add MW
+		// register stream recv/send middlewares
+		s.buildInvokeChain(ctx)
+	})
 }
 
 func fillContext(opt *internal_server.Options) context.Context {

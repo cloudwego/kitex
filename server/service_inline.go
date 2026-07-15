@@ -78,6 +78,16 @@ func (s *server) constructServerRPCInfo(svrCtx context.Context, cliRPCInfo rpcin
 }
 
 func (s *server) BuildServiceInlineInvokeChain() endpoint.Endpoint {
+	// A single inlined server may be shared by multiple upstream clients that are
+	// constructed concurrently. Build the invoke chain exactly once and reuse it,
+	// so server.init and buildMiddlewares are not run concurrently on the same server.
+	s.inlineOnce.Do(func() {
+		s.inlineChain = s.buildServiceInlineInvokeChain()
+	})
+	return s.inlineChain
+}
+
+func (s *server) buildServiceInlineInvokeChain() endpoint.Endpoint {
 	// service inline will not call server.Run, so we should init server here
 	s.init()
 
