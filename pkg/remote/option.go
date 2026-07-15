@@ -111,6 +111,10 @@ type ServerOption struct {
 
 	GRPCCfg *grpc.ServerConfig
 
+	// GRPCMaxReceiveMessageSize limits the maximum size in bytes of a received gRPC message.
+	// A non-positive value means unlimited.
+	GRPCMaxReceiveMessageSize int
+
 	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
 
 	// TTHeaderStreaming
@@ -144,6 +148,7 @@ type ClientOption struct {
 	// for grpc streaming, only used for streaming call
 	GRPCStreamingCliHandlerFactory ClientTransHandlerFactory
 	GRPCStreamingConnPool          ConnPool
+	GRPCMaxReceiveMessageSize      int
 
 	// for ttheader streaming, only used for streaming call
 	TTHeaderStreamingProvider ClientStreamFactory

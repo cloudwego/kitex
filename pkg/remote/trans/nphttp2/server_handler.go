@@ -64,7 +64,7 @@ func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 	return &svrTransHandler{
 		opt:         opt,
 		svcSearcher: opt.SvcSearcher,
-		codec:       grpc.NewGRPCCodec(grpc.WithThriftCodec(opt.PayloadCodec)),
+		codec:       grpc.NewGRPCCodec(grpc.WithThriftCodec(opt.PayloadCodec), grpc.WithMaxReceiveMessageSize(opt.GRPCMaxReceiveMessageSize)),
 		li:          list.New(),
 	}, nil
 }
