@@ -251,7 +251,8 @@ func getCombineServiceName(name string, svcs []*generator.ServiceInfo) string {
 
 func (pg *PrutalGen) convertParameter(f *prutalgen.Proto, t *prutalgen.Type, paramName string) *generator.Parameter {
 	importPath := t.GoImport()
-	pkgRefName := path.Base(importPath)
+	// Match protoc plugin: version path segments (v1/v2/...) keep parent for unique aliases (#1892).
+	pkgRefName := importPathToPkgRef(importPath)
 	typeName := t.GoName()
 	if !strings.Contains(typeName, ".") {
 		typeName = pkgRefName + "." + t.GoName()
@@ -361,4 +362,30 @@ func writeFile(fn string, data []byte) {
 	if err != nil {
 		log.Errorf("write file %q err: %s", fn, err)
 	}
+}
+
+// importPathToPkgRef returns a stable import alias for importPath.
+// Version path segments (v1, v2, ...) include the parent directory so
+// packagea/v1 and packageb/v1 do not both become "v1" (kitex#1892).
+func importPathToPkgRef(importPath string) string {
+	importPath = strings.Trim(importPath, `"`)
+	base := path.Base(importPath)
+	parent := path.Base(path.Dir(importPath))
+	ref := base
+	if isVersionPathSeg(base) && parent != "" && parent != "." {
+		ref = parent + "_" + base
+	}
+	return ref
+}
+
+func isVersionPathSeg(s string) bool {
+	if len(s) < 2 || (s[0] != 'v' && s[0] != 'V') {
+		return false
+	}
+	for _, c := range s[1:] {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }

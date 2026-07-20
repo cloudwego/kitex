@@ -16,6 +16,7 @@ package protoc
 
 import (
 	"go/token"
+	"path"
 	"strings"
 	"unicode"
 
@@ -36,6 +37,33 @@ func goSanitized(s string) string {
 		return "_" + s
 	}
 	return s
+}
+
+// isVersionPathSeg reports whether s looks like a version path segment (v1, v2, ...).
+func isVersionPathSeg(s string) bool {
+	if len(s) < 2 || (s[0] != 'v' && s[0] != 'V') {
+		return false
+	}
+	for _, c := range s[1:] {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// importPathToPkgRef returns a stable import alias for importPath.
+// Paths ending with a version segment (e.g. packagea/v1 vs packageb/v1) include
+// the parent directory so generated aliases stay unique (issue #1892).
+func importPathToPkgRef(importPath string) string {
+	importPath = strings.Trim(importPath, `"`)
+	base := path.Base(importPath)
+	parent := path.Base(path.Dir(importPath))
+	ref := base
+	if isVersionPathSeg(base) && parent != "" && parent != "." {
+		ref = parent + "_" + base
+	}
+	return goSanitized(ref)
 }
 
 type pathElements struct {

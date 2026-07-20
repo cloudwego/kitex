@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -232,7 +231,7 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 	}
 	pi := generator.PkgInfo{
 		PkgName:    file.Proto.GetPackage(),
-		PkgRefName: goSanitized(path.Base(pth)),
+		PkgRefName: importPathToPkgRef(pth),
 		ImportPath: pth,
 	}
 	for _, service := range file.Services {
@@ -321,7 +320,7 @@ func (pp *protocPlugin) getCombineServiceName(name string, svcs []*generator.Ser
 
 func (pp *protocPlugin) convertParameter(msg *protogen.Message, paramName string) *generator.Parameter {
 	importPath := pp.fixImport(msg.GoIdent.GoImportPath.String())
-	pkgRefName := goSanitized(path.Base(importPath))
+	pkgRefName := importPathToPkgRef(importPath)
 	res := &generator.Parameter{
 		Deps: []generator.PkgInfo{
 			{
