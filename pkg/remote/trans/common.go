@@ -18,6 +18,8 @@ package trans
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 	"time"
 
@@ -25,7 +27,54 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-var readMoreTimeout = 5 * time.Millisecond
+var (
+	readMoreTimeout = 5 * time.Millisecond
+
+	ErrRemoteClosed = errors.New("remote connection closed")
+)
+
+// RemoteClosedSource identifies how a remote-closed error was classified.
+type RemoteClosedSource int
+
+const (
+	// RemoteClosedByExtension indicates the transport extension recognized the error.
+	RemoteClosedByExtension RemoteClosedSource = iota
+	// RemoteClosedByConnectionState indicates the connection was already inactive.
+	RemoteClosedByConnectionState
+)
+
+// String implements fmt.Stringer for readable logging.
+func (s RemoteClosedSource) String() string {
+	switch s {
+	case RemoteClosedByExtension:
+		return "extension"
+	case RemoteClosedByConnectionState:
+		return "connection_state"
+	default:
+		return "unknown"
+	}
+}
+
+// RemoteClosedError records the original error and how it was classified.
+type RemoteClosedError struct {
+	Source RemoteClosedSource
+	Cause  error
+}
+
+// Error implements the error interface.
+func (e *RemoteClosedError) Error() string {
+	return fmt.Sprintf("%s (%s): %v", ErrRemoteClosed, e.Source, e.Cause)
+}
+
+// Unwrap exposes the original error.
+func (e *RemoteClosedError) Unwrap() error {
+	return e.Cause
+}
+
+// Is enables errors.Is(err, ErrRemoteClosed).
+func (e *RemoteClosedError) Is(target error) bool {
+	return target == ErrRemoteClosed
+}
 
 // Extension is the interface that trans extensions need to implement, it will make the extension of trans more easily.
 // Normally if we want to extend transport layer we need to implement the trans interfaces which are defined in trans_handler.go.
@@ -48,6 +97,27 @@ func GetReadTimeout(cfg rpcinfo.RPCConfig) time.Duration {
 		return 0
 	}
 	return cfg.RPCTimeout() + readMoreTimeout
+}
+
+// IsRemoteClosedErr returns the remote-closed classification for err.
+//
+// Besides the extension's error-based check, it also treats the error as remote-closed
+// when conn is already inactive. This covers the case where an encoder flattens the
+// underlying netpoll.ErrConnClosed into a plain string (e.g. gopkg/ttheader uses %s),
+// which breaks the errors.Is chain so ext.IsRemoteClosedErr can no longer recognize it.
+func IsRemoteClosedErr(ext Extension, err error, conn net.Conn) *RemoteClosedError {
+	if err == nil {
+		return nil
+	}
+	if ext.IsRemoteClosedErr(err) {
+		return &RemoteClosedError{Source: RemoteClosedByExtension, Cause: err}
+	}
+	if ac, ok := conn.(remote.IsActive); ok {
+		if !ac.IsActive() {
+			return &RemoteClosedError{Source: RemoteClosedByConnectionState, Cause: err}
+		}
+	}
+	return nil
 }
 
 // MuxEnabledFlag is used to determine whether a serverHandlerFactory is multiplexing.

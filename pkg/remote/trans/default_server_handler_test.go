@@ -256,6 +256,66 @@ func TestSvrTransHandlerReadPanic(t *testing.T) {
 	test.Assert(t, strings.Contains(err.Error(), "panic"))
 }
 
+func TestSvrTransHandlerOnErrorClosedConn(t *testing.T) {
+	ri := newMockRPCInfo()
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	handler, err := NewDefaultSvrTransHandler(&remote.ServerOption{}, &MockExtension{})
+	test.Assert(t, err == nil, err)
+
+	handler.OnError(ctx, errors.New("encode failed"), &connWithActive{})
+
+	tag, ok := ri.From().Tag(rpcinfo.RemoteClosedTag)
+	test.Assert(t, ok)
+	test.Assert(t, tag == "1", tag)
+}
+
+func TestSvrTransHandlerFinishTracerByConnectionState(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	flattenedErr := errors.New("flattened encode error")
+	mockTracer := stats.NewMockTracer(ctrl)
+	mockTracer.EXPECT().Finish(gomock.Any()).Do(func(ctx context.Context) {
+		test.Assert(t, errors.Is(rpcinfo.GetRPCInfo(ctx).Stats().Error(), flattenedErr))
+	})
+	tracerCtl := &rpcinfo.TraceController{}
+	tracerCtl.Append(mockTracer)
+
+	rawHandler, err := NewDefaultSvrTransHandler(&remote.ServerOption{TracerCtl: tracerCtl}, &MockExtension{})
+	test.Assert(t, err == nil, err)
+	handler := rawHandler.(*svrTransHandler)
+	ri := newMockRPCInfo()
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+
+	handler.finishTracer(ctx, ri, flattenedErr, &connWithActive{}, nil)
+}
+
+func TestSvrTransHandlerFinishTracerByExtension(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	remoteClosedErr := errors.New("remote closed")
+	mockTracer := stats.NewMockTracer(ctrl)
+	mockTracer.EXPECT().Finish(gomock.Any()).Do(func(ctx context.Context) {
+		test.Assert(t, rpcinfo.GetRPCInfo(ctx).Stats().Error() == nil)
+	})
+	tracerCtl := &rpcinfo.TraceController{}
+	tracerCtl.Append(mockTracer)
+
+	rawHandler, err := NewDefaultSvrTransHandler(
+		&remote.ServerOption{TracerCtl: tracerCtl},
+		&MockExtension{IsRemoteClosedErrFunc: func(err error) bool {
+			return errors.Is(err, remoteClosedErr)
+		}},
+	)
+	test.Assert(t, err == nil, err)
+	handler := rawHandler.(*svrTransHandler)
+	ri := newMockRPCInfo()
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+
+	handler.finishTracer(ctx, ri, remoteClosedErr, &connWithActive{active: true}, nil)
+}
+
 func TestSvrTransHandlerOnReadHeartbeat(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
