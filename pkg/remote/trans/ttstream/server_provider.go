@@ -47,8 +47,9 @@ func newServerProvider(opts ...ServerProviderOption) *serverProvider {
 }
 
 type serverProvider struct {
-	metaHandler   MetaFrameHandler
-	headerHandler HeaderFrameReadHandler
+	metaHandler           MetaFrameHandler
+	headerHandler         HeaderFrameReadHandler
+	maxReceiveMessageSize int
 }
 
 // Available sniff the conn if provider can process
@@ -67,7 +68,7 @@ func (s *serverProvider) Available(ctx context.Context, conn net.Conn) bool {
 // OnActive will be called when a connection accepted
 func (s *serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	nconn := conn.(netpoll.Connection)
-	trans := newTransport(serverTransport, nconn, nil)
+	trans := newTransport(serverTransport, nconn, nil, withMaxReceiveMessageSize(s.maxReceiveMessageSize))
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
 		// server only close transport when peer connection closed
 		_ = trans.Close(nil)

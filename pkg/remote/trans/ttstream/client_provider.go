@@ -38,13 +38,22 @@ func NewClientProvider(opts ...ClientProviderOption) remote.ClientStreamFactory 
 	for _, opt := range opts {
 		opt(cp)
 	}
+	cp.setMaxReceiveMessageSize(cp.maxReceiveMessageSize)
 	return cp
 }
 
 type clientProvider struct {
-	transPool     transPool
-	metaHandler   MetaFrameHandler
-	headerHandler HeaderFrameWriteHandler
+	transPool             transPool
+	metaHandler           MetaFrameHandler
+	headerHandler         HeaderFrameWriteHandler
+	maxReceiveMessageSize int
+}
+
+func (c *clientProvider) setMaxReceiveMessageSize(size int) {
+	c.maxReceiveMessageSize = size
+	if setter, ok := c.transPool.(maxReceiveMessageSizeSetter); ok {
+		setter.SetMaxReceiveMessageSize(size)
+	}
 }
 
 // NewStream return a client stream

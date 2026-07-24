@@ -34,6 +34,7 @@ var (
 	errIllegalFrame         = newExceptionType("illegal frame", kerrors.ErrStreamingProtocol, 12004)
 	errIllegalOperation     = newExceptionType("illegal operation", kerrors.ErrStreamingProtocol, 12005)
 	errTransport            = newExceptionType("transport is closing", kerrors.ErrStreamingProtocol, 12006)
+	errFrameSizeLimit       = newExceptionType("frame size limit exceeded", kerrors.ErrStreamingProtocol, 12007)
 )
 
 type exceptionType struct {

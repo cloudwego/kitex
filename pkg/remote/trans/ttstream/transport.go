@@ -42,6 +42,14 @@ const (
 	frameCacheSize  = 256
 )
 
+type transportOption func(*transport)
+
+func withMaxReceiveMessageSize(size int) transportOption {
+	return func(t *transport) {
+		t.maxReceiveMessageSize = size
+	}
+}
+
 func isIgnoreError(err error) bool {
 	return errors.Is(err, netpoll.ErrEOF) || errors.Is(err, io.EOF) || errors.Is(err, netpoll.ErrConnClosed)
 }
@@ -52,15 +60,16 @@ type transport struct {
 	conn netpoll.Connection
 	pool transPool
 	// transport should operate directly on stream
-	streams       sync.Map                 // key=streamID val=stream
-	scache        []*stream                // size is streamCacheSize
-	spipe         *container.Pipe[*stream] // in-coming stream pipe
-	fpipe         *container.Pipe[*Frame]  // out-coming frame pipe
-	closedFlag    int32
-	closedTrigger chan struct{}
+	streams               sync.Map                 // key=streamID val=stream
+	scache                []*stream                // size is streamCacheSize
+	spipe                 *container.Pipe[*stream] // in-coming stream pipe
+	fpipe                 *container.Pipe[*Frame]  // out-coming frame pipe
+	maxReceiveMessageSize int
+	closedFlag            int32
+	closedTrigger         chan struct{}
 }
 
-func newTransport(kind int32, conn netpoll.Connection, pool transPool) *transport {
+func newTransport(kind int32, conn netpoll.Connection, pool transPool, opts ...transportOption) *transport {
 	// TODO: let it configurable
 	_ = conn.SetReadTimeout(0)
 	t := &transport{
@@ -72,6 +81,9 @@ func newTransport(kind int32, conn netpoll.Connection, pool transPool) *transpor
 		scache:        make([]*stream, 0, streamCacheSize),
 		fpipe:         container.NewPipe[*Frame](),
 		closedTrigger: make(chan struct{}, 2),
+	}
+	for _, opt := range opts {
+		opt(t)
 	}
 	addr := ""
 	if t.Addr() != nil {
@@ -171,7 +183,7 @@ func (t *transport) deleteStream(sid int32) {
 }
 
 func (t *transport) readFrame(reader bufiox.Reader) error {
-	fr, err := DecodeFrame(context.Background(), reader)
+	fr, err := decodeFrame(context.Background(), reader, t.maxReceiveMessageSize)
 	if err != nil {
 		return err
 	}

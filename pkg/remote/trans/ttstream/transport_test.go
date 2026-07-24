@@ -129,6 +129,34 @@ func TestTransportBasic(t *testing.T) {
 	wg.Wait()
 }
 
+func TestTransportMaxReceiveMessageSize(t *testing.T) {
+	cfd, sfd := netpoll.GetSysFdPairs()
+	cconn, err := netpoll.NewFDConnection(cfd)
+	test.Assert(t, err == nil, err)
+	sconn, err := netpoll.NewFDConnection(sfd)
+	test.Assert(t, err == nil, err)
+
+	ctrans := newTransport(clientTransport, cconn, nil)
+	ctx := context.Background()
+	rawClientStream := newStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	err = ctrans.WriteStream(ctx, rawClientStream, make(IntHeader), make(streaming.Header))
+	test.Assert(t, err == nil, err)
+
+	strans := newTransport(serverTransport, sconn, nil, withMaxReceiveMessageSize(1))
+	rawServerStream, err := strans.ReadStream(context.Background())
+	test.Assert(t, err == nil, err)
+
+	cs := newClientStream(rawClientStream)
+	req := new(testRequest)
+	req.B = "hello"
+	err = cs.SendMsg(context.Background(), req)
+	test.Assert(t, err == nil, err)
+
+	ss := newServerStream(rawServerStream)
+	err = ss.RecvMsg(context.Background(), new(testRequest))
+	test.Assert(t, errors.Is(err, errFrameSizeLimit), err)
+}
+
 func TestTransportServerStreaming(t *testing.T) {
 	cfd, sfd := netpoll.GetSysFdPairs()
 	cconn, err := netpoll.NewFDConnection(cfd)

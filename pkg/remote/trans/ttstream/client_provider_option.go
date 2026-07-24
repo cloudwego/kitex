@@ -33,6 +33,14 @@ func WithClientHeaderFrameHandler(handler HeaderFrameWriteHandler) ClientProvide
 	}
 }
 
+// WithClientMaxReceiveMessageSize limits the maximum size in bytes of a received TTHeader Streaming frame payload.
+// A non-positive value means unlimited.
+func WithClientMaxReceiveMessageSize(size int) ClientProviderOption {
+	return func(cp *clientProvider) {
+		cp.setMaxReceiveMessageSize(size)
+	}
+}
+
 // WithClientLongConnPool using long connection pool for client
 func WithClientLongConnPool(config LongConnConfig) ClientProviderOption {
 	return func(cp *clientProvider) {
