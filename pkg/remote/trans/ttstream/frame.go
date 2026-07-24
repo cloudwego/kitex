@@ -130,6 +130,10 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr *Frame) (err erro
 }
 
 func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err error) {
+	return decodeFrame(ctx, reader, 0)
+}
+
+func decodeFrame(ctx context.Context, reader bufiox.Reader, maxReceiveMessageSize int) (fr *Frame, err error) {
 	var dp ttheader.DecodeParam
 	dp, err = ttheader.Decode(ctx, reader)
 	if err != nil {
@@ -167,6 +171,13 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	// frame payload
 	var fpayload []byte
 	if dp.PayloadLen > 0 {
+		if maxReceiveMessageSize > 0 && dp.PayloadLen > maxReceiveMessageSize {
+			_ = reader.Release(nil)
+			return nil, errFrameSizeLimit.WithCause(fmt.Errorf(
+				"ttheader streaming frame payload length %d exceeds max receive message size %d",
+				dp.PayloadLen, maxReceiveMessageSize,
+			))
+		}
 		fpayload = mcache.Malloc(dp.PayloadLen)
 		_, err = reader.ReadBinary(fpayload) // copy read
 		_ = reader.Release(err)

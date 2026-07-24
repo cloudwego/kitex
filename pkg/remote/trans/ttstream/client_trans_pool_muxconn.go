@@ -42,14 +42,15 @@ type MuxConnConfig struct {
 var _ transPool = (*muxConnTransPool)(nil)
 
 type muxConnTransList struct {
-	L          sync.RWMutex
-	size       int
-	cursor     uint32
-	transports []*transport
-	pool       transPool
+	L                     sync.RWMutex
+	size                  int
+	cursor                uint32
+	transports            []*transport
+	pool                  transPool
+	maxReceiveMessageSize int
 }
 
-func newMuxConnTransList(size int, pool transPool) *muxConnTransList {
+func newMuxConnTransList(size int, pool transPool, maxReceiveMessageSize int) *muxConnTransList {
 	tl := new(muxConnTransList)
 	if size <= 0 {
 		size = runtime.GOMAXPROCS(0)
@@ -57,6 +58,7 @@ func newMuxConnTransList(size int, pool transPool) *muxConnTransList {
 	tl.size = size
 	tl.transports = make([]*transport, size)
 	tl.pool = pool
+	tl.maxReceiveMessageSize = maxReceiveMessageSize
 	return tl
 }
 
@@ -98,7 +100,7 @@ func (tl *muxConnTransList) Get(network, addr string) (*transport, error) {
 	if err != nil {
 		return nil, err
 	}
-	trans = newTransport(clientTransport, conn, tl.pool)
+	trans = newTransport(clientTransport, conn, tl.pool, withMaxReceiveMessageSize(tl.maxReceiveMessageSize))
 	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
 		// peer close
 		_ = trans.Close(errTransport.WithCause(errors.New("connection closed by peer")))
@@ -117,19 +119,24 @@ func newMuxConnTransPool(config MuxConnConfig) transPool {
 }
 
 type muxConnTransPool struct {
-	config      MuxConnConfig
-	pool        sync.Map // addr:*muxConnTransList
-	activity    sync.Map // addr:lastActive
-	cleanerOnce int32
+	config                MuxConnConfig
+	maxReceiveMessageSize int
+	pool                  sync.Map // addr:*muxConnTransList
+	activity              sync.Map // addr:lastActive
+	cleanerOnce           int32
 }
 
 func (p *muxConnTransPool) Get(network, addr string) (trans *transport, err error) {
 	v, ok := p.pool.Load(addr)
 	if !ok {
 		// multi concurrent Get should get the same TransList object
-		v, _ = p.pool.LoadOrStore(addr, newMuxConnTransList(p.config.PoolSize, p))
+		v, _ = p.pool.LoadOrStore(addr, newMuxConnTransList(p.config.PoolSize, p, p.maxReceiveMessageSize))
 	}
 	return v.(*muxConnTransList).Get(network, addr)
+}
+
+func (p *muxConnTransPool) SetMaxReceiveMessageSize(size int) {
+	p.maxReceiveMessageSize = size
 }
 
 func (p *muxConnTransPool) Put(trans *transport) {

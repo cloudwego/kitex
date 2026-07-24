@@ -26,3 +26,7 @@ type transPool interface {
 	Get(network, addr string) (trans *transport, err error)
 	Put(trans *transport)
 }
+
+type maxReceiveMessageSizeSetter interface {
+	SetMaxReceiveMessageSize(size int)
+}
