@@ -23,11 +23,13 @@ import (
 	"net"
 	"runtime/debug"
 	"sync/atomic"
+	"time"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/internal/logbackoff"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
@@ -55,6 +57,7 @@ type svrTransHandler struct {
 	transPipe          *remote.TransPipeline
 	ext                Extension
 	inGracefulShutdown uint32
+	remoteClosedWarn   logbackoff.Exponential
 }
 
 // Write implements the remote.ServerTransHandler interface.
@@ -159,7 +162,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 				err = panicErr
 			}
 		}
-		t.finishTracer(ctx, ri, err, panicErr)
+		t.finishTracer(ctx, ri, err, conn, panicErr)
 		t.finishProfiler(ctx)
 		remote.RecycleMessage(recvMsg)
 		remote.RecycleMessage(sendMsg)
@@ -245,8 +248,11 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	rService, rAddr := getRemoteInfo(ri, conn)
-	if t.ext.IsRemoteClosedErr(err) {
+	if remoteClosedErr := IsRemoteClosedErr(t.ext, err, conn); remoteClosedErr != nil {
 		// it should not regard error which cause by remote connection closed as server error
+		if count, elapsed, allow := t.remoteClosedWarn.Observe(time.Now()); allow {
+			klog.CtxWarnf(ctx, "KITEX: processing request error caused by remote connection closed, source=%s, remoteService=%s, remoteAddr=%v, error=%s, count=%d, period=%s", remoteClosedErr.Source, rService, rAddr, remoteClosedErr.Cause, count, elapsed)
+		}
 		if ri == nil {
 			return
 		}
@@ -313,7 +319,7 @@ func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) c
 	return c
 }
 
-func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, err error, panicErr interface{}) {
+func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, err error, conn net.Conn, panicErr interface{}) {
 	rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
 	if rpcStats == nil {
 		return
@@ -321,7 +327,8 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	if panicErr != nil {
 		rpcStats.SetPanicked(panicErr)
 	}
-	if err != nil && t.ext.IsRemoteClosedErr(err) {
+	if remoteClosedErr := IsRemoteClosedErr(t.ext, err, conn); remoteClosedErr != nil &&
+		remoteClosedErr.Source == RemoteClosedByExtension {
 		// it should not regard the error which caused by remote connection closed as server error
 		err = nil
 	}
