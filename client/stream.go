@@ -19,22 +19,14 @@ package client
 import (
 	"context"
 	"fmt"
-	"io"
-	"runtime/debug"
-	"sync/atomic"
-	"time"
 
-	"github.com/bytedance/gopkg/util/gopool"
-
-	internal_stream "github.com/cloudwego/kitex/internal/stream"
+	"github.com/cloudwego/kitex/internal/clientstream"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/endpoint/cep"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
@@ -175,8 +167,8 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 	// recvEP and sendEP are the endpoints for the new stream interface,
 	// and grpcRecvEP and grpcSendEP are the endpoints for the old grpc stream interface,
 	// the latter two are going to be removed in the future.
-	recvEP := kc.opt.StreamOptions.BuildRecvChain(recvEndpoint)
-	sendEP := kc.opt.StreamOptions.BuildSendChain(sendEndpoint)
+	recvEP := kc.opt.StreamOptions.BuildRecvChain(clientstream.DefaultRecvEndpoint)
+	sendEP := kc.opt.StreamOptions.BuildSendChain(clientstream.DefaultSendEndpoint)
 	grpcRecvEP := kc.opt.Streaming.BuildRecvInvokeChain()
 	grpcSendEP := kc.opt.Streaming.BuildSendInvokeChain()
 
@@ -197,25 +189,15 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 	}, nil
 }
 
-const (
-	recvTimeoutErrTpl = "stream Recv timeout, timeout config=%+v"
-)
-
 type stream struct {
-	streaming.ClientStream
+	clientstream.CommonStream
 	grpcStream *grpcStream
 	ctx        context.Context
 	scm        *remotecli.StreamConnManager
-	kc         *kClient
-	ri         rpcinfo.RPCInfo
 
-	recv      cep.StreamRecvEndpoint
-	recvTmCfg streaming.TimeoutConfig
-	send      cep.StreamSendEndpoint
-
-	streamingMode serviceinfo.StreamingMode
-	finished      uint32
-	isGRPC        bool
+	// kc is retained so OnFinish can reach the client's TracerCtl; all stream
+	// send/recv behavior is implemented by the embedded CommonStream.
+	kc *kClient
 }
 
 var (
@@ -228,22 +210,22 @@ func newStream(ctx context.Context, s streaming.ClientStream, scm *remotecli.Str
 	sendEP cep.StreamSendEndpoint, recvEP cep.StreamRecvEndpoint, grpcSendEP endpoint.SendEndpoint, grpcRecvEP endpoint.RecvEndpoint,
 ) *stream {
 	recvTmCfg := ri.Config().StreamRecvTimeoutConfig()
+	grpcStreamGetter, isGRPC := s.(streaming.GRPCStreamGetter)
 	st := &stream{
-		ClientStream:  s,
-		ctx:           ctx,
-		scm:           scm,
-		kc:            kc,
-		ri:            ri,
-		streamingMode: mode,
-		recv:          recvEP,
-		recvTmCfg:     recvTmCfg,
-		send:          sendEP,
+		ctx: ctx,
+		scm: scm,
+		kc:  kc,
 	}
-	if grpcStreamGetter, ok := s.(streaming.GRPCStreamGetter); ok {
-		st.isGRPC = true
+	clientstream.Init(&st.CommonStream, ctx, s, kc.opt.TracerCtl, ri, mode, clientstream.Options{
+		Send:              sendEP,
+		Recv:              recvEP,
+		RecvTmCfg:         recvTmCfg,
+		EnableRecvTimeout: isGRPC,
+		FinishHandler:     st,
+	})
+	if isGRPC {
 		if grpcStream := grpcStreamGetter.GetGRPCStream(); grpcStream != nil {
-			st.grpcStream = newGRPCStream(grpcStream, grpcSendEP, grpcRecvEP, recvTmCfg)
-			st.grpcStream.st = st
+			st.grpcStream = newGRPCStream(grpcStream, &st.CommonStream, grpcSendEP, grpcRecvEP)
 		}
 	}
 	if register, ok := s.(streaming.CloseCallbackRegister); ok {
@@ -252,104 +234,11 @@ func newStream(ctx context.Context, s streaming.ClientStream, scm *remotecli.Str
 	return st
 }
 
-// Header returns the header data sent by the server if any.
-func (s *stream) Header() (hd streaming.Header, err error) {
-	if hd, err = s.ClientStream.Header(); err != nil {
-		s.DoFinish(err)
-	}
-	return
-}
-
-// RecvMsg receives a message from the server.
-// If an error is returned, stream.DoFinish() will be called to record the end of stream
-func (s *stream) RecvMsg(ctx context.Context, m interface{}) (err error) {
-	if !s.recv.EqualsTo(recvEndpoint) {
-		// If the values are not equal, it indicates the presence of custom middleware.
-		// To prevent errors caused by middleware code that relies on rpcinfo when users
-		// incorrectly pass a context lacking rpcinfo, this safeguard logic is added to
-		// propagate the rpcinfo from the stream to the incoming context.
-		ri := rpcinfo.GetRPCInfo(ctx)
-		if ri != s.ri {
-			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, s.ri)
-		}
-	}
-	err = s.recvWithTimeout(ctx, m)
-	if err == nil {
-		// BizStatusErr is returned by the server handle, meaning the stream is ended;
-		// And it should be returned to the calling business code for error handling
-		err = s.ri.Invocation().BizStatusErr()
-	}
-	s.handleStreamRecvEvent(err)
-	if err != nil || s.streamingMode == serviceinfo.StreamingClient {
-		s.DoFinish(err)
-	}
-	return
-}
-
-func (s *stream) handleStreamRecvEvent(err error) {
-	s.kc.opt.TracerCtl.HandleStreamRecvEvent(s.ctx, s.ri, rpcinfo.StreamRecvEvent{
-		Err: err,
-	})
-}
-
-func (s *stream) recvWithTimeout(ctx context.Context, m interface{}) error {
-	if !s.isGRPC || s.recvTmCfg.Timeout <= 0 {
-		return s.recv(ctx, s.ClientStream, m)
-	}
-	return callWithTimeout(s.recvTmCfg,
-		func() error {
-			return s.recv(ctx, s.ClientStream, m)
-		},
-		s.cancel,
-	)
-}
-
-func (s *stream) cancel(err error) {
-	// for now, only gRPC ClientStream implements CancelableClientStream interface
-	if c, ok := s.ClientStream.(internal_stream.CancelableClientStream); ok {
-		c.CancelWithErr(err)
-	}
-}
-
-// SendMsg sends a message to the server.
-// If an error is returned, stream.DoFinish() will be called to record the end of stream
-func (s *stream) SendMsg(ctx context.Context, m interface{}) (err error) {
-	if !s.send.EqualsTo(sendEndpoint) {
-		// same with RecvMsg
-		ri := rpcinfo.GetRPCInfo(ctx)
-		if ri != s.ri {
-			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, s.ri)
-		}
-	}
-	err = s.send(ctx, s.ClientStream, m)
-	s.handleStreamSendEvent(err)
-	if err != nil {
-		s.DoFinish(err)
-	}
-	return
-}
-
-func (s *stream) handleStreamSendEvent(err error) {
-	s.kc.opt.TracerCtl.HandleStreamSendEvent(s.ctx, s.ri, rpcinfo.StreamSendEvent{
-		Err: err,
-	})
-}
-
-// DoFinish implements the streaming.WithDoFinish interface, and it records the end of stream
-// It will release the connection.
-func (s *stream) DoFinish(err error) {
-	if atomic.SwapUint32(&s.finished, 1) == 1 {
-		// already called
-		return
-	}
-	if !isRPCError(err) {
-		// only rpc errors are reported
-		err = nil
-	}
+func (s *stream) OnFinish(err error, ri rpcinfo.RPCInfo) {
 	if s.scm != nil {
-		s.scm.ReleaseConn(err, s.ri)
+		s.scm.ReleaseConn(err, ri)
 	}
-	s.kc.opt.TracerCtl.DoFinish(s.ctx, s.ri, err)
+	s.kc.opt.TracerCtl.DoFinish(s.ctx, ri, err)
 }
 
 func (s *stream) GetGRPCStream() streaming.Stream {
@@ -359,121 +248,58 @@ func (s *stream) GetGRPCStream() streaming.Stream {
 	return s.grpcStream
 }
 
-func newGRPCStream(st streaming.Stream, sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint,
-	recvTmCfg streaming.TimeoutConfig,
-) *grpcStream {
+func newGRPCStream(st streaming.Stream, cs *clientstream.CommonStream, sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint) *grpcStream {
 	return &grpcStream{
 		Stream:       st,
+		cs:           cs,
 		sendEndpoint: sendEP,
 		recvEndpoint: recvEP,
-		recvTmCfg:    recvTmCfg,
 	}
 }
 
 type grpcStream struct {
 	streaming.Stream
 
-	st *stream
+	cs *clientstream.CommonStream
 
 	sendEndpoint endpoint.SendEndpoint
 	recvEndpoint endpoint.RecvEndpoint
-	recvTmCfg    streaming.TimeoutConfig
 }
 
 // Header returns the header metadata sent by the server if any.
 // If a non-nil error is returned, stream.DoFinish() will be called to record the EndOfStream
 func (s *grpcStream) Header() (md metadata.MD, err error) {
 	if md, err = s.Stream.Header(); err != nil {
-		s.st.DoFinish(err)
+		s.cs.DoFinish(err)
 	}
 	return
 }
 
 func (s *grpcStream) RecvMsg(m interface{}) (err error) {
-	err = s.recvWithTimeout(m)
-	if err == nil {
-		// BizStatusErr is returned by the server handle, meaning the stream is ended;
-		// And it should be returned to the calling business code for error handling
-		err = s.st.ri.Invocation().BizStatusErr()
+	if s.cs.RecvTimeoutEnabled() {
+		err = s.cs.RecvWithTimeout(
+			func() error {
+				return s.recvEndpoint(s.Stream, m)
+			},
+		)
+	} else {
+		err = s.recvEndpoint(s.Stream, m)
 	}
-	s.st.handleStreamRecvEvent(err)
-	if err != nil || s.st.streamingMode == serviceinfo.StreamingClient {
-		s.st.DoFinish(err)
-	}
-	return
-}
-
-func (s *grpcStream) recvWithTimeout(m interface{}) error {
-	if s.recvTmCfg.Timeout <= 0 {
-		return s.recvEndpoint(s.Stream, m)
-	}
-	return callWithTimeout(
-		s.recvTmCfg,
-		func() error {
-			return s.recvEndpoint(s.Stream, m)
-		},
-		s.st.cancel,
-	)
+	return s.cs.HandleRecvResult(err)
 }
 
 func (s *grpcStream) SendMsg(m interface{}) (err error) {
 	err = s.sendEndpoint(s.Stream, m)
-	s.st.handleStreamSendEvent(err)
-	if err != nil {
-		s.st.DoFinish(err)
-	}
-	return
+	return s.cs.HandleSendResult(err)
 }
 
 func (s *grpcStream) DoFinish(err error) {
-	s.st.DoFinish(err)
+	s.cs.DoFinish(err)
 }
 
-func callWithTimeout(tmCfg streaming.TimeoutConfig, call func() error, cancel func(error)) error {
-	timer := time.NewTimer(tmCfg.Timeout)
-	defer timer.Stop()
-	finishChan := make(chan error, 1)
-	gopool.Go(func() {
-		var callErr error
-		defer func() {
-			if r := recover(); r != nil {
-				callErr = status.Errorf(codes.Internal, "stream Recv panic, panic=%v, stack=%s", r, debug.Stack())
-				cancel(callErr)
-			}
-			finishChan <- callErr
-		}()
-		callErr = call()
-	})
-	select {
-	case <-timer.C:
-		err := status.Errorf(codes.RecvDeadlineExceeded, recvTimeoutErrTpl, tmCfg)
-		if !tmCfg.DisableCancelRemote {
-			// finish the stream lifecycle so that the goroutine could exit
-			cancel(err)
-		}
-		return err
-	case callErr := <-finishChan:
-		return callErr
-	}
-}
-
-func isRPCError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if err == io.EOF {
-		return false
-	}
-	_, isBizStatusError := err.(kerrors.BizStatusErrorIface)
-	// if a tracer needs to get the BizStatusError, it should read from rpcinfo.invocation.bizStatusErr
-	return !isBizStatusError
-}
+func isRPCError(err error) bool { return clientstream.IsRPCError(err) }
 
 var (
-	recvEndpoint cep.StreamRecvEndpoint = func(ctx context.Context, stream streaming.ClientStream, m interface{}) error {
-		return stream.RecvMsg(ctx, m)
-	}
-	sendEndpoint cep.StreamSendEndpoint = func(ctx context.Context, stream streaming.ClientStream, m interface{}) error {
-		return stream.SendMsg(ctx, m)
-	}
+	recvEndpoint = clientstream.DefaultRecvEndpoint
+	sendEndpoint = clientstream.DefaultSendEndpoint
 )
