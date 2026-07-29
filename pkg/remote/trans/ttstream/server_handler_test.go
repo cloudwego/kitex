@@ -120,6 +120,21 @@ func (m *mockHeaderFrameReadHandler) OnReadStream(ctx context.Context, ihd IntHe
 	return ctx, nil
 }
 
+func TestServerMaxReceiveMessageSizeOption(t *testing.T) {
+	const maxReceiveMessageSize = 1024
+
+	rawHandler, err := NewSvrTransHandlerFactory().NewTransHandler(&remote.ServerOption{
+		TTHeaderStreamingOptions: remote.TTHeaderStreamingOptions{
+			TransportOptions: []interface{}{
+				WithServerMaxReceiveMessageSize(maxReceiveMessageSize),
+			},
+		},
+	})
+	test.Assert(t, err == nil, err)
+	handler := rawHandler.(*svrTransHandler)
+	test.Assert(t, handler.maxReceiveMessageSize == maxReceiveMessageSize, handler.maxReceiveMessageSize)
+}
+
 func TestOnRead(t *testing.T) {
 	prepare := func() (ctx context.Context, ripTag string, tracer *mockTracer, transHdl *svrTransHandler, wconn netpoll.Connection, wb *writerBuffer, mockConn *mockNetpollConn) {
 		ripTag = "rip"

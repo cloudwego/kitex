@@ -284,6 +284,16 @@ func WithGRPCReadBufferSize(s uint32) Option {
 	}}
 }
 
+// WithGRPCMaxReceiveMessageSize sets the maximum size in bytes of a received gRPC message.
+// A non-positive value means unlimited.
+func WithGRPCMaxReceiveMessageSize(s int) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCMaxReceiveMessageSize(%+v)", s))
+
+		o.RemoteOpt.GRPCMaxReceiveMessageSize = s
+	}}
+}
+
 // WithGRPCInitialWindowSize returns a Option that sets window size for stream.
 // The lower bound for window size is 64K and any value smaller than that will be ignored.
 // It corresponds to the InitialWindowSize ServerOption of gRPC.

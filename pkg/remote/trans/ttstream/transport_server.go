@@ -37,6 +37,8 @@ type serverTransport struct {
 	scache  []*serverStream                // size is streamCacheSize
 	spipe   *container.Pipe[*serverStream] // in-coming stream pipe
 
+	maxReceiveMessageSize int
+
 	mu        sync.Mutex // protect writer
 	state     int32
 	closedErr error
@@ -45,7 +47,17 @@ type serverTransport struct {
 	closedTrigger chan struct{}
 }
 
-func newServerTransport(conn netpoll.Connection) *serverTransport {
+// serverTransportOption configures a serverTransport when it is created.
+type serverTransportOption func(*serverTransport)
+
+// withServerMaxReceiveMessageSize limits the maximum size in bytes of a received frame payload.
+func withServerMaxReceiveMessageSize(size int) serverTransportOption {
+	return func(t *serverTransport) {
+		t.maxReceiveMessageSize = size
+	}
+}
+
+func newServerTransport(conn netpoll.Connection, opts ...serverTransportOption) *serverTransport {
 	// TODO: let it configurable
 	_ = conn.SetReadTimeout(0)
 	t := &serverTransport{
@@ -56,6 +68,9 @@ func newServerTransport(conn netpoll.Connection) *serverTransport {
 		scache:        make([]*serverStream, 0, streamCacheSize),
 		writer:        newWriterBuffer(conn.Writer()),
 		closedTrigger: make(chan struct{}, 1),
+	}
+	for _, opt := range opts {
+		opt(t)
 	}
 	addr := ""
 	if t.Addr() != nil {
@@ -157,7 +172,7 @@ func (t *serverTransport) deleteStream(sid int32) {
 }
 
 func (t *serverTransport) readFrame(reader bufiox.Reader) error {
-	fr, err := DecodeFrame(context.Background(), reader)
+	fr, err := decodeFrame(context.Background(), reader, t.maxReceiveMessageSize)
 	if err != nil {
 		return err
 	}

@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -249,5 +250,31 @@ func Test_isNonServerStreaming(t *testing.T) {
 
 	for _, tc := range testcases {
 		test.Assert(t, isNonServerStreaming(tc.mode) == tc.expectRes)
+	}
+}
+
+func TestGRPCCodecDecodeMaxReceiveMessageSize(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	codec := NewGRPCCodec(WithMaxReceiveMessageSize(1))
+	mockIn := mocksremote.NewMockByteBuffer(ctrl)
+	mockIn.EXPECT().Next(5).Return([]byte{0, 0, 0, 0, 2}, nil).Times(1)
+
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetPayloadCodec(serviceinfo.PayloadCodec(-1))
+	ri := rpcinfo.NewRPCInfo(
+		rpcinfo.EmptyEndpointInfo(),
+		remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "grpcService"}, "method").ImmutableView(),
+		rpcinfo.NewInvocation("grpcService", "method"),
+		cfg,
+		rpcinfo.NewRPCStats(),
+	)
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	msg := remote.NewMessage(nil, ri, remote.Stream, remote.Client)
+
+	err := codec.Decode(ctx, msg, mockIn)
+	if pErr, ok := err.(perrors.ProtocolError); !ok || pErr.TypeId() != perrors.SizeLimit {
+		t.Fatalf("unexpected error: %T %v", err, err)
 	}
 }

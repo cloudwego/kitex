@@ -57,7 +57,8 @@ type protobufV2MsgCodec interface {
 }
 
 type grpcCodec struct {
-	ThriftCodec remote.PayloadCodec
+	ThriftCodec           remote.PayloadCodec
+	MaxReceiveMessageSize int
 }
 
 type CodecOption func(c *grpcCodec)
@@ -65,6 +66,14 @@ type CodecOption func(c *grpcCodec)
 func WithThriftCodec(t remote.PayloadCodec) CodecOption {
 	return func(c *grpcCodec) {
 		c.ThriftCodec = t
+	}
+}
+
+// WithMaxReceiveMessageSize limits the maximum size in bytes of a received gRPC message.
+// A non-positive value means unlimited.
+func WithMaxReceiveMessageSize(size int) CodecOption {
+	return func(c *grpcCodec) {
+		c.MaxReceiveMessageSize = size
 	}
 }
 
@@ -200,7 +209,7 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 }
 
 func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
-	d, err := decodeGRPCFrame(ctx, in)
+	d, err := decodeGRPCFrame(ctx, in, c.MaxReceiveMessageSize)
 	if rpcStats := rpcinfo.AsMutableRPCStats(message.RPCInfo().Stats()); rpcStats != nil {
 		// record recv size, even when err != nil (0 is recorded to the lastRecvSize)
 		rpcStats.IncrRecvSize(uint64(len(d)))
@@ -216,7 +225,7 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 		// If err == io.EOF, it means server returns nil, just ignore io.EOF.
 		// If err != io.EOF, it means server returns status err or BizStatusErr, or other gRPC transport error came out,
 		// we need to throw it to users.
-		_, err = decodeGRPCFrame(ctx, in)
+		_, err = decodeGRPCFrame(ctx, in, c.MaxReceiveMessageSize)
 		if err == nil {
 			return errWrongGRPCImplementation
 		}

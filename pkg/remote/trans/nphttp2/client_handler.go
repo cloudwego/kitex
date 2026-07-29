@@ -41,7 +41,7 @@ func (f *cliTransHandlerFactory) NewTransHandler(opt *remote.ClientOption) (remo
 func newCliTransHandler(opt *remote.ClientOption) (*cliTransHandler, error) {
 	return &cliTransHandler{
 		opt:   opt,
-		codec: grpc.NewGRPCCodec(grpc.WithThriftCodec(opt.PayloadCodec)),
+		codec: grpc.NewGRPCCodec(grpc.WithThriftCodec(opt.PayloadCodec), grpc.WithMaxReceiveMessageSize(opt.GRPCMaxReceiveMessageSize)),
 	}, nil
 }
 

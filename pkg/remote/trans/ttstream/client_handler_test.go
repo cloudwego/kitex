@@ -21,8 +21,11 @@ package ttstream
 import (
 	"context"
 	"errors"
+	"net"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -42,6 +45,18 @@ func (p *mockTransPool) Get(network, addr string) (*clientTransport, error) {
 }
 
 func (p *mockTransPool) Put(trans *clientTransport) {}
+
+type mockDialer struct {
+	connection netpoll.Connection
+}
+
+func (m *mockDialer) DialConnection(network, address string, timeout time.Duration) (netpoll.Connection, error) {
+	return m.connection, nil
+}
+
+func (m *mockDialer) DialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
+	return m.connection, nil
+}
 
 // mockHeaderFrameWriteHandler implements HeaderFrameWriteHandler for testing
 type mockHeaderFrameWriteHandler struct {
@@ -67,6 +82,41 @@ func newTestRPCInfoCtx(cfg rpcinfo.RPCConfig) (context.Context, rpcinfo.RPCInfo)
 	)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	return ctx, ri
+}
+
+func testPoolMaxReceiveMessageSize(t *testing.T, pool transPool, maxReceiveMessageSize int) {
+	clientConn, serverConn := newTestConnectionPipe(t)
+	originalDialer := dialer
+	dialer = &mockDialer{connection: clientConn}
+	defer func() {
+		dialer = originalDialer
+		_ = serverConn.Close()
+	}()
+
+	trans, err := pool.Get("tcp", "unused")
+	test.Assert(t, err == nil, err)
+	test.Assert(t, trans.maxReceiveMessageSize == maxReceiveMessageSize, trans.maxReceiveMessageSize)
+	_ = trans.Close(nil)
+}
+
+func TestClientMaxReceiveMessageSizeOption(t *testing.T) {
+	const maxReceiveMessageSize = 1024
+
+	handler := NewCliTransHandlerFactory(
+		WithClientMaxReceiveMessageSize(maxReceiveMessageSize),
+		WithClientLongConnPool(LongConnConfig{}),
+	).(*clientTransHandler)
+	longPool := handler.transPool.(*longConnTransPool)
+	test.Assert(t, longPool.maxReceiveMessageSize == maxReceiveMessageSize, longPool.maxReceiveMessageSize)
+	testPoolMaxReceiveMessageSize(t, longPool, maxReceiveMessageSize)
+
+	handler = NewCliTransHandlerFactory(
+		WithClientShortConnPool(),
+		WithClientMaxReceiveMessageSize(maxReceiveMessageSize),
+	).(*clientTransHandler)
+	shortPool := handler.transPool.(*shortConnTransPool)
+	test.Assert(t, shortPool.maxReceiveMessageSize == maxReceiveMessageSize, shortPool.maxReceiveMessageSize)
+	testPoolMaxReceiveMessageSize(t, shortPool, maxReceiveMessageSize)
 }
 
 func TestNewStream(t *testing.T) {
