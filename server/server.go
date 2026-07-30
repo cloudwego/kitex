@@ -177,19 +177,19 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	s.Lock()
 	defer s.Unlock()
 	if s.isRun {
-		panic("service cannot be registered while server is running")
+		return errors.New("service cannot be registered while server is running")
 	}
 	if svcInfo == nil {
-		panic("svcInfo is nil. please specify non-nil svcInfo")
+		return errors.New("svcInfo is nil. please specify non-nil svcInfo")
 	}
 	if handler == nil || reflect.ValueOf(handler).IsNil() {
-		panic("handler is nil. please specify non-nil handler")
+		return errors.New("handler is nil. please specify non-nil handler")
 	}
 
 	registerOpts := internal_server.NewRegisterOptions(opts)
 	// register service
 	if err := s.svcs.addService(svcInfo, handler, registerOpts); err != nil {
-		panic(err.Error())
+		return err
 	}
 	return nil
 }
