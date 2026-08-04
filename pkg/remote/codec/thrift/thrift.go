@@ -50,6 +50,8 @@ const (
 	FrugalReadWrite = FrugalWrite | FrugalRead
 
 	EnableSkipDecoder CodecType = 0b10000
+
+	fastWriteCopy CodecType = 0b100000
 )
 
 var (
@@ -64,6 +66,13 @@ var (
 // NewThriftCodec creates the thrift binary codec.
 func NewThriftCodec() remote.PayloadCodec {
 	return &thriftCodec{FastWrite | FastRead}
+}
+
+// NewThriftCodecWithFastWriteCopy creates a thrift codec that keeps fast read
+// and fast write enabled, but copies string and binary fields into the output
+// buffer instead of using remote.NocopyWrite.
+func NewThriftCodecWithFastWriteCopy() remote.PayloadCodec {
+	return &thriftCodec{FastReadWrite | fastWriteCopy}
 }
 
 // IsThriftCodec checks if the codec is thriftCodec
@@ -122,10 +131,10 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 		// if remote.Exception, we always use fastcodec
 		if transErr, ok := data.(*remote.TransError); ok {
 			ex := thrift.NewApplicationException(transErr.TypeID(), transErr.Error())
-			return encodeFastThrift(out, methodName, msgType, seqID, ex)
+			return encodeFastThrift(out, methodName, msgType, seqID, ex, c.IsSet(fastWriteCopy))
 		} else if err, ok := data.(error); ok {
 			ex := thrift.NewApplicationException(remote.InternalError, err.Error())
-			return encodeFastThrift(out, methodName, msgType, seqID, ex)
+			return encodeFastThrift(out, methodName, msgType, seqID, ex, c.IsSet(fastWriteCopy))
 		} else {
 			return fmt.Errorf("got %T for remote.Exception", data)
 		}
@@ -139,7 +148,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	// encode with FastWrite
 	if c.IsSet(FastWrite) {
 		if msg, ok := data.(thrift.FastCodec); ok {
-			return encodeFastThrift(out, methodName, msgType, seqID, msg)
+			return encodeFastThrift(out, methodName, msgType, seqID, msg, c.IsSet(fastWriteCopy))
 		}
 	}
 
@@ -157,7 +166,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	if c.CodecType != Basic {
 		// try FrugalWrite < - > FastWrite fallback
 		if msg, ok := data.(thrift.FastCodec); ok {
-			return encodeFastThrift(out, methodName, msgType, seqID, msg)
+			return encodeFastThrift(out, methodName, msgType, seqID, msg, c.IsSet(fastWriteCopy))
 		}
 		if hyperMarshalAvailable(data) { // slim template?
 			return c.hyperMarshal(out, methodName, msgType, seqID, data)
@@ -167,8 +176,13 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 }
 
 // encodeFastThrift encode with the FastCodec way
-func encodeFastThrift(out bufiox.Writer, methodName string, msgType remote.MessageType, seqID int32, msg thrift.FastCodec) error {
-	nw, _ := out.(remote.NocopyWrite)
+func encodeFastThrift(out bufiox.Writer, methodName string, msgType remote.MessageType, seqID int32, msg thrift.FastCodec, forceCopy bool) error {
+	// FastWriteNocopy copies string and binary fields into buf when its writer is nil.
+	// Expose the transport's NocopyWrite only when forceCopy is disabled.
+	var nw remote.NocopyWrite
+	if !forceCopy {
+		nw, _ = out.(remote.NocopyWrite)
+	}
 	// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
 	msgBeginLen := thrift.Binary.MessageBeginLength(methodName)
 	buf, err := out.Malloc(msgBeginLen + msg.BLength())
