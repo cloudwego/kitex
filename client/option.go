@@ -507,7 +507,7 @@ func WithGRPCReadBufferSize(s uint32) Option {
 }
 
 // WithGRPCMaxReceiveMessageSize sets the maximum size in bytes of a received gRPC message.
-// A non-positive value means unlimited.
+// The default is unlimited for backward compatibility. A non-positive value keeps it unlimited.
 func WithGRPCMaxReceiveMessageSize(s int) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCMaxReceiveMessageSize(%d)", s))

@@ -18,6 +18,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 
@@ -27,7 +28,6 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -274,7 +274,7 @@ func TestGRPCCodecDecodeMaxReceiveMessageSize(t *testing.T) {
 	msg := remote.NewMessage(nil, ri, remote.Stream, remote.Client)
 
 	err := codec.Decode(ctx, msg, mockIn)
-	if pErr, ok := err.(perrors.ProtocolError); !ok || pErr.TypeId() != perrors.SizeLimit {
+	if !errors.Is(err, kerrors.ErrOverlimit) {
 		t.Fatalf("unexpected error: %T %v", err, err)
 	}
 }

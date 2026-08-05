@@ -25,8 +25,8 @@ import (
 	"io"
 
 	"github.com/cloudwego/kitex/internal/utils/safemcache"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
@@ -49,9 +49,8 @@ func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer, maxReceiveMessag
 	compressFlag := hdr[0]
 	dLen := int(binary.BigEndian.Uint32(hdr[1:]))
 	if maxReceiveMessageSize > 0 && dLen > maxReceiveMessageSize {
-		return nil, perrors.NewProtocolErrorWithType(
-			perrors.SizeLimit,
-			fmt.Sprintf("grpc message length %d exceeds max receive message size %d", dLen, maxReceiveMessageSize),
+		return nil, kerrors.ErrOverlimit.WithCause(
+			fmt.Errorf("grpc message length %d exceeds max receive message size %d", dLen, maxReceiveMessageSize),
 		)
 	}
 	d, err := in.Next(dLen)

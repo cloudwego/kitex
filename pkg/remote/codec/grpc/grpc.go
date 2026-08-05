@@ -70,7 +70,7 @@ func WithThriftCodec(t remote.PayloadCodec) CodecOption {
 }
 
 // WithMaxReceiveMessageSize limits the maximum size in bytes of a received gRPC message.
-// A non-positive value means unlimited.
+// The default is unlimited for backward compatibility. A non-positive value keeps it unlimited.
 func WithMaxReceiveMessageSize(size int) CodecOption {
 	return func(c *grpcCodec) {
 		c.MaxReceiveMessageSize = size
