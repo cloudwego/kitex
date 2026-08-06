@@ -45,6 +45,7 @@ import (
 	mockthrift "github.com/cloudwego/kitex/internal/mocks/thrift"
 	internal_stream "github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/internal/test/rpcinfotest"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -154,24 +155,18 @@ func TestCall(t *testing.T) {
 }
 
 type asyncRPCInfoReadTracker struct {
-	mu    sync.Mutex
-	stops []chan struct{}
-	dones []chan any
+	mu      sync.Mutex
+	readers []*rpcinfotest.ReadLoop
 }
 
 func (r *asyncRPCInfoReadTracker) middleware(next endpoint.Endpoint) endpoint.Endpoint {
 	return func(ctx context.Context, req, resp interface{}) error {
-		stop := make(chan struct{})
-		started := make(chan struct{})
-		done := make(chan any, 1)
+		reader := rpcinfotest.StartReadLoop(ctx)
 
 		r.mu.Lock()
-		r.stops = append(r.stops, stop)
-		r.dones = append(r.dones, done)
+		r.readers = append(r.readers, reader)
 		r.mu.Unlock()
 
-		go readRPCInfoUntilStopped(ctx, stop, started, done)
-		<-started
 		return next(ctx, req, resp)
 	}
 }
@@ -180,17 +175,11 @@ func (r *asyncRPCInfoReadTracker) stopAndAssert(t *testing.T) {
 	t.Helper()
 
 	r.mu.Lock()
-	stops := append([]chan struct{}(nil), r.stops...)
-	dones := append([]chan any(nil), r.dones...)
+	readers := append([]*rpcinfotest.ReadLoop(nil), r.readers...)
 	r.mu.Unlock()
 
-	for _, stop := range stops {
-		close(stop)
-	}
-	for _, done := range dones {
-		if panicInfo := <-done; panicInfo != nil {
-			t.Fatalf("async RPCInfo read panicked: %v", panicInfo)
-		}
+	for _, reader := range readers {
+		reader.StopAndAssert(t)
 	}
 }
 

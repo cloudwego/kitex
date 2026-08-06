@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +30,7 @@ import (
 	thrift "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/mocks/thrift/testservice"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/internal/test/rpcinfotest"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/generic"
@@ -163,61 +163,6 @@ func assertPanicErr(t *testing.T, err error) {
 	test.Assert(t, errors.Is(err, kerrors.ErrPanic), err)
 }
 
-func readLocalCallerRPCInfoForAsyncTest(ctx context.Context) {
-	ri := rpcinfo.GetRPCInfo(ctx)
-	if ri == nil {
-		panic("nil RPCInfo")
-	}
-	if from := ri.From(); from == nil {
-		panic("nil From endpoint")
-	} else {
-		_ = from.ServiceName()
-		_ = from.Method()
-		_ = from.Address()
-	}
-	if to := ri.To(); to == nil {
-		panic("nil To endpoint")
-	} else {
-		_ = to.ServiceName()
-		_ = to.Method()
-		_ = to.Address()
-	}
-	if inv := ri.Invocation(); inv == nil {
-		panic("nil Invocation")
-	} else {
-		_ = inv.ServiceName()
-		_ = inv.MethodName()
-		_ = inv.StreamingMode()
-	}
-	if cfg := ri.Config(); cfg == nil {
-		panic("nil RPCConfig")
-	} else {
-		_ = cfg.RPCTimeout()
-	}
-	if stats := ri.Stats(); stats == nil {
-		panic("nil RPCStats")
-	} else {
-		_ = stats.Level()
-		_ = stats.Error()
-	}
-}
-
-func readLocalCallerRPCInfoUntilStopped(ctx context.Context, stop <-chan struct{}, started chan<- struct{}, done chan<- any) {
-	close(started)
-	defer func() {
-		done <- recover()
-	}()
-	for {
-		select {
-		case <-stop:
-			return
-		default:
-			readLocalCallerRPCInfoForAsyncTest(ctx)
-			runtime.Gosched()
-		}
-	}
-}
-
 // --- second service for multi-service tests ---
 
 type testService2 interface {
@@ -308,13 +253,10 @@ func TestLocalCaller_MiddlewareExecution(t *testing.T) {
 }
 
 func TestRPCInfoAceessNoRace(t *testing.T) {
-	stop := make(chan struct{})
-	started := make(chan struct{})
-	done := make(chan any, 1)
+	var reader *rpcinfotest.ReadLoop
 	mw := func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, req, resp any) error {
-			go readLocalCallerRPCInfoUntilStopped(ctx, stop, started, done)
-			<-started
+			reader = rpcinfotest.StartReadLoop(ctx)
 			return next(ctx, req, resp)
 		}
 	}
@@ -329,10 +271,7 @@ func TestRPCInfoAceessNoRace(t *testing.T) {
 		&thrift.TestServiceEchoPingPongResult{})
 	test.Assert(t, err == nil, err)
 
-	close(stop)
-	if panicInfo := <-done; panicInfo != nil {
-		t.Fatalf("async RPCInfo read panicked: %v", panicInfo)
-	}
+	reader.StopAndAssert(t)
 }
 
 func TestLocalCaller_MultipleMiddlewaresOrdering(t *testing.T) {

@@ -33,6 +33,7 @@ import (
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	mockstats "github.com/cloudwego/kitex/internal/mocks/stats"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/internal/test/rpcinfotest"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -63,58 +64,6 @@ func newTestRpcInfo() rpcinfo.RPCInfo {
 	rpcinfo.AsMutableEndpointInfo(rpcInfo.From()).SetAddress(addr)
 
 	return rpcInfo
-}
-
-func mustReadMuxServerRPCInfoAsync(t *testing.T, ctx context.Context) {
-	t.Helper()
-
-	done := make(chan interface{}, 1)
-	go func() {
-		defer func() {
-			done <- recover()
-		}()
-		readMuxServerRPCInfoForAsyncTest(ctx)
-	}()
-	if panicInfo := <-done; panicInfo != nil {
-		t.Fatalf("async RPCInfo read panicked: %v", panicInfo)
-	}
-}
-
-func readMuxServerRPCInfoForAsyncTest(ctx context.Context) {
-	ri := rpcinfo.GetRPCInfo(ctx)
-	if ri == nil {
-		panic("nil RPCInfo")
-	}
-	if from := ri.From(); from == nil {
-		panic("nil From endpoint")
-	} else {
-		_ = from.ServiceName()
-		_ = from.Method()
-		_ = from.Address()
-	}
-	if to := ri.To(); to == nil {
-		panic("nil To endpoint")
-	} else {
-		_ = to.ServiceName()
-		_ = to.Method()
-		_ = to.Address()
-	}
-	if inv := ri.Invocation(); inv == nil {
-		panic("nil Invocation")
-	} else {
-		_ = inv.ServiceName()
-		_ = inv.MethodName()
-		_ = inv.StreamingMode()
-	}
-	if cfg := ri.Config(); cfg != nil {
-		_ = cfg.RPCTimeout()
-	}
-	if stats := ri.Stats(); stats == nil {
-		panic("nil RPCStats")
-	} else {
-		_ = stats.Level()
-		_ = stats.Error()
-	}
 }
 
 func init() {
@@ -375,7 +324,7 @@ func TestRPCInfoAceessNoRace(t *testing.T) {
 	}
 	svrTransHdlr.tasks.Wait()
 	test.Assert(t, captured != nil)
-	mustReadMuxServerRPCInfoAsync(t, captured)
+	rpcinfotest.MustReadAsync(t, captured)
 }
 
 // TestPanicAfterMuxSvrOnRead test have panic after read
