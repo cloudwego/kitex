@@ -188,7 +188,7 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	test.Panic(t, func() { mw1(mw2(panicEp))(ctx, nil, nil) })
 }
 
-func TestRpcTimeoutMWDisablePoolKeepsRPCInfoReadableAfterTimeout(t *testing.T) {
+func TestRpcTimeoutMWRPCInfoAceessNoRace(t *testing.T) {
 	timeoutCtxCh := make(chan context.Context, 1)
 	stop := make(chan struct{})
 	started := make(chan struct{})

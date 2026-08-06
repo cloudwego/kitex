@@ -28,7 +28,7 @@ import (
 func newCtxTestRPCInfo() rpcinfo.RPCInfo {
 	method := "TestMethod"
 	svcName := "TestServiceName"
-	netAddr := utils.NewNetAddr("TestNetWork", "TestAddress")
+	netAddr := utils.NewNetAddr("TestNetwork", "TestAddress")
 	tags := map[string]string{"MapTestKey": "MapTestValue"}
 
 	return rpcinfo.NewRPCInfo(

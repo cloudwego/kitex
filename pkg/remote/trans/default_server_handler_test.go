@@ -211,7 +211,7 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 	test.Assert(t, err == nil)
 }
 
-func TestDefaultSvrTransHandlerDisablePoolKeepsRPCInfoReadableAfterOnRead(t *testing.T) {
+func TestRPCInfoAceessNoRace(t *testing.T) {
 	buf := remote.NewReaderWriterBuffer(1024)
 	ext := &MockExtension{
 		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {

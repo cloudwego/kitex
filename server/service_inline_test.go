@@ -195,7 +195,7 @@ func TestServiceInline(t *testing.T) {
 	}
 }
 
-func TestServiceInlineDisablePoolNoRaceWithAsyncServerRPCInfoReadDuringFinish(t *testing.T) {
+func TestRPCInfoAceessNoRace(t *testing.T) {
 	stop := make(chan struct{})
 	started := make(chan struct{})
 	done := make(chan any, 1)

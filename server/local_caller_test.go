@@ -307,7 +307,7 @@ func TestLocalCaller_MiddlewareExecution(t *testing.T) {
 	test.Assert(t, called, "middleware was not called")
 }
 
-func TestLocalCallerDisablePoolNoRaceWithAsyncRPCInfoReadDuringFinish(t *testing.T) {
+func TestRPCInfoAceessNoRace(t *testing.T) {
 	stop := make(chan struct{})
 	started := make(chan struct{})
 	done := make(chan any, 1)

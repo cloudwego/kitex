@@ -84,7 +84,7 @@ func TestServiceInlineCall(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
-func TestServiceInlineDisablePoolKeepsClientRPCInfoReadableAfterCall(t *testing.T) {
+func TestServiceInlineRPCInfoAceessNoRace(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
