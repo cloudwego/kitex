@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -718,6 +719,51 @@ func createErrorMiddleware(injectErr error) cep.StreamMiddleware {
 			return nil, injectErr
 		}
 	}
+}
+
+func createPanicMiddleware(panicInfo interface{}) cep.StreamMiddleware {
+	return func(next cep.StreamEndpoint) cep.StreamEndpoint {
+		return func(ctx context.Context) (streaming.ClientStream, error) {
+			panic(panicInfo)
+		}
+	}
+}
+
+func TestStreamRecoverPanicAsError(t *testing.T) {
+	const panicMessage = "test stream panic"
+
+	cli, err := NewClient(mocks.ServiceInfo(),
+		WithTransportProtocol(transport.TTHeaderStreaming),
+		WithDestService("MockService"),
+		WithStreamOptions(
+			WithStreamMiddleware(createPanicMiddleware(panicMessage)),
+		),
+	)
+	test.Assert(t, err == nil, err)
+	streamingCli := cli.(Streaming)
+
+	err = streamingCli.Stream(context.Background(), "mockStreaming", nil, &streaming.Result{})
+	test.Assert(t, err != nil)
+	test.Assert(t, strings.Contains(err.Error(), panicMessage), err)
+}
+
+func TestStreamXRecoverPanicAsError(t *testing.T) {
+	const panicMessage = "test streamX panic"
+
+	cli, err := NewClient(mocks.ServiceInfo(),
+		WithTransportProtocol(transport.TTHeaderStreaming),
+		WithDestService("MockService"),
+		WithStreamOptions(
+			WithStreamMiddleware(createPanicMiddleware(panicMessage)),
+		),
+	)
+	test.Assert(t, err == nil, err)
+	streamingCli := cli.(Streaming)
+
+	stream, err := streamingCli.StreamX(context.Background(), "mockStreaming")
+	test.Assert(t, stream == nil, stream)
+	test.Assert(t, err != nil)
+	test.Assert(t, strings.Contains(err.Error(), panicMessage), err)
 }
 
 // TestStreamDoFinish tests if DoFinish is correctly called in Stream method
