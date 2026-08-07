@@ -243,7 +243,7 @@ func TestMuxSvrOnRead(t *testing.T) {
 	test.Assert(t, isInvoked.Load() == 1)
 }
 
-func TestRPCInfoAceessNoRace(t *testing.T) {
+func TestRPCInfoAccessNoRace(t *testing.T) {
 	const body = "hello world"
 	buf := netpoll.NewLinkBuffer(1024)
 	npconn := &MockNetpollConn{

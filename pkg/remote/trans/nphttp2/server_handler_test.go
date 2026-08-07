@@ -504,7 +504,7 @@ func Test_RPCInfoReuse(t *testing.T) {
 	}
 }
 
-func TestRPCInfoAceessNoRace(t *testing.T) {
+func TestRPCInfoAccessNoRace(t *testing.T) {
 	opt := newMockServerOption()
 	opt.SvcSearcher = mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
 		"Greeter": {

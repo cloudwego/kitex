@@ -140,7 +140,7 @@ func TestServiceInline(t *testing.T) {
 	}
 }
 
-func TestRPCInfoAceessNoRace(t *testing.T) {
+func TestRPCInfoAccessNoRace(t *testing.T) {
 	var reader *rpcinfotest.ReadLoop
 	svr := NewServer(WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, req, resp interface{}) error {

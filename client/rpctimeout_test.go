@@ -115,7 +115,7 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	test.Panic(t, func() { mw1(mw2(panicEp))(ctx, nil, nil) })
 }
 
-func TestRpcTimeoutMWRPCInfoAceessNoRace(t *testing.T) {
+func TestRpcTimeoutMWRPCInfoAccessNoRace(t *testing.T) {
 	timeoutCtxCh := make(chan context.Context, 1)
 	readerCh := make(chan *rpcinfotest.ReadLoop, 1)
 	mw := rpcTimeoutMW(context.Background())

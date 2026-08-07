@@ -85,7 +85,7 @@ func TestServiceInlineCall(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
-func TestServiceInlineRPCInfoAceessNoRace(t *testing.T) {
+func TestServiceInlineRPCInfoAccessNoRace(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 

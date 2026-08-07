@@ -160,7 +160,7 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 	test.Assert(t, err == nil)
 }
 
-func TestRPCInfoAceessNoRace(t *testing.T) {
+func TestRPCInfoAccessNoRace(t *testing.T) {
 	buf := remote.NewReaderWriterBuffer(1024)
 	ext := &MockExtension{
 		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {

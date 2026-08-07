@@ -252,7 +252,7 @@ func TestLocalCaller_MiddlewareExecution(t *testing.T) {
 	test.Assert(t, called, "middleware was not called")
 }
 
-func TestRPCInfoAceessNoRace(t *testing.T) {
+func TestRPCInfoAccessNoRace(t *testing.T) {
 	var reader *rpcinfotest.ReadLoop
 	mw := func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, req, resp any) error {

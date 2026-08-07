@@ -183,7 +183,7 @@ func (r *asyncRPCInfoReadTracker) stopAndAssert(t *testing.T) {
 	}
 }
 
-func TestClientRPCInfoAceessNoRace(t *testing.T) {
+func TestClientRPCInfoAccessNoRace(t *testing.T) {
 	mockErr := errors.New("mock")
 	testcases := []struct {
 		name      string
