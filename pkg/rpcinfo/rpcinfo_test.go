@@ -39,23 +39,27 @@ func TestInitPoolEnabledFromEnv(t *testing.T) {
 	originState := PoolEnabled()
 	defer EnablePool(originState)
 
-	t.Run("disable", func(t *testing.T) {
-		t.Setenv("KITEX_DISABLE_RPCINFO_POOL", "1")
-		t.Setenv("KITEX_ENABLE_RPCINFO_POOL", "")
-		EnablePool(true)
+	tests := []struct {
+		name       string
+		disableEnv string
+		enableEnv  string
+		want       bool
+	}{
+		{name: "disabled by default", want: false},
+		{name: "disable", disableEnv: "1", want: false},
+		{name: "enable", enableEnv: "1", want: true},
+		{name: "disable overrides enable", disableEnv: "1", enableEnv: "1", want: false},
+	}
 
-		initPoolEnabledFromEnv()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("KITEX_DISABLE_RPCINFO_POOL", tt.disableEnv)
+			t.Setenv("KITEX_ENABLE_RPCINFO_POOL", tt.enableEnv)
+			EnablePool(!tt.want)
 
-		test.Assert(t, !PoolEnabled())
-	})
+			initPoolEnabledFromEnv()
 
-	t.Run("enable overrides disable", func(t *testing.T) {
-		t.Setenv("KITEX_DISABLE_RPCINFO_POOL", "1")
-		t.Setenv("KITEX_ENABLE_RPCINFO_POOL", "1")
-		EnablePool(false)
-
-		initPoolEnabledFromEnv()
-
-		test.Assert(t, PoolEnabled())
-	})
+			test.Assert(t, PoolEnabled() == tt.want)
+		})
+	}
 }

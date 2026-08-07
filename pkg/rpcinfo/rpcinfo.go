@@ -36,12 +36,12 @@ func init() {
 
 func initPoolEnabledFromEnv() {
 	// Keep migration-only env switches for compatibility with existing
-	// deployments while RPCInfo pooling is being phased out.
+	// deployments while RPCInfo pooling is being phased out. The legacy disable
+	// switch takes precedence when both switches are set.
 	if os.Getenv("KITEX_DISABLE_RPCINFO_POOL") != "" {
 		EnablePool(false)
-	}
-	if os.Getenv("KITEX_ENABLE_RPCINFO_POOL") != "" {
-		EnablePool(true)
+	} else {
+		EnablePool(os.Getenv("KITEX_ENABLE_RPCINFO_POOL") != "")
 	}
 }
 
