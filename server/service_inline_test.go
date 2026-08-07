@@ -154,7 +154,9 @@ func TestRPCInfoAceessNoRace(t *testing.T) {
 	if iface, ok := svr.(serviceInline); ok {
 		cliCtx := context.Background()
 		cliRPCInfo := constructClientRPCInfo()
+		//nolint:staticcheck // SA1029: consts.SERVICE_INLINE_RPCINFO_KEY has been used and we just follow it
 		cliCtx = context.WithValue(cliCtx, consts.SERVICE_INLINE_RPCINFO_KEY, unsafe.Pointer(&cliRPCInfo))
+		//nolint:staticcheck // SA1029: consts.SERVICE_INLINE_CUSTOM_CTX_KEY has been used and we just follow it
 		cliCtx = context.WithValue(cliCtx, consts.SERVICE_INLINE_CUSTOM_CTX_KEY, "custom_ctx_key")
 		cliCtx = metainfo.WithBackwardValues(cliCtx)
 		cliCtx = metainfo.WithValue(cliCtx, "KeyTmp", "ValueTmp")

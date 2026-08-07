@@ -54,7 +54,9 @@ func initPoolEnabledFromEnv() {
 // By turning off the pool, we can quickly confirm whether the concurrency issues is
 // caused by such cases, but do remember there's a PERFORMANCE LOSS.
 //
-// Deprecated: RPCInfo pooling is a legacy mechanism under migration. It may
+// TODO: mark Deprecated after all internal uses have been migrated.
+//
+// RPCInfo pooling is a legacy mechanism under migration. It may
 // cause panic or data races when RPCInfo is accessed asynchronously after
 // framework cleanup. Kitex is gradually removing this pooling mechanism; this
 // API is kept only for compatibility during the migration.
@@ -68,7 +70,9 @@ func EnablePool(enable bool) {
 
 // PoolEnabled returns true if rpcInfoPool is enabled.
 //
-// Deprecated: RPCInfo pooling is a legacy mechanism under migration. It may
+// TODO: mark Deprecated after all internal uses have been migrated.
+//
+// RPCInfo pooling is a legacy mechanism under migration. It may
 // cause panic or data races when RPCInfo is accessed asynchronously after
 // framework cleanup. Kitex is gradually removing this pooling mechanism; this
 // API is kept only for compatibility during the migration.

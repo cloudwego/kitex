@@ -260,8 +260,8 @@ func TestRPCInfoAceessNoRace(t *testing.T) {
 		},
 	}
 	serverOpt := &remote.ServerOption{
-		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-			ri = newTestRpcInfo()
+		InitOrResetRPCInfoFunc: func(_ rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+			ri := newTestRpcInfo()
 			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
 			return ri
 		},
