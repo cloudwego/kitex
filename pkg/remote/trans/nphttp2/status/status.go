@@ -45,15 +45,70 @@ type Iface interface {
 	GRPCStatus() *Status
 }
 
+// Source identifies, from the current process's point of view, the boundary
+// through which a terminal status originated: produced by the process itself
+// (SourceLocal), received on a connection the process accepted (SourceInbound),
+// or received on a connection the process initiated (SourceOutbound).
+//
+// Source is process-local observability metadata: it is never transmitted on
+// the wire, so each process derives its own attribution at the point where a
+// terminal signal first enters it (or is produced locally). Within the
+// process, the attribution is deliberately preserved while the signal
+// cascades across RPC legs. E.g. when a proxy cancels its outbound call
+// because the caller of the inbound RPC driving it terminated, the outbound
+// stream surfaces a SourceInbound status, telling the process that the
+// termination originated from its inbound side rather than from the callee.
+//
+// Source reflects neither the cross-process root cause of a failure nor a
+// trusted identity, so it must not be used for authorization decisions.
+type Source uint8
+
+const (
+	// SourceLocal means the current process produced the terminal status, e.g. a
+	// local context cancel/deadline, admission check, or framework-local error.
+	SourceLocal Source = iota
+	// SourceInbound means the terminal signal was explicitly sent by the peer of
+	// an RPC accepted by the current process, e.g. the caller sent RST_STREAM.
+	SourceInbound
+	// SourceOutbound means the termination was returned by the peer of an RPC
+	// initiated by the current process, e.g. a gRPC status carried by
+	// Headers/Trailers or an RST_STREAM sent by the callee.
+	SourceOutbound
+)
+
+// String returns a stable low-cardinality label suitable for metrics.
+func (s Source) String() string {
+	switch s {
+	case SourceInbound:
+		return "inbound"
+	case SourceOutbound:
+		return "outbound"
+	default:
+		return "local"
+	}
+}
+
 // Status represents an RPC status code, message, and details.  It is immutable
-// and should be created with New, Newf, or FromProto.
+// and should be created with New, Newf, NewWithSource, FromProto, or
+// FromProtoWithSource.
 type Status struct {
 	s *spb.Status
+	// source is intentionally excluded from Proto() and never reaches the wire.
+	source Source
 }
 
 // New returns a Status representing c and msg.
 func New(c codes.Code, msg string) *Status {
-	return &Status{s: &spb.Status{Code: int32(c), Message: msg}}
+	return NewWithSource(c, msg, SourceLocal)
+}
+
+// NewWithSource returns a Status representing c and msg with source as its
+// process-local source attribution.
+func NewWithSource(c codes.Code, msg string, source Source) *Status {
+	return &Status{
+		s:      &spb.Status{Code: int32(c), Message: msg},
+		source: normalizeSource(source),
+	}
 }
 
 // Newf returns New(c, fmt.Sprintf(format, a...)).
@@ -68,7 +123,20 @@ func ErrorProto(s *spb.Status) error {
 
 // FromProto returns a Status representing s.
 func FromProto(s *spb.Status) *Status {
-	return &Status{s: proto.Clone(s).(*spb.Status)}
+	return FromProtoWithSource(s, SourceLocal)
+}
+
+// FromProtoWithSource returns a Status representing s with source as its
+// process-local source attribution.
+func FromProtoWithSource(s *spb.Status, source Source) *Status {
+	return newStatusFromProto(s, source)
+}
+
+func newStatusFromProto(s *spb.Status, source Source) *Status {
+	return &Status{
+		s:      proto.Clone(s).(*spb.Status),
+		source: normalizeSource(source),
+	}
 }
 
 // Err returns an error representing c and msg.  If c is OK, returns nil.
@@ -97,6 +165,45 @@ func (s *Status) Message() string {
 	return s.s.Message
 }
 
+// Source returns the process-local source attribution of s. It returns
+// SourceLocal when s is nil or its source is invalid.
+func (s *Status) Source() Source {
+	if s == nil {
+		return SourceLocal
+	}
+	return normalizeSource(s.source)
+}
+
+// WithSource returns a copy of s with the process-local source
+// attribution set to source. The returned Source is excluded from Proto() and
+// is therefore never transmitted on the wire.
+func (s *Status) WithSource(source Source) *Status {
+	if s == nil {
+		return nil
+	}
+	ns := s.Copy()
+	ns.source = normalizeSource(source)
+	return ns
+}
+
+func normalizeSource(source Source) Source {
+	switch source {
+	case SourceInbound, SourceOutbound:
+		return source
+	default:
+		return SourceLocal
+	}
+}
+
+// Copy returns a deep copy of s, preserving Source.
+// Note that copying via Proto()/FromProto() drops Source by design.
+func (s *Status) Copy() *Status {
+	if s == nil {
+		return nil
+	}
+	return newStatusFromProto(s.s, s.Source())
+}
+
 // AppendMessage append extra msg for Status
 func (s *Status) AppendMessage(extraMsg string) *Status {
 	if s == nil || s.s == nil || extraMsg == "" {
@@ -119,7 +226,7 @@ func (s *Status) Err() error {
 	if s.Code() == codes.OK {
 		return nil
 	}
-	return &Error{e: s.Proto()}
+	return &Error{e: s.Proto(), source: s.Source()}
 }
 
 // WithDetails returns a new status with the provided details messages appended to the status.
@@ -137,7 +244,9 @@ func (s *Status) WithDetails(details ...proto.Message) (*Status, error) {
 		}
 		p.Details = append(p.Details, any)
 	}
-	return &Status{s: p}, nil
+	// p is already a private deep copy returned by Proto(), so constructing the
+	// result directly avoids cloning the entire status a second time.
+	return &Status{s: p, source: s.Source()}, nil
 }
 
 // Details returns a slice of details messages attached to the status.
@@ -161,7 +270,8 @@ func (s *Status) Details() []interface{} {
 // Error wraps a pointer of a status proto. It implements error and Status,
 // and a nil *Error should never be returned by this package.
 type Error struct {
-	e *spb.Status
+	e      *spb.Status
+	source Source
 }
 
 func (e *Error) Error() string {
@@ -170,7 +280,7 @@ func (e *Error) Error() string {
 
 // GRPCStatus returns the Status represented by se.
 func (e *Error) GRPCStatus() *Status {
-	return FromProto(e.e)
+	return newStatusFromProto(e.e, e.source)
 }
 
 // Is implements future error.Is functionality.

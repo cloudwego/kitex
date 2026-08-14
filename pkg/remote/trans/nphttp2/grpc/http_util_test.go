@@ -23,7 +23,14 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/http2/hpack"
+	spb "google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
 func TestEncoding(t *testing.T) {
@@ -502,4 +509,87 @@ func TestConnectionError(t *testing.T) {
 	test.Assert(t, ori == context.Canceled)
 
 	test.Assert(t, connectionError.Code() == 14)
+}
+
+func TestDecodedStatusSources(t *testing.T) {
+	t.Run("client receives explicit status", func(t *testing.T) {
+		state := &decodeState{}
+		state.processHeaderField(hpack.HeaderField{Name: "grpc-status", Value: "1"})
+		got := state.status()
+		test.Assert(t, got.Source() == status.SourceOutbound, got)
+		// status() caches the generated status instead of allocating on every read.
+		test.Assert(t, state.status() == got)
+	})
+
+	t.Run("server receives explicit status", func(t *testing.T) {
+		state := &decodeState{serverSide: true}
+		state.processHeaderField(hpack.HeaderField{Name: "grpc-status", Value: "1"})
+		test.Assert(t, state.status().Source() == status.SourceInbound, state.status())
+	})
+
+	t.Run("client synthesizes missing status", func(t *testing.T) {
+		state := &decodeState{}
+		err := state.decodeHeader(&grpcframe.MetaHeadersFrame{Fields: []hpack.HeaderField{
+			{Name: "content-type", Value: baseContentType},
+		}})
+		test.Assert(t, err == nil, err)
+		test.Assert(t, state.status().Code() == codes.Unknown, state.status())
+		test.Assert(t, state.status().Source() == status.SourceLocal, state.status())
+	})
+
+	t.Run("client receives HTTP fallback status", func(t *testing.T) {
+		state := &decodeState{}
+		err := state.decodeHeader(&grpcframe.MetaHeadersFrame{Fields: []hpack.HeaderField{
+			{Name: ":status", Value: "503"},
+			{Name: "content-type", Value: "text/plain"},
+		}})
+		got, ok := status.FromError(err)
+		test.Assert(t, ok, err)
+		test.Assert(t, got.Code() == codes.Unavailable, got)
+		test.Assert(t, got.Source() == status.SourceOutbound, got.Source())
+	})
+
+	t.Run("client synthesizes missing HTTP status", func(t *testing.T) {
+		state := &decodeState{}
+		err := state.decodeHeader(&grpcframe.MetaHeadersFrame{Fields: []hpack.HeaderField{
+			{Name: "content-type", Value: "text/plain"},
+		}})
+		got, ok := status.FromError(err)
+		test.Assert(t, ok, err)
+		test.Assert(t, got.Source() == status.SourceLocal, got.Source())
+	})
+
+	t.Run("client rejects malformed HTTP status", func(t *testing.T) {
+		state := &decodeState{}
+		err := state.decodeHeader(&grpcframe.MetaHeadersFrame{Fields: []hpack.HeaderField{
+			{Name: ":status", Value: "invalid"},
+		}})
+		got, ok := status.FromError(err)
+		test.Assert(t, ok, err)
+		test.Assert(t, got.Source() == status.SourceLocal, got.Source())
+	})
+
+	t.Run("server rejects invalid HTTP request", func(t *testing.T) {
+		state := &decodeState{serverSide: true}
+		err := state.decodeHeader(&grpcframe.MetaHeadersFrame{Fields: []hpack.HeaderField{
+			{Name: "content-type", Value: "text/plain"},
+		}})
+		got, ok := status.FromError(err)
+		test.Assert(t, ok, err)
+		test.Assert(t, got.Source() == status.SourceLocal, got.Source())
+	})
+
+	t.Run("client receives status details", func(t *testing.T) {
+		state := &decodeState{}
+		state.processHeaderField(hpack.HeaderField{Name: "grpc-status", Value: "13"})
+		wireStatus := &spb.Status{Code: int32(codes.Internal), Message: "details"}
+		payload, err := proto.Marshal(wireStatus)
+		test.Assert(t, err == nil, err)
+		state.processHeaderField(hpack.HeaderField{Name: "grpc-status-details-bin", Value: encodeBinHeader(payload)})
+
+		got := state.status()
+		test.Assert(t, got.Source() == status.SourceOutbound, got)
+		test.Assert(t, got.Code() == codes.Internal, got)
+		test.Assert(t, got.Message() == "details", got)
+	})
 }

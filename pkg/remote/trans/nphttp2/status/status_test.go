@@ -70,7 +70,7 @@ func TestError(t *testing.T) {
 	s.Code = 1
 	s.Message = "test err"
 
-	er := &Error{s}
+	er := &Error{e: s}
 	test.Assert(t, len(er.Error()) > 0)
 
 	status := er.GRPCStatus()
@@ -101,7 +101,7 @@ func TestFromContextError(t *testing.T) {
 	s := new(spb.Status)
 	s.Code = 1
 	s.Message = "test err"
-	grpcErr := &Error{s}
+	grpcErr := &Error{e: s}
 	// grpc err
 	codeGrpcErr := Code(grpcErr)
 	test.Assert(t, codeGrpcErr == codes.Canceled)

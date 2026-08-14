@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
 func TestGracefulShutdown(t *testing.T) {
@@ -57,4 +58,5 @@ func TestGracefulShutdown(t *testing.T) {
 	st := stream.Status()
 	test.Assert(t, strings.Contains(st.Message(), gracefulShutdownMsg), st.Message())
 	test.Assert(t, st.Code() == codes.Unavailable, st.Code())
+	test.Assert(t, st.Source() == status.SourceOutbound, st.Source())
 }

@@ -77,7 +77,8 @@ var (
 	errIdleClosing        = status.Err(codes.Canceled, "transport: closing server transport due to idleness"+triggeredByRemoteServiceSuffix)
 	errBizHandlerReturn   = status.Err(codes.Canceled, "transport: canceled by business handler returning")
 
-	errGracefulShutdown = status.Err(codes.Unavailable, gracefulShutdownMsg)
+	errGracefulShutdown        = status.Err(codes.Unavailable, gracefulShutdownMsg)
+	errGracefulShutdownInbound = status.NewWithSource(codes.Unavailable, gracefulShutdownMsg, status.SourceInbound).Err()
 )
 
 func init() {
@@ -605,9 +606,10 @@ func (t *http2Server) handleRSTStream(f *http2.RSTStreamFrame) {
 	// If the stream is not deleted from the transport's active streams map, then do a regular close stream.
 	if s, ok := t.getStream(f); ok {
 		if f.ErrCode == gracefulShutdownCode {
-			t.closeStream(s, errGracefulShutdown, false, 0, false)
+			t.closeStream(s, errGracefulShutdownInbound, false, 0, false)
 		} else {
-			t.closeStream(s, status.Errorf(codes.Canceled, "transport: RSTStream Frame received with error code: %v [triggered by %s]", f.ErrCode, s.sourceService), false, 0, false)
+			msg := fmt.Sprintf("transport: RSTStream Frame received with error code: %v [triggered by %s]", f.ErrCode, s.sourceService)
+			t.closeStream(s, status.NewWithSource(codes.Canceled, msg, status.SourceInbound).Err(), false, 0, false)
 		}
 		return
 	}

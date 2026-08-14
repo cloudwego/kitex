@@ -113,8 +113,12 @@ type parsedHeaderData struct {
 	// statusGen caches the stream status received from the trailer the server
 	// sent.  Client side only.  Do not access directly.  After all trailers are
 	// parsed, use the status method to retrieve the status.
-	statusGen    *status.Status
-	bizStatusErr kerrors.BizStatusErrorIface
+	statusGen *status.Status
+	// statusReceived records whether a valid terminal status field was
+	// explicitly received from the peer. A locally synthesized fallback code
+	// must not be attributed to the peer.
+	statusReceived bool
+	bizStatusErr   kerrors.BizStatusErrorIface
 	// rawStatusCode and rawStatusMsg are set from the raw trailer fields and are not
 	// intended for direct access outside of parsing.
 	rawStatusCode  *int
@@ -237,9 +241,24 @@ func contentType(contentSubtype string) string {
 func (d *decodeState) status() *status.Status {
 	if d.data.statusGen == nil {
 		// No status-details were provided; generate status using code/msg.
-		d.data.statusGen = status.New(codes.Code(safeCastInt32(*(d.data.rawStatusCode))), d.data.rawStatusMsg)
+		code := codes.Unknown
+		if d.data.rawStatusCode != nil {
+			code = codes.Code(safeCastInt32(*d.data.rawStatusCode))
+		}
+		source := status.SourceLocal
+		if d.data.statusReceived {
+			source = d.peerStatusSource()
+		}
+		d.data.statusGen = status.NewWithSource(code, d.data.rawStatusMsg, source)
 	}
 	return d.data.statusGen
+}
+
+func (d *decodeState) peerStatusSource() status.Source {
+	if d.serverSide {
+		return status.SourceInbound
+	}
+	return status.SourceOutbound
 }
 
 func (d *decodeState) bizStatusErr() kerrors.BizStatusErrorIface {
@@ -338,7 +357,14 @@ func (d *decodeState) decodeHeader(frame *grpcframe.MetaHeadersFrame) error {
 		}
 	}
 
-	return status.New(code, d.constructHTTPErrMsg()).Err()
+	source := status.SourceLocal
+	if !d.serverSide && d.data.httpStatus != nil {
+		// A valid HTTP status is an explicit terminal signal from the peer of
+		// this outbound RPC. Missing status and server-side protocol validation
+		// errors are synthesized locally.
+		source = status.SourceOutbound
+	}
+	return status.NewWithSource(code, d.constructHTTPErrMsg(), source).Err()
 }
 
 // constructErrMsg constructs error message to be returned in HTTP fallback mode.
@@ -394,6 +420,7 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 			return
 		}
 		d.data.rawStatusCode = &code
+		d.data.statusReceived = true
 	case "grpc-message":
 		d.data.rawStatusMsg = decodeGrpcMessage(f.Value)
 	case "biz-status":
@@ -421,7 +448,8 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 			d.data.grpcErr = status.Errorf(codes.Internal, "transport: malformed grpc-status-details-bin: %v", err)
 			return
 		}
-		d.data.statusGen = status.FromProto(s)
+		d.data.statusReceived = true
+		d.data.statusGen = status.FromProtoWithSource(s, d.peerStatusSource())
 	case "grpc-timeout":
 		d.data.timeoutSet = true
 		var err error

@@ -320,6 +320,7 @@ func (h *testStreamHandler) gracefulShutdown(t *testing.T, s *Stream) {
 	st, ok := status.FromError(err)
 	test.Assert(t, ok, err)
 	test.Assert(t, st.Code() == codes.Unavailable, st)
+	test.Assert(t, st.Source() == status.SourceLocal, st.Source())
 }
 
 func (h *testStreamHandler) handleStreamCancel(t *testing.T, s *Stream) {
@@ -374,6 +375,7 @@ func verifyCancelError(t *testing.T, err error) {
 	test.Assert(t, ok)
 	test.Assert(t, st.Code() == codes.Canceled, st.Code())
 	test.Assert(t, strings.Contains(st.Message(), "transport: RSTStream Frame received with error code"), st.Message())
+	test.Assert(t, st.Source() == status.SourceInbound, st.Source())
 }
 
 func (h *testStreamHandler) handleFullStreamingMode(t *testing.T, s *Stream) {
@@ -869,6 +871,108 @@ func TestMain(m *testing.M) {
 	ticker = oldTicker
 }
 
+func TestGoAwayStatusSources(t *testing.T) {
+	ctx := context.Background()
+	newStream := func(id uint32) *Stream {
+		return &Stream{
+			id:         id,
+			ctx:        ctx,
+			done:       make(chan struct{}),
+			buf:        newRecvBuffer(),
+			headerChan: make(chan struct{}),
+		}
+	}
+	stream1 := newStream(3)
+	stream2 := newStream(5)
+	client := &http2Client{
+		ctx:        ctx,
+		goAway:     make(chan struct{}),
+		controlBuf: newControlBuffer(ctx.Done()),
+		activeStreams: map[uint32]*Stream{
+			stream1.id: stream1,
+			stream2.id: stream2,
+		},
+		onGoAway: func(context.Context, ClientTransport, GoAwayReason) {},
+	}
+
+	client.handleGoAway(&grpcframe.GoAwayFrame{LastStreamID: 1})
+	<-stream1.Done()
+	<-stream2.Done()
+
+	gotErr := stream1.getCloseStreamErr()
+	gotStatus, ok := status.FromError(gotErr)
+	test.Assert(t, ok, gotErr)
+	test.Assert(t, gotStatus.Source() == status.SourceOutbound, gotStatus.Source())
+	// Source is observability metadata and does not change status equality.
+	test.Assert(t, errors.Is(gotErr, errStreamDrain), gotErr)
+	test.Assert(t, status.Convert(errStreamDrain).Source() == status.SourceLocal)
+
+	status1 := stream1.Status()
+	status2 := stream2.Status()
+	test.Assert(t, status1.Source() == status.SourceOutbound, status1.Source())
+	test.Assert(t, status2.Source() == status.SourceOutbound, status2.Source())
+	test.Assert(t, status1 != status2, "GOAWAY streams must not share a mutable Status")
+	wantMessage := statusGoAway.Message()
+	status1.AppendMessage("extra")
+	test.Assert(t, status2.Message() == wantMessage, status2.Message())
+	test.Assert(t, statusGoAway.Message() == wantMessage, statusGoAway.Message())
+}
+
+// TestCancelReasonSourcePropagation pins the intended cascade semantics of
+// status sources: Source is process-perspective, so when an RPC accepted by
+// this process is terminated from its inbound side, the SourceInbound status
+// recorded as the server stream ctx's cancel reason must survive, unchanged,
+// to the terminal status of an outbound stream driven by that ctx (proxy
+// topology). Recv on the outbound leg then reports that the termination
+// originated from the process's inbound boundary, not from the callee.
+func TestCancelReasonSourcePropagation(t *testing.T) {
+	// Server side: the caller of the accepted RPC terminates it; the transport
+	// records a SourceInbound status as the stream ctx's cancel reason
+	// (http2Server.closeStream -> s.cancel(err)).
+	baseCtx, baseCancel := context.WithCancel(context.Background())
+	serverStreamCtx, cancelWithReason := newContextWithCancelReason(baseCtx, baseCancel)
+	// The handler ctx handed to user code and downstream calls wraps the stream
+	// ctx in value layers only (see server_handler.go), so Err() still surfaces
+	// the cancel reason.
+	type handlerCtxKey struct{}
+	handlerCtx := context.WithValue(serverStreamCtx, handlerCtxKey{}, "cascade")
+	cancelWithReason(errGracefulShutdownInbound)
+
+	// Client boundary of the cascaded outbound RPC: both ctx-error conversion
+	// paths must preserve the inbound attribution.
+	ctxErr := ContextErr(handlerCtx.Err())
+	ctxSt, ok := status.FromError(ctxErr)
+	test.Assert(t, ok, ctxErr)
+	test.Assert(t, ctxSt.Code() == codes.Unavailable, ctxSt.Code())
+	test.Assert(t, ctxSt.Source() == status.SourceInbound, ctxSt.Source())
+
+	tickSt, reused, tickErr := contextStatusAndErr(handlerCtx.Err())
+	test.Assert(t, !reused)
+	test.Assert(t, tickSt.Source() == status.SourceInbound, tickSt.Source())
+	test.Assert(t, errors.Is(tickErr, errGracefulShutdown), tickErr)
+
+	// The outbound stream's terminal status surfaces the inbound source.
+	stream := &Stream{
+		id:         3,
+		ctx:        handlerCtx,
+		done:       make(chan struct{}),
+		buf:        newRecvBuffer(),
+		headerChan: make(chan struct{}),
+	}
+	client := &http2Client{
+		ctx:           context.Background(),
+		controlBuf:    newControlBuffer(context.Background().Done()),
+		activeStreams: map[uint32]*Stream{stream.id: stream},
+	}
+	client.CloseStream(stream, ContextErr(stream.Context().Err()))
+	<-stream.Done()
+	test.Assert(t, stream.Status().Source() == status.SourceInbound, stream.Status().Source())
+	closeErr := stream.getCloseStreamErr()
+	closeSt, ok := status.FromError(closeErr)
+	test.Assert(t, ok, closeErr)
+	test.Assert(t, closeSt.Source() == status.SourceInbound, closeSt.Source())
+}
+
 // TestInflightStreamClosing ensures that closing in-flight stream
 // sends status error to concurrent stream reader.
 func TestInflightStreamClosing(t *testing.T) {
@@ -1221,6 +1325,8 @@ func TestLargeMessageSuspension(t *testing.T) {
 	expectedErr := status.Err(codes.DeadlineExceeded, context.DeadlineExceeded.Error())
 	if _, err := s.Read(make([]byte, 8)); err.Error() != expectedErr.Error() {
 		t.Fatalf("Read got %v of type %T, want %v", err, err, expectedErr)
+	} else if st, ok := status.FromError(err); !ok || st.Source() != status.SourceLocal {
+		t.Fatalf("Read status source = %v, want %v", st.Source(), status.SourceLocal)
 	}
 	ct.Close(errSelfCloseForTest)
 	server.stop()
@@ -1375,6 +1481,9 @@ func TestServerContextCanceledOnClosedConnection(t *testing.T) {
 		if ss.Context().Err() != errConnectionEOF {
 			t.Fatalf("ss.Context().Err() got %v, want %v", ss.Context().Err(), errConnectionEOF)
 		}
+		st, ok := status.FromError(ss.Context().Err())
+		test.Assert(t, ok)
+		test.Assert(t, st.Source() == status.SourceLocal, st.Source())
 	case <-time.After(3 * time.Second):
 		t.Fatalf("%s", "Failed to cancel the context of the sever side stream.")
 	}
@@ -1836,6 +1945,7 @@ func TestEncodingRequiredStatus(t *testing.T) {
 	if !testutils.StatusErrEqual(s.Status().Err(), encodingTestStatus.Err()) {
 		t.Fatalf("stream with status %v, want %v", s.Status(), encodingTestStatus)
 	}
+	test.Assert(t, s.Status().Source() == status.SourceOutbound, s.Status().Source())
 	ct.Close(errSelfCloseForTest)
 	server.stop()
 }
@@ -1856,6 +1966,8 @@ func TestInvalidHeaderField(t *testing.T) {
 	_, err = s.trReader.(*transportReader).Read(p)
 	if se, ok := status.FromError(err); !ok || se.Code() != codes.Internal || !strings.Contains(err.Error(), expectedInvalidHeaderField) {
 		t.Fatalf("Read got error %v, want error with code %v and contains %q", err, codes.Internal, expectedInvalidHeaderField)
+	} else {
+		test.Assert(t, se.Source() == status.SourceLocal, se.Source())
 	}
 	ct.Close(errSelfCloseForTest)
 	server.stop()
@@ -1987,6 +2099,10 @@ func TestContextErr(t *testing.T) {
 		err := ContextErr(test.errIn)
 		if err.Error() != test.errOut.Error() {
 			t.Fatalf("ContextErr{%v} = %v \nwant %v", test.errIn, err, test.errOut)
+		}
+		st, ok := status.FromError(err)
+		if !ok || st.Source() != status.SourceLocal {
+			t.Fatalf("ContextErr{%v} source = %v, want %v", test.errIn, st.Source(), status.SourceLocal)
 		}
 	}
 }
@@ -2620,6 +2736,7 @@ func Test_contextStatusAndErr(t *testing.T) {
 		st, stReused, err := contextStatusAndErr(context.Canceled)
 		test.Assert(t, st.Code() == codes.Canceled, st)
 		test.Assert(t, st.Message() == context.Canceled.Error(), st)
+		test.Assert(t, st.Source() == status.SourceLocal, st.Source())
 		test.Assert(t, stReused)
 		test.Assert(t, err == errCanceled, err)
 		// reuse
@@ -2632,6 +2749,7 @@ func Test_contextStatusAndErr(t *testing.T) {
 		st2, stReused2, err2 := contextStatusAndErr(context.DeadlineExceeded)
 		test.Assert(t, st2.Code() == codes.DeadlineExceeded, st2)
 		test.Assert(t, st2.Message() == context.DeadlineExceeded.Error(), st2)
+		test.Assert(t, st2.Source() == status.SourceLocal, st2.Source())
 		test.Assert(t, stReused2)
 		test.Assert(t, err2 == errDeadlineExceeded, err2)
 		// reuse
@@ -2645,6 +2763,7 @@ func Test_contextStatusAndErr(t *testing.T) {
 		st, stReused, err := contextStatusAndErr(stErr)
 		test.Assert(t, st.Code() == codes.Internal, st)
 		test.Assert(t, st.Message() == "test", st)
+		test.Assert(t, st.Source() == status.SourceLocal, st.Source())
 		test.Assert(t, !stReused)
 		test.Assert(t, err == stErr, err)
 
@@ -2660,6 +2779,7 @@ func Test_contextStatusAndErr(t *testing.T) {
 		testErr := errors.New("test")
 		st, stReused, err := contextStatusAndErr(testErr)
 		test.Assert(t, st.Code() == codes.Internal, st)
+		test.Assert(t, st.Source() == status.SourceLocal, st.Source())
 		test.Assert(t, strings.Contains(st.Message(), testErr.Error()), st)
 		test.Assert(t, !stReused)
 		test.Assert(t, strings.Contains(err.Error(), testErr.Error()), err)
@@ -2694,6 +2814,7 @@ func Test_reuseStatus(t *testing.T) {
 			test.Assert(t, got != tc.st, "Status() should return a copy, not the singleton")
 			test.Assert(t, got.Code() == tc.st.Code())
 			test.Assert(t, got.Message() == tc.origMsg)
+			test.Assert(t, got.Source() == tc.st.Source(), got.Source())
 
 			// mutate the copy
 			got.AppendMessage("extra")

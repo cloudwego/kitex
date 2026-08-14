@@ -458,7 +458,7 @@ func (s *Stream) Status() *status.Status {
 	// When the internal status is a shared pre-defined instance (reuseStatus == true),
 	// a deep copy is returned to prevent callers from mutating the shared object via AppendMessage().
 	if s.reuseStatus && s.status != nil {
-		return status.FromProto(s.status.Proto())
+		return s.status.Copy()
 	}
 	return s.status
 }
@@ -911,11 +911,18 @@ var (
 	// errStreamDrain indicates that the stream is rejected because the
 	// connection is draining. This could be caused by goaway or balancer
 	// removing the address.
-	errStreamDrain = status.Err(codes.Unavailable, "the connection is draining")
+	// errStreamDrain stays SourceLocal: no per-stream terminal signal was
+	// received at its return sites. In NewStream's <-t.goAway wait the drain is
+	// known to come from a received GOAWAY but the stream was never established,
+	// while in initStream the draining state may also come from a local
+	// GracefulClose. errStreamDrainOutbound is used only in handleGoAway, where
+	// a received GOAWAY frame rejects established unprocessed streams.
+	errStreamDrain         = status.Err(codes.Unavailable, "the connection is draining")
+	errStreamDrainOutbound = status.NewWithSource(codes.Unavailable, "the connection is draining", status.SourceOutbound).Err()
 
 	// StatusGoAway indicates that the server sent a GOAWAY that included this
 	// stream's ID in unprocessed RPCs.
-	statusGoAway = status.New(codes.Unavailable, "the stream is rejected because server is draining the connection")
+	statusGoAway = status.NewWithSource(codes.Unavailable, "the stream is rejected because server is draining the connection", status.SourceOutbound)
 )
 
 // GoAwayReason contains the reason for the GoAway frame received.

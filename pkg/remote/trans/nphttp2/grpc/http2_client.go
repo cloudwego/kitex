@@ -655,6 +655,15 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 	t.doCloseStream(s, err, rst, rstCode, st, false, mdata)
 }
 
+// before invoking closeStreamWithReusingStatus, pls do not hold the t.mu
+// because accessing the controlbuf while holding t.mu will cause a deadlock.
+func (t *http2Client) closeStreamWithReusingStatus(s *Stream, err error, rst bool, rstCode http2.ErrCode, st *status.Status, mdata map[string][]string) {
+	if !t.casStreamDone(s) {
+		return
+	}
+	t.doCloseStream(s, err, rst, rstCode, st, true, mdata)
+}
+
 // casStreamDone atomically marks s as done. Returns true if the caller wins the race
 // and should proceed with doCloseStream; false if another goroutine already closed it.
 func (t *http2Client) casStreamDone(s *Stream) bool {
@@ -949,7 +958,7 @@ func (t *http2Client) handleRSTStream(f *http2.RSTStreamFrame) {
 	} else {
 		msg = fmt.Sprintf("stream terminated by RST_STREAM with error code: %v", f.ErrCode)
 	}
-	t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.New(statusCode, msg), nil)
+	t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.NewWithSource(statusCode, msg, status.SourceOutbound), nil)
 }
 
 func (t *http2Client) handleSettings(f *grpcframe.SettingsFrame, isFirst bool) {
@@ -1098,7 +1107,7 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 	// Pls refer to checkForStreamQuota in NewStream, it gets the controlbuf.mu and
 	// wants to get the t.mu.
 	for _, stream := range unprocessedStream {
-		t.closeStream(stream, errStreamDrain, false, http2.ErrCodeNo, statusGoAway, nil)
+		t.closeStreamWithReusingStatus(stream, errStreamDrainOutbound, false, http2.ErrCodeNo, statusGoAway, nil)
 	}
 }
 
