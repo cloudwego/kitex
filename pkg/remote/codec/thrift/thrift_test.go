@@ -263,19 +263,50 @@ func TestFastWriteCopy(t *testing.T) {
 	}
 }
 
-func TestFastWriteCopyException(t *testing.T) {
-	codec := NewThriftCodecWithFastWriteCopy()
-	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", "mock"), rpcinfo.NewRPCConfig(), nil)
-	errMsg := initServerErrorMsg(transport.TTHeader, ri, remote.NewTransErrorWithMsg(
-		remote.InternalError, strings.Repeat("e", 4096),
-	))
-	out := &trackingNocopyByteBuffer{ByteBuffer: remote.NewWriterBuffer(0)}
+func TestFastWriteCopyFallbackFastCodec(t *testing.T) {
+	codec := NewThriftCodecWithConfig(FastRead | fastWriteCopy)
+	sendMsg := initSendMsg(transport.TTHeader)
+	sendMsg.Data().(*mt.MockTestArgs).Req.Msg = strings.Repeat("a", 4096)
+	out := &trackingNocopyByteBuffer{ByteBuffer: remote.NewReaderWriterBuffer(0)}
 	defer out.Release(nil)
 
-	err := codec.Marshal(context.Background(), errMsg, out)
+	err := codec.Marshal(context.Background(), sendMsg, out)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, out.writeDirectCalls == 0, out.writeDirectCalls)
 	test.Assert(t, out.mallocAckCalls == 0, out.mallocAckCalls)
+}
+
+func TestFastWriteCopyException(t *testing.T) {
+	codec := NewThriftCodecWithFastWriteCopy()
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", "mock"), rpcinfo.NewRPCConfig(), nil)
+	tests := []struct {
+		name string
+		data interface{}
+	}{
+		{
+			name: "trans error",
+			data: remote.NewTransErrorWithMsg(remote.InternalError, strings.Repeat("e", 4096)),
+		},
+		{
+			name: "plain error",
+			data: errors.New(strings.Repeat("e", 4096)),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errMsg := remote.NewMessage(tt.data, ri, remote.Exception, remote.Server)
+			mcfg := rpcinfo.AsMutableRPCConfig(errMsg.RPCInfo().Config())
+			mcfg.SetTransportProtocol(transport.TTHeader)
+			mcfg.SetPayloadCodec(svcInfo.PayloadCodec)
+			out := &trackingNocopyByteBuffer{ByteBuffer: remote.NewWriterBuffer(0)}
+			defer out.Release(nil)
+
+			err := codec.Marshal(context.Background(), errMsg, out)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, out.writeDirectCalls == 0, out.writeDirectCalls)
+			test.Assert(t, out.mallocAckCalls == 0, out.mallocAckCalls)
+		})
+	}
 }
 
 func BenchmarkNormalParallel(b *testing.B) {
