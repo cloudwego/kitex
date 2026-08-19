@@ -20,8 +20,11 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
 func TestContextWithCancelReason(t *testing.T) {
@@ -40,4 +43,56 @@ func TestContextWithCancelReason(t *testing.T) {
 	cancel0()
 	test.Assert(t, ctx0.Err() == context.Canceled)
 	test.Assert(t, ctx.Err() == context.Canceled)
+}
+
+func TestClientContextErrCascadeCancel(t *testing.T) {
+	reason := status.Err(codes.Canceled, "inbound RPC terminated")
+
+	// The accepted server RPC still observes an ordinary status. It becomes a
+	// cascade cancellation only when it terminates a client RPC.
+	test.Assert(t, !status.Convert(ContextErr(reason)).IsCascadeCancel())
+
+	err := cascadeContextErr(reason)
+	st := status.Convert(err)
+	test.Assert(t, st.IsCascadeCancel())
+	test.Assert(t, st.Code() == codes.Canceled)
+	test.Assert(t, st.Message() == "inbound RPC terminated")
+
+	test.Assert(t, !status.Convert(cascadeContextErr(context.Canceled)).IsCascadeCancel())
+	test.Assert(t, !status.Convert(cascadeContextErr(context.DeadlineExceeded)).IsCascadeCancel())
+	test.Assert(t, !status.Convert(cascadeContextErr(status.Err(codes.Unavailable, "transport closed"))).IsCascadeCancel())
+}
+
+func TestClientContextErrDerivedContextLimitation(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		derive func(context.Context) (context.Context, context.CancelFunc)
+	}{
+		{name: "WithCancel", derive: context.WithCancel},
+		{name: "WithTimeout", derive: func(ctx context.Context) (context.Context, context.CancelFunc) {
+			return context.WithTimeout(ctx, time.Hour)
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			parent, parentCancel := context.WithCancel(context.Background())
+			serverCtx, cancelWithReason := newContextWithCancelReason(parent, parentCancel)
+			derivedCtx, cancelDerived := tc.derive(serverCtx)
+			defer cancelDerived()
+
+			reason := status.Err(codes.Canceled, "inbound RPC terminated")
+			cancelWithReason(reason)
+
+			select {
+			case <-derivedCtx.Done():
+			case <-time.After(time.Second):
+				t.Fatal("derived context was not canceled")
+			}
+
+			// Standard derived contexts expose context.Canceled instead of the
+			// process-local status error.
+			test.Assert(t, serverCtx.Err() == reason)
+			test.Assert(t, derivedCtx.Err() == context.Canceled)
+			test.Assert(t, !status.Convert(cascadeContextErr(derivedCtx.Err())).IsCascadeCancel())
+		})
+	}
 }

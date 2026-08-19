@@ -344,7 +344,7 @@ func (task *closeStreamTask) Tick() {
 			continue
 		}
 		// uniformly converted to *status.Status and related error
-		st, stReused, sErr := contextStatusAndErr(stream.Context().Err())
+		st, stReused, sErr := contextStatusAndErr(tryMarkAsCascadeCancel(stream.Context().Err()))
 		trans.doCloseStream(stream, sErr, true, http2.ErrCodeCancel, st, stReused, nil)
 		task.toCloseStreams[i] = nil
 	}
@@ -615,7 +615,7 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 		select {
 		case <-ch:
 		case <-s.ctx.Done():
-			return nil, ContextErr(s.ctx.Err())
+			return nil, cascadeContextErr(s.ctx.Err())
 		case <-t.goAway:
 			return nil, errStreamDrain
 		case <-t.ctx.Done():
