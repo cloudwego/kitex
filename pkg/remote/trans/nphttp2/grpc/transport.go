@@ -199,7 +199,7 @@ func (r *recvBufferReader) readClient(p []byte) (n int, err error) {
 		// TODO: delaying ctx error seems like a unnecessary side effect. What
 		// we really want is to mark the stream as done, and return ctx error
 		// faster.
-		r.closeStream(ContextErr(r.ctx.Err()))
+		r.closeStream(cascadeContextErr(r.ctx.Err()))
 		m := <-r.recv.get()
 		return r.readAdditional(m, p)
 	case m := <-r.recv.get():
@@ -329,7 +329,7 @@ func (s *Stream) waitOnHeader() {
 	case <-s.ctx.Done():
 		// Close the stream to prevent headers/trailers from changing after
 		// this function returns.
-		s.ct.CloseStream(s, ContextErr(s.ctx.Err()))
+		s.ct.CloseStream(s, cascadeContextErr(s.ctx.Err()))
 		// headerChan could possibly not be closed yet if closeStream raced
 		// with operateHeaders; wait until it is closed explicitly here.
 		<-s.headerChan
@@ -941,17 +941,47 @@ var (
 
 // ContextErr converts the error from context package into a status error.
 func ContextErr(err error) error {
+	if scErr, ok := standardContextErr(err); ok {
+		return scErr
+	}
+	if stErr, ok := err.(*status.Error); ok {
+		return stErr
+	}
+	return defaultContextErr(err)
+}
+
+// cascadeContextErr converts a client-side stream context error.
+// A status error used as the context's cancellation reason is produced by contextWithCancelReason
+// when another server-side Stream driving this client-side Stream has terminated.
+func cascadeContextErr(err error) error {
+	if scErr, ok := standardContextErr(err); ok {
+		return scErr
+	}
+	if stErr, ok := err.(*status.Error); ok {
+		return stErr.WithCascadeCancel()
+	}
+	return defaultContextErr(err)
+}
+
+func standardContextErr(err error) (error, bool) {
 	switch err {
 	case context.DeadlineExceeded:
-		return errDeadlineExceeded
+		return errDeadlineExceeded, true
 	case context.Canceled:
-		return errCanceled
+		return errCanceled, true
 	}
-	statusErr, ok := err.(*status.Error)
-	if ok { // only returned by contextWithCancelReason
-		return statusErr
-	}
+	return err, false
+}
+
+func defaultContextErr(err error) error {
 	return status.Errorf(codes.Internal, "Unexpected error from context packet: %v", err)
+}
+
+func tryMarkAsCascadeCancel(err error) error {
+	if stErr, ok := err.(*status.Error); ok {
+		return stErr.WithCascadeCancel()
+	}
+	return err
 }
 
 // contextStatusAndErr converts err to (*status.Status, reused, error).

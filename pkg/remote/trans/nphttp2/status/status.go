@@ -49,6 +49,8 @@ type Iface interface {
 // and should be created with New, Newf, or FromProto.
 type Status struct {
 	s *spb.Status
+	// cascadeCancel is process-local and intentionally excluded from Proto.
+	cascadeCancel bool
 }
 
 // New returns a Status representing c and msg.
@@ -97,6 +99,19 @@ func (s *Status) Message() string {
 	return s.s.Message
 }
 
+// IsCascadeCancel reports whether the status was produced when a client-side Stream was
+// canceled because another server-side Stream driving it had terminated.
+// (e.g. Using ctx provided by streaming handler to invoke another streaming interface)
+//
+// This marker has the following limitations:
+//   - It is not propagated across processes.
+//   - After wrapping the ctx provided to the handler using the standard library's context package
+//     (for example, context.WithCancel or context.WithTimeout),
+//     IsCascadeCancel will still return false even if a cascading cancellation is triggered.
+func (s *Status) IsCascadeCancel() bool {
+	return s != nil && s.Code() == codes.Canceled && s.cascadeCancel
+}
+
 // AppendMessage append extra msg for Status
 func (s *Status) AppendMessage(extraMsg string) *Status {
 	if s == nil || s.s == nil || extraMsg == "" {
@@ -119,7 +134,7 @@ func (s *Status) Err() error {
 	if s.Code() == codes.OK {
 		return nil
 	}
-	return &Error{e: s.Proto()}
+	return &Error{e: s.Proto(), cascadeCancel: s.cascadeCancel}
 }
 
 // WithDetails returns a new status with the provided details messages appended to the status.
@@ -137,7 +152,7 @@ func (s *Status) WithDetails(details ...proto.Message) (*Status, error) {
 		}
 		p.Details = append(p.Details, any)
 	}
-	return &Status{s: p}, nil
+	return &Status{s: p, cascadeCancel: s.cascadeCancel}, nil
 }
 
 // Details returns a slice of details messages attached to the status.
@@ -161,7 +176,8 @@ func (s *Status) Details() []interface{} {
 // Error wraps a pointer of a status proto. It implements error and Status,
 // and a nil *Error should never be returned by this package.
 type Error struct {
-	e *spb.Status
+	e             *spb.Status
+	cascadeCancel bool
 }
 
 func (e *Error) Error() string {
@@ -170,7 +186,7 @@ func (e *Error) Error() string {
 
 // GRPCStatus returns the Status represented by se.
 func (e *Error) GRPCStatus() *Status {
-	return FromProto(e.e)
+	return &Status{s: proto.Clone(e.e).(*spb.Status), cascadeCancel: e.cascadeCancel}
 }
 
 // Is implements future error.Is functionality.
@@ -181,6 +197,15 @@ func (e *Error) Is(target error) bool {
 		return false
 	}
 	return proto.Equal(e.e, tse.e)
+}
+
+// WithCascadeCancel returns a new Error marked as a cascade cancellation when its code
+// is Canceled.
+func (e *Error) WithCascadeCancel() *Error {
+	if e == nil || codes.Code(e.e.GetCode()) != codes.Canceled || e.cascadeCancel {
+		return e
+	}
+	return &Error{e: e.e, cascadeCancel: true}
 }
 
 // FromError returns a Status representing err if it was produced from this
