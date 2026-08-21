@@ -89,8 +89,8 @@ func NewThriftFileProviderWithDynamicgoWithOption(path string, opts []ThriftIDLP
 	if err != nil {
 		return nil, err
 	}
-	handleGoTagForDynamicGo(tOpts.goTag)
 	dOpts := mergeDynamicgoOptions(tOpts.dynamicGoOpt, dParseMode, tOpts.serviceName)
+	handleGoTagForDynamicGo(&dOpts, tOpts.goTag)
 	dsvc, err := dOpts.NewDescritorFromPath(context.Background(), path, includeDirs...)
 	if err != nil {
 		// fall back to the original way (without dynamicgo)
@@ -529,13 +529,13 @@ func mergeDynamicgoOptions(dOpts *dthrift.Options, dParseMode meta.ParseServiceM
 }
 
 func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, isAbsIncludePath bool, parseMode thrift.ParseMode, goTag *goTagOption, serviceName string, dopts *dthrift.Options) error {
-	handleGoTagForDynamicGo(goTag)
 	// ServiceDescriptor of dynamicgo
 	dParseMode, err := getDynamicGoParseMode(parseMode)
 	if err != nil {
 		return err
 	}
 	dOpts := mergeDynamicgoOptions(dopts, dParseMode, serviceName)
+	handleGoTagForDynamicGo(&dOpts, goTag)
 	dsvc, err := dOpts.NewDescritorFromContent(context.Background(), path, content, includes, isAbsIncludePath)
 	if err != nil {
 		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
@@ -545,14 +545,14 @@ func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content
 	return nil
 }
 
-func handleGoTagForDynamicGo(goTagOpt *goTagOption) {
+func handleGoTagForDynamicGo(dOpts *dthrift.Options, goTagOpt *goTagOption) {
 	shouldRemove := isGoTagAliasDisabled
 	if goTagOpt != nil {
 		shouldRemove = goTagOpt.isGoTagAliasDisabled
 	}
 	if shouldRemove {
-		dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
+		dOpts.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
 	} else {
-		dthrift.RegisterAnnotationMapper(dthrift.AnnoScopeField, goTagMapper, "go.tag")
+		dOpts.RegisterAnnotationMapper(dthrift.AnnoScopeField, goTagMapper, "go.tag")
 	}
 }

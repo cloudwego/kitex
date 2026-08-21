@@ -407,6 +407,21 @@ func TestDisableGoTagForDynamicGo(t *testing.T) {
 	p.Close()
 }
 
+func TestGoTagMapperForDynamicGoIsIsolated(t *testing.T) {
+	globalMapper := dthrift.FindAnnotationMapper("go.tag", dthrift.AnnoScopeField)
+	test.Assert(t, globalMapper != nil)
+
+	disabledOpts := dthrift.Options{}
+	handleGoTagForDynamicGo(&disabledOpts, &goTagOption{isGoTagAliasDisabled: true})
+	test.Assert(t, disabledOpts.FindAnnotationMapper("go.tag", dthrift.AnnoScopeField) == nil)
+	test.Assert(t, dthrift.FindAnnotationMapper("go.tag", dthrift.AnnoScopeField) != nil)
+
+	enabledOpts := dthrift.Options{}
+	handleGoTagForDynamicGo(&enabledOpts, &goTagOption{isGoTagAliasDisabled: false})
+	test.Assert(t, enabledOpts.FindAnnotationMapper("go.tag", dthrift.AnnoScopeField) != nil)
+	test.Assert(t, disabledOpts.FindAnnotationMapper("go.tag", dthrift.AnnoScopeField) == nil)
+}
+
 func TestFileProviderParseMode(t *testing.T) {
 	path := "json_test/idl/example_multi_service.thrift"
 	thrift.SetDefaultParseMode(thrift.LastServiceOnly)
