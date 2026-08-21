@@ -135,6 +135,39 @@ func TestTransportBasic(t *testing.T) {
 	wg.Wait()
 }
 
+func TestTransportMaxReceiveMessageSize(t *testing.T) {
+	cfd, sfd := netpoll.GetSysFdPairs()
+	cconn, err := netpoll.NewFDConnection(cfd)
+	test.Assert(t, err == nil, err)
+	sconn, err := netpoll.NewFDConnection(sfd)
+	test.Assert(t, err == nil, err)
+
+	ctrans := newClientTransport(cconn, nil)
+	defer ctrans.Close(nil)
+	ctx := context.Background()
+	cs := newClientStream(ctx, ctrans, streamFrame{sid: genStreamID(), method: "Bidi"})
+	err = ctrans.WriteStream(ctx, cs, make(IntHeader), make(streaming.Header))
+	test.Assert(t, err == nil, err)
+
+	// server transport only accepts frame payload up to 1 byte
+	strans := newServerTransport(sconn, withServerMaxReceiveMessageSize(1))
+	ss, err := strans.ReadStream(context.Background())
+	test.Assert(t, err == nil, err)
+
+	req := new(testRequest)
+	req.B = "hello"
+	err = cs.SendMsg(context.Background(), req)
+	test.Assert(t, err == nil, err)
+
+	// the oversized data frame makes the server transport close the stream,
+	// the frame size limit error is carried either directly or as the close cause.
+	err = ss.RecvMsg(context.Background(), new(testRequest))
+	test.Assert(t, err != nil, err)
+	ex, ok := err.(*Exception)
+	test.Assert(t, ok, err)
+	test.Assert(t, errors.Is(ex, errFrameSizeLimit) || errors.Is(ex.cause, errFrameSizeLimit), err)
+}
+
 func TestTransportServerStreaming(t *testing.T) {
 	cfd, sfd := netpoll.GetSysFdPairs()
 	cconn, err := netpoll.NewFDConnection(cfd)

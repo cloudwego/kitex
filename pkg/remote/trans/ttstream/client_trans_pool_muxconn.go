@@ -98,7 +98,7 @@ func (tl *muxConnTransList) Get(network, addr string) (*clientTransport, error) 
 	if err != nil {
 		return nil, err
 	}
-	trans = newClientTransport(conn, tl.pool)
+	trans = newClientTransport(conn, tl.pool, withClientMaxReceiveMessageSize(tl.pool.maxReceiveMessageSize))
 	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
 		// peer close
 		_ = trans.Close(errTransport.newBuilder().withCause(errors.New("connection closed by peer")))
@@ -117,10 +117,11 @@ func newMuxConnTransPool(config MuxConnConfig) transPool {
 }
 
 type muxConnTransPool struct {
-	config      MuxConnConfig
-	pool        sync.Map // addr:*muxConnTransList
-	activity    sync.Map // addr:lastActive
-	cleanerOnce int32
+	config                MuxConnConfig
+	maxReceiveMessageSize int
+	pool                  sync.Map // addr:*muxConnTransList
+	activity              sync.Map // addr:lastActive
+	cleanerOnce           int32
 }
 
 func (p *muxConnTransPool) Get(network, addr string) (trans *clientTransport, err error) {
@@ -130,6 +131,10 @@ func (p *muxConnTransPool) Get(network, addr string) (trans *clientTransport, er
 		v, _ = p.pool.LoadOrStore(addr, newMuxConnTransList(p.config.PoolSize, p))
 	}
 	return v.(*muxConnTransList).Get(network, addr)
+}
+
+func (p *muxConnTransPool) SetMaxReceiveMessageSize(size int) {
+	p.maxReceiveMessageSize = size
 }
 
 func (p *muxConnTransPool) Put(trans *clientTransport) {

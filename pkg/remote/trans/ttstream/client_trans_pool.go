@@ -26,3 +26,9 @@ type transPool interface {
 	Get(network, addr string) (trans *clientTransport, err error)
 	Put(trans *clientTransport)
 }
+
+// maxReceiveMessageSizeSetter is implemented by transPool types that support
+// limiting the maximum size in bytes of a received frame payload.
+type maxReceiveMessageSizeSetter interface {
+	SetMaxReceiveMessageSize(size int)
+}

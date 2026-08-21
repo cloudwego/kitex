@@ -19,6 +19,7 @@ package ttstream
 import (
 	"bytes"
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/cloudwego/gopkg/bufiox"
@@ -65,6 +66,25 @@ func TestFrameCodec(t *testing.T) {
 		test.DeepEqual(t, string(wframe.payload), string(rframe.payload))
 		test.DeepEqual(t, wframe.header, rframe.header)
 	}
+}
+
+func TestDecodeFrameMaxReceiveMessageSize(t *testing.T) {
+	var buf bytes.Buffer
+	writer := bufiox.NewDefaultWriter(&buf)
+	reader := bufiox.NewDefaultReader(&buf)
+	wframe := newFrame(streamFrame{
+		sid:    1,
+		method: "method",
+		header: map[string]string{"key": "value"},
+	}, dataFrameType, []byte("hi"))
+
+	err := EncodeFrame(context.Background(), writer, wframe)
+	test.Assert(t, err == nil, err)
+	err = writer.Flush()
+	test.Assert(t, err == nil, err)
+
+	_, err = decodeFrame(context.Background(), reader, 1 /*max receive message size*/)
+	test.Assert(t, errors.Is(err, errFrameSizeLimit), err)
 }
 
 func TestFrameWithoutPayloadCodec(t *testing.T) {
