@@ -91,3 +91,19 @@ type Result struct {
 type GRPCStreamGetter interface {
 	GetGRPCStream() Stream
 }
+
+// RecvTimeoutConfigSetter allows dynamically setting RecvTimeoutConfig on a server stream.
+// Server handlers can use this to override the global recv timeout on a per-stream basis.
+type RecvTimeoutConfigSetter interface {
+	SetRecvTimeoutConfig(cfg TimeoutConfig)
+}
+
+// SetRecvTimeoutConfig sets the RecvTimeoutConfig on a server stream if it supports it.
+// Returns true if the config was set successfully.
+func SetRecvTimeoutConfig(stream ServerStream, cfg TimeoutConfig) bool {
+	if setter, ok := stream.(RecvTimeoutConfigSetter); ok {
+		setter.SetRecvTimeoutConfig(cfg)
+		return true
+	}
+	return false
+}

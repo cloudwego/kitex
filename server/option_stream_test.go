@@ -18,9 +18,11 @@ package server
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 func Test_WithStreamEventHandler(t *testing.T) {
@@ -36,4 +38,18 @@ func Test_WithStreamEventHandler(t *testing.T) {
 		))
 	iSvr := svr.(*server)
 	test.Assert(t, len(iSvr.opt.StreamOptions.StreamEventHandlers) == 2, iSvr.opt)
+}
+
+func Test_WithStreamRecvTimeoutConfig(t *testing.T) {
+	cfg := streaming.TimeoutConfig{
+		Timeout:             3 * time.Second,
+		DisableCancelRemote: true,
+	}
+	svr, _ := NewTestServer(
+		WithStreamOptions(
+			WithStreamRecvTimeoutConfig(cfg),
+		))
+	iSvr := svr.(*server)
+	test.Assert(t, iSvr.opt.StreamOptions.RecvTimeoutConfig.Timeout == 3*time.Second, iSvr.opt)
+	test.Assert(t, iSvr.opt.StreamOptions.RecvTimeoutConfig.DisableCancelRemote, iSvr.opt)
 }

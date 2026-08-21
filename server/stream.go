@@ -18,9 +18,15 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"runtime/debug"
+	"time"
+
+	"github.com/bytedance/gopkg/util/gopool"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/endpoint/sep"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
@@ -34,9 +40,10 @@ func (s *server) wrapStreamMiddleware() endpoint.Middleware {
 		recvEP := s.opt.StreamOptions.BuildRecvChain()
 		grpcSendEP := s.opt.Streaming.BuildSendInvokeChain()
 		grpcRecvEP := s.opt.Streaming.BuildRecvInvokeChain()
+		recvTmCfg := s.opt.StreamOptions.RecvTimeoutConfig
 		return func(ctx context.Context, req, resp interface{}) (err error) {
 			if st, ok := req.(*streaming.Args); ok {
-				nst := newStream(ctx, st.ServerStream, sendEP, recvEP, s.opt.TracerCtl, grpcSendEP, grpcRecvEP)
+				nst := newStream(ctx, st.ServerStream, sendEP, recvEP, s.opt.TracerCtl, grpcSendEP, grpcRecvEP, recvTmCfg)
 				st.ServerStream = nst
 				st.Stream = nst.GetGRPCStream()
 			}
@@ -47,6 +54,7 @@ func (s *server) wrapStreamMiddleware() endpoint.Middleware {
 
 func newStream(ctx context.Context, s streaming.ServerStream, sendEP sep.StreamSendEndpoint, recvEP sep.StreamRecvEndpoint,
 	traceCtl *rpcinfo.TraceController, grpcSendEP endpoint.SendEndpoint, grpcRecvEP endpoint.RecvEndpoint,
+	recvTmCfg streaming.TimeoutConfig,
 ) *stream {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	st := &stream{
@@ -56,10 +64,11 @@ func newStream(ctx context.Context, s streaming.ServerStream, sendEP sep.StreamS
 		recv:         recvEP,
 		send:         sendEP,
 		traceCtl:     traceCtl,
+		recvTmCfg:    recvTmCfg,
 	}
 	if grpcStreamGetter, ok := s.(streaming.GRPCStreamGetter); ok {
 		if grpcStream := grpcStreamGetter.GetGRPCStream(); grpcStream != nil {
-			st.grpcStream = newGRPCStream(grpcStream, grpcSendEP, grpcRecvEP)
+			st.grpcStream = newGRPCStream(grpcStream, grpcSendEP, grpcRecvEP, recvTmCfg)
 			st.grpcStream.st = st
 		}
 	}
@@ -73,11 +82,15 @@ type stream struct {
 	ri         rpcinfo.RPCInfo
 	traceCtl   *rpcinfo.TraceController
 
-	recv sep.StreamRecvEndpoint
-	send sep.StreamSendEndpoint
+	recv      sep.StreamRecvEndpoint
+	send      sep.StreamSendEndpoint
+	recvTmCfg streaming.TimeoutConfig
 }
 
-var _ streaming.GRPCStreamGetter = (*stream)(nil)
+var (
+	_ streaming.GRPCStreamGetter        = (*stream)(nil)
+	_ streaming.RecvTimeoutConfigSetter = (*stream)(nil)
+)
 
 func (s *stream) GetGRPCStream() streaming.Stream {
 	if s.grpcStream == nil {
@@ -86,11 +99,28 @@ func (s *stream) GetGRPCStream() streaming.Stream {
 	return s.grpcStream
 }
 
+// SetRecvTimeoutConfig allows handlers to dynamically override the recv timeout for this stream.
+func (s *stream) SetRecvTimeoutConfig(cfg streaming.TimeoutConfig) {
+	s.recvTmCfg = cfg
+	if s.grpcStream != nil {
+		s.grpcStream.recvTmCfg = cfg
+	}
+}
+
 // RecvMsg receives a message from the client.
 func (s *stream) RecvMsg(ctx context.Context, m interface{}) (err error) {
-	err = s.recv(ctx, s.ServerStream, m)
+	err = s.recvWithTimeout(ctx, m)
 	s.handleStreamRecvEvent(err)
 	return
+}
+
+func (s *stream) recvWithTimeout(ctx context.Context, m interface{}) error {
+	if s.recvTmCfg.Timeout <= 0 {
+		return s.recv(ctx, s.ServerStream, m)
+	}
+	return callWithTimeout(s.recvTmCfg, func() error {
+		return s.recv(ctx, s.ServerStream, m)
+	})
 }
 
 func (s *stream) handleStreamRecvEvent(err error) {
@@ -112,11 +142,14 @@ func (s *stream) handleStreamSendEvent(err error) {
 	})
 }
 
-func newGRPCStream(st streaming.Stream, sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint) *grpcStream {
+func newGRPCStream(st streaming.Stream, sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint,
+	recvTmCfg streaming.TimeoutConfig,
+) *grpcStream {
 	return &grpcStream{
 		Stream:       st,
 		sendEndpoint: sendEP,
 		recvEndpoint: recvEP,
+		recvTmCfg:    recvTmCfg,
 	}
 }
 
@@ -127,12 +160,22 @@ type grpcStream struct {
 
 	sendEndpoint endpoint.SendEndpoint
 	recvEndpoint endpoint.RecvEndpoint
+	recvTmCfg    streaming.TimeoutConfig
 }
 
 func (s *grpcStream) RecvMsg(m interface{}) (err error) {
-	err = s.recvEndpoint(s.Stream, m)
+	err = s.recvWithTimeout(m)
 	s.st.handleStreamRecvEvent(err)
 	return
+}
+
+func (s *grpcStream) recvWithTimeout(m interface{}) error {
+	if s.recvTmCfg.Timeout <= 0 {
+		return s.recvEndpoint(s.Stream, m)
+	}
+	return callWithTimeout(s.recvTmCfg, func() error {
+		return s.recvEndpoint(s.Stream, m)
+	})
 }
 
 func (s *grpcStream) SendMsg(m interface{}) (err error) {
@@ -171,4 +214,31 @@ type gRPCCompatibleServerStream struct {
 
 func (gs gRPCCompatibleServerStream) GetGRPCStream() streaming.Stream {
 	return gs.st
+}
+
+// callWithTimeout wraps a blocking call with a timeout.
+// Unlike the client-side version, no cancel function is needed because
+// ServerStream does not support CancelWithErr. When timeout occurs,
+// the error is returned to the handler; the handler returns, and the
+// framework closes the stream, which unblocks the stuck recv goroutine.
+func callWithTimeout(tmCfg streaming.TimeoutConfig, call func() error) error {
+	timer := time.NewTimer(tmCfg.Timeout)
+	defer timer.Stop()
+	finishChan := make(chan error, 1)
+	gopool.Go(func() {
+		var callErr error
+		defer func() {
+			if r := recover(); r != nil {
+				callErr = fmt.Errorf("server stream Recv panic, panic=%v, stack=%s", r, debug.Stack())
+			}
+			finishChan <- callErr
+		}()
+		callErr = call()
+	})
+	select {
+	case <-timer.C:
+		return kerrors.ErrRPCTimeout.WithCause(fmt.Errorf("server stream Recv timeout, timeout config=%+v", tmCfg))
+	case callErr := <-finishChan:
+		return callErr
+	}
 }
