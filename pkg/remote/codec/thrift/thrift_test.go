@@ -19,6 +19,7 @@ package thrift
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cloudwego/gopkg/bufiox"
@@ -67,6 +68,22 @@ func init() {
 type mockWithContext struct {
 	ReadFunc  func(ctx context.Context, method string, dataLen int, oprot bufiox.Reader) error
 	WriteFunc func(ctx context.Context, method string, oprot bufiox.Writer) error
+}
+
+type trackingNocopyByteBuffer struct {
+	remote.ByteBuffer
+	writeDirectCalls int
+	mallocAckCalls   int
+}
+
+func (b *trackingNocopyByteBuffer) WriteDirect(_ []byte, _ int) error {
+	b.writeDirectCalls++
+	return nil
+}
+
+func (b *trackingNocopyByteBuffer) MallocAck(_ int) error {
+	b.mallocAckCalls++
+	return nil
 }
 
 func (m *mockWithContext) Read(ctx context.Context, method string, dataLen int, oprot bufiox.Reader) error {
@@ -196,6 +213,98 @@ func TestNormal(t *testing.T) {
 			te, ok := err.(*remote.TransError)
 			test.Assert(t, ok)
 			test.Assert(t, te.TypeID() == 1 && te.Error() == "hello", te)
+		})
+	}
+}
+
+func TestFastWriteCopy(t *testing.T) {
+	tests := []struct {
+		name            string
+		codec           remote.PayloadCodec
+		wantWriteDirect bool
+		wantMallocAck   bool
+	}{
+		{
+			name:            "default keeps nocopy",
+			codec:           NewThriftCodec(),
+			wantWriteDirect: true,
+			wantMallocAck:   true,
+		},
+		{
+			name:  "fast write copy",
+			codec: NewThriftCodecWithFastWriteCopy(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sendMsg := initSendMsg(transport.TTHeader)
+			sendMsg.Data().(*mt.MockTestArgs).Req.Msg = strings.Repeat("a", 4096)
+			out := &trackingNocopyByteBuffer{ByteBuffer: remote.NewReaderWriterBuffer(0)}
+			defer out.Release(nil)
+
+			err := tt.codec.Marshal(context.Background(), sendMsg, out)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, (out.writeDirectCalls > 0) == tt.wantWriteDirect, out.writeDirectCalls)
+			test.Assert(t, (out.mallocAckCalls > 0) == tt.wantMallocAck, out.mallocAckCalls)
+
+			if tt.wantWriteDirect {
+				return
+			}
+			writtenLen := out.WrittenLen()
+			err = out.Flush()
+			test.Assert(t, err == nil, err)
+			recvMsg := initRecvMsg()
+			recvMsg.SetPayloadLen(writtenLen)
+			err = tt.codec.Unmarshal(context.Background(), recvMsg, out)
+			test.Assert(t, err == nil, err)
+			compare(t, sendMsg, recvMsg)
+		})
+	}
+}
+
+func TestFastWriteCopyFallbackFastCodec(t *testing.T) {
+	codec := NewThriftCodecWithConfig(FastRead | fastWriteCopy)
+	sendMsg := initSendMsg(transport.TTHeader)
+	sendMsg.Data().(*mt.MockTestArgs).Req.Msg = strings.Repeat("a", 4096)
+	out := &trackingNocopyByteBuffer{ByteBuffer: remote.NewReaderWriterBuffer(0)}
+	defer out.Release(nil)
+
+	err := codec.Marshal(context.Background(), sendMsg, out)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, out.writeDirectCalls == 0, out.writeDirectCalls)
+	test.Assert(t, out.mallocAckCalls == 0, out.mallocAckCalls)
+}
+
+func TestFastWriteCopyException(t *testing.T) {
+	codec := NewThriftCodecWithFastWriteCopy()
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", "mock"), rpcinfo.NewRPCConfig(), nil)
+	tests := []struct {
+		name string
+		data interface{}
+	}{
+		{
+			name: "trans error",
+			data: remote.NewTransErrorWithMsg(remote.InternalError, strings.Repeat("e", 4096)),
+		},
+		{
+			name: "plain error",
+			data: errors.New(strings.Repeat("e", 4096)),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errMsg := remote.NewMessage(tt.data, ri, remote.Exception, remote.Server)
+			mcfg := rpcinfo.AsMutableRPCConfig(errMsg.RPCInfo().Config())
+			mcfg.SetTransportProtocol(transport.TTHeader)
+			mcfg.SetPayloadCodec(svcInfo.PayloadCodec)
+			out := &trackingNocopyByteBuffer{ByteBuffer: remote.NewWriterBuffer(0)}
+			defer out.Release(nil)
+
+			err := codec.Marshal(context.Background(), errMsg, out)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, out.writeDirectCalls == 0, out.writeDirectCalls)
+			test.Assert(t, out.mallocAckCalls == 0, out.mallocAckCalls)
 		})
 	}
 }
