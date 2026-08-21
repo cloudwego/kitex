@@ -109,6 +109,16 @@ func TestCreateListener(t *testing.T) {
 	ln.Close()
 }
 
+func TestShutdownWithoutActiveConnections(t *testing.T) {
+	transSvr := NewTransServerFactory().NewTransServer(
+		&remote.ServerOption{ExitWaitTime: 10 * time.Millisecond},
+		&mocks.MockSvrTransHandler{},
+	).(*transServer)
+
+	err := transSvr.Shutdown()
+	test.Assert(t, err == nil, err)
+}
+
 func TestBootStrapAndShutdown(t *testing.T) {
 	// tcp init
 	addrStr := "127.0.0.1:9093"

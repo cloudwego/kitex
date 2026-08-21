@@ -147,6 +147,9 @@ func (ts *transServer) Shutdown() (err error) {
 			_ = g.GracefulShutdown(ctx)
 		}
 	}
+	if ts.connCount.Value() == 0 {
+		return nil
+	}
 
 	shutdownTicker := time.NewTicker(defaultShutdownTicker)
 	defer shutdownTicker.Stop()
