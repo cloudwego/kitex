@@ -33,6 +33,7 @@ import (
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	mockstats "github.com/cloudwego/kitex/internal/mocks/stats"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/internal/test/rpcinfotest"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -240,6 +241,90 @@ func TestMuxSvrOnRead(t *testing.T) {
 	test.Assert(t, isReaderBufReleased.Load() == 1)
 	test.Assert(t, isWriteBufFlushed.Load() == 1)
 	test.Assert(t, isInvoked.Load() == 1)
+}
+
+func TestRPCInfoAccessNoRace(t *testing.T) {
+	const body = "hello world"
+	buf := netpoll.NewLinkBuffer(1024)
+	npconn := &MockNetpollConn{
+		ReaderFunc: func() (r netpoll.Reader) {
+			return buf
+		},
+		WriterFunc: func() (r netpoll.Writer) {
+			return buf
+		},
+		Conn: mocks.Conn{
+			RemoteAddrFunc: func() (r net.Addr) {
+				return addr
+			},
+		},
+	}
+	serverOpt := &remote.ServerOption{
+		InitOrResetRPCInfoFunc: func(_ rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+			ri := newTestRpcInfo()
+			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
+			return ri
+		},
+		Codec: &MockCodec{
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), body)
+				_, err := out.WriteBinary(r.Bytes())
+				return err
+			},
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				in.Skip(3 * codec.Size32)
+				_, err := in.ReadString(len(body))
+				if err != nil {
+					return err
+				}
+				msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter).SetServiceName(mocks.MockServiceName)
+				return codec.SetOrCheckMethodName(ctx, mocks.MockMethod, msg)
+			},
+		},
+		SvcSearcher:      svcSearcher,
+		TracerCtl:        &rpcinfo.TraceController{},
+		ReadWriteTimeout: rwTimeout,
+	}
+	rawHandler, err := NewSvrTransHandlerFactory().NewTransHandler(serverOpt)
+	test.Assert(t, err == nil, err)
+	svrTransHdlr := rawHandler.(*svrTransHandler)
+
+	rpcInfo := newTestRpcInfo()
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcInfo)
+	msg := &mockmessage.MockMessage{
+		RPCInfoFunc: func() rpcinfo.RPCInfo {
+			return rpcInfo
+		},
+	}
+	muxSvrCon := newMuxSvrConn(npconn, &sync.Pool{})
+	ctx, err = svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	test.Assert(t, err == nil, err)
+	time.Sleep(10 * time.Millisecond)
+	buf.Flush()
+
+	ctx, err = svrTransHdlr.OnActive(ctx, muxSvrCon)
+	test.Assert(t, err == nil, err)
+	pl := remote.NewTransPipeline(svrTransHdlr)
+	svrTransHdlr.SetPipeline(pl)
+
+	handled := make(chan struct{})
+	var captured context.Context
+	svrTransHdlr.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) error {
+		captured = ctx
+		close(handled)
+		return nil
+	})
+
+	err = svrTransHdlr.OnRead(ctx, npconn)
+	test.Assert(t, err == nil, err)
+	select {
+	case <-handled:
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for mux server handler")
+	}
+	svrTransHdlr.tasks.Wait()
+	test.Assert(t, captured != nil)
+	rpcinfotest.MustReadAsync(t, captured)
 }
 
 // TestPanicAfterMuxSvrOnRead test have panic after read

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/internal/test/rpcinfotest"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -112,6 +113,36 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
 	mw2 = rpcTimeoutMW(mwCtx).ToMiddleware()
 	test.Panic(t, func() { mw1(mw2(panicEp))(ctx, nil, nil) })
+}
+
+func TestRpcTimeoutMWRPCInfoAccessNoRace(t *testing.T) {
+	timeoutCtxCh := make(chan context.Context, 1)
+	readerCh := make(chan *rpcinfotest.ReadLoop, 1)
+	mw := rpcTimeoutMW(context.Background())
+	processor := mw(func(ctx context.Context, req, rsp interface{}) error {
+		select {
+		case timeoutCtxCh <- ctx:
+		default:
+		}
+		readerCh <- rpcinfotest.StartReadLoop(ctx)
+		time.Sleep(80 * time.Millisecond)
+		return nil
+	})
+
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), mockRPCInfo(20*time.Millisecond))
+	err := processor(ctx, nil, nil)
+	test.Assert(t, errors.Is(err, kerrors.ErrRPCTimeout), err)
+
+	var timeoutCtx context.Context
+	select {
+	case timeoutCtx = <-timeoutCtxCh:
+	case <-time.After(time.Second):
+		t.Fatal("rpcTimeoutMW did not execute the background endpoint")
+	}
+	rpcinfotest.MustReadAsync(t, timeoutCtx)
+
+	reader := <-readerCh
+	reader.StopAndAssert(t)
 }
 
 func TestIsBusinessTimeout(t *testing.T) {
@@ -243,11 +274,13 @@ func TestRpcTimeoutMWCancelByBusiness(t *testing.T) {
 }
 
 func mockRPCInfo(timeout time.Duration) rpcinfo.RPCInfo {
+	caller := rpcinfo.NewEndpointInfo("mockCaller", "mockCallerMethod", nil, nil)
 	s := rpcinfo.NewEndpointInfo("mockService", "mockMethod", nil, nil)
+	m := rpcinfo.NewInvocation("mockService", "mockMethod")
 	c := rpcinfo.NewRPCConfig()
 	mc := rpcinfo.AsMutableRPCConfig(c)
 	_ = mc.SetRPCTimeout(timeout)
-	return rpcinfo.NewRPCInfo(nil, s, nil, c, rpcinfo.NewRPCStats())
+	return rpcinfo.NewRPCInfo(caller, s, m, c, rpcinfo.NewRPCStats())
 }
 
 func Test_isBusinessTimeout(t *testing.T) {

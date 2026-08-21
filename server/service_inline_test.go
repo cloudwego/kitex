@@ -26,6 +26,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/internal/test/rpcinfotest"
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -137,4 +138,35 @@ func TestServiceInline(t *testing.T) {
 			test.Assert(t, val == "BackwardValue", fmt.Errorf("backward info[%s] is not right, expect=%s, actual=%s", "BackwardKey", "BackwardValue", val))
 		}
 	}
+}
+
+func TestRPCInfoAccessNoRace(t *testing.T) {
+	var reader *rpcinfotest.ReadLoop
+	svr := NewServer(WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp interface{}) error {
+			reader = rpcinfotest.StartReadLoop(ctx)
+			return next(ctx, req, resp)
+		}
+	}))
+	err := svr.RegisterService(newServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+
+	if iface, ok := svr.(serviceInline); ok {
+		cliCtx := context.Background()
+		cliRPCInfo := constructClientRPCInfo()
+		//nolint:staticcheck // SA1029: consts.SERVICE_INLINE_RPCINFO_KEY has been used and we just follow it
+		cliCtx = context.WithValue(cliCtx, consts.SERVICE_INLINE_RPCINFO_KEY, unsafe.Pointer(&cliRPCInfo))
+		//nolint:staticcheck // SA1029: consts.SERVICE_INLINE_CUSTOM_CTX_KEY has been used and we just follow it
+		cliCtx = context.WithValue(cliCtx, consts.SERVICE_INLINE_CUSTOM_CTX_KEY, "custom_ctx_key")
+		cliCtx = metainfo.WithBackwardValues(cliCtx)
+		cliCtx = metainfo.WithValue(cliCtx, "KeyTmp", "ValueTmp")
+		cliCtx = metainfo.WithPersistentValue(cliCtx, "KeyPersist", "ValuePersist")
+
+		err = iface.BuildServiceInlineInvokeChain()(cliCtx, nil, nil)
+		test.Assert(t, err == nil, err)
+	} else {
+		t.Fatalf("server does not implement serviceInline")
+	}
+
+	reader.StopAndAssert(t)
 }
