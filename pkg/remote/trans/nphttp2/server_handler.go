@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"runtime/debug"
 	"strings"
@@ -143,7 +144,12 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	}, func(ctx context.Context, method string) context.Context {
 		return ctx
 	})
-	return nil
+	// HandleStreams is a blocking call that runs until the connection is closed.
+	// Returning a non-nil error ensures the caller (e.g. gonet serveConn for-loop)
+	// will not attempt to call OnRead again on the same transport, which would
+	// cause a "close of closed channel" panic since HandleStreams closes internal
+	// channels on exit.
+	return io.EOF
 }
 
 func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans, conn net.Conn) {
