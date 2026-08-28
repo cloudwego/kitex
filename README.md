@@ -103,14 +103,14 @@ We provide the [kitex-benchmark](https://github.com/cloudwego/kitex-benchmark) p
 
 ## Contributing
 
-Contributor guide: [Contributing](https://github.com/cloudwego/kitex/blob/develop/CONTRIBUTING.md).
+Contributor guide: [Contributing](https://github.com/cloudwego/kitex/blob/main/CONTRIBUTING.md).
 
 ## License
 
-Kitex is distributed under the [Apache License, version 2.0](https://github.com/cloudwego/kitex/blob/develop/LICENSE). The licenses of third party dependencies of Kitex are explained [here](https://github.com/cloudwego/kitex/blob/develop/licenses).
+Kitex is distributed under the [Apache License, version 2.0](https://github.com/cloudwego/kitex/blob/main/LICENSE). The licenses of third party dependencies of Kitex are explained [here](https://github.com/cloudwego/kitex/blob/main/licenses).
 
 ## Community
-- Email: [conduct@cloudwego.io](conduct@cloudwego.io)
+- Email: [conduct@cloudwego.io](mailto:conduct@cloudwego.io)
 - How to become a member: [COMMUNITY MEMBERSHIP](https://github.com/cloudwego/community/blob/main/COMMUNITY_MEMBERSHIP.md)
 - Issues: [Issues](https://github.com/cloudwego/kitex/issues)
 - Discord: Join the community with [Discord Channel](https://discord.gg/jceZSE7DsW).
