@@ -263,7 +263,9 @@ func (s *server) Run() (err error) {
 	errCh := svr.Start()
 	select {
 	case err = <-errCh:
-		klog.Errorf("KITEX: server start error: error=%s", err.Error())
+		if err != nil {
+			klog.Errorf("KITEX: server start error: error=%s", err.Error())
+		}
 		return err
 	default:
 	}

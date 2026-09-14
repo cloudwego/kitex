@@ -19,6 +19,7 @@ package client
 
 import (
 	"context"
+	"net"
 	"time"
 
 	"github.com/cloudwego/localsession/backup"
@@ -42,6 +43,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/remote/connpool"
+	"github.com/cloudwego/kitex/pkg/remote/trans/gonet"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/remote/trans/ttstream"
@@ -155,7 +157,14 @@ type Options struct {
 
 	MetaHandlers []remote.MetaHandler
 
-	RemoteOpt        *remote.ClientOption
+	RemoteOpt *remote.ClientOption
+
+	// Explicit option state is separate from defaults and scoped to each client.
+	HTTPProxyEnabled                 bool
+	DialerExplicitlySet              bool
+	ProxyExplicitlySet               bool
+	TransHandlerFactoryExplicitlySet bool
+
 	Proxy            proxy.ForwardProxy
 	Resolver         discovery.Resolver
 	HTTPResolver     http.Resolver
@@ -264,6 +273,27 @@ func NewOptions(opts []Option) *Options {
 }
 
 func (o *Options) initRemoteOpt() {
+	if o.HTTPProxyEnabled {
+		tp := o.Configs.TransportProtocol()
+		if tp&transport.TTHeaderStreaming != 0 {
+			panic("HTTP CONNECT proxy does not support TTHeaderStreaming")
+		}
+		if tp&transport.HTTP != 0 || o.TransHandlerFactoryExplicitlySet {
+			panic("HTTP CONNECT proxy conflicts with HTTP, mux, or custom transport handlers")
+		}
+		if tp&transport.GRPC == 0 {
+			o.RemoteOpt.CliHandlerFactory = gonet.NewCliTransHandlerFactory()
+			dialer := o.RemoteOpt.Dialer
+			o.RemoteOpt.Dialer = remote.SynthesizedDialer{DialFunc: func(network, address string, timeout time.Duration) (net.Conn, error) {
+				conn, err := dialer.DialTimeout(network, address, timeout)
+				if err != nil {
+					return nil, err
+				}
+				return gonet.NewClientConn(conn), nil
+			}}
+		}
+	}
+
 	var zero connpool2.IdleConfig
 
 	// configure grpc

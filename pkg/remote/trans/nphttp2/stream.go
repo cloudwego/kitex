@@ -224,6 +224,11 @@ func (s *clientStream) Header() (streaming.Header, error) {
 }
 
 func (s *clientStream) Trailer() (streaming.Trailer, error) {
+	select {
+	case <-s.conn.s.Done():
+	case <-s.ctx.Done():
+		return nil, s.ctx.Err()
+	}
 	tl := s.conn.Trailer()
 	return http2MDToStreamingTrailer(tl)
 }

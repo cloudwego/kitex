@@ -20,6 +20,7 @@ import (
 	"errors"
 	"net"
 	"sync/atomic"
+	"time"
 
 	"github.com/cloudwego/gopkg/bufiox"
 )
@@ -44,12 +45,26 @@ type cliConn struct {
 	closed uint32 // 1: closed
 }
 
+// NewClientConn adapts a net.Conn returned by a custom dialer for the gonet
+// client transport, providing its buffered reader and writer. The returned
+// connection owns conn and closes it when closed. RPC read timeouts use conn's
+// SetReadTimeout(time.Duration) error capability when available, otherwise
+// SetReadDeadline. Unsupported timeout methods cause the transport to close it.
+func NewClientConn(conn net.Conn) net.Conn {
+	return newCliConn(conn)
+}
+
 func newCliConn(conn net.Conn) *cliConn {
 	return &cliConn{
 		Conn: conn,
 		r:    bufiox.NewDefaultReader(conn),
 		w:    bufiox.NewDefaultWriter(conn),
 	}
+}
+
+// SetReadTimeout preserves a custom connection's duration timeout capability.
+func (c *cliConn) SetReadTimeout(timeout time.Duration) error {
+	return setReadTimeout(c.Conn, timeout)
 }
 
 func (c *cliConn) Reader() *bufiox.DefaultReader {

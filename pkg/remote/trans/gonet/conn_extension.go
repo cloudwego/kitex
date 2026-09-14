@@ -41,14 +41,25 @@ func (e *gonetConnExtension) SetReadTimeout(ctx context.Context, conn net.Conn, 
 	// only client sets the ReadDeadline here.
 	// server sets the ReadDeadline in transServer before invoking OnRead.
 	if role == remote.Client {
-		timeout := trans.GetReadTimeout(cfg)
-		if timeout > 0 {
-			conn.SetReadDeadline(time.Now().Add(timeout))
-		} else {
-			// no timeout
-			conn.SetReadDeadline(time.Time{})
+		if err := setReadTimeout(conn, trans.GetReadTimeout(cfg)); err != nil {
+			// The extension cannot return an error. Close before Decode so a custom
+			// connection with unsupported timeout methods cannot strand its reader.
+			conn.Close()
 		}
 	}
+}
+
+// setReadTimeout uses the duration-based API of netpoll connections when
+// available. Other connections retain the standard absolute deadline behavior.
+func setReadTimeout(conn net.Conn, timeout time.Duration) error {
+	if c, ok := conn.(interface{ SetReadTimeout(time.Duration) error }); ok {
+		return c.SetReadTimeout(timeout)
+	}
+	var deadline time.Time
+	if timeout > 0 {
+		deadline = time.Now().Add(timeout)
+	}
+	return conn.SetReadDeadline(deadline)
 }
 
 // NewWriteByteBuffer implements the trans.Extension interface.

@@ -106,6 +106,10 @@ func WithMetaHandler(h remote.MetaHandler) client.Option {
 func WithProxy(p proxy.ForwardProxy) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithProxy(%T)", p))
+		if o.HTTPProxyEnabled {
+			panic("WithProxy conflicts with HTTP CONNECT proxy")
+		}
+		o.ProxyExplicitlySet = true
 
 		if o.Proxy != nil {
 			panic(fmt.Errorf("reassignment of Proxy is not allowed: %T -> %T", o.Proxy, p))
@@ -120,6 +124,7 @@ func WithTransHandlerFactory(f remote.ClientTransHandlerFactory) Option {
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithTransHandlerFactory(%T)", f))
 
+		o.TransHandlerFactoryExplicitlySet = true
 		o.RemoteOpt.CliHandlerFactory = f
 	}}
 }
@@ -133,6 +138,10 @@ func WithDialer(d remote.Dialer) Option {
 		if d == nil {
 			panic("invalid Dialer: nil")
 		}
+		if o.HTTPProxyEnabled {
+			panic("WithDialer conflicts with HTTP CONNECT proxy")
+		}
+		o.DialerExplicitlySet = true
 		o.RemoteOpt.Dialer = d
 	}}
 }

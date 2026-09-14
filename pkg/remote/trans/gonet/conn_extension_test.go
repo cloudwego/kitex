@@ -18,6 +18,8 @@ package gonet
 
 import (
 	"context"
+	"errors"
+	"net"
 	"testing"
 	"time"
 
@@ -69,4 +71,32 @@ func TestGonetConnExtensionSetReadTimeout(t *testing.T) {
 	mcfg.SetReadWriteTimeout(timeout)
 	e.SetReadTimeout(context.Background(), mc, cfg, remote.Server)
 	test.Assert(t, !isSet)
+}
+
+// A custom wrapper can hide netpoll's duration timeout API while retaining its
+// unsupported SetReadDeadline. It must fail closed instead of stranding a read.
+type unsupportedDeadlineConn struct{ net.Conn }
+
+func (c unsupportedDeadlineConn) SetReadDeadline(time.Time) error {
+	return errors.New("read deadlines unsupported")
+}
+
+func TestGonetClosesConnectionWhenReadTimeoutUnsupported(t *testing.T) {
+	c, peer := net.Pipe()
+	defer peer.Close()
+	conn := NewClientConn(unsupportedDeadlineConn{c})
+	defer conn.Close()
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetRPCTimeout(time.Millisecond)
+	NewGonetExtension().SetReadTimeout(context.Background(), conn, cfg, remote.Client)
+	done := make(chan error, 1)
+	go func() { _, err := conn.Read(make([]byte, 1)); done <- err }()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected closed connection")
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("unsupported deadline left read blocked")
+	}
 }

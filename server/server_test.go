@@ -128,6 +128,23 @@ func TestServerRun(t *testing.T) {
 	test.Assert(t, atomic.LoadInt32(&shutdownHook) == 1)
 }
 
+func TestServerRunWithNilStartupError(t *testing.T) {
+	ln, err := net.Listen("tcp", test.GetLocalAddress())
+	test.Assert(t, err == nil, err)
+	defer ln.Close()
+
+	transSvr := &mocks.MockTransServer{
+		BootstrapServerFunc: func(net.Listener) error { return nil },
+		ShutdownFunc:        func() error { return nil },
+	}
+	svr := NewServer(WithListener(ln), WithTransServerFactory(mocks.NewMockTransServerFactory(transSvr)))
+	err = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+
+	err = svr.Run()
+	test.Assert(t, err == nil, err)
+}
+
 func TestReusePortServerRun(t *testing.T) {
 	addr := getAddrForListener()
 	var opts []Option

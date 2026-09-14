@@ -274,8 +274,8 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 	}
 	if bizStatusErr := ri.Invocation().BizStatusErr(); bizStatusErr != nil {
 		var st *status.Status
-		if sterr, ok := bizStatusErr.(status.Iface); ok {
-			st = sterr.GRPCStatus()
+		if statusErr, ok := bizStatusErr.(status.Iface); ok {
+			st = statusErr.GRPCStatus()
 		} else {
 			st = status.New(codes.Internal, bizStatusErr.BizMessage())
 		}
