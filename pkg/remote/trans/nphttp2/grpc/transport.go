@@ -232,6 +232,7 @@ const (
 
 // Stream represents an RPC in the transport layer.
 type Stream struct {
+	diagnostics  *serverStreamDiagnostics // server only, initialized before publishing the stream
 	id           uint32
 	st           ServerTransport  // nil for client side Stream
 	ct           *http2Client     // nil for server side Stream
@@ -601,6 +602,8 @@ const (
 
 // ServerConfig consists of all the configurations to establish a server transport.
 type ServerConfig struct {
+	// ConnectionDiagnostics enables bounded HTTP/2 connection/stream metadata logs.
+	ConnectionDiagnostics      bool
 	MaxStreams                 uint32
 	KeepaliveParams            ServerKeepalive
 	KeepaliveEnforcementPolicy EnforcementPolicy

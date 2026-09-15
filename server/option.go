@@ -329,6 +329,16 @@ func WithGRPCKeepaliveEnforcementPolicy(kep grpc.EnforcementPolicy) Option {
 	}}
 }
 
+// WithGRPCConnectionDiagnostics enables bounded connection and stream metadata
+// logs on HTTP/2 close, RST_STREAM, GOAWAY and local drain. Disabled by default.
+// The diagnostics contain trace identifiers and service names, not RPC payloads.
+func WithGRPCConnectionDiagnostics(enabled bool) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCConnectionDiagnostics(%v)", enabled))
+		o.RemoteOpt.GRPCCfg.ConnectionDiagnostics = enabled
+	}}
+}
+
 // WithGRPCMaxConcurrentStreams returns an Option that will apply a limit on the number
 // of concurrent streams to each ServerTransport.
 // It corresponds to the MaxConcurrentStreams ServerOption of gRPC.

@@ -85,6 +85,7 @@ func init() {
 
 // http2Server implements the ServerTransport interface with HTTP2.
 type http2Server struct {
+	diagnostics *serverConnDiagnostics // nil unless explicitly enabled; initialized before goroutines
 	lastRead    int64
 	ctx         context.Context
 	done        chan struct{}
@@ -287,16 +288,28 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		return nil, connectionErrorf(false, nil, "transport: http2Server.HandleStreams saw invalid preface type %T from client", frame)
 	}
 	t.handleSettings(sf)
+	if config.ConnectionDiagnostics {
+		t.diagnostics = newServerConnDiagnostics(t.idle)
+	}
 
 	gofunc.RecoverGoFuncWithInfo(ctx, func() {
 		t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst)
 		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
 		runErr := t.loopy.run(conn.RemoteAddr().String())
+		var closeDiagnostic *connectionCloseDiagnostic
 		if runErr != nil {
-			klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v", runErr)
+			if t.diagnostics != nil {
+				t.mu.Lock()
+				closeDiagnostic = t.captureDiagnosticCloseLocked("writer_exit", runErr, runErr)
+				t.mu.Unlock()
+				klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v, conn_id=%s", runErr, t.diagnostics.id)
+			} else {
+				klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v", runErr)
+			}
 		}
 		t.conn.Close()
 		close(t.writerDone)
+		t.logDiagnosticClose(closeDiagnostic)
 	}, gofunc.NewBasicInfo("", conn.RemoteAddr().String()))
 
 	gofunc.RecoverGoFuncWithInfo(ctx, t.keepalive, gofunc.NewBasicInfo("", conn.RemoteAddr().String()))
@@ -355,6 +368,7 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 			s.sourceService = vals[0]
 		}
 	}
+	t.initStreamDiagnostics(s)
 
 	t.mu.Lock()
 	if t.state != reachable {
@@ -440,12 +454,15 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				continue
 			}
 			if err == io.EOF || err == io.ErrUnexpectedEOF || errors.Is(err, netpoll.ErrEOF) {
-				t.closeWithErr(errConnectionEOF)
+				t.closeWithDiagnostic(errConnectionEOF, err, "read_frame")
 				return
 			}
 			klog.CtxWarnf(t.ctx, "transport: http2Server.HandleStreams failed to read frame: %v", err)
-			t.closeWithErr(status.Errorf(codes.Canceled, "transport: ReadFrame encountered err: %v"+triggeredByRemoteServiceSuffix, err))
+			t.closeWithDiagnostic(status.Errorf(codes.Canceled, "transport: ReadFrame encountered err: %v"+triggeredByRemoteServiceSuffix, err), err, "read_frame")
 			return
+		}
+		if t.diagnostics != nil {
+			atomic.StoreInt64(&t.diagnostics.lastFrameAt, time.Now().UnixNano())
 		}
 		switch frame := frame.(type) {
 		case *grpcframe.MetaHeadersFrame:
@@ -465,6 +482,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 		case *http2.WindowUpdateFrame:
 			t.handleWindowUpdate(frame)
 		case *grpcframe.GoAwayFrame:
+			t.recordDiagnosticEvent(connectionDiagnosticEvent{Kind: "goaway", Direction: "received", Code: frame.ErrCode.String(), LastStreamID: frame.LastStreamID, DebugDataLen: len(frame.DebugData())})
 			// TODO: Handle GoAway from the client appropriately.
 		default:
 			klog.CtxErrorf(t.ctx, "transport: http2Server.HandleStreams found unhandled frame type %v.", frame)
@@ -598,6 +616,7 @@ func (t *http2Server) handleData(f *grpcframe.DataFrame) {
 }
 
 func (t *http2Server) handleRSTStream(f *http2.RSTStreamFrame) {
+	t.recordDiagnosticEvent(connectionDiagnosticEvent{Kind: "rst_stream", Direction: "received", Code: f.ErrCode.String(), StreamID: f.StreamID})
 	// If the stream is not deleted from the transport's active streams map, then do a regular close stream.
 	if s, ok := t.getStream(f); ok {
 		if f.ErrCode == gracefulShutdownCode {
@@ -990,10 +1009,12 @@ func (t *http2Server) Close() error {
 		t.mu.Unlock()
 		return nil
 	}
+	closeDiagnostic := t.captureDiagnosticCloseLocked("server_close", errGracefulShutdown, nil)
 	t.state = closing
 	streams := t.activeStreams
 	t.activeStreams = nil
 	t.mu.Unlock()
+	defer t.logDiagnosticClose(closeDiagnostic)
 
 	finishErr := errGracefulShutdown
 	finishCh := make(chan struct{}, 1)
@@ -1053,11 +1074,22 @@ func (t *http2Server) rstActiveStreams(streams map[uint32]*Stream, cancelErr err
 }
 
 func (t *http2Server) closeWithErr(reason error) error {
+	stage := "transport_close"
+	if errors.Is(reason, errMaxAgeClosing) {
+		stage = "max_connection_age"
+	} else if errors.Is(reason, errIdleClosing) {
+		stage = "keepalive_timeout"
+	}
+	return t.closeWithDiagnostic(reason, nil, stage)
+}
+
+func (t *http2Server) closeWithDiagnostic(reason, raw error, stage string) error {
 	t.mu.Lock()
 	if t.state == closing {
 		t.mu.Unlock()
 		return errors.New("transport: Close() was already called")
 	}
+	closeDiagnostic := t.captureDiagnosticCloseLocked(stage, reason, raw)
 	t.state = closing
 	streams := t.activeStreams
 	t.activeStreams = nil
@@ -1070,6 +1102,7 @@ func (t *http2Server) closeWithErr(reason error) error {
 	for _, s := range streams {
 		s.cancel(reason)
 	}
+	t.logDiagnosticClose(closeDiagnostic)
 
 	return err
 }
@@ -1078,6 +1111,7 @@ func (t *http2Server) closeWithErr(reason error) error {
 func (t *http2Server) deleteStream(s *Stream, eosReceived bool) {
 	t.mu.Lock()
 	if _, ok := t.activeStreams[s.id]; ok {
+		t.rememberFinishedStreamLocked(s)
 		delete(t.activeStreams, s.id)
 		if len(t.activeStreams) == 0 {
 			t.idle = time.Now()
@@ -1143,6 +1177,7 @@ func (t *http2Server) drain(code http2.ErrCode, debugData []byte) {
 	}
 	t.drainChan = make(chan struct{})
 	t.mu.Unlock()
+	t.recordDiagnosticEvent(connectionDiagnosticEvent{Kind: "drain", Direction: "local", Code: code.String(), Detail: string(debugData)})
 	// drain successfully
 	// should release lock before access controlBuf
 	t.controlBuf.put(&goAway{code: code, debugData: debugData, headsUp: true})
@@ -1170,6 +1205,7 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 		if err := t.framer.WriteGoAway(sid, g.code, g.debugData); err != nil {
 			return false, err
 		}
+		t.recordDiagnosticEvent(connectionDiagnosticEvent{Kind: "goaway", Direction: "sent", Code: g.code.String(), LastStreamID: sid, Detail: string(g.debugData)})
 		if g.closeConn {
 			// Abruptly close the connection following the GoAway (via
 			// loopywriter).  But flush out what's inside the buffer first.
@@ -1188,6 +1224,7 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 	if err := t.framer.WriteGoAway(math.MaxUint32, http2.ErrCodeNo, g.debugData); err != nil {
 		return false, err
 	}
+	t.recordDiagnosticEvent(connectionDiagnosticEvent{Kind: "goaway", Direction: "sent", Code: http2.ErrCodeNo.String(), LastStreamID: math.MaxUint32, Detail: string(g.debugData)})
 	if err := t.framer.WritePing(false, goAwayPing.data); err != nil {
 		return false, err
 	}

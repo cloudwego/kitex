@@ -46,6 +46,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/testutils"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -102,6 +103,7 @@ const (
 
 	gracefulShutdown
 	cancel
+	connectionDiagnostics
 )
 
 func (h *testStreamHandler) handleStreamAndNotify(s *Stream) {
@@ -383,6 +385,14 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 				func(ctx context.Context, method string) context.Context {
 					return ctx
 				})
+		case connectionDiagnostics:
+			go transport.HandleStreams(func(stream *Stream) {
+				ctx := stream.Context()
+				md, _ := metadata.FromIncomingContext(ctx)
+				if ids := md.Get("x-test-log-id"); len(ids) > 0 {
+					RecordServerStreamLogID(ctx, ids[0], "received", true)
+				}
+			}, func(ctx context.Context, _ string) context.Context { return ctx })
 		case misbehaved:
 			go transport.HandleStreams(func(s *Stream) {
 				go h.handleStreamMisbehave(t, s)
