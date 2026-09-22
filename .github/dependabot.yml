@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    schedule:
+      # Run every day, including weekends.
+      interval: cron
+      cronjob: "0 9 * * *"
+      timezone: Asia/Shanghai
+    allow:
+      - dependency-name: github.com/cloudwego/*
+        dependency-type: all
+      - dependency-name: github.com/bytedance/sonic
+        dependency-type: all
+    groups:
+      cloudwego-dependencies:
+        patterns:
+          - github.com/cloudwego/*
+          - github.com/bytedance/sonic
+    directories:
+      - /
