@@ -22,8 +22,13 @@ import (
 )
 
 var (
-	_            EndpointInfo        = &endpointInfo{}
-	_            MutableEndpointInfo = &endpointInfo{}
+	_ EndpointInfo        = &endpointInfo{}
+	_ MutableEndpointInfo = &endpointInfo{}
+
+	// Deprecated: endpointInfo pooling is part of the legacy RPCInfo pooling
+	// mechanism under migration. RPCInfo pooling may cause panic or data races
+	// when RPCInfo is accessed asynchronously after framework cleanup. Kitex is
+	// gradually removing this pooling mechanism.
 	endpointPool sync.Pool
 )
 
@@ -134,6 +139,12 @@ func (ei *endpointInfo) zero() {
 }
 
 // Recycle is used to recycle the endpointInfo.
+//
+// Deprecated: endpointInfo recycling is part of the legacy RPCInfo pooling
+// mechanism under migration. It may cause panic or data races when RPCInfo is
+// accessed asynchronously after framework cleanup. Kitex is gradually removing
+// this pooling mechanism; this method is kept only for compatibility during the
+// migration.
 func (ei *endpointInfo) Recycle() {
 	ei.zero()
 	endpointPool.Put(ei)

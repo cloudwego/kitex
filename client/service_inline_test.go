@@ -31,6 +31,7 @@ import (
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/internal/test/rpcinfotest"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -82,6 +83,25 @@ func TestServiceInlineCall(t *testing.T) {
 
 	err := cli.Call(ctx, mtd, req, res)
 	test.Assert(t, err == nil, err)
+}
+
+func TestServiceInlineRPCInfoAccessNoRace(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var captured context.Context
+	md := func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, res interface{}) error {
+			captured = ctx
+			return next(ctx, req, res)
+		}
+	}
+	cli := newMockServiceInlineClient(t, ctrl, WithMiddleware(md))
+
+	err := cli.Call(context.Background(), mocks.MockMethod, new(MockTStruct), new(MockTStruct))
+	test.Assert(t, err == nil, err)
+	test.Assert(t, captured != nil)
+	rpcinfotest.MustReadAsync(t, captured)
 }
 
 func TestServiceInlineTagOptions(t *testing.T) {

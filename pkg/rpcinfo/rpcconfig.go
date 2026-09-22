@@ -27,8 +27,13 @@ import (
 )
 
 var (
-	_             MutableRPCConfig = &rpcConfig{}
-	_             RPCConfig        = &rpcConfig{}
+	_ MutableRPCConfig = &rpcConfig{}
+	_ RPCConfig        = &rpcConfig{}
+
+	// Deprecated: rpcConfig pooling is part of the legacy RPCInfo pooling
+	// mechanism under migration. RPCInfo pooling may cause panic or data races
+	// when RPCInfo is accessed asynchronously after framework cleanup. Kitex is
+	// gradually removing this pooling mechanism.
 	rpcConfigPool sync.Pool
 )
 
@@ -240,6 +245,12 @@ func (r *rpcConfig) initialize() {
 }
 
 // Recycle reuses the rpcConfig.
+//
+// Deprecated: rpcConfig recycling is part of the legacy RPCInfo pooling
+// mechanism under migration. It may cause panic or data races when RPCInfo is
+// accessed asynchronously after framework cleanup. Kitex is gradually removing
+// this pooling mechanism; this method is kept only for compatibility during the
+// migration.
 func (r *rpcConfig) Recycle() {
 	r.initialize()
 	rpcConfigPool.Put(r)

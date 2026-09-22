@@ -22,6 +22,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
+// Deprecated: inline RPCInfo pooling is part of the legacy RPCInfo pooling
+// mechanism under migration. RPCInfo pooling may cause panic or data races when
+// RPCInfo is accessed asynchronously after framework cleanup. Kitex is gradually
+// removing this pooling mechanism.
 var inlineRPCInfoPool sync.Pool
 
 func init() {
@@ -52,6 +56,12 @@ func (r *inlineRPCInfo) Config() RPCConfig { return &r.config }
 func (r *inlineRPCInfo) Stats() RPCStats { return &r.stats }
 
 // Recycle reuses the inlineRPCInfo.
+//
+// Deprecated: RPCInfo recycling is part of the legacy RPCInfo pooling mechanism
+// under migration. It may cause panic or data races when RPCInfo is accessed
+// asynchronously after framework cleanup. Kitex is gradually removing this
+// pooling mechanism; this method is kept only for compatibility during the
+// migration.
 func (r *inlineRPCInfo) Recycle() {
 	if !PoolEnabled() {
 		return
@@ -68,6 +78,12 @@ func (r *inlineRPCInfo) Recycle() {
 // avoiding separate pool allocations for from, to, invocation, config, and stats.
 // The returned RPCInfo's From(), To(), Invocation(), Config(), and Stats() return
 // pointers to the inlined fields. Use AsMutable* to modify them after creation.
+//
+// Deprecated: inline RPCInfo is part of the legacy RPCInfo pooling mechanism
+// under migration. RPCInfo pooling may cause panic or data races when RPCInfo is
+// accessed asynchronously after framework cleanup. Kitex is gradually removing
+// this pooling mechanism; this function is kept only for compatibility during
+// the migration.
 func NewRPCInfoWithInlineFields() RPCInfo {
 	return inlineRPCInfoPool.Get().(*inlineRPCInfo)
 }
