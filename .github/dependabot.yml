@@ -2,9 +2,8 @@ version: 2
 updates:
   - package-ecosystem: gomod
     schedule:
-      # Run every day, including weekends.
-      interval: cron
-      cronjob: "0 9 * * *"
+      interval: daily
+      time: "10:00"
       timezone: Asia/Shanghai
     allow:
       - dependency-name: github.com/cloudwego/*
