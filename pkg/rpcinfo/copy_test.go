@@ -19,6 +19,7 @@ package rpcinfo
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
@@ -50,6 +51,44 @@ func TestFreezeRPCInfo(t *testing.T) {
 	test.Assert(t, ctx3 != ctx2)
 	ri3 := GetRPCInfo(ctx3)
 	checkFreezeRPCInfo(t, ri3, ri2)
+}
+
+func TestFreezeRPCInfoKeepsValuesAfterOriginalRecycled(t *testing.T) {
+	cfg := NewRPCConfig()
+	mcfg := AsMutableRPCConfig(cfg)
+	test.Assert(t, mcfg != nil)
+	test.Assert(t, mcfg.SetRPCTimeout(time.Second) == nil)
+	test.Assert(t, mcfg.SetConnectTimeout(2*time.Second) == nil)
+	test.Assert(t, mcfg.SetReadWriteTimeout(3*time.Second) == nil)
+
+	ri := NewRPCInfo(
+		NewEndpointInfo("fromService", "fromMethod", nil, map[string]string{"from": "tag"}),
+		NewEndpointInfo("toService", "toMethod", nil, map[string]string{"to": "tag"}),
+		NewInvocation("invocationService", "invocationMethod", "invocationPackage"),
+		cfg,
+		NewRPCStats(),
+	)
+	ctx := NewCtxWithRPCInfo(context.Background(), ri)
+	frozenCtx := FreezeRPCInfo(ctx)
+	frozenRI := GetRPCInfo(frozenCtx)
+
+	PutRPCInfo(ri)
+
+	test.Assert(t, frozenRI.From().ServiceName() == "fromService")
+	test.Assert(t, frozenRI.From().Method() == "fromMethod")
+	fromTag, ok := frozenRI.From().Tag("from")
+	test.Assert(t, ok && fromTag == "tag")
+	test.Assert(t, frozenRI.To().ServiceName() == "toService")
+	test.Assert(t, frozenRI.To().Method() == "toMethod")
+	toTag, ok := frozenRI.To().Tag("to")
+	test.Assert(t, ok && toTag == "tag")
+	test.Assert(t, frozenRI.Invocation().PackageName() == "invocationPackage")
+	test.Assert(t, frozenRI.Invocation().ServiceName() == "invocationService")
+	test.Assert(t, frozenRI.Invocation().MethodName() == "invocationMethod")
+	test.Assert(t, frozenRI.Config().RPCTimeout() == time.Second)
+	test.Assert(t, frozenRI.Config().ConnectTimeout() == 2*time.Second)
+	test.Assert(t, frozenRI.Config().ReadWriteTimeout() == 3*time.Second)
+	test.Assert(t, frozenRI.Stats() == nil)
 }
 
 func checkFreezeRPCInfo(t *testing.T, ri, prevRI RPCInfo) {
