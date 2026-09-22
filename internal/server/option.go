@@ -77,6 +77,7 @@ type StreamOption struct {
 }
 
 type StreamOptions struct {
+	RecvTimeoutConfig            streaming.TimeoutConfig
 	StreamEventHandlers          []rpcinfo.ServerStreamEventHandler
 	StreamMiddlewares            []sep.StreamMiddleware
 	StreamMiddlewareBuilders     []sep.StreamMiddlewareBuilder

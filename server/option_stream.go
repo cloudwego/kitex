@@ -24,6 +24,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/endpoint/sep"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -101,6 +102,16 @@ func WithStreamEventHandler(hdl rpcinfo.ServerStreamEventHandler) StreamOption {
 		di.Push(fmt.Sprintf("WithStreamEventHandler(%+v)", hdl))
 
 		o.StreamEventHandlers = append(o.StreamEventHandlers, hdl)
+	}}
+}
+
+// WithStreamRecvTimeoutConfig sets the default recv timeout for all server-side streaming handlers.
+// Handlers can dynamically override this per-stream using streaming.SetRecvTimeoutConfig(stream, cfg).
+func WithStreamRecvTimeoutConfig(cfg streaming.TimeoutConfig) StreamOption {
+	return StreamOption{F: func(o *internal_server.StreamOptions, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithStreamRecvTimeoutConfig(%+v)", cfg))
+
+		o.RecvTimeoutConfig = cfg
 	}}
 }
 
