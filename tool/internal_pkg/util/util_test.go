@@ -16,6 +16,9 @@ package util
 
 import (
 	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -35,15 +38,17 @@ func TestCombineOutputPath(t *testing.T) {
 }
 
 func TestGetGOPATH(t *testing.T) {
-	orig := os.Getenv("GOPATH")
-	defer func() {
-		os.Setenv("GOPATH", orig)
-	}()
+	first := filepath.Join(string(filepath.Separator), "first", "go")
+	second := filepath.Join(string(filepath.Separator), "second", "go")
+	if runtime.GOOS == "windows" {
+		first = `C:\first\go`
+		second = `D:\second\go`
+	}
 
-	os.Setenv("GOPATH", "/usr/bin/go:/usr/local/bin/go")
+	t.Setenv("GOPATH", strings.Join([]string{first, second}, string(os.PathListSeparator)))
 	gopath, err := GetGOPATH()
-	test.Assert(t, err == nil && gopath == "/usr/bin/go")
-	os.Setenv("GOPATH", "")
+	test.Assert(t, err == nil && gopath == first)
+	t.Setenv("GOPATH", "")
 	gopath, err = GetGOPATH()
 	test.Assert(t, err == nil && gopath != "")
 }
