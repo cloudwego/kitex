@@ -47,3 +47,15 @@ func TestGetGOPATH(t *testing.T) {
 	gopath, err = GetGOPATH()
 	test.Assert(t, err == nil && gopath != "")
 }
+
+func TestExists(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "exists_test")
+	test.Assert(t, err == nil)
+	tmpPath := tmpFile.Name()
+	tmpFile.Close()
+	defer os.Remove(tmpPath)
+
+	test.Assert(t, Exists(tmpPath))
+	test.Assert(t, !Exists(tmpPath+"_nonexistent"))
+	test.Assert(t, !Exists(t.TempDir()))
+}
