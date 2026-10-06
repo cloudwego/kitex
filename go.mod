@@ -11,8 +11,8 @@ require (
 	github.com/cloudwego/frugal v0.3.1
 	github.com/cloudwego/gopkg v0.2.1
 	github.com/cloudwego/localsession v0.2.2
-	github.com/cloudwego/netpoll v0.7.2
-	github.com/cloudwego/prutal v0.1.3
+	github.com/cloudwego/netpoll v0.7.5
+	github.com/cloudwego/prutal v0.2.1
 	github.com/cloudwego/runtimex v0.1.2
 	github.com/cloudwego/thriftgo v0.4.5
 	github.com/golang/mock v1.6.0
@@ -30,8 +30,8 @@ require (
 )
 
 require (
-	github.com/bytedance/sonic/loader v0.5.0 // indirect
-	github.com/cloudwego/base64x v0.1.6 // indirect
+	github.com/bytedance/sonic/loader v0.5.1 // indirect
+	github.com/cloudwego/base64x v0.1.7 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dlclark/regexp2 v1.11.0 // indirect
 	github.com/fatih/structtag v1.2.0 // indirect
