@@ -46,6 +46,7 @@ type client struct {
 	transHdlr   remote.TransHandler
 	connManager *ConnWrapper
 	conn        net.Conn
+	unary       bool
 }
 
 // NewClient creates a new Client using the given params.
@@ -56,11 +57,31 @@ func NewClient(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.TransHand
 	for _, shdlr := range opt.StreamingMetaHandlers {
 		ctx, err = shdlr.OnConnectStream(ctx)
 		if err != nil {
+			cm.zero()
+			connWrapperPool.Put(cm)
 			return nil, err
 		}
 	}
-	rawConn, err := cm.GetConn(ctx, opt.Dialer, ri)
+	dialer := opt.Dialer
+	call := remote.UnaryCallFromContext(ctx)
+	if call != nil {
+		call.ConnectStart = time.Now()
+		dialer = call.Dialer(dialer)
+	}
+	rawConn, err := cm.GetConn(ctx, dialer, ri)
+	if call != nil {
+		call.ConnectEnd, call.Conn = time.Now(), rawConn
+		if err != nil {
+			call.FailureStage = remote.UnaryFailureConnect
+		} else if identified, ok := cm.conn.(interface{ ConnID() uint64 }); ok {
+			call.ConnID = identified.ConnID()
+		} else if opt.ConnPool == nil {
+			call.ConnID = remote.NextUnaryConnID()
+		}
+	}
 	if err != nil {
+		cm.zero()
+		connWrapperPool.Put(cm)
 		if errors.Is(err, kerrors.ErrGetConnection) {
 			return nil, err
 		}
@@ -68,13 +89,18 @@ func NewClient(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.TransHand
 	}
 	cli := clientPool.Get().(*client)
 	cli.init(handler, cm, rawConn)
+	cli.unary = call != nil
 	return cli, nil
 }
 
 func (c *client) Recycle() {
+	if c.unary && c.connManager != nil {
+		c.connManager.ReleaseConn(errors.New("client recycled before IO completed"), nil)
+	}
 	c.transHdlr = nil
 	c.connManager = nil
 	c.conn = nil
+	c.unary = false
 	clientPool.Put(c)
 }
 
@@ -88,7 +114,12 @@ func (c *client) init(handler remote.TransHandler, cm *ConnWrapper, conn net.Con
 func (c *client) Send(ctx context.Context, ri rpcinfo.RPCInfo, req remote.Message) (err error) {
 	_, err = c.transHdlr.Write(ctx, c.conn, req)
 	if err != nil {
+		if call := remote.UnaryCallFromContext(ctx); call != nil {
+			call.FailureStage = remote.UnaryFailureSend
+			err = call.FinishClient(ctx, err)
+		}
 		c.connManager.ReleaseConn(err, ri)
+		c.connManager = nil
 	}
 	return err
 }
@@ -98,7 +129,14 @@ func (c *client) Recv(ctx context.Context, ri rpcinfo.RPCInfo, resp remote.Messa
 	// resp is nil means oneway
 	if resp != nil {
 		ctx, err = c.transHdlr.Read(ctx, c.conn, resp)
-		c.transHdlr.OnMessage(ctx, nil, resp)
+		if call := remote.UnaryCallFromContext(ctx); call != nil {
+			err = call.FinishClient(ctx, err)
+			if err == nil {
+				ctx, err = c.transHdlr.OnMessage(ctx, nil, resp)
+			}
+		} else {
+			c.transHdlr.OnMessage(ctx, nil, resp)
+		}
 	} else {
 		// Wait for the request to be flushed out before closing the connection.
 		// 500us is an acceptable duration to keep a minimal loss rate at best effort.
@@ -106,5 +144,6 @@ func (c *client) Recv(ctx context.Context, ri rpcinfo.RPCInfo, resp remote.Messa
 	}
 
 	c.connManager.ReleaseConn(err, ri)
+	c.connManager = nil
 	return err
 }

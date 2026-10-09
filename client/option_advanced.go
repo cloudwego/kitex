@@ -40,6 +40,12 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
+func WithUnaryLifecycle(h remote.UnaryLifecycle) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.RemoteOpt.UnaryLifecycle = h
+	}}
+}
+
 // WithHTTPConnection specifies client use RPC over http.
 func WithHTTPConnection() Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {

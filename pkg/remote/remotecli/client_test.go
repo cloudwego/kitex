@@ -96,6 +96,63 @@ func TestNewClient(t *testing.T) {
 	test.Assert(t, cli != nil, cli)
 }
 
+type unaryIdentifiedConn struct {
+	net.Conn
+	idCalls int
+}
+
+func (c *unaryIdentifiedConn) ConnID() uint64 {
+	c.idCalls++
+	return 37
+}
+
+func TestUnaryConnIDOptional(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		enabled bool
+		hasID   bool
+	}{
+		{"disabled", false, true},
+		{"identified", true, true},
+		{"custom_pool_without_id", true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			addr := utils.NewNetAddr("tcp", "to")
+			ri := newMockRPCInfo(addr)
+			ctx := context.Background()
+			call := remote.NewUnaryCall(nil)
+			defer call.Recycle()
+			if tc.enabled {
+				ctx = remote.WithUnaryCall(ctx, call)
+			}
+			var conn net.Conn = mocksnetpoll.NewMockConnection(ctrl)
+			identified := &unaryIdentifiedConn{Conn: conn}
+			if tc.hasID {
+				conn = identified
+			}
+			pool := mocksremote.NewMockConnPool(ctrl)
+			pool.EXPECT().Get(gomock.Any(), addr.Network(), addr.String(), gomock.Any()).Return(conn, nil)
+			pool.EXPECT().Put(conn).Return(nil)
+			cli, err := NewClient(ctx, ri, nil, &remote.ClientOption{ConnPool: pool})
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantID, wantCalls := uint64(0), 0
+			if tc.enabled && tc.hasID {
+				wantID, wantCalls = 37, 1
+			}
+			if call.ConnID != wantID || identified.idCalls != wantCalls {
+				t.Fatalf("ConnID=%d calls=%d, want %d/%d", call.ConnID, identified.idCalls, wantID, wantCalls)
+			}
+			c := cli.(*client)
+			c.connManager.ReleaseConn(nil, ri)
+			c.connManager = nil
+			cli.Recycle()
+		})
+	}
+}
+
 func newMockRPCInfo(addr net.Addr) rpcinfo.RPCInfo {
 	from := rpcinfo.NewEndpointInfo("from", "method", nil, nil)
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")

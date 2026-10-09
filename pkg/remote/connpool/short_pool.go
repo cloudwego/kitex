@@ -30,6 +30,14 @@ var _ remote.ConnPool = &ShortPool{}
 type shortConn struct {
 	net.Conn
 	closed bool
+	id     uint64
+}
+
+func (sc *shortConn) ConnID() uint64 {
+	if sc.id == 0 {
+		sc.id = remote.NextUnaryConnID()
+	}
+	return sc.id
 }
 
 // Close closes the connection.

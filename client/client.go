@@ -149,6 +149,15 @@ func (kc *kClient) checkOptions() (err error) {
 	if kc.opt.Svr.ServiceName == "" {
 		return errors.New("service name is required")
 	}
+	if kc.unaryLifecycle() != nil {
+		tp := kc.opt.Configs.TransportProtocol()
+		if kc.svcInfo.PayloadCodec != serviceinfo.Thrift || (tp != transport.TTHeader && tp != transport.TTHeaderFramed) {
+			return remote.ErrUnaryLifecycleProtocol
+		}
+		if kc.opt.Proxy != nil || kc.opt.WarmUpOption != nil {
+			return errors.New("unary lifecycle cannot be combined with a proxy or connection warmup")
+		}
+	}
 	return nil
 }
 
@@ -300,11 +309,11 @@ func (kc *kClient) initMiddlewares(ctx context.Context) (mw middleware) {
 	mw.mws = append(mw.mws, contextMW)
 	mw.mws = append(mw.mws, builderMWs...)
 	mw.mws = append(mw.mws, acl.NewACLMiddleware(kc.opt.ACLRules))
-	if kc.opt.Proxy == nil {
+	if kc.unaryLifecycle() == nil && kc.opt.Proxy == nil {
 		mw.mws = append(mw.mws, newResolveMWBuilder(kc.lbf)(ctx))
 		mw.mws = append(mw.mws, kc.opt.CBSuite.InstanceCBMW())
 		mw.mws = append(mw.mws, richMWsWithBuilder(ctx, kc.opt.IMWBs)...)
-	} else {
+	} else if kc.unaryLifecycle() == nil {
 		if kc.opt.Resolver != nil { // customized service discovery
 			mw.mws = append(mw.mws, newResolveMWBuilder(kc.lbf)(ctx))
 		}
@@ -314,11 +323,13 @@ func (kc *kClient) initMiddlewares(ctx context.Context) (mw middleware) {
 
 	// 2. unary middlewares
 	mw.uMws = append(mw.uMws, kc.opt.CBSuite.ServiceCBMW().ToUnaryMiddleware())
-	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {
+	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil && kc.unaryLifecycle() == nil {
 		// integrate xds if enabled
 		mw.uMws = append(mw.uMws, kc.opt.XDSRouterMiddleware.ToUnaryMiddleware())
 	}
-	mw.uMws = append(mw.uMws, rpcTimeoutMW(ctx))
+	if kc.unaryLifecycle() == nil {
+		mw.uMws = append(mw.uMws, rpcTimeoutMW(ctx))
+	}
 	kc.opt.UnaryOptions.InitMiddlewares(ctx)
 	mw.uMws = append(mw.uMws, kc.opt.UnaryOptions.UnaryMiddlewares...)
 
@@ -507,6 +518,9 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 	transPipl, err := newCliTransHandler(kc.opt.RemoteOpt)
 	if err != nil {
 		return nil, err
+	}
+	if kc.unaryLifecycle() != nil {
+		return kc.unaryLifecycleEndpoint(transPipl)
 	}
 	return func(ctx context.Context, req, resp interface{}) (err error) {
 		var sendMsg remote.Message

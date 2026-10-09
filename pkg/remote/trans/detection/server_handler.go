@@ -51,6 +51,9 @@ type svrTransHandlerFactory struct {
 }
 
 func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
+	if opt.UnaryLifecycle != nil {
+		return f.defaultHandlerFactory.NewTransHandler(opt)
+	}
 	t := &svrTransHandler{}
 	var err error
 	for i := range f.detectableHandlerFactory {

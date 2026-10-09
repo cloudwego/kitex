@@ -36,6 +36,13 @@ import (
 
 // NewDefaultSvrTransHandler to provide default impl of svrTransHandler, it can be reused in netpoll, shm-ipc, framework-sdk extensions
 func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.ServerTransHandler, error) {
+	if opt.UnaryLifecycle != nil {
+		if _, ok := opt.Codec.(interface {
+			PrepareUnaryWire(context.Context, remote.Message, *remote.UnaryCall) error
+		}); !ok {
+			return nil, remote.ErrUnaryLifecycleProtocol
+		}
+	}
 	svrHdlr := &svrTransHandler{
 		opt:         opt,
 		codec:       opt.Codec,
@@ -60,12 +67,29 @@ type svrTransHandler struct {
 	remoteClosedWarn   logbackoff.Exponential
 }
 
+type unaryConnKey struct{}
+
+type unaryConnState struct {
+	id   uint64
+	used bool
+}
+
 // Write implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
 	var bufWriter remote.ByteBuffer
+	failureStage := remote.UnaryFailureSend
 	ri := sendMsg.RPCInfo()
 	rpcinfo.Record(ctx, ri, stats.WriteStart, nil)
 	defer func() {
+		if call := remote.UnaryCallFromContext(ctx); call != nil {
+			if err != nil {
+				call.FailureStage = failureStage
+			}
+			if !call.WriteStart.IsZero() {
+				call.WriteEnd = time.Now()
+			}
+			err = call.CompleteServer(ctx, err)
+		}
 		t.ext.ReleaseBuffer(bufWriter, err)
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, err)
 	}()
@@ -75,9 +99,30 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	}
 
 	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
+	if call := remote.UnaryCallFromContext(ctx); call != nil {
+		call.Response = sendMsg
+		preparer, ok := t.codec.(interface {
+			PrepareUnaryWire(context.Context, remote.Message, *remote.UnaryCall) error
+		})
+		if !ok {
+			return ctx, remote.ErrUnaryLifecycleProtocol
+		}
+		if err = preparer.PrepareUnaryWire(ctx, sendMsg, call); err != nil {
+			return ctx, err
+		}
+		if call.Started {
+			if err = call.Lifecycle.ServerResponse(ctx, call); err != nil {
+				failureStage = remote.UnaryFailurePrepare
+				return ctx, err
+			}
+		}
+	}
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
 	if err != nil {
 		return ctx, err
+	}
+	if call := remote.UnaryCallFromContext(ctx); call != nil {
+		call.WriteStart = time.Now()
 	}
 	return ctx, bufWriter.Flush()
 }
@@ -116,6 +161,19 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 		recvMsg.Tags()[remote.ReadFailed] = true
 		return ctx, err
 	}
+	if call := remote.UnaryCallFromContext(ctx); call != nil {
+		if err = remote.CheckUnaryLifecycle(ri); err != nil {
+			return ctx, err
+		}
+		call.ReadEnd = time.Now()
+		call.Started = true
+		call.FailureStage = remote.UnaryFailurePrepare
+		call.Err = call.Lifecycle.ServerBegin(ctx, call)
+		if call.Err == nil {
+			call.FailureStage = remote.UnaryFailureNone
+		}
+		remote.RefreshUnaryRPCInfo(recvMsg, conn)
+	}
 	return ctx, nil
 }
 
@@ -145,6 +203,16 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	var recvMsg remote.Message
 	var sendMsg remote.Message
+	var call *remote.UnaryCall
+	if t.opt.UnaryLifecycle != nil {
+		call = remote.NewUnaryCall(t.opt.UnaryLifecycle)
+		call.Conn = conn
+		if state, ok := ctx.Value(unaryConnKey{}).(*unaryConnState); ok {
+			call.ConnID, call.Reused = state.id, state.used
+			state.used = true
+		}
+		ctx = remote.WithUnaryCall(ctx, call)
+	}
 	closeConnOutsideIfErr := true
 	defer func() {
 		var panicErr error
@@ -162,8 +230,20 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 				err = panicErr
 			}
 		}
+		if call != nil {
+			if err != nil && call.FailureStage == remote.UnaryFailureNone {
+				call.FailureStage = remote.UnaryFailureSend
+			}
+			if call.FailureStage == remote.UnaryFailureSend && call.Err != nil {
+				err = call.Err
+			}
+			err = call.CompleteServer(ctx, err)
+		}
 		t.finishTracer(ctx, ri, err, conn, panicErr)
 		t.finishProfiler(ctx)
+		if call != nil {
+			call.Recycle()
+		}
 		remote.RecycleMessage(recvMsg)
 		remote.RecycleMessage(sendMsg)
 		// reset rpcinfo for reuse
@@ -179,11 +259,19 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
 	recvMsg = remote.NewMessage(nil, ri, remote.Call, remote.Server)
+	if call != nil {
+		call.Request = recvMsg
+	}
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
 	if err != nil {
 		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true, true)
 		// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
+		return err
+	}
+	if call != nil && call.Err != nil {
+		err = remote.NewTransError(remote.InternalError, call.Err)
+		closeConnOutsideIfErr = t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true, false)
 		return err
 	}
 
@@ -203,6 +291,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 
 		ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
 		if err != nil {
+			if call != nil {
+				call.Err, call.FailureStage = err, remote.UnaryFailureBusiness
+			}
 			// error cannot be wrapped to print here, so it must exec before NewTransError
 			t.OnError(ctx, err, conn)
 			err = remote.NewTransError(remote.InternalError, err)
@@ -226,12 +317,19 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 // OnMessage implements the remote.ServerTransHandler interface.
 // msg is the decoded instance, such as Arg and Result.
 func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
+	if call := remote.UnaryCallFromContext(ctx); call != nil {
+		call.HandlerStart = time.Now()
+		defer func() { call.HandlerEnd = time.Now() }()
+	}
 	err := t.inkHdlFunc(ctx, args.Data(), result.Data())
 	return ctx, err
 }
 
 // OnActive implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
+	if t.opt.UnaryLifecycle != nil {
+		ctx = context.WithValue(ctx, unaryConnKey{}, &unaryConnState{id: remote.NextUnaryConnID()})
+	}
 	ctx = remote.WithServiceSearcher(ctx, t.svcSearcher)
 	// init rpcinfo
 	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
@@ -308,6 +406,9 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 	}
 	ctx, err = t.transPipe.Write(ctx, conn, errMsg)
 	if err != nil {
+		if call := remote.UnaryCallFromContext(ctx); call != nil {
+			call.Err, call.FailureStage = err, remote.UnaryFailureSend
+		}
 		klog.CtxErrorf(ctx, "KITEX: write error reply failed, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
 		return true
 	}

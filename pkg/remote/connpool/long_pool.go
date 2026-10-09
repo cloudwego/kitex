@@ -74,6 +74,14 @@ type longConn struct {
 	sync.RWMutex
 	deadline time.Time
 	address  string
+	id       uint64
+}
+
+func (c *longConn) ConnID() uint64 {
+	if c.id == 0 {
+		c.id = remote.NextUnaryConnID()
+	}
+	return c.id
 }
 
 // Close implements the net.Conn interface.

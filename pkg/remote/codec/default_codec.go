@@ -128,6 +128,9 @@ func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message
 	if err = c.encodePayload(ctx, message, out); err != nil {
 		return err
 	}
+	if remote.UnaryCallFromContext(ctx) != nil {
+		message.SetPayloadLen(out.WrittenLen() - headerLen)
+	}
 
 	// 3. fill framed field if needed
 	var payloadLen int
@@ -182,6 +185,11 @@ func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.
 
 // Encode implements the remote.Codec interface, it does complete message encode include header and payload.
 func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
+	if call := remote.UnaryCallFromContext(ctx); call != nil {
+		if err := c.PrepareUnaryWire(ctx, message, call); err != nil {
+			return err
+		}
+	}
 	return c.EncodeMetaAndPayload(ctx, message, out, c)
 }
 
@@ -217,11 +225,34 @@ func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, i
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("meshHeader read payload first 8 byte failed: %s", err.Error()))
 		}
 	}
-	return checkPayload(flagBuf, message, in, isTTHeader, c.MaxSize)
+	if err = checkPayload(flagBuf, message, in, isTTHeader, c.MaxSize); err != nil {
+		return err
+	}
+	if call := remote.UnaryCallFromContext(ctx); call != nil {
+		framed := isThriftFramedBinary(flagBuf) || isProtobufKitex(flagBuf)
+		if message.RPCRole() == remote.Server {
+			call.RequestWire.Framed = framed
+		} else {
+			call.ResponseWire.Framed = framed
+		}
+	}
+	return nil
 }
 
 // DecodePayload decode payload
 func (c *defaultCodec) DecodePayload(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
+	if call := remote.UnaryCallFromContext(ctx); call != nil {
+		if err := remote.CheckUnaryLifecycle(message.RPCInfo()); err != nil {
+			return err
+		}
+		defer func() {
+			if message.RPCRole() == remote.Client {
+				call.ResponseWire.MessageType = uint32(message.MessageType())
+			} else {
+				call.RequestWire.MessageType = uint32(message.MessageType())
+			}
+		}()
+	}
 	defer func() {
 		if ri := message.RPCInfo(); ri != nil {
 			if ms := rpcinfo.AsMutableRPCStats(ri.Stats()); ms != nil {

@@ -18,7 +18,11 @@ package trans
 
 import (
 	"context"
+	"errors"
 	"net"
+	"time"
+
+	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -48,6 +52,9 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	var bufWriter remote.ByteBuffer
 	rpcinfo.Record(ctx, sendMsg.RPCInfo(), stats.WriteStart, nil)
 	defer func() {
+		if call := remote.UnaryCallFromContext(ctx); call != nil && !call.WriteStart.IsZero() {
+			call.WriteEnd = time.Now()
+		}
 		t.ext.ReleaseBuffer(bufWriter, err)
 		rpcinfo.Record(ctx, sendMsg.RPCInfo(), stats.WriteFinish, err)
 	}()
@@ -58,6 +65,9 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	if err != nil {
 		return ctx, err
 	}
+	if call := remote.UnaryCallFromContext(ctx); call != nil {
+		call.WriteStart = time.Now()
+	}
 	return ctx, bufWriter.Flush()
 }
 
@@ -66,6 +76,25 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 	var bufReader remote.ByteBuffer
 	rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadStart, nil)
 	defer func() {
+		if call := remote.UnaryCallFromContext(ctx); call != nil {
+			if p := recover(); p != nil {
+				err = rpcinfo.ClientPanicToErr(ctx, p, recvMsg.RPCInfo(), false)
+				nctx = ctx
+			}
+			call.ReadEnd = time.Now()
+			if err == nil && ctx.Err() != nil {
+				err = ctx.Err()
+			}
+			if err != nil {
+				call.FailureStage = remote.UnaryFailureReceive
+				var application *thrift.ApplicationException
+				if recvMsg.MessageType() == remote.Exception && errors.As(err, &application) {
+					call.FailureStage = remote.UnaryFailureBusiness
+				}
+			}
+			err = call.FinishClient(ctx, err)
+			remote.RefreshUnaryRPCInfo(recvMsg, conn)
+		}
 		t.ext.ReleaseBuffer(bufReader, err)
 		rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadFinish, err)
 	}()
