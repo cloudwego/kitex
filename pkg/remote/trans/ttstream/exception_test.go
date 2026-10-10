@@ -57,6 +57,7 @@ func TestCommonParentKerror(t *testing.T) {
 		errIllegalFrame,
 		errIllegalOperation,
 		errTransport,
+		errFrameSizeLimit,
 	}
 	for _, err := range errs {
 		test.Assert(t, errors.Is(err, kerrors.ErrStreamingProtocol), err)
@@ -97,6 +98,7 @@ func TestGetTypeId(t *testing.T) {
 		{err: errIllegalFrame, expectTypeId: 12004},
 		{err: errIllegalOperation, expectTypeId: 12005},
 		{err: errTransport, expectTypeId: 12006},
+		{err: errFrameSizeLimit, expectTypeId: 12016},
 		{err: errApplicationException.newBuilder().withCauseAndTypeId(exception, 1000), expectTypeId: 1000},
 		{err: errApplicationException.newBuilder().withCause(normalErr), expectTypeId: 12001},
 	}

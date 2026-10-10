@@ -18,6 +18,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 
@@ -249,5 +250,31 @@ func Test_isNonServerStreaming(t *testing.T) {
 
 	for _, tc := range testcases {
 		test.Assert(t, isNonServerStreaming(tc.mode) == tc.expectRes)
+	}
+}
+
+func TestGRPCCodecDecodeMaxReceiveMessageSize(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	codec := NewGRPCCodec(WithMaxReceiveMessageSize(1))
+	mockIn := mocksremote.NewMockByteBuffer(ctrl)
+	mockIn.EXPECT().Next(5).Return([]byte{0, 0, 0, 0, 2}, nil).Times(1)
+
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetPayloadCodec(serviceinfo.PayloadCodec(-1))
+	ri := rpcinfo.NewRPCInfo(
+		rpcinfo.EmptyEndpointInfo(),
+		remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "grpcService"}, "method").ImmutableView(),
+		rpcinfo.NewInvocation("grpcService", "method"),
+		cfg,
+		rpcinfo.NewRPCStats(),
+	)
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	msg := remote.NewMessage(nil, ri, remote.Stream, remote.Client)
+
+	err := codec.Decode(ctx, msg, mockIn)
+	if !errors.Is(err, kerrors.ErrOverlimit) {
+		t.Fatalf("unexpected error: %T %v", err, err)
 	}
 }

@@ -38,14 +38,26 @@ func NewCliTransHandlerFactory(opts ...ClientHandlerOption) remote.ClientStreamF
 	for _, opt := range opts {
 		opt(cp)
 	}
+	// re-propagate the max receive message size in case a pool option was applied
+	// after WithClientMaxReceiveMessageSize replaced the transPool.
+	cp.setMaxReceiveMessageSize(cp.maxReceiveMessageSize)
 	return cp
 }
 
 type clientTransHandler struct {
-	transPool     transPool
-	metaHandler   MetaFrameHandler
-	headerHandler HeaderFrameWriteHandler
-	traceCtl      *rpcinfo.TraceController
+	transPool             transPool
+	metaHandler           MetaFrameHandler
+	headerHandler         HeaderFrameWriteHandler
+	traceCtl              *rpcinfo.TraceController
+	maxReceiveMessageSize int
+}
+
+// setMaxReceiveMessageSize stores the limit and propagates it to the current transPool if supported.
+func (c *clientTransHandler) setMaxReceiveMessageSize(size int) {
+	c.maxReceiveMessageSize = size
+	if setter, ok := c.transPool.(maxReceiveMessageSizeSetter); ok {
+		setter.SetMaxReceiveMessageSize(size)
+	}
 }
 
 // NewStream creates a client stream

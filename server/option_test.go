@@ -399,6 +399,18 @@ func TestRemoteOptGRPCCfgUintValueOption(t *testing.T) {
 	test.Assert(t, *iSvr1.opt.RemoteOpt.GRPCCfg.MaxHeaderListSize == randUint4)
 }
 
+func TestMaxReceiveMessageSizeOptions(t *testing.T) {
+	const maxReceiveMessageSize = 1024
+
+	opts := internal_server.NewOptions([]internal_server.Option{
+		WithGRPCMaxReceiveMessageSize(maxReceiveMessageSize),
+		WithTTHeaderStreamingMaxReceiveMessageSize(maxReceiveMessageSize),
+	})
+
+	test.Assert(t, opts.RemoteOpt.GRPCMaxReceiveMessageSize == maxReceiveMessageSize, opts.RemoteOpt.GRPCMaxReceiveMessageSize)
+	test.Assert(t, len(opts.RemoteOpt.TTHeaderStreamingOptions.TransportOptions) == 1, opts.RemoteOpt.TTHeaderStreamingOptions.TransportOptions)
+}
+
 // TestGRPCKeepaliveEnforcementPolicyOption tests the creation of a server with RemoteOpt.GRPCCfg.KeepaliveEnforcementPolicy option
 func TestGRPCKeepaliveEnforcementPolicyOption(t *testing.T) {
 	// random value between 1 and 100

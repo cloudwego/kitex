@@ -25,7 +25,9 @@ func newShortConnTransPool() transPool {
 	return &shortConnTransPool{}
 }
 
-type shortConnTransPool struct{}
+type shortConnTransPool struct {
+	maxReceiveMessageSize int
+}
 
 func (p *shortConnTransPool) Get(network, addr string) (*clientTransport, error) {
 	// create new connection
@@ -34,10 +36,14 @@ func (p *shortConnTransPool) Get(network, addr string) (*clientTransport, error)
 		return nil, err
 	}
 	// create new transport
-	trans := newClientTransport(conn, p)
+	trans := newClientTransport(conn, p, withClientMaxReceiveMessageSize(p.maxReceiveMessageSize))
 	return trans, nil
 }
 
 func (p *shortConnTransPool) Put(trans *clientTransport) {
 	_ = trans.Close(errTransport.newBuilder().withCause(errors.New("short connection closed")))
+}
+
+func (p *shortConnTransPool) SetMaxReceiveMessageSize(size int) {
+	p.maxReceiveMessageSize = size
 }

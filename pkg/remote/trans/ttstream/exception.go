@@ -33,6 +33,8 @@ var (
 	errIllegalFrame         = newException("illegal frame", kerrors.ErrStreamingProtocol, 12004)
 	errIllegalOperation     = newException("illegal operation", kerrors.ErrStreamingProtocol, 12005)
 	errTransport            = newException("transport is closing", kerrors.ErrStreamingProtocol, 12006)
+	// errFrameSizeLimit uses typeId 12016 because 12007-12015 are already taken by the cancel/timeout exceptions below.
+	errFrameSizeLimit = newException("frame size limit exceeded", kerrors.ErrStreamingProtocol, 12016)
 
 	errBizCancel = newException("user code invoking stream RPC with context processed by context.WithCancel or context.WithTimeout, then invoking cancel() actively",
 		kerrors.ErrStreamingCanceled, 12007)

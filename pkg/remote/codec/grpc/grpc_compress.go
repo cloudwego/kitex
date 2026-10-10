@@ -21,9 +21,11 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/cloudwego/kitex/internal/utils/safemcache"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -34,7 +36,7 @@ func getSendCompressor(ctx context.Context) (encoding.Compressor, error) {
 	return encoding.FindCompressor(remote.GetSendCompressor(ri))
 }
 
-func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) {
+func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer, maxReceiveMessageSize int) ([]byte, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	compressor, err := encoding.FindCompressor(remote.GetRecvCompressor(ri))
 	if err != nil {
@@ -46,6 +48,11 @@ func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) 
 	}
 	compressFlag := hdr[0]
 	dLen := int(binary.BigEndian.Uint32(hdr[1:]))
+	if maxReceiveMessageSize > 0 && dLen > maxReceiveMessageSize {
+		return nil, kerrors.ErrOverlimit.WithCause(
+			fmt.Errorf("grpc message length %d exceeds max receive message size %d", dLen, maxReceiveMessageSize),
+		)
+	}
 	d, err := in.Next(dLen)
 	if err != nil {
 		return nil, err

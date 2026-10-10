@@ -48,3 +48,15 @@ func WithTTHeaderStreamingTransportOptions(opts ...ttstream.ServerHandlerOption)
 		}
 	}}
 }
+
+// WithTTHeaderStreamingMaxReceiveMessageSize sets the maximum size in bytes of a received TTHeader Streaming frame payload.
+// The default is unlimited for backward compatibility. A non-positive value keeps it unlimited.
+func WithTTHeaderStreamingMaxReceiveMessageSize(s int) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithTTHeaderStreamingMaxReceiveMessageSize(%+v)", s))
+		o.RemoteOpt.TTHeaderStreamingOptions.TransportOptions = append(
+			o.RemoteOpt.TTHeaderStreamingOptions.TransportOptions,
+			ttstream.WithServerMaxReceiveMessageSize(s),
+		)
+	}}
+}

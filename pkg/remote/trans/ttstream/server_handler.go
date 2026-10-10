@@ -87,9 +87,10 @@ var (
 )
 
 type svrTransHandler struct {
-	opt           *remote.ServerOption
-	inkHdlFunc    endpoint.Endpoint
-	headerHandler HeaderFrameReadHandler
+	opt                   *remote.ServerOption
+	inkHdlFunc            endpoint.Endpoint
+	headerHandler         HeaderFrameReadHandler
+	maxReceiveMessageSize int
 }
 
 func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {
@@ -118,7 +119,7 @@ type onDisConnectSetter interface {
 // OnActive will be called when a connection accepted
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	nconn := conn.(netpoll.Connection)
-	trans := newServerTransport(nconn)
+	trans := newServerTransport(nconn, withServerMaxReceiveMessageSize(t.maxReceiveMessageSize))
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
 		// server only close transport when peer connection closed
 		_ = trans.Close(nil)

@@ -45,6 +45,8 @@ type clientTransport struct {
 	pool    transPool
 	streams sync.Map // key=streamID val=clientStream
 
+	maxReceiveMessageSize int
+
 	mu        sync.Mutex // protect state, closedErr and writer
 	state     int32
 	closedErr error
@@ -53,7 +55,17 @@ type clientTransport struct {
 	closedTrigger chan struct{}
 }
 
-func newClientTransport(conn netpoll.Connection, pool transPool) *clientTransport {
+// clientTransportOption configures a clientTransport when it is created.
+type clientTransportOption func(*clientTransport)
+
+// withClientMaxReceiveMessageSize limits the maximum size in bytes of a received frame payload.
+func withClientMaxReceiveMessageSize(size int) clientTransportOption {
+	return func(t *clientTransport) {
+		t.maxReceiveMessageSize = size
+	}
+}
+
+func newClientTransport(conn netpoll.Connection, pool transPool, opts ...clientTransportOption) *clientTransport {
 	// TODO: let it configurable
 	_ = conn.SetReadTimeout(0)
 	t := &clientTransport{
@@ -62,6 +74,9 @@ func newClientTransport(conn netpoll.Connection, pool transPool) *clientTranspor
 		streams:       sync.Map{},
 		writer:        newWriterBuffer(conn.Writer()),
 		closedTrigger: make(chan struct{}, 1),
+	}
+	for _, opt := range opts {
+		opt(t)
 	}
 	addr := ""
 	if t.Addr() != nil {
@@ -166,7 +181,7 @@ func (t *clientTransport) deleteStream(sid int32) {
 }
 
 func (t *clientTransport) readFrame(reader bufiox.Reader) error {
-	fr, err := DecodeFrame(context.Background(), reader)
+	fr, err := decodeFrame(context.Background(), reader, t.maxReceiveMessageSize)
 	if err != nil {
 		return err
 	}

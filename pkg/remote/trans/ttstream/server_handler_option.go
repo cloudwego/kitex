@@ -28,3 +28,11 @@ func WithServerHeaderFrameHandler(handler HeaderFrameReadHandler) ServerHandlerO
 		sp.headerHandler = handler
 	}
 }
+
+// WithServerMaxReceiveMessageSize limits the maximum size in bytes of a received TTHeader Streaming frame payload.
+// A non-positive value means unlimited.
+func WithServerMaxReceiveMessageSize(size int) ServerHandlerOption {
+	return func(sp *svrTransHandler) {
+		sp.maxReceiveMessageSize = size
+	}
+}

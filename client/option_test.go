@@ -505,10 +505,21 @@ func TestWithCircuitBreaker(t *testing.T) {
 }
 
 const mockUint32Size uint32 = 0
+const mockMaxReceiveMessageSize = 1024
 
 func TestWithGRPCConnPoolSize(t *testing.T) {
 	opts := client.NewOptions([]client.Option{WithGRPCConnPoolSize(mockUint32Size)})
 	test.Assert(t, opts.GRPCConnPoolSize == mockUint32Size, opts.GRPCConnPoolSize)
+}
+
+func TestWithGRPCMaxReceiveMessageSize(t *testing.T) {
+	opts := client.NewOptions([]client.Option{WithGRPCMaxReceiveMessageSize(mockMaxReceiveMessageSize)})
+	test.Assert(t, opts.RemoteOpt.GRPCMaxReceiveMessageSize == mockMaxReceiveMessageSize, opts.RemoteOpt.GRPCMaxReceiveMessageSize)
+}
+
+func TestWithTTHeaderStreamingMaxReceiveMessageSize(t *testing.T) {
+	opts := client.NewOptions([]client.Option{WithTTHeaderStreamingMaxReceiveMessageSize(mockMaxReceiveMessageSize)})
+	test.Assert(t, len(opts.TTHeaderStreamingOptions.TransportOptions) == 1, opts.TTHeaderStreamingOptions.TransportOptions)
 }
 
 func TestWithGRPCInitialWindowSize(t *testing.T) {
