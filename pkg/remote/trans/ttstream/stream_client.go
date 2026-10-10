@@ -302,6 +302,13 @@ func (s *clientStream) onReadHeaderFrame(fr *Frame) error {
 	select {
 	case s.headerSig <- streamSigActive:
 	default:
+		// close() marks the stream inactive before parking a terminal signal in
+		// headerSig. A header that arrives after that point is an in-flight frame
+		// for an already-closed stream and must not tear down the mux connection.
+		if atomic.LoadInt32(&s.state) == streamStateInactive {
+			s.header = nil
+			return nil
+		}
 		return errUnexpectedHeader.newBuilder().withSide(clientSide).withCause(fmt.Errorf("stream[%d] already set header", s.sid))
 	}
 	s.handleStreamRecvHeaderEvent(rpcinfo.StreamRecvHeaderEvent{TTStreamHeader: s.header})
