@@ -23,7 +23,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -68,6 +70,58 @@ func (h *baseHandler) EchoBizException(stream thrift.TestService_EchoBizExceptio
 
 func (h *baseHandler) EchoPingPong(ctx context.Context, req *thrift.Request) (*thrift.Response, error) {
 	return &thrift.Response{Message: "echo:" + req.Message}, nil
+}
+
+type streamingHandler struct{ baseHandler }
+
+func (h *streamingHandler) Echo(stream thrift.TestService_EchoServer) error {
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if err := stream.Send(&thrift.Response{Message: "bidi:" + req.Message}); err != nil {
+			return err
+		}
+	}
+}
+
+func (h *streamingHandler) EchoClient(stream thrift.TestService_EchoClientServer) error {
+	var parts []string
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			return stream.SendAndClose(&thrift.Response{Message: "client:" + strings.Join(parts, ",")})
+		}
+		if err != nil {
+			return err
+		}
+		parts = append(parts, req.Message)
+	}
+}
+
+func (h *streamingHandler) EchoServer(req *thrift.Request, stream thrift.TestService_EchoServerServer) error {
+	if err := stream.Send(&thrift.Response{Message: "server:" + req.Message + ":1"}); err != nil {
+		return err
+	}
+	return stream.Send(&thrift.Response{Message: "server:" + req.Message + ":2"})
+}
+
+func (h *streamingHandler) EchoUnary(ctx context.Context, req *thrift.Request) (*thrift.Response, error) {
+	if streaming.GetStream(ctx) == nil {
+		return nil, fmt.Errorf("stream context not set")
+	}
+	return &thrift.Response{Message: "stream-unary:" + req.Message}, nil
+}
+
+func (h *streamingHandler) EchoBizException(stream thrift.TestService_EchoBizExceptionServer) error {
+	if _, err := stream.Recv(); err != nil && err != io.EOF {
+		return err
+	}
+	return kerrors.NewBizStatusError(100, "stream biz error")
 }
 
 // --- variant handlers embedding baseHandler ---
@@ -154,6 +208,45 @@ func (tr *traceRecorder) Finish(ctx context.Context) {
 	if ri := rpcinfo.GetRPCInfo(ctx); ri != nil {
 		tr.lastErr = ri.Stats().Error()
 	}
+}
+
+type streamTraceRecorder struct {
+	mu       sync.Mutex
+	started  int
+	finished int
+	recv     int
+	send     int
+}
+
+func (tr *streamTraceRecorder) Start(ctx context.Context) context.Context {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	tr.started++
+	return ctx
+}
+
+func (tr *streamTraceRecorder) Finish(ctx context.Context) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	tr.finished++
+}
+
+func (tr *streamTraceRecorder) onRecv(ctx context.Context, ri rpcinfo.RPCInfo, evt rpcinfo.StreamRecvEvent) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	tr.recv++
+}
+
+func (tr *streamTraceRecorder) onSend(ctx context.Context, ri rpcinfo.RPCInfo, evt rpcinfo.StreamSendEvent) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	tr.send++
+}
+
+func (tr *streamTraceRecorder) snapshot() (started, finished, recv, send int) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	return tr.started, tr.finished, tr.recv, tr.send
 }
 
 func assertPanicErr(t *testing.T, err error) {
@@ -462,20 +555,184 @@ func TestLocalCaller_UniqueShortMethodName(t *testing.T) {
 	test.Assert(t, r.Success != nil && r.Success.Message == "pong", r)
 }
 
-func TestLocalCaller_StreamingMethodRejected(t *testing.T) {
+func TestLocalCaller_CallRejectsTrueStreamingMethods(t *testing.T) {
 	svr := server.NewServer()
 	svr.RegisterService(testservice.NewServiceInfo(), &baseHandler{})
 	lc, err := server.NewLocalCaller("test-caller", svr)
 	test.Assert(t, err == nil, err)
 
 	// Echo is StreamingBidirectional, EchoClient is StreamingClient,
-	// EchoServer is StreamingServer, and EchoUnary is StreamingUnary.
-	for _, method := range []string{"Echo", "EchoClient", "EchoServer", "EchoUnary"} {
+	// EchoServer is StreamingServer. EchoUnary is unary over streaming transport
+	// and remains supported by Call.
+	for _, method := range []string{"Echo", "EchoClient", "EchoServer"} {
 		err = lc.Call(context.Background(), method,
 			&streaming.Args{}, &streaming.Result{})
 		test.Assert(t, err != nil, "expected error for streaming method %s", method)
 		test.Assert(t, strings.Contains(err.Error(), "streaming"), err)
 	}
+}
+
+func TestLocalCaller_StreamGRPC_Bidirectional(t *testing.T) {
+	svr := server.NewServer()
+	svr.RegisterService(testservice.NewServiceInfo(), &streamingHandler{})
+	lc, err := server.NewLocalCaller("test-caller", svr)
+	test.Assert(t, err == nil, err)
+
+	res := new(streaming.Result)
+	err = lc.Stream(context.Background(), "Echo", nil, res)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, res.Stream != nil)
+
+	err = res.Stream.SendMsg(&thrift.Request{Message: "hello"})
+	test.Assert(t, err == nil, err)
+	got := new(thrift.Response)
+	err = res.Stream.RecvMsg(got)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, got.Message == "bidi:hello", got)
+	err = res.Stream.Close()
+	test.Assert(t, err == nil, err)
+	err = res.Stream.RecvMsg(new(thrift.Response))
+	test.Assert(t, err == io.EOF, err)
+}
+
+func TestLocalCaller_StreamX_Bidirectional(t *testing.T) {
+	svr := server.NewServer()
+	svr.RegisterService(testservice.NewServiceInfo(), &streamingHandler{})
+	lc, err := server.NewLocalCaller("test-caller", svr)
+	test.Assert(t, err == nil, err)
+
+	st, err := lc.StreamX(context.Background(), "Echo")
+	test.Assert(t, err == nil, err)
+	err = st.SendMsg(context.Background(), &thrift.Request{Message: "streamx"})
+	test.Assert(t, err == nil, err)
+	got := new(thrift.Response)
+	err = st.RecvMsg(context.Background(), got)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, got.Message == "bidi:streamx", got)
+	err = st.CloseSend(context.Background())
+	test.Assert(t, err == nil, err)
+	err = st.RecvMsg(context.Background(), new(thrift.Response))
+	test.Assert(t, err == io.EOF, err)
+}
+
+func TestLocalCaller_StreamXTraceEvents(t *testing.T) {
+	tracer := &streamTraceRecorder{}
+	svr := server.NewServer(
+		server.WithTracer(stats.Tracer(tracer)),
+		server.WithStreamOptions(server.WithStreamEventHandler(rpcinfo.ServerStreamEventHandler{
+			HandleStreamRecvEvent: tracer.onRecv,
+			HandleStreamSendEvent: tracer.onSend,
+		})),
+	)
+	svr.RegisterService(testservice.NewServiceInfo(), &streamingHandler{})
+	lc, err := server.NewLocalCaller("test-caller", svr)
+	test.Assert(t, err == nil, err)
+
+	st, err := lc.StreamX(context.Background(), "Echo")
+	test.Assert(t, err == nil, err)
+	err = st.SendMsg(context.Background(), &thrift.Request{Message: "trace"})
+	test.Assert(t, err == nil, err)
+	got := new(thrift.Response)
+	err = st.RecvMsg(context.Background(), got)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, got.Message == "bidi:trace", got)
+	err = st.CloseSend(context.Background())
+	test.Assert(t, err == nil, err)
+	err = st.RecvMsg(context.Background(), new(thrift.Response))
+	test.Assert(t, err == io.EOF, err)
+
+	started, finished, recv, send := tracer.snapshot()
+	test.Assert(t, started == 1, started)
+	test.Assert(t, finished == 1, finished)
+	// LocalCaller acts as both local client and local server. For one bidi
+	// request/response pair, stream events should be emitted on both sides:
+	// client send + server send, client recv + server recv. EOF recv is filtered
+	// by TraceController and should not be counted.
+	test.Assert(t, send == 2, send)
+	test.Assert(t, recv == 2, recv)
+}
+
+func TestLocalCaller_StreamGRPC_ClientStreaming(t *testing.T) {
+	svr := server.NewServer()
+	svr.RegisterService(testservice.NewServiceInfo(), &streamingHandler{})
+	lc, err := server.NewLocalCaller("test-caller", svr)
+	test.Assert(t, err == nil, err)
+
+	res := new(streaming.Result)
+	err = lc.Stream(context.Background(), "EchoClient", nil, res)
+	test.Assert(t, err == nil, err)
+	err = res.Stream.SendMsg(&thrift.Request{Message: "a"})
+	test.Assert(t, err == nil, err)
+	err = res.Stream.SendMsg(&thrift.Request{Message: "b"})
+	test.Assert(t, err == nil, err)
+	err = res.Stream.Close()
+	test.Assert(t, err == nil, err)
+
+	got := new(thrift.Response)
+	err = res.Stream.RecvMsg(got)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, got.Message == "client:a,b", got)
+}
+
+func TestLocalCaller_StreamGRPC_ServerStreaming(t *testing.T) {
+	svr := server.NewServer()
+	svr.RegisterService(testservice.NewServiceInfo(), &streamingHandler{})
+	lc, err := server.NewLocalCaller("test-caller", svr)
+	test.Assert(t, err == nil, err)
+
+	res := new(streaming.Result)
+	err = lc.Stream(context.Background(), "EchoServer", nil, res)
+	test.Assert(t, err == nil, err)
+	err = res.Stream.SendMsg(&thrift.Request{Message: "x"})
+	test.Assert(t, err == nil, err)
+	err = res.Stream.Close()
+	test.Assert(t, err == nil, err)
+
+	got1 := new(thrift.Response)
+	err = res.Stream.RecvMsg(got1)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, got1.Message == "server:x:1", got1)
+	got2 := new(thrift.Response)
+	err = res.Stream.RecvMsg(got2)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, got2.Message == "server:x:2", got2)
+	err = res.Stream.RecvMsg(new(thrift.Response))
+	test.Assert(t, err == io.EOF, err)
+}
+
+func TestLocalCaller_StreamBizStatusError(t *testing.T) {
+	svr := server.NewServer()
+	svr.RegisterService(testservice.NewServiceInfo(), &streamingHandler{})
+	lc, err := server.NewLocalCaller("test-caller", svr)
+	test.Assert(t, err == nil, err)
+
+	res := new(streaming.Result)
+	err = lc.Stream(context.Background(), "EchoBizException", nil, res)
+	test.Assert(t, err == nil, err)
+	err = res.Stream.SendMsg(&thrift.Request{Message: "x"})
+	test.Assert(t, err == nil, err)
+	err = res.Stream.Close()
+	test.Assert(t, err == nil, err)
+
+	// server returns a BizStatusError; client should observe it via RecvMsg,
+	// matching normal Kitex streaming client behavior.
+	err = res.Stream.RecvMsg(new(thrift.Response))
+	bizErr, ok := kerrors.FromBizStatusError(err)
+	test.Assert(t, ok, err)
+	test.Assert(t, bizErr.BizStatusCode() == 100, bizErr)
+}
+
+func TestLocalCaller_CallStreamingUnary(t *testing.T) {
+	svr := server.NewServer()
+	svr.RegisterService(testservice.NewServiceInfo(), &streamingHandler{})
+	lc, err := server.NewLocalCaller("test-caller", svr)
+	test.Assert(t, err == nil, err)
+
+	r := &thrift.TestServiceEchoUnaryResult{}
+	err = lc.Call(context.Background(), "EchoUnary",
+		&thrift.TestServiceEchoUnaryArgs{Req: &thrift.Request{Message: "u"}}, r)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, r.Success != nil && r.Success.Message == "stream-unary:u", r)
 }
 
 func TestLocalCaller_ArgsResultTypeMismatch(t *testing.T) {

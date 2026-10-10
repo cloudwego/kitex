@@ -34,7 +34,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Checkout PR
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ steps.pr-info.outputs.pr_head_owner }}/${{ steps.pr-info.outputs.pr_head_repo }}
           ref: ${{ steps.pr-info.outputs.pr_head_ref }}

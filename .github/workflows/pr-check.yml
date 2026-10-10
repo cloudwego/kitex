@@ -6,7 +6,7 @@ jobs:
   compliant:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check License Header
         uses: apache/skywalking-eyes/header@v0.4.0
@@ -19,16 +19,16 @@ jobs:
   golangci-lint:
     runs-on: [ Linux, X64 ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: stable
           cache: false # false for self-hosted runners
 
       - name: Golangci Lint
         # https://golangci-lint.run/
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: latest
           only-new-issues: true
