@@ -81,13 +81,11 @@ const (
 type ttHeader struct{}
 
 func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (totalLenField []byte, err error) {
-	tm := message.TransInfo()
-	if totalLenField, err = ttheader.Encode(ctx, ttheader.EncodeParam{
+	headers := remote.AccessHeaders(message.TransInfo())
+	if totalLenField, err = headers.EncodeTTHeader(ctx, ttheader.EncodeParam{
 		Flags:      getFlags(message),
 		SeqID:      message.RPCInfo().Invocation().SeqID(),
 		ProtocolID: getProtocolID(message.RPCInfo().Config().PayloadCodec()),
-		IntInfo:    tm.TransIntInfo(),
-		StrInfo:    tm.TransStrInfo(),
 	}, out); err != nil {
 		return nil, perrors.NewProtocolError(err)
 	}
@@ -95,8 +93,9 @@ func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote
 }
 
 func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
-	var param ttheader.DecodeParam
-	if param, err = ttheader.Decode(ctx, in); err != nil {
+	remote.PreparePrimaryHeaders(ctx, message, message.RPCRole() == remote.Client)
+	param, err := remote.AccessHeaders(message.TransInfo()).DecodeTTHeader(ctx, in)
+	if err != nil {
 		return perrors.NewProtocolError(err)
 	}
 	if call := remote.UnaryCallFromContext(ctx); call != nil {
@@ -113,8 +112,6 @@ func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.
 		// some framework doesn't write correct seqID in TTheader, to ignore err only check it in payload
 		// print log to push the downstream framework to refine it.
 	}
-	message.TransInfo().PutTransIntInfo(param.IntInfo)
-	message.TransInfo().PutTransStrInfo(param.StrInfo)
 	fillBasicInfoOfTTHeader(message)
 	message.SetPayloadLen(param.PayloadLen)
 	return nil
@@ -224,25 +221,26 @@ func (m meshHeader) decode(ctx context.Context, message remote.Message, in remot
 // but metahandlers are executed after payloadDecode, we don't know from_info when error happen in payloadDecode.
 // So 'fillBasicInfoOfTTHeader' is just for getting more info to output log when decode error happen.
 func fillBasicInfoOfTTHeader(msg remote.Message) {
+	headers := remote.AccessHeaders(msg.TransInfo())
 	if msg.RPCRole() == remote.Server {
 		fi := rpcinfo.AsMutableEndpointInfo(msg.RPCInfo().From())
 		if fi != nil {
-			if v := msg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr]; v != "" {
+			if v := headers.String(transmeta.HeaderTransRemoteAddr); v != "" {
 				fi.SetAddress(utils.NewNetAddr("tcp", v))
 			}
-			if v := msg.TransInfo().TransIntInfo()[transmeta.FromService]; v != "" {
+			if v := headers.Int(transmeta.FromService); v != "" {
 				fi.SetServiceName(v)
 			}
 		}
 		if ink, ok := msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter); ok {
-			if svcName, ok := msg.TransInfo().TransStrInfo()[transmeta.HeaderIDLServiceName]; ok {
+			if svcName, ok := headers.StringValue(transmeta.HeaderIDLServiceName); ok {
 				ink.SetServiceName(svcName)
 			}
 		}
 	} else {
 		ti := remoteinfo.AsRemoteInfo(msg.RPCInfo().To())
 		if ti != nil {
-			if v := msg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr]; v != "" {
+			if v := headers.String(transmeta.HeaderTransRemoteAddr); v != "" {
 				ti.SetRemoteAddr(utils.NewNetAddr("tcp", v))
 			}
 		}

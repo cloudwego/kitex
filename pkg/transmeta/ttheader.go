@@ -58,33 +58,16 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 	ri := msg.RPCInfo()
 	transInfo := msg.TransInfo()
 
-	hd := map[uint16]string{
-		transmeta.FromService: ri.From().ServiceName(),
-		transmeta.FromMethod:  ri.From().Method(),
-		transmeta.ToService:   ri.To().ServiceName(),
-		transmeta.ToMethod:    ri.To().Method(),
-		transmeta.MsgType:     strconv.Itoa(int(msg.MessageType())),
-	}
-	if ri.Config().TransportProtocol()&transport.Framed == transport.Framed {
-		hd[transmeta.TransportType] = framedTransportType
+	headers := remote.AccessHeaders(transInfo)
+	if headers.Primary() {
+		writeClientIntHeaders(msg, headers.SetInt)
 	} else {
-		hd[transmeta.TransportType] = unframedTransportType
+		hd := make(map[uint16]string, 5)
+		writeClientIntHeaders(msg, func(k uint16, v string) { hd[k] = v })
+		transInfo.PutTransIntInfo(hd)
 	}
-
-	cfg := rpcinfo.AsMutableRPCConfig(ri.Config())
-	if cfg.IsRPCTimeoutLocked() {
-		hd[transmeta.RPCTimeout] = strconv.Itoa(int(ri.Config().RPCTimeout().Milliseconds()))
-	}
-	if cfg.IsConnectTimeoutLocked() {
-		hd[transmeta.ConnectTimeout] = strconv.Itoa(int(ri.Config().ConnectTimeout().Milliseconds()))
-	}
-	transInfo.PutTransIntInfo(hd)
 	if idlSvcName := getIDLSvcName(ri); idlSvcName != "" {
-		if strInfo := transInfo.TransStrInfo(); strInfo != nil {
-			strInfo[transmeta.HeaderIDLServiceName] = idlSvcName
-		} else {
-			transInfo.PutTransStrInfo(map[string]string{transmeta.HeaderIDLServiceName: idlSvcName})
-		}
+		headers.SetString(transmeta.HeaderIDLServiceName, idlSvcName)
 	}
 	return ctx, nil
 }
@@ -113,17 +96,16 @@ func (ch *clientTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Messag
 		return ctx, nil
 	}
 	ri := msg.RPCInfo()
-	transInfo := msg.TransInfo()
-	strInfo := transInfo.TransStrInfo()
+	headers := remote.AccessHeaders(msg.TransInfo())
 
-	bizErr, err := ParseBizStatusErr(strInfo)
+	bizErr, err := parseBizStatusErr(headers.String)
 	if err != nil {
 		return ctx, err
 	}
 	if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok && bizErr != nil {
 		setter.SetBizStatusErr(bizErr)
 	}
-	if val, ok := strInfo[transmeta.HeaderConnectionReadyToReset]; ok {
+	if val, ok := headers.StringValue(transmeta.HeaderConnectionReadyToReset); ok {
 		if ei := rpcinfo.AsTaggable(ri.To()); ei != nil {
 			ei.SetTag(rpcinfo.ConnResetTag, val)
 		}
@@ -132,15 +114,19 @@ func (ch *clientTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Messag
 }
 
 func ParseBizStatusErr(strInfo map[string]string) (kerrors.BizStatusErrorIface, error) {
-	if code, err := strconv.ParseInt(strInfo[bizStatus], 10, 32); err == nil && code != 0 {
-		if bizExtra := strInfo[bizExtra]; bizExtra != "" {
+	return parseBizStatusErr(func(k string) string { return strInfo[k] })
+}
+
+func parseBizStatusErr(get func(string) string) (kerrors.BizStatusErrorIface, error) {
+	if code, err := strconv.ParseInt(get(bizStatus), 10, 32); err == nil && code != 0 {
+		if bizExtra := get(bizExtra); bizExtra != "" {
 			extra, err := utils.JSONStr2Map(bizExtra)
 			if err != nil {
 				return nil, fmt.Errorf("malformed header info, extra: %s", bizExtra)
 			}
-			return kerrors.NewBizStatusErrorWithExtra(int32(code), strInfo[bizMessage], extra), nil
+			return kerrors.NewBizStatusErrorWithExtra(int32(code), get(bizMessage), extra), nil
 		} else {
-			return kerrors.NewBizStatusError(int32(code), strInfo[bizMessage]), nil
+			return kerrors.NewBizStatusError(int32(code), get(bizMessage)), nil
 		}
 	}
 	return nil, nil
@@ -155,21 +141,20 @@ func (sh *serverTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Messag
 		return ctx, nil
 	}
 	ri := msg.RPCInfo()
-	transInfo := msg.TransInfo()
-	intInfo := transInfo.TransIntInfo()
+	headers := remote.AccessHeaders(msg.TransInfo())
 
 	ci := rpcinfo.AsMutableEndpointInfo(ri.From())
 	if ci != nil {
-		if v := intInfo[transmeta.FromService]; v != "" {
+		if v := headers.Int(transmeta.FromService); v != "" {
 			ci.SetServiceName(v)
 		}
-		if v := intInfo[transmeta.FromMethod]; v != "" {
+		if v := headers.Int(transmeta.FromMethod); v != "" {
 			ci.SetMethod(v)
 		}
 	}
 
 	if cfg := rpcinfo.AsMutableRPCConfig(ri.Config()); cfg != nil {
-		timeout := intInfo[transmeta.RPCTimeout]
+		timeout := headers.Int(transmeta.RPCTimeout)
 		if timeoutMS, err := strconv.Atoi(timeout); err == nil {
 			cfg.SetRPCTimeout(time.Duration(timeoutMS) * time.Millisecond)
 		}
@@ -183,21 +168,18 @@ func (sh *serverTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 		return ctx, nil
 	}
 	ri := msg.RPCInfo()
-	transInfo := msg.TransInfo()
-	intInfo := transInfo.TransIntInfo()
-	strInfo := transInfo.TransStrInfo()
-
-	intInfo[transmeta.MsgType] = strconv.Itoa(int(msg.MessageType()))
-
+	h := remote.AccessHeaders(msg.TransInfo())
+	h.SetInt(transmeta.MsgType, strconv.Itoa(int(msg.MessageType())))
 	if bizErr := ri.Invocation().BizStatusErr(); bizErr != nil {
-		strInfo[bizStatus] = strconv.Itoa(int(bizErr.BizStatusCode()))
-		strInfo[bizMessage] = bizErr.BizMessage()
+		h.SetString(bizStatus, strconv.Itoa(int(bizErr.BizStatusCode())))
+		h.SetString(bizMessage, bizErr.BizMessage())
 		if len(bizErr.BizExtra()) != 0 {
-			strInfo[bizExtra], _ = utils.Map2JSONStr(bizErr.BizExtra())
+			extra, _ := utils.Map2JSONStr(bizErr.BizExtra())
+			h.SetString(bizExtra, extra)
 		}
 	}
 	if val, ok := ri.To().Tag(rpcinfo.ConnResetTag); ok {
-		strInfo[transmeta.HeaderConnectionReadyToReset] = val
+		h.SetString(transmeta.HeaderConnectionReadyToReset, val)
 	}
 
 	return ctx, nil
@@ -206,4 +188,26 @@ func (sh *serverTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 func isTTHeader(msg remote.Message) bool {
 	transProto := msg.RPCInfo().Config().TransportProtocol()
 	return transProto&transport.TTHeader == transport.TTHeader
+}
+
+func writeClientIntHeaders(msg remote.Message, set func(uint16, string)) {
+	ri := msg.RPCInfo()
+	set(transmeta.FromService, ri.From().ServiceName())
+	set(transmeta.FromMethod, ri.From().Method())
+	set(transmeta.ToService, ri.To().ServiceName())
+	set(transmeta.ToMethod, ri.To().Method())
+	set(transmeta.MsgType, strconv.Itoa(int(msg.MessageType())))
+	if ri.Config().TransportProtocol()&transport.Framed == transport.Framed {
+		set(transmeta.TransportType, framedTransportType)
+	} else {
+		set(transmeta.TransportType, unframedTransportType)
+	}
+
+	cfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	if cfg.IsRPCTimeoutLocked() {
+		set(transmeta.RPCTimeout, strconv.Itoa(int(ri.Config().RPCTimeout().Milliseconds())))
+	}
+	if cfg.IsConnectTimeoutLocked() {
+		set(transmeta.ConnectTimeout, strconv.Itoa(int(ri.Config().ConnectTimeout().Milliseconds())))
+	}
 }

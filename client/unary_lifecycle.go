@@ -25,6 +25,26 @@ func (kc *kClient) unaryLifecycleEndpoint(pipe remote.ClientTransHandler) (endpo
 	if !ok {
 		return nil, remote.ErrUnaryLifecycleProtocol
 	}
+	prepare := func(ctx context.Context, call *remote.UnaryCall) (context.Context, error) {
+		var err error
+		remote.PreparePrimaryHeaders(ctx, call.Request, false)
+		for _, h := range kc.opt.MetaHandlers {
+			ctx, err = h.WriteMeta(ctx, call.Request)
+			if err != nil {
+				return ctx, err
+			}
+		}
+		call.MetaPrepared = true
+		if err = preparer.PrepareUnaryWire(ctx, call.Request, call); err != nil {
+			return ctx, err
+		}
+		call.Started = true
+		if err = call.Lifecycle.ClientPrepare(ctx, call); err != nil {
+			call.FailureStage = remote.UnaryFailurePrepare
+			return ctx, err
+		}
+		return ctx, nil
+	}
 	run := func(ctx context.Context, request, response any) (err error) {
 		call := request.(*remote.UnaryCall)
 		ri := call.Request.RPCInfo()
@@ -46,6 +66,20 @@ func (kc *kClient) unaryLifecycleEndpoint(pipe remote.ClientTransHandler) (endpo
 		if ctx.Err() != nil {
 			call.FailureStage = remote.UnaryFailurePrepare
 			return ctx.Err()
+		}
+		if !call.MetaPrepared {
+			ctx, err = prepare(ctx, call)
+			if err != nil {
+				return err
+			}
+			if err = ctx.Err(); err != nil {
+				call.FailureStage = remote.UnaryFailurePrepare
+				return err
+			}
+			if timeout := ri.Config().RPCTimeout(); timeout > 0 && time.Since(call.Begin) >= timeout {
+				call.FailureStage = remote.UnaryFailurePrepare
+				return kerrors.ErrRPCTimeout.WithCause(context.DeadlineExceeded)
+			}
 		}
 		cli, err = remotecli.NewClient(ctx, ri, pipe, kc.opt.RemoteOpt)
 		if err != nil {
@@ -81,20 +115,11 @@ func (kc *kClient) unaryLifecycleEndpoint(pipe remote.ClientTransHandler) (endpo
 				call.Recycle()
 			}
 		}()
-		for _, h := range kc.opt.MetaHandlers {
-			ctx, err = h.WriteMeta(ctx, call.Request)
+		if cfg := rpcinfo.AsMutableRPCConfig(ri.Config()); cfg == nil || !cfg.IsRPCTimeoutLocked() {
+			ctx, err = prepare(ctx, call)
 			if err != nil {
 				return err
 			}
-		}
-		call.MetaPrepared = true
-		if err = preparer.PrepareUnaryWire(ctx, call.Request, call); err != nil {
-			return err
-		}
-		call.Started = true
-		if err = call.Lifecycle.ClientPrepare(ctx, call); err != nil {
-			call.FailureStage = remote.UnaryFailurePrepare
-			return err
 		}
 		timeout := ri.Config().RPCTimeout()
 		if timeout > 0 {

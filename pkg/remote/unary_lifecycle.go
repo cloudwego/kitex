@@ -146,13 +146,14 @@ func CheckUnaryLifecycle(ri rpcinfo.RPCInfo) error {
 
 func RefreshUnaryRPCInfo(msg Message, conn net.Conn) {
 	ri := msg.RPCInfo()
+	headers := AccessHeaders(msg.TransInfo())
 	endpoint := ri.To()
 	if msg.RPCRole() == Server {
 		endpoint = ri.From()
 	}
 	addr := conn.RemoteAddr()
 	changed := true
-	if v := msg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr]; v != "" {
+	if v := headers.String(transmeta.HeaderTransRemoteAddr); v != "" {
 		if endpoint != nil {
 			current := endpoint.Address()
 			changed = current == nil || current.Network() != "tcp" || current.String() != v
@@ -166,8 +167,8 @@ func RefreshUnaryRPCInfo(msg Message, conn net.Conn) {
 			if changed {
 				from.SetAddress(addr)
 			}
-			from.SetServiceName(msg.TransInfo().TransIntInfo()[transmeta.FromService])
-			from.SetMethod(msg.TransInfo().TransIntInfo()[transmeta.FromMethod])
+			from.SetServiceName(headers.Int(transmeta.FromService))
+			from.SetMethod(headers.Int(transmeta.FromMethod))
 		}
 	} else if changed {
 		if to := remoteinfo.AsRemoteInfo(ri.To()); to != nil {

@@ -253,18 +253,22 @@ type TransInfo interface {
 }
 
 func newTransInfo() interface{} {
-	return &transInfo{
-		intInfo: make(map[uint16]string),
-		strInfo: make(map[string]string),
-	}
+	return &transInfo{fresh: true}
 }
 
 type transInfo struct {
-	strInfo map[string]string
-	intInfo map[uint16]string
+	store                   *headerStore
+	primary, escaped, fresh bool
+	strInfo                 map[string]string
+	intInfo                 map[uint16]string
 }
 
 func (ti *transInfo) zero() {
+	ti.primary = false
+	ti.fresh = true
+	if ti.store != nil {
+		ti.store.reset(false)
+	}
 	for k := range ti.intInfo {
 		delete(ti.intInfo, k)
 	}
@@ -273,16 +277,16 @@ func (ti *transInfo) zero() {
 	}
 }
 
-// TransIntInfo implements the TransInfo interface.
 func (ti *transInfo) TransIntInfo() map[uint16]string {
+	ti.materialize()
 	return ti.intInfo
 }
 
-// PutTransIntInfo implements the TransInfo interface.
 func (ti *transInfo) PutTransIntInfo(kvInfo map[uint16]string) {
 	if kvInfo == nil {
 		return
 	}
+	ti.materialize()
 	if len(ti.intInfo) == 0 {
 		ti.intInfo = kvInfo
 	} else {
@@ -292,16 +296,16 @@ func (ti *transInfo) PutTransIntInfo(kvInfo map[uint16]string) {
 	}
 }
 
-// TransStrInfo implements the TransInfo interface.
 func (ti *transInfo) TransStrInfo() map[string]string {
+	ti.materialize()
 	return ti.strInfo
 }
 
-// PutTransStrInfo implements the TransInfo interface.
 func (ti *transInfo) PutTransStrInfo(kvInfo map[string]string) {
 	if kvInfo == nil {
 		return
 	}
+	ti.materialize()
 	if len(ti.strInfo) == 0 {
 		ti.strInfo = kvInfo
 	} else {

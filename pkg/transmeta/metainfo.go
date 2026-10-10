@@ -18,6 +18,7 @@ package transmeta
 
 import (
 	"context"
+	"strings"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 
@@ -69,14 +70,18 @@ func (mi *metainfoClientHandler) WriteMeta(ctx context.Context, sendMsg remote.M
 	if metainfo.HasMetaInfo(ctx) {
 		kvs := make(map[string]string)
 		metainfo.SaveMetaInfoToMap(ctx, kvs)
-		sendMsg.TransInfo().PutTransStrInfo(kvs)
+		if h := remote.AccessHeaders(sendMsg.TransInfo()); h.Primary() {
+			h.MergeString(kvs)
+		} else {
+			sendMsg.TransInfo().PutTransStrInfo(kvs)
+		}
 	}
 	return ctx, nil
 }
 
 func (mi *metainfoClientHandler) ReadMeta(ctx context.Context, recvMsg remote.Message) (context.Context, error) {
 	if info := recvMsg.TransInfo(); info != nil {
-		if kvs := info.TransStrInfo(); len(kvs) > 0 {
+		if kvs := metainfoHeaderValues(info, false); len(kvs) > 0 {
 			metainfo.SetBackwardValuesFromMap(ctx, kvs)
 		}
 	}
@@ -86,7 +91,7 @@ func (mi *metainfoClientHandler) ReadMeta(ctx context.Context, recvMsg remote.Me
 type metainfoServerHandler struct{}
 
 func (mi *metainfoServerHandler) ReadMeta(ctx context.Context, recvMsg remote.Message) (context.Context, error) {
-	if kvs := recvMsg.TransInfo().TransStrInfo(); len(kvs) > 0 {
+	if kvs := metainfoHeaderValues(recvMsg.TransInfo(), true); len(kvs) > 0 {
 		ctx = metainfo.SetMetaInfoFromMap(ctx, kvs)
 	}
 	ctx = metainfo.WithBackwardValuesToSend(ctx)
@@ -125,8 +130,31 @@ func addStreamIDToContext(ctx context.Context, md metadata.MD) context.Context {
 
 func (mi *metainfoServerHandler) WriteMeta(ctx context.Context, sendMsg remote.Message) (context.Context, error) {
 	if kvs := metainfo.AllBackwardValuesToSend(ctx); len(kvs) > 0 {
-		sendMsg.TransInfo().PutTransStrInfo(kvs)
+		if h := remote.AccessHeaders(sendMsg.TransInfo()); h.Primary() {
+			h.MergeString(kvs)
+		} else {
+			sendMsg.TransInfo().PutTransStrInfo(kvs)
+		}
 	}
 
 	return ctx, nil
+}
+
+func metainfoHeaderValues(info remote.TransInfo, forward bool) map[string]string {
+	h := remote.AccessHeaders(info)
+	if !h.Primary() {
+		return info.TransStrInfo()
+	}
+	var values map[string]string
+	h.RangeString(func(k, v string) bool {
+		if forward && !strings.HasPrefix(k, metainfo.PrefixTransient) && !strings.HasPrefix(k, metainfo.PrefixPersistent) {
+			return true
+		}
+		if values == nil {
+			values = make(map[string]string)
+		}
+		values[k] = v
+		return true
+	})
+	return values
 }
