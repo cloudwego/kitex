@@ -18,17 +18,20 @@ package grpc
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 )
 
-// contextWithCancelReason implements context.Context
-// with a cancel func for passing cancel reason
-// NOTE: use context.WithCancelCause when go1.20?
+// contextWithCancelReason implements context.Context with a cancel func for
+// passing a reason while preserving the legacy Err behavior of the context
+// passed directly to the handler.
 type contextWithCancelReason struct {
 	context.Context
 
-	cancel context.CancelFunc
-	reason atomic.Value
+	cancel      context.CancelFunc
+	cancelCause context.CancelCauseFunc
+	once        sync.Once
+	reason      atomic.Value
 }
 
 func (c *contextWithCancelReason) Err() error {
@@ -40,15 +43,44 @@ func (c *contextWithCancelReason) Err() error {
 }
 
 func (c *contextWithCancelReason) CancelWithReason(reason error) {
-	if reason != nil {
-		c.reason.CompareAndSwap(nil, reason)
-	}
-	c.cancel()
+	// The reason, cascade cause, and optional parent cancel must be published by
+	// the same first caller. Without once, a concurrent loser could cancel the
+	// parent before the winner installs streamCancelCause, permanently replacing
+	// the cascade cause with context.Canceled. It also ensures reason is stored
+	// only once, avoiding atomic.Value panics for different concrete error types.
+	c.once.Do(func() {
+		if reason != nil {
+			c.reason.Store(reason)
+			c.cancelCause(&streamCancelCause{err: reason})
+		} else {
+			c.cancelCause(nil)
+		}
+		if c.cancel != nil {
+			c.cancel()
+		}
+	})
+}
+
+// streamCancelCause identifies cancellation originating from a Kitex stream.
+// It is intentionally private so a user-provided context.WithCancelCause error,
+// including a *status.Error, cannot be mistaken for a cascading cancellation.
+// Unwrap keeps the original cancellation reason available to standard error APIs.
+type streamCancelCause struct {
+	err error
+}
+
+func (c *streamCancelCause) Error() string {
+	return c.err.Error()
+}
+
+func (c *streamCancelCause) Unwrap() error {
+	return c.err
 }
 
 type cancelWithReason func(reason error)
 
 func newContextWithCancelReason(ctx context.Context, cancel context.CancelFunc) (context.Context, cancelWithReason) {
-	ret := &contextWithCancelReason{Context: ctx, cancel: cancel}
+	causeCtx, cancelCause := context.WithCancelCause(ctx)
+	ret := &contextWithCancelReason{Context: causeCtx, cancel: cancel, cancelCause: cancelCause}
 	return ret, ret.CancelWithReason
 }

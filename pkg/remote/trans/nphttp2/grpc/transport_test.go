@@ -2608,6 +2608,8 @@ func Test_closeStreamTask(t *testing.T) {
 func TestCloseStreamTaskCascadeCancel(t *testing.T) {
 	parent, parentCancel := context.WithCancel(context.Background())
 	serverCtx, cancelWithReason := newContextWithCancelReason(parent, parentCancel)
+	clientCtx, cancelClient := context.WithCancel(serverCtx)
+	defer cancelClient()
 
 	reason := status.Err(codes.Canceled, "inbound RPC terminated")
 	cancelWithReason(reason)
@@ -2615,7 +2617,7 @@ func TestCloseStreamTaskCascadeCancel(t *testing.T) {
 	clientDone := make(chan struct{})
 	stream := &Stream{
 		id:         1,
-		ctx:        serverCtx,
+		ctx:        clientCtx,
 		done:       make(chan struct{}),
 		buf:        newRecvBuffer(),
 		headerChan: make(chan struct{}),
@@ -2634,6 +2636,33 @@ func TestCloseStreamTaskCascadeCancel(t *testing.T) {
 	test.Assert(t, st.IsCascadeCancel())
 	test.Assert(t, st.Code() == codes.Canceled)
 	test.Assert(t, st.Message() == "inbound RPC terminated")
+}
+
+func TestCloseStreamTaskUserStatusCauseIsNotCascadeCancel(t *testing.T) {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	cancel(status.Err(codes.Canceled, "user cancellation"))
+
+	clientDone := make(chan struct{})
+	stream := &Stream{
+		id:         1,
+		ctx:        ctx,
+		done:       make(chan struct{}),
+		buf:        newRecvBuffer(),
+		headerChan: make(chan struct{}),
+	}
+	client := &http2Client{
+		activeStreams:         map[uint32]*Stream{stream.id: stream},
+		controlBuf:            newControlBuffer(clientDone),
+		streamsQuotaAvailable: make(chan struct{}, 1),
+	}
+
+	(&closeStreamTask{t: client}).Tick()
+	<-stream.Done()
+
+	st := stream.Status()
+	test.Assert(t, !st.IsCascadeCancel())
+	test.Assert(t, st.Code() == codes.Canceled)
+	test.Assert(t, st.Message() == context.Canceled.Error())
 }
 
 func TestStreamGetHeaderValid(t *testing.T) {

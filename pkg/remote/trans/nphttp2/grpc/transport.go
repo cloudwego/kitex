@@ -199,7 +199,7 @@ func (r *recvBufferReader) readClient(p []byte) (n int, err error) {
 		// TODO: delaying ctx error seems like a unnecessary side effect. What
 		// we really want is to mark the stream as done, and return ctx error
 		// faster.
-		r.closeStream(cascadeContextErr(r.ctx.Err()))
+		r.closeStream(cascadeContextErr(contextErrForCascade(r.ctx)))
 		m := <-r.recv.get()
 		return r.readAdditional(m, p)
 	case m := <-r.recv.get():
@@ -329,7 +329,7 @@ func (s *Stream) waitOnHeader() {
 	case <-s.ctx.Done():
 		// Close the stream to prevent headers/trailers from changing after
 		// this function returns.
-		s.ct.CloseStream(s, cascadeContextErr(s.ctx.Err()))
+		s.ct.CloseStream(s, cascadeContextErr(contextErrForCascade(s.ctx)))
 		// headerChan could possibly not be closed yet if closeStream raced
 		// with operateHeaders; wait until it is closed explicitly here.
 		<-s.headerChan
@@ -561,8 +561,7 @@ func CreateStream(ctx context.Context, id uint32, requestRead func(i int), metho
 		hdrMu:       sync.Mutex{},
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	stream.ctx, stream.cancel = newContextWithCancelReason(ctx, cancel)
+	stream.ctx, stream.cancel = newContextWithCancelReason(ctx, nil)
 	return stream
 }
 
@@ -982,6 +981,18 @@ func tryMarkAsCascadeCancel(err error) error {
 		return stErr.WithCascadeCancel()
 	}
 	return err
+}
+
+// contextErrForCascade returns the original error only when the cancellation
+// carries Kitex's private streamCancelCause marker. In particular, a raw
+// *status.Error supplied by a user through context.WithCancelCause is ignored
+// and falls back to the standard ctx.Err() behavior for compatibility.
+func contextErrForCascade(ctx context.Context) error {
+	cause, ok := context.Cause(ctx).(*streamCancelCause)
+	if ok && cause != nil {
+		return cause.err
+	}
+	return ctx.Err()
 }
 
 // contextStatusAndErr converts err to (*status.Status, reused, error).

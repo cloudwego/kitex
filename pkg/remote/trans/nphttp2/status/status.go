@@ -105,9 +105,8 @@ func (s *Status) Message() string {
 //
 // This marker has the following limitations:
 //   - It is not propagated across processes.
-//   - After wrapping the ctx provided to the handler using the standard library's context package
-//     (for example, context.WithCancel or context.WithTimeout),
-//     IsCascadeCancel will still return false even if a cascading cancellation is triggered.
+//   - A cancellation initiated by user code is not considered a cascading
+//     cancellation, including when context.WithCancelCause carries a status error.
 func (s *Status) IsCascadeCancel() bool {
 	return s != nil && s.Code() == codes.Canceled && s.cascadeCancel
 }
