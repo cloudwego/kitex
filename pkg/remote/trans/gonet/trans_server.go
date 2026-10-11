@@ -90,6 +90,10 @@ func (ts *transServer) BootstrapServer(ln net.Listener) error {
 			klog.Errorf("KITEX: BootstrapServer accept failed, err=%s", err.Error())
 			return err
 		}
+		// Increment the connection count before spawning the goroutine, so that
+		// Shutdown can never observe a stale zero count while an accepted
+		// connection has not been counted yet.
+		ts.connCount.Inc()
 		go ts.serveConn(context.Background(), conn)
 	}
 }
@@ -97,7 +101,6 @@ func (ts *transServer) BootstrapServer(ln net.Listener) error {
 func (ts *transServer) serveConn(ctx context.Context, conn net.Conn) (err error) {
 	defer transRecover(ctx, conn, "serveConn")
 
-	ts.connCount.Inc()
 	bc := newSvrConn(conn)
 	defer func() {
 		if err != nil {
@@ -146,6 +149,9 @@ func (ts *transServer) Shutdown() (err error) {
 			// 2. signal all active connections to close gracefully
 			_ = g.GracefulShutdown(ctx)
 		}
+	}
+	if ts.connCount.Value() == 0 {
+		return nil
 	}
 
 	shutdownTicker := time.NewTicker(defaultShutdownTicker)
