@@ -298,7 +298,7 @@ func TestWeightedConsistBalance(t *testing.T) {
 	}
 }
 
-func TestConsistPicker_Reblance(t *testing.T) {
+func TestConsistPicker_Rebalance(t *testing.T) {
 	opt := NewConsistentHashOption(getKey)
 	insList := makeNInstances(10, 10)
 	e := discovery.Result{
