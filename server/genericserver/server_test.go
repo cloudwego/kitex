@@ -80,3 +80,55 @@ type mockImpl struct{}
 func (g *mockImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
 	return nil, nil
 }
+
+func TestRegisterService(t *testing.T) {
+	gV1 := generic.BinaryThriftGeneric()
+	gV2 := generic.BinaryThriftGenericV2("mock")
+	handler := &generic.ServiceV2{
+		GenericCall: func(ctx context.Context, service, method string, request interface{}) (response interface{}, err error) {
+			return nil, nil
+		},
+	}
+
+	err := RegisterService(nil, handler, gV2)
+	test.Assert(t, err != nil)
+	test.Assert(t, strings.Contains(err.Error(), "svr is nil"), err)
+
+	svr := server.NewServer()
+
+	err = RegisterService(svr, handler, nil)
+	test.Assert(t, err != nil)
+	test.Assert(t, strings.Contains(err.Error(), "generic is nil"), err)
+
+	err = RegisterService(svr, handler, gV1)
+	test.Assert(t, err != nil)
+	test.Assert(t, strings.Contains(err.Error(), "not support generic.BinaryThriftGeneric"), err)
+
+	err = RegisterService(svr, handler, gV2)
+	test.Assert(t, err == nil, err)
+}
+
+func TestRegisterUnknownServiceOrMethodHandler(t *testing.T) {
+	unknownHdlr := &UnknownServiceOrMethodHandler{
+		DefaultHandler: func(ctx context.Context, service, method string, request interface{}) (response interface{}, err error) {
+			return nil, nil
+		},
+	}
+
+	err := RegisterUnknownServiceOrMethodHandler(nil, unknownHdlr)
+	test.Assert(t, err != nil)
+	test.Assert(t, strings.Contains(err.Error(), "svr is nil"), err)
+
+	svr := server.NewServer()
+
+	err = RegisterUnknownServiceOrMethodHandler(svr, nil)
+	test.Assert(t, err != nil)
+	test.Assert(t, strings.Contains(err.Error(), "unknownHandler is nil"), err)
+
+	err = RegisterUnknownServiceOrMethodHandler(svr, &UnknownServiceOrMethodHandler{})
+	test.Assert(t, err != nil)
+	test.Assert(t, strings.Contains(err.Error(), "neither default nor streaming handler"), err)
+
+	err = RegisterUnknownServiceOrMethodHandler(svr, unknownHdlr)
+	test.Assert(t, err == nil, err)
+}

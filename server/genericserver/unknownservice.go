@@ -54,6 +54,12 @@ import (
 //		StreamingHandler: streamingHandler,
 //	})
 func RegisterUnknownServiceOrMethodHandler(svr server.Server, unknownHandler *UnknownServiceOrMethodHandler) error {
+	if svr == nil {
+		return errors.New("svr is nil. please specify non-nil svr")
+	}
+	if unknownHandler == nil {
+		return errors.New("unknownHandler is nil. please specify non-nil unknownHandler")
+	}
 	if unknownHandler.DefaultHandler == nil && unknownHandler.StreamingHandler == nil {
 		return errors.New("neither default nor streaming handler registered")
 	}

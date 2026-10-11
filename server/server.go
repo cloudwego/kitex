@@ -177,21 +177,33 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	s.Lock()
 	defer s.Unlock()
 	if s.isRun {
-		panic("service cannot be registered while server is running")
+		return errors.New("service cannot be registered while server is running")
 	}
 	if svcInfo == nil {
-		panic("svcInfo is nil. please specify non-nil svcInfo")
+		return errors.New("svcInfo is nil. please specify non-nil svcInfo")
 	}
-	if handler == nil || reflect.ValueOf(handler).IsNil() {
-		panic("handler is nil. please specify non-nil handler")
+	if isNil(handler) {
+		return errors.New("handler is nil. please specify non-nil handler")
 	}
 
 	registerOpts := internal_server.NewRegisterOptions(opts)
 	// register service
 	if err := s.svcs.addService(svcInfo, handler, registerOpts); err != nil {
-		panic(err.Error())
+		return err
 	}
 	return nil
+}
+
+func isNil(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	v := reflect.ValueOf(i)
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice, reflect.UnsafePointer:
+		return v.IsNil()
+	}
+	return false
 }
 
 func (s *server) GetServiceInfos() map[string]*serviceinfo.ServiceInfo {
