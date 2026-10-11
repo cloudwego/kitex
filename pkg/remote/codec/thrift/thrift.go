@@ -50,6 +50,8 @@ const (
 	FrugalReadWrite = FrugalWrite | FrugalRead
 
 	EnableSkipDecoder CodecType = 0b10000
+
+	fastWriteCopy CodecType = 0b100000
 )
 
 var (
@@ -62,6 +64,13 @@ var (
 // NewThriftCodec creates the thrift binary codec.
 func NewThriftCodec() remote.PayloadCodec {
 	return &thriftCodec{FastWrite | FastRead}
+}
+
+// NewThriftCodecWithFastWriteCopy creates a thrift codec that keeps fast read
+// and fast write enabled, but copies string and binary fields into the output
+// buffer instead of using remote.NocopyWrite.
+func NewThriftCodecWithFastWriteCopy() remote.PayloadCodec {
+	return &thriftCodec{FastReadWrite | fastWriteCopy}
 }
 
 // IsThriftCodec checks if the codec is thriftCodec
@@ -123,10 +132,10 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 		// if remote.Exception, we always use fastcodec
 		if transErr, ok := data.(*remote.TransError); ok {
 			ex := thrift.NewApplicationException(transErr.TypeID(), transErr.Error())
-			return fastMarshal(out, methodName, msgType, seqID, ex)
+			return fastMarshal(out, methodName, msgType, seqID, ex, c.IsSet(fastWriteCopy))
 		} else if err, ok := data.(error); ok {
 			ex := thrift.NewApplicationException(remote.InternalError, err.Error())
-			return fastMarshal(out, methodName, msgType, seqID, ex)
+			return fastMarshal(out, methodName, msgType, seqID, ex, c.IsSet(fastWriteCopy))
 		} else {
 			return fmt.Errorf("got %T for remote.Exception", data)
 		}
@@ -141,7 +150,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 
 	// encode with FastWrite
 	if c.IsSet(FastWrite) && typecodec.FastCodec {
-		return fastMarshal(out, methodName, msgType, seqID, data.(thrift.FastCodec))
+		return fastMarshal(out, methodName, msgType, seqID, data.(thrift.FastCodec), c.IsSet(fastWriteCopy))
 	}
 
 	// generic call
@@ -156,7 +165,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 
 	// try fallback to fastcodec or frugal even though CodecType=Basic
 	if typecodec.FastCodec {
-		return fastMarshal(out, methodName, msgType, seqID, data.(thrift.FastCodec))
+		return fastMarshal(out, methodName, msgType, seqID, data.(thrift.FastCodec), c.IsSet(fastWriteCopy))
 	}
 	if typecodec.Frugal {
 		return frugalMarshal(out, methodName, msgType, seqID, data)
