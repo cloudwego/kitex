@@ -30,6 +30,7 @@ import (
 	thrift "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/mocks/thrift/testservice"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/internal/test/rpcinfotest"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/generic"
@@ -249,6 +250,28 @@ func TestLocalCaller_MiddlewareExecution(t *testing.T) {
 		&thrift.TestServiceEchoPingPongResult{})
 	test.Assert(t, err == nil, err)
 	test.Assert(t, called, "middleware was not called")
+}
+
+func TestRPCInfoAccessNoRace(t *testing.T) {
+	var reader *rpcinfotest.ReadLoop
+	mw := func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp any) error {
+			reader = rpcinfotest.StartReadLoop(ctx)
+			return next(ctx, req, resp)
+		}
+	}
+	svr := server.NewServer(server.WithMiddleware(mw))
+	err := svr.RegisterService(testservice.NewServiceInfo(), &baseHandler{})
+	test.Assert(t, err == nil, err)
+	lc, err := server.NewLocalCaller("test-caller", svr)
+	test.Assert(t, err == nil, err)
+
+	err = lc.Call(context.Background(), "EchoPingPong",
+		&thrift.TestServiceEchoPingPongArgs{Req: &thrift.Request{}},
+		&thrift.TestServiceEchoPingPongResult{})
+	test.Assert(t, err == nil, err)
+
+	reader.StopAndAssert(t)
 }
 
 func TestLocalCaller_MultipleMiddlewaresOrdering(t *testing.T) {
