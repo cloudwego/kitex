@@ -85,7 +85,7 @@ func GetGOPATH() (string, error) {
 func Exists(path string) bool {
 	fi, err := os.Stat(path)
 	if err != nil {
-		return os.IsExist(err)
+		return false
 	}
 	return !fi.IsDir()
 }
@@ -194,7 +194,7 @@ func RunGitCommand(gitLink string) (string, string, error) {
 	gitPath := JoinPath(cachePath, repoLink+branchSuffix)
 
 	_, err = os.Stat(JoinPath(gitPath, ".git"))
-	if err != nil && !os.IsExist(err) {
+	if err != nil && os.IsNotExist(err) {
 		err = os.MkdirAll(gitPath, os.ModePerm)
 		if err != nil {
 			return "", "Failed to create cache directory,please check your permission for ~/.kitex/cache", err
