@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -42,6 +43,7 @@ func TestNativeServerRejectsMissingBridge(t *testing.T) {
 }
 
 func TestNativeServerRejectsCustomTransportInEitherOrder(t *testing.T) {
+	nativeFixtureDefaultCodec(t)
 	for _, custom := range []server.Option{server.WithCodec(codec.NewDefaultCodec()), server.WithPayloadCodec(thriftcodec.NewThriftCodecWithConfig(thriftcodec.FrugalReadWrite)), server.WithMetaHandler(nativeFixtureMeta{new(nativeServerFixture)}), server.WithProfiler(nil)} {
 		for _, options := range [][]server.Option{{custom, server.WithNativeTransport(new(nativeServerFixture))}, {server.WithNativeTransport(new(nativeServerFixture)), custom}} {
 			options = append(options, server.WithServiceAddr(utils.NewNetAddr("tcp", "127.0.0.1:0")), server.WithExitSignal(func() <-chan error { return make(chan error) }))
@@ -62,6 +64,30 @@ func TestNativeServerRejectsCustomTransportInEitherOrder(t *testing.T) {
 				t.Fatal("native server accepted custom transport configuration")
 			}
 		}
+	}
+}
+
+type nativeCodecObserverSuite struct {
+	codec remote.PayloadCodec
+	err   error
+}
+
+func (s *nativeCodecObserverSuite) Options() []server.Option {
+	info := rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), nil)
+	message := remote.NewMessage(nil, info, remote.Call, remote.Server)
+	s.codec, s.err = remote.GetPayloadCodec(message)
+	remote.RecycleMessage(message)
+	rpcinfo.PutRPCInfo(info)
+	return nil
+}
+
+func TestServerPayloadCodecIsVisibleToFollowingSuite(t *testing.T) {
+	nativeFixtureDefaultCodec(t)
+	want := thriftcodec.NewThriftCodecDisableFastMode(false, true)
+	observer := new(nativeCodecObserverSuite)
+	server.NewServer(server.WithPayloadCodec(want), server.WithSuite(observer))
+	if observer.err != nil || !reflect.DeepEqual(observer.codec, want) {
+		t.Fatalf("following suite could not observe the preceding codec option: codec=%v error=%v", observer.codec, observer.err)
 	}
 }
 

@@ -231,10 +231,10 @@ func WithPayloadCodec(c remote.PayloadCodec) Option {
 			// default thriftCodec has been registered,
 			// if using NewThriftCodecWithConfig to set codec mode, just replace the registered one
 			di.Push(fmt.Sprintf("ResetThriftPayloadCodec(%+v)", c))
-			o.PayloadCodecUpdates = append(o.PayloadCodecUpdates, func() { remote.PutPayloadCode(serviceinfo.Thrift, c) })
+			remote.PutPayloadCode(serviceinfo.Thrift, c)
 		} else if protobuf.IsProtobufCodec(c) {
 			di.Push(fmt.Sprintf("ResetProtobufPayloadCodec(%+v)", c))
-			o.PayloadCodecUpdates = append(o.PayloadCodecUpdates, func() { remote.PutPayloadCode(serviceinfo.Protobuf, c) })
+			remote.PutPayloadCode(serviceinfo.Protobuf, c)
 		} else {
 			di.Push(fmt.Sprintf("WithPayloadCodec(%+v)", c))
 			// if specify RemoteOpt.PayloadCodec, then the priority is highest, all payload decode will use this one
