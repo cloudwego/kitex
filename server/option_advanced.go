@@ -42,6 +42,7 @@ import (
 
 func WithUnaryLifecycle(h remote.UnaryLifecycle) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithUnaryLifecycle")
 		o.RemoteOpt.UnaryLifecycle = h
 	}}
 }
@@ -83,6 +84,7 @@ func WithACLRules(rules ...acl.RejectFunc) Option {
 // WithMetaHandler adds a MetaHandler.
 func WithMetaHandler(h remote.MetaHandler) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithMetaHandler")
 		di.Push(fmt.Sprintf("WithMetaHandler(%T)", h))
 
 		o.MetaHandlers = append(o.MetaHandlers, h)
@@ -92,6 +94,7 @@ func WithMetaHandler(h remote.MetaHandler) Option {
 // WithProxy sets the backward Proxy for server.
 func WithProxy(p proxy.ReverseProxy) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithProxy")
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithProxy(%T)", p))
 
@@ -105,6 +108,7 @@ func WithProxy(p proxy.ReverseProxy) Option {
 // WithTransHandlerFactory sets the TransHandlerFactory for server.
 func WithTransHandlerFactory(f remote.ServerTransHandlerFactory) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithTransHandlerFactory")
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithTransHandlerFactory(%T)", f))
 
@@ -115,6 +119,7 @@ func WithTransHandlerFactory(f remote.ServerTransHandlerFactory) Option {
 // WithTransServerFactory sets the TransServerFactory for server.
 func WithTransServerFactory(f remote.TransServerFactory) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithTransServerFactory")
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithTransServerFactory(%T)", f))
 
@@ -137,6 +142,7 @@ func WithLimitReporter(r limiter.LimitReporter) Option {
 // please use generic.BinaryThriftGenericV2 instead.
 func WithGeneric(g generic.Generic) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithGeneric")
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithGeneric(%T)", g))
 
@@ -160,6 +166,7 @@ func WithErrorHandler(f func(context.Context, error) error) Option {
 // WithBoundHandler adds remote.BoundHandler for server.
 func WithBoundHandler(h remote.BoundHandler) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithBoundHandler")
 		di.Push(fmt.Sprintf("AddBoundHandler(%T)", h))
 
 		exist := false
@@ -199,6 +206,7 @@ func WithExitSignal(f func() <-chan error) Option {
 // WithListener sets the listener for server, the priority is higher than WithServiceAddr
 func WithListener(ln net.Listener) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithListener")
 		di.Push(fmt.Sprintf("WithListener(%+v)", ln))
 
 		o.RemoteOpt.Listener = ln
@@ -209,6 +217,7 @@ func WithListener(ln net.Listener) Option {
 // It won't take effect when listener is specified by WithListener.
 func WithReusePort(reuse bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithReusePort")
 		di.Push(fmt.Sprintf("WithReusePort(%+v)", reuse))
 
 		o.RemoteOpt.ReusePort = reuse
@@ -218,6 +227,7 @@ func WithReusePort(reuse bool) Option {
 // WithProfiler set a profiler to server.
 func WithProfiler(pc profiler.Profiler) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithProfiler")
 		di.Push(fmt.Sprintf("WithProfiler(%T{%+v})", pc, pc))
 		o.RemoteOpt.Profiler = pc
 	}}
@@ -230,6 +240,7 @@ func WithProfiler(pc profiler.Profiler) Option {
 // So if you don't very care about the accuracy of statistics, we recommend to use WithProfilerMessageTagging to extract your custom tags.
 func WithProfilerTransInfoTagging(tagging remote.TransInfoTagging) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithProfilerTransInfoTagging")
 		di.Push(fmt.Sprintf("WithProfilerTransInfoTagging(%+v)", utils.GetFuncName(tagging)))
 		interTagging := o.RemoteOpt.ProfilerTransInfoTagging
 		if interTagging == nil {
@@ -249,6 +260,7 @@ func WithProfilerTransInfoTagging(tagging remote.TransInfoTagging) Option {
 // At this stage, we can get the rpcInfo from ctx, and full complete message.
 func WithProfilerMessageTagging(tagging remote.MessageTagging) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithProfilerMessageTagging")
 		di.Push(fmt.Sprintf("WithProfilerMessageTagging(%+v)", utils.GetFuncName(tagging)))
 		interTagging := o.RemoteOpt.ProfilerMessageTagging
 		if interTagging == nil {

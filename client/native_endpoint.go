@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/kitex/internal/transportcheck"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -81,10 +82,10 @@ func (kc *kClient) nativeEndpoint() (endpoint.Endpoint, error) {
 			return nil
 		}
 		call.FailureStage = remote.UnaryFailurePrepare
-		if err = checkNativeFastCodec(request); err != nil {
+		if err = transportcheck.FastCodec(request); err != nil {
 			return err
 		}
-		if err = checkNativeFastCodec(response); err != nil {
+		if err = transportcheck.FastCodec(response); err != nil {
 			return err
 		}
 		payloadCodec, codecErr := remote.GetPayloadCodec(call.Request)

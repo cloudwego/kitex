@@ -41,6 +41,7 @@ type UnaryCall struct {
 	Request, Response               Message
 	RequestWire, ResponseWire       UnaryWire
 	State                           any
+	NativeRequest                   NativeServerRequest
 	Conn                            net.Conn
 	ConnID                          uint64
 	Err                             error

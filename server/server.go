@@ -207,6 +207,11 @@ func (s *server) Run() (err error) {
 	if err = s.check(); err != nil {
 		return err
 	}
+	if s.opt.NativeTransportSet {
+		if err = s.checkNativeOptions(); err != nil {
+			return err
+		}
+	}
 	svrCfg := s.opt.RemoteOpt
 	addr := svrCfg.Address // should not be nil
 	if s.opt.Proxy != nil {
@@ -217,14 +222,20 @@ func (s *server) Run() (err error) {
 	}
 
 	s.registerDebugInfo()
-	s.richRemoteOption()
-	transHdlr, err := s.newSvrTransHandler()
-	if err != nil {
-		return err
-	}
-	svr, err := remotesvr.NewServer(s.opt.RemoteOpt, transHdlr)
-	if err != nil {
-		return err
+	var svr remotesvr.Server
+	if s.opt.NativeTransportSet {
+		s.initBasicRemoteOption()
+		svr = newNativeServer(s)
+	} else {
+		s.richRemoteOption()
+		transHdlr, e := s.newSvrTransHandler()
+		if e != nil {
+			return e
+		}
+		svr, err = remotesvr.NewServer(s.opt.RemoteOpt, transHdlr)
+		if err != nil {
+			return err
+		}
 	}
 	s.Lock()
 	s.svr = svr

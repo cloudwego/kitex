@@ -138,6 +138,10 @@ func NewRPCStats() RPCStats {
 // Record implements the RPCStats interface.
 // It only record once for each event, it will ignore follow events with the same Index()
 func (r *rpcStats) Record(ctx context.Context, e stats.Event, status stats.Status, info string) {
+	r.recordAt(e, status, info, time.Now())
+}
+
+func (r *rpcStats) recordAt(e stats.Event, status stats.Status, info string, at time.Time) {
 	if e.Level() > r.level {
 		return
 	}
@@ -149,7 +153,7 @@ func (r *rpcStats) Record(ctx context.Context, e stats.Event, status stats.Statu
 		ev.event = e
 		ev.status = status
 		ev.info = info
-		ev.time = time.Now().UnixNano()
+		ev.time = at.UnixNano()
 		atomic.StoreUint32(p, eventRecorded) // done, make it visible to GetEvent
 	} else {
 		// eventRecorded? panic?

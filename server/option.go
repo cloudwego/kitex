@@ -84,6 +84,7 @@ func WithSuite(suite Suite) Option {
 // Deprecated: Mux Transport is no longer being maintained.
 func WithMuxTransport() Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithMuxTransport")
 		di.Push("WithMuxTransport()")
 		o.RemoteOpt.SvrHandlerFactory = netpollmux.NewSvrTransHandlerFactory()
 		// set limit options
@@ -153,6 +154,7 @@ func WithMaxConnIdleTime(timeout time.Duration) Option {
 // We don't promise compatibility for this option in future versions!!!
 func WithLimit(lim *limit.Option) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithLimit")
 		di.Push(fmt.Sprintf("WithLimit(%+v)", lim))
 
 		o.Limit.Limits = lim
@@ -163,6 +165,7 @@ func WithLimit(lim *limit.Option) Option {
 // If both WithLimit and WithConnectionLimiter are called, only the latter will take effect.
 func WithConnectionLimiter(conLimit limiter.ConcurrencyLimiter) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithConnectionLimiter")
 		di.Push(fmt.Sprintf("WithConnectionLimiter(%T{%+v})", conLimit, conLimit))
 
 		o.Limit.ConLimit = conLimit
@@ -173,6 +176,7 @@ func WithConnectionLimiter(conLimit limiter.ConcurrencyLimiter) Option {
 // If both WithLimit and WithQPSLimiter are called, only the latter will take effect.
 func WithQPSLimiter(qpsLimit limiter.RateLimiter) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithQPSLimiter")
 		di.Push(fmt.Sprintf("WithQPSLimiter(%T{%+v})", qpsLimit, qpsLimit))
 
 		o.Limit.QPSLimit = qpsLimit
@@ -212,6 +216,7 @@ func WithServiceAddr(addr net.Addr) Option {
 // WithCodec to set a codec that handle other protocols which not support by kitex
 func WithCodec(c remote.Codec) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithCodec")
 		di.Push(fmt.Sprintf("WithCodec(%+v)", c))
 
 		o.RemoteOpt.Codec = c
@@ -221,14 +226,15 @@ func WithCodec(c remote.Codec) Option {
 // WithPayloadCodec to set a payloadCodec that handle other payload which not support by kitex
 func WithPayloadCodec(c remote.PayloadCodec) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithPayloadCodec")
 		if thrift.IsThriftCodec(c) {
 			// default thriftCodec has been registered,
 			// if using NewThriftCodecWithConfig to set codec mode, just replace the registered one
 			di.Push(fmt.Sprintf("ResetThriftPayloadCodec(%+v)", c))
-			remote.PutPayloadCode(serviceinfo.Thrift, c)
+			o.PayloadCodecUpdates = append(o.PayloadCodecUpdates, func() { remote.PutPayloadCode(serviceinfo.Thrift, c) })
 		} else if protobuf.IsProtobufCodec(c) {
 			di.Push(fmt.Sprintf("ResetProtobufPayloadCodec(%+v)", c))
-			remote.PutPayloadCode(serviceinfo.Protobuf, c)
+			o.PayloadCodecUpdates = append(o.PayloadCodecUpdates, func() { remote.PutPayloadCode(serviceinfo.Protobuf, c) })
 		} else {
 			di.Push(fmt.Sprintf("WithPayloadCodec(%+v)", c))
 			// if specify RemoteOpt.PayloadCodec, then the priority is highest, all payload decode will use this one

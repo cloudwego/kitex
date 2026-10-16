@@ -1,4 +1,4 @@
-package client
+package transportcheck
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 
 var nativeFastTypes sync.Map
 
-func checkNativeFastCodec(data interface{}) error {
+func FastCodec(data interface{}) error {
 	if _, ok := data.(thrift.FastCodec); !ok {
 		return fmt.Errorf("native transport requires default generated Fast codec: %T", data)
 	}

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
+	"time"
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -38,6 +39,21 @@ func Record(ctx context.Context, ri RPCInfo, event stats.Event, err error) {
 		st.Record(ctx, event, stats.StatusError, err.Error())
 	} else {
 		st.Record(ctx, event, stats.StatusInfo, "")
+	}
+}
+
+func RecordAt(ctx context.Context, ri RPCInfo, event stats.Event, err error, at time.Time) {
+	if ctx == nil || at.IsZero() {
+		return
+	}
+	st, ok := ri.Stats().(*rpcStats)
+	if !ok {
+		return
+	}
+	if err != nil {
+		st.recordAt(event, stats.StatusError, err.Error(), at)
+	} else {
+		st.recordAt(event, stats.StatusInfo, "", at)
 	}
 }
 

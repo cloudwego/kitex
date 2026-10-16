@@ -137,7 +137,11 @@ type Options struct {
 	UnaryOptions  UnaryOptions
 	StreamOptions StreamOptions
 
-	MetaHandlers []remote.MetaHandler
+	MetaHandlers        []remote.MetaHandler
+	NativeTransport     remote.NativeServerTransport
+	NativeTransportSet  bool
+	NativeUnsupported   []string
+	PayloadCodecUpdates []func()
 
 	RemoteOpt  *remote.ServerOption
 	ErrHandle  func(context.Context, error) error
@@ -210,6 +214,12 @@ func NewOptions(opts []Option) *Options {
 		Registry:  registry.NoopRegistry,
 	}
 	ApplyOptions(opts, o)
+	if !o.NativeTransportSet {
+		for _, update := range o.PayloadCodecUpdates {
+			update()
+		}
+	}
+	o.PayloadCodecUpdates = nil
 
 	o.initTraceController()
 	rpcinfo.AsMutableRPCConfig(o.Configs).LockConfig(o.LockBits)
