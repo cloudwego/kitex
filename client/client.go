@@ -24,6 +24,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"sync/atomic"
+	"time"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession/backup"
@@ -146,6 +147,11 @@ func (kc *kClient) init() (err error) {
 }
 
 func (kc *kClient) checkOptions() (err error) {
+	if kc.opt.NativeTransportSet {
+		if err = kc.checkNativeOptions(); err != nil {
+			return err
+		}
+	}
 	if kc.opt.Svr.ServiceName == "" {
 		return errors.New("service name is required")
 	}
@@ -216,6 +222,9 @@ func (kc *kClient) initProxy() error {
 }
 
 func (kc *kClient) initConnPool() error {
+	if kc.opt.NativeTransportSet {
+		return nil
+	}
 	pool := kc.opt.RemoteOpt.ConnPool
 	kc.opt.CloseCallbacks = append(kc.opt.CloseCallbacks, pool.Close)
 
@@ -243,6 +252,9 @@ func (kc *kClient) initConnPool() error {
 }
 
 func (kc *kClient) initLBCache() error {
+	if kc.opt.NativeTransportSet {
+		return nil
+	}
 	if kc.opt.Proxy != nil && kc.opt.Resolver == nil {
 		return nil
 	}
@@ -378,6 +390,9 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	ctx = backup.RecoverCtxOnDemands(ctx, kc.opt.CtxBackupHandler)
 
 	validateForCall(ctx, kc.inited, kc.closed)
+	if kc.opt.NativeTransportSet {
+		ctx = context.WithValue(ctx, nativeBeginKey{}, time.Now())
+	}
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions
 	ctx, ri, callOpts = kc.initRPCInfo(ctx, method, 0, nil, false)
@@ -404,6 +419,16 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	}()
 
 	callOptRetry := getCalloptRetryPolicy(callOpts)
+	if kc.opt.NativeTransportSet && ri.To().Address() != nil {
+		err = errors.New("native transport does not support Go address routing")
+		reportErr = err
+		return err
+	}
+	if kc.opt.NativeTransportSet && callOptRetry != nil && callOptRetry.Enable {
+		err = errors.New("native transport does not support call retry or backup")
+		reportErr = err
+		return err
+	}
 	if kc.opt.UnaryOptions.RetryContainer == nil && callOptRetry != nil && callOptRetry.Enable {
 		// setup retry in callopt
 		kc.opt.InitRetryContainer()
@@ -497,6 +522,10 @@ func (kc *kClient) buildInvokeChain(mw middleware) error {
 	kc.eps = endpoint.UnaryChain(mw.uMws...)(func(ctx context.Context, req, resp interface{}) (err error) {
 		return eps(ctx, req, resp)
 	})
+	if kc.opt.NativeTransportSet {
+		kc.sEps = func(context.Context) (streaming.ClientStream, error) { return nil, remote.ErrUnaryLifecycleProtocol }
+		return nil
+	}
 
 	innerStreamingEp, err := kc.invokeStreamingEndpoint()
 	if err != nil {
@@ -515,6 +544,9 @@ func (kc *kClient) buildInvokeChain(mw middleware) error {
 }
 
 func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
+	if kc.opt.NativeTransportSet {
+		return kc.nativeEndpoint()
+	}
 	transPipl, err := newCliTransHandler(kc.opt.RemoteOpt)
 	if err != nil {
 		return nil, err

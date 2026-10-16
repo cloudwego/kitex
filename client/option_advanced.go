@@ -42,6 +42,7 @@ import (
 
 func WithUnaryLifecycle(h remote.UnaryLifecycle) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithUnaryLifecycle")
 		o.RemoteOpt.UnaryLifecycle = h
 	}}
 }
@@ -49,6 +50,7 @@ func WithUnaryLifecycle(h remote.UnaryLifecycle) Option {
 // WithHTTPConnection specifies client use RPC over http.
 func WithHTTPConnection() Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithHTTPConnection")
 		o.Once.OnceOrPanic()
 		di.Push("WithHTTPConnection")
 
@@ -92,6 +94,7 @@ func WithACLRules(rules ...acl.RejectFunc) Option {
 // WithFirstMetaHandler adds a MetaHandler.
 func WithFirstMetaHandler(h remote.MetaHandler) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithFirstMetaHandler")
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithFirstMetaHandler(%T)", h))
 		handlers := []remote.MetaHandler{h}
@@ -102,6 +105,7 @@ func WithFirstMetaHandler(h remote.MetaHandler) Option {
 // WithMetaHandler adds a MetaHandler.
 func WithMetaHandler(h remote.MetaHandler) client.Option {
 	return client.Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithMetaHandler")
 		di.Push(fmt.Sprintf("WithMetaHandler(%T)", h))
 
 		o.MetaHandlers = append(o.MetaHandlers, h)
@@ -123,6 +127,7 @@ func WithProxy(p proxy.ForwardProxy) Option {
 // WithTransHandlerFactory sets the TransHandlerFactory for client.
 func WithTransHandlerFactory(f remote.ClientTransHandlerFactory) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithTransHandlerFactory")
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithTransHandlerFactory(%T)", f))
 
@@ -133,6 +138,7 @@ func WithTransHandlerFactory(f remote.ClientTransHandlerFactory) Option {
 // WithDialer sets the Dialer for creating connections.
 func WithDialer(d remote.Dialer) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithDialer")
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithDialer(%T)", d))
 
@@ -149,6 +155,7 @@ func WithDialer(d remote.Dialer) Option {
 // one will be used.
 func WithConnPool(pool remote.ConnPool) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithConnPool")
 		di.Push(fmt.Sprintf("WithConnPool((%T)", pool))
 
 		if o.RemoteOpt.ConnPool == nil {
@@ -177,6 +184,7 @@ func WithRetryContainer(rc *retry.Container) Option {
 // please use generic.BinaryThriftGenericV2 instead.
 func WithGeneric(g generic.Generic) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithGeneric")
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithGeneric(%T)", g))
 
@@ -212,6 +220,7 @@ func WithErrorHandler(f func(context.Context, error) error) Option {
 // WithBoundHandler adds remote.BoundHandler for client.
 func WithBoundHandler(h remote.BoundHandler) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithBoundHandler")
 		di.Push(fmt.Sprintf("AddBoundHandler(%T)", h))
 
 		exist := false
@@ -243,6 +252,7 @@ func WithBoundHandler(h remote.BoundHandler) Option {
 // WithGRPCTLSConfig sets the TLS config for gRPC client.
 func WithGRPCTLSConfig(tlsConfig *tls.Config) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithGRPCTLSConfig")
 		if tlsConfig == nil {
 			panic("invalid TLS config: nil")
 		}

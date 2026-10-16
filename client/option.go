@@ -311,6 +311,7 @@ func WithStatsLevel(level stats.Level) Option {
 // WithCodec to set a codec that handle other protocols which not support by kitex
 func WithCodec(c remote.Codec) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithCodec")
 		di.Push(fmt.Sprintf("WithCodec(%+v)", c))
 
 		o.RemoteOpt.Codec = c
@@ -320,6 +321,7 @@ func WithCodec(c remote.Codec) Option {
 // WithPayloadCodec to set a payloadCodec that handle other payload which not support by kitex
 func WithPayloadCodec(c remote.PayloadCodec) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithPayloadCodec")
 		di.Push(fmt.Sprintf("WithPayloadCodec(%+v)", c))
 
 		o.RemoteOpt.PayloadCodec = c
@@ -329,6 +331,7 @@ func WithPayloadCodec(c remote.PayloadCodec) Option {
 // WithConnReporterEnabled to enable reporting connection pool stats.
 func WithConnReporterEnabled() Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithConnReporterEnabled")
 		di.Push("WithConnReporterEnabled()")
 
 		o.RemoteOpt.EnableConnPoolReporter = true
@@ -473,6 +476,7 @@ func WithCircuitBreaker(s *circuitbreak.CBSuite) Option {
 // You should adjust the size according to the actual situation.
 func WithGRPCConnPoolSize(s uint32) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithGRPCConnPoolSize")
 		di.Push(fmt.Sprintf("WithGRPCConnPoolSize(%d)", s))
 		o.GRPCConnPoolSize = s
 	}}
@@ -521,6 +525,7 @@ func WithGRPCInitialWindowSize(s uint32) Option {
 // It corresponds to the WithInitialConnWindowSize DialOption of gRPC.
 func WithGRPCInitialConnWindowSize(s uint32) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		o.NativeUnsupported = append(o.NativeUnsupported, "WithGRPCInitialConnWindowSize")
 		di.Push(fmt.Sprintf("WithGRPCInitialConnWindowSize(%d)", s))
 		o.GRPCConnectOpts.InitialConnWindowSize = s
 	}}
