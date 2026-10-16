@@ -47,7 +47,7 @@ func RecordAt(ctx context.Context, ri RPCInfo, event stats.Event, err error, at 
 		return
 	}
 	st, ok := ri.Stats().(*rpcStats)
-	if !ok {
+	if !ok || event.Level() > st.level {
 		return
 	}
 	if err != nil {

@@ -138,13 +138,13 @@ func NewRPCStats() RPCStats {
 // Record implements the RPCStats interface.
 // It only record once for each event, it will ignore follow events with the same Index()
 func (r *rpcStats) Record(ctx context.Context, e stats.Event, status stats.Status, info string) {
+	if e.Level() > r.level {
+		return
+	}
 	r.recordAt(e, status, info, time.Now())
 }
 
 func (r *rpcStats) recordAt(e stats.Event, status stats.Status, info string, at time.Time) {
-	if e.Level() > r.level {
-		return
-	}
 	idx := e.Index()
 	p := &r.eventMap[idx].state
 	if atomic.CompareAndSwapUint32(p, eventUnset, eventUpdating) ||
