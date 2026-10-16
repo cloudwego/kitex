@@ -3,12 +3,15 @@ package client_test
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/cloudwego/frugal"
+	gthrift "github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -18,6 +21,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
+	thriftcodec "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -44,8 +48,9 @@ func (b *nativeTestBuffer) Release() error {
 
 type nativeTestTransport struct {
 	*unaryHooks
-	address string
-	conn    net.Conn
+	address  string
+	conn     net.Conn
+	exchange func(context.Context, remote.NativeBuffer, int) (remote.NativeBuffer, remote.NativeIO, error)
 }
 
 func (n *nativeTestTransport) BuiltinMetaHandlers() []remote.MetaHandler { return nil }
@@ -66,6 +71,9 @@ func (n *nativeTestTransport) AcquireTx(context.Context) (remote.NativeBuffer, e
 }
 func (n *nativeTestTransport) Exchange(ctx context.Context, tx remote.NativeBuffer, length int) (remote.NativeBuffer, remote.NativeIO, error) {
 	defer tx.Release()
+	if n.exchange != nil {
+		return n.exchange(ctx, tx, length)
+	}
 	facts := remote.NativeIO{ConnID: 1, WriteStart: time.Now()}
 	if deadline, ok := ctx.Deadline(); ok {
 		n.conn.SetDeadline(deadline)
@@ -121,10 +129,34 @@ func TestNativeTransportCallsExistingGoServer(t *testing.T) {
 	}
 }
 
+func TestNativeTransportKeepsExplicitSendFailureAfterFullWrite(t *testing.T) {
+	address, _ := startUnaryServer(t, nil)
+	var finished remote.UnaryFailureStage
+	bridge := &nativeTestTransport{unaryHooks: &unaryHooks{finish: func(_ context.Context, call *remote.UnaryCall) error {
+		finished = call.FailureStage
+		return nil
+	}}, address: address, exchange: func(_ context.Context, _ remote.NativeBuffer, length int) (remote.NativeBuffer, remote.NativeIO, error) {
+		return nil, remote.NativeIO{SentBytes: uint64(length), WriteEnd: time.Now(), FailureStage: remote.UnaryFailureSend}, errors.New("full write send failure")
+	}}
+	t.Cleanup(func() { bridge.Release(false) })
+	cli, err := testservice.NewClient("native.target", client.WithNativeTransport(bridge), client.WithTransportProtocol(transport.TTHeaderFramed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = cli.EchoPingPong(context.Background(), &kt.Request{Message: "send failure"}); err == nil || !strings.Contains(err.Error(), "full write send failure") {
+		t.Fatalf("unexpected send result: %v", err)
+	}
+	if finished != remote.UnaryFailureSend {
+		t.Fatalf("failure stage=%v, want Send", finished)
+	}
+}
+
 func TestNativeTransportRejectsCustomDataPlaneInEitherOptionOrder(t *testing.T) {
 	bridge := &nativeTestTransport{unaryHooks: &unaryHooks{}}
 	for _, custom := range []client.Option{
 		client.WithCodec(codec.NewDefaultCodec()),
+		client.WithPayloadCodec(thriftcodec.NewThriftCodecWithConfig(thriftcodec.FrugalReadWrite)),
+		client.WithPayloadCodec(&countingPayload{PayloadCodec: thriftcodec.NewThriftCodec()}),
 		client.WithMetaHandler(&unaryMeta{}),
 		client.WithUnaryLifecycle(&unaryHooks{}),
 		client.WithFailureRetry(retry.NewFailurePolicy()),
@@ -140,6 +172,69 @@ func TestNativeTransportRejectsCustomDataPlaneInEitherOptionOrder(t *testing.T) 
 			if err == nil {
 				t.Fatalf("custom transport configuration was accepted: %T", cli)
 			}
+		}
+	}
+}
+
+type nativeFrugalArgs struct {
+	Message string `thrift:"message,1" frugal:"1,default,string"`
+}
+
+func (p *nativeFrugalArgs) FastRead(b []byte) (int, error) { return frugal.DecodeObject(b, p) }
+func (p *nativeFrugalArgs) BLength() int                   { return frugal.EncodedSize(p) }
+func (p *nativeFrugalArgs) FastWriteNocopy(b []byte, w gthrift.NocopyWriter) int {
+	n, _ := frugal.EncodeObject(b, w, p)
+	return n
+}
+
+type nativeFrugalNestedArgs struct {
+	Payload *nativeFrugalArgs `thrift:"payload,1" frugal:"1,default,nativeFrugalArgs"`
+}
+
+func (p *nativeFrugalNestedArgs) FastRead(b []byte) (int, error) {
+	return frugal.DecodeObject(b, p)
+}
+func (p *nativeFrugalNestedArgs) BLength() int { return frugal.EncodedSize(p) }
+func (p *nativeFrugalNestedArgs) FastWriteNocopy(b []byte, w gthrift.NocopyWriter) int {
+	n, _ := frugal.EncodeObject(b, w, p)
+	return n
+}
+func (p *nativeFrugalNestedArgs) FastReadField1(b []byte) (int, error) {
+	p.Payload = new(nativeFrugalArgs)
+	return p.Payload.FastRead(b)
+}
+
+type nativeNoCopyArgs struct {
+	Message string `thrift:"message,1" frugal:"1,default,string,nocopy"`
+}
+
+func (p *nativeNoCopyArgs) FastRead(b []byte) (int, error) { return frugal.DecodeObject(b, p) }
+func (p *nativeNoCopyArgs) BLength() int                   { return frugal.EncodedSize(p) }
+func (p *nativeNoCopyArgs) FastWriteNocopy(b []byte, w gthrift.NocopyWriter) int {
+	n, _ := frugal.EncodeObject(b, w, p)
+	return n
+}
+func (p *nativeNoCopyArgs) FastReadField1(b []byte) (int, error) {
+	v, n, err := gthrift.Binary.ReadString(b)
+	p.Message = v
+	return n, err
+}
+
+func TestNativeTransportRejectsFrugalFastWrapper(t *testing.T) {
+	bridge := &nativeTestTransport{unaryHooks: &unaryHooks{}}
+	cli, err := client.NewClient(mocks.ServiceInfo(), client.WithDestService("native.target"),
+		client.WithNativeTransport(bridge), client.WithTransportProtocol(transport.TTHeaderFramed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sample := range []struct{ request, response interface{} }{
+		{&nativeFrugalArgs{}, &kt.MockTestResult{}},
+		{&nativeFrugalNestedArgs{}, &kt.MockTestResult{}},
+		{&kt.MockTestArgs{}, &nativeFrugalArgs{}},
+		{&nativeNoCopyArgs{}, &kt.MockTestResult{}},
+	} {
+		if err = cli.Call(context.Background(), "mock", sample.request, sample.response); err == nil || !strings.Contains(err.Error(), "default generated Fast") {
+			t.Fatalf("non-default Fast implementation was accepted: %T/%T: %v", sample.request, sample.response, err)
 		}
 	}
 }

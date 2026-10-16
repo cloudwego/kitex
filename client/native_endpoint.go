@@ -81,11 +81,11 @@ func (kc *kClient) nativeEndpoint() (endpoint.Endpoint, error) {
 			return nil
 		}
 		call.FailureStage = remote.UnaryFailurePrepare
-		if _, ok := request.(thrift.FastCodec); !ok {
-			return errors.New("native transport requires generated Fast codec arguments")
+		if err = checkNativeFastCodec(request); err != nil {
+			return err
 		}
-		if _, ok := response.(thrift.FastCodec); !ok {
-			return errors.New("native transport requires generated Fast codec results")
+		if err = checkNativeFastCodec(response); err != nil {
+			return err
 		}
 		payloadCodec, codecErr := remote.GetPayloadCodec(call.Request)
 		if codecErr != nil {
@@ -148,10 +148,10 @@ func (kc *kClient) nativeEndpoint() (endpoint.Endpoint, error) {
 		tx = nil
 		rx, facts, err = connection.Exchange(ctx, owned, length)
 		applyNativeIO(call, facts)
-		if facts.SentBytes == uint64(length) && !facts.WriteEnd.IsZero() {
-			call.FailureStage = remote.UnaryFailureReceive
-		}
 		if err != nil {
+			if facts.FailureStage != remote.UnaryFailureNone {
+				call.FailureStage = facts.FailureStage
+			}
 			return err
 		}
 		call.FailureStage = remote.UnaryFailureReceive

@@ -15,6 +15,7 @@ type NativeIO struct {
 	Reused                                                  bool
 	ConnectStart, ConnectEnd, WriteStart, WriteEnd, ReadEnd time.Time
 	SentBytes, ReceivedBytes                                uint64
+	FailureStage                                            UnaryFailureStage
 }
 
 type NativeClientConnection interface {
