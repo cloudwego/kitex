@@ -7,6 +7,8 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -51,6 +53,8 @@ type nativeTestTransport struct {
 	address  string
 	conn     net.Conn
 	exchange func(context.Context, remote.NativeBuffer, int) (remote.NativeBuffer, remote.NativeIO, error)
+	txBuffer func(remote.NativeBuffer) remote.NativeBuffer
+	rxBuffer func(remote.NativeBuffer) remote.NativeBuffer
 }
 
 func (n *nativeTestTransport) BuiltinMetaHandlers() []remote.MetaHandler { return nil }
@@ -67,7 +71,11 @@ func (n *nativeTestTransport) Connect(ctx context.Context, _ *remote.UnaryCall) 
 	return n, facts, nil
 }
 func (n *nativeTestTransport) AcquireTx(context.Context) (remote.NativeBuffer, error) {
-	return &nativeTestBuffer{data: make([]byte, 1<<20)}, nil
+	buffer := remote.NativeBuffer(&nativeTestBuffer{data: make([]byte, 1<<20)})
+	if n.txBuffer != nil {
+		buffer = n.txBuffer(buffer)
+	}
+	return buffer, nil
 }
 func (n *nativeTestTransport) Exchange(ctx context.Context, tx remote.NativeBuffer, length int) (remote.NativeBuffer, remote.NativeIO, error) {
 	defer tx.Release()
@@ -96,6 +104,9 @@ func (n *nativeTestTransport) Exchange(ctx context.Context, tx remote.NativeBuff
 	}
 	facts.ReceivedBytes = uint64(len(rx.data))
 	facts.ReadEnd = time.Now()
+	if n.rxBuffer != nil {
+		return n.rxBuffer(rx), facts, nil
+	}
 	return rx, facts, nil
 }
 func (n *nativeTestTransport) Release(reuse bool) error {
@@ -126,6 +137,83 @@ func TestNativeTransportCallsExistingGoServer(t *testing.T) {
 	}
 	if first.Message != "echo:native" || second.Message != "echo:"+strings.Repeat("b", 16384) {
 		t.Fatal("RPC results did not survive release and reuse of the input frame")
+	}
+}
+
+type nativeCodecGate struct {
+	remote.NativeBuffer
+	entered  chan struct{}
+	resume   chan struct{}
+	once     sync.Once
+	released atomic.Int32
+}
+
+func (b *nativeCodecGate) Bytes() []byte {
+	b.once.Do(func() { close(b.entered); <-b.resume })
+	return b.NativeBuffer.Bytes()
+}
+func (b *nativeCodecGate) Release() error {
+	b.released.Add(1)
+	return b.NativeBuffer.Release()
+}
+
+func TestNativeCancellationWaitsForDefaultCodecBufferUse(t *testing.T) {
+	for _, phase := range []string{"encode", "decode"} {
+		t.Run(phase, func(t *testing.T) {
+			address, _ := startUnaryServer(t, nil)
+			gate := &nativeCodecGate{entered: make(chan struct{}), resume: make(chan struct{})}
+			var resume sync.Once
+			unblock := func() { resume.Do(func() { close(gate.resume) }) }
+			t.Cleanup(unblock)
+			wrap := func(buffer remote.NativeBuffer) remote.NativeBuffer { gate.NativeBuffer = buffer; return gate }
+			bridge := &nativeTestTransport{unaryHooks: &unaryHooks{}, address: address}
+			if phase == "encode" {
+				bridge.txBuffer = wrap
+			} else {
+				bridge.rxBuffer = wrap
+			}
+			t.Cleanup(func() { bridge.Release(false) })
+			cli, err := client.NewClient(testservice.NewServiceInfo(), client.WithDestService("native.target"), client.WithNativeTransport(bridge),
+				client.WithTransportProtocol(transport.TTHeaderFramed), client.WithRPCTimeout(time.Second))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer cli.(interface{ Close() error }).Close()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			args := &kt.TestServiceEchoPingPongArgs{Req: &kt.Request{Message: "codec-owned-request"}}
+			var result kt.TestServiceEchoPingPongResult
+			done := make(chan error, 1)
+			go func() { done <- cli.Call(ctx, "EchoPingPong", args, &result) }()
+			select {
+			case <-gate.entered:
+			case <-time.After(time.Second):
+				t.Fatal("default codec did not reach its native buffer")
+			}
+			cancel()
+			select {
+			case err := <-done:
+				unblock()
+				t.Fatalf("RPC returned while codec buffer was still in use: %v", err)
+			case <-time.After(20 * time.Millisecond):
+			}
+			if gate.released.Load() != 0 {
+				t.Fatal("cancellation released the codec buffer before it resumed")
+			}
+			unblock()
+			select {
+			case err := <-done:
+				if err == nil || gate.released.Load() != 1 {
+					t.Fatalf("canceled codec result=%v release count=%d", err, gate.released.Load())
+				}
+			case <-time.After(time.Second):
+				t.Fatal("canceled codec did not finish after buffer use ended")
+			}
+			args.Req.Message = "caller-reused-request"
+			if phase == "decode" && (result.Success == nil || result.Success.Message != "echo:codec-owned-request") {
+				t.Fatalf("decoded result did not survive RX poison: %+v", result.Success)
+			}
+		})
 	}
 }
 
