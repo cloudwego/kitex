@@ -335,7 +335,7 @@ func (n *nativeServer) handle(request remote.NativeServerRequest) {
 	if err = budget(); err != nil {
 		return
 	}
-	tx, err = request.AcquireTx(ctx)
+	tx, err = remote.AcquireNativeTx(ctx, call.Response, request)
 	if err != nil {
 		return
 	}

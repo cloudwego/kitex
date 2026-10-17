@@ -133,7 +133,7 @@ func (kc *kClient) nativeEndpoint() (endpoint.Endpoint, error) {
 		if err = budget(); err != nil {
 			return err
 		}
-		tx, err = connection.AcquireTx(ctx)
+		tx, err = remote.AcquireNativeTx(ctx, call.Request, connection)
 		if err != nil {
 			return err
 		}

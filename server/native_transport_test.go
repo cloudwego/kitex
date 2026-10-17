@@ -103,6 +103,7 @@ type nativeServerFixture struct {
 	admissionTimeout         time.Duration
 	projectBase              bool
 	completed                chan nativeFixtureCompletion
+	request                  func(*nativeFixtureRequest) remote.NativeServerRequest
 }
 
 type nativeFixtureCompletion struct {
@@ -205,6 +206,9 @@ func (l *nativeFixtureListener) Accept(ctx context.Context) (remote.NativeServer
 	}
 	r := &nativeFixtureRequest{listener: l, conn: conn, frame: &nativeFixtureBuffer{data: data}, done: make(chan struct{})}
 	l.previous = r.done
+	if l.bridge.request != nil {
+		return l.bridge.request(r), nil
+	}
 	return r, nil
 }
 func (l *nativeFixtureListener) Close() error {
