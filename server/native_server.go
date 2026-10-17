@@ -145,7 +145,7 @@ func (n *nativeServer) handle(request remote.NativeServerRequest) {
 	s := n.server
 	facts := request.Facts()
 	ctx, cancel := context.WithCancel(n.ctx)
-	stop := context.AfterFunc(request.Context(), cancel)
+	stop := nativeAfterCancel(request.Context(), cancel)
 	ri := s.opt.RemoteOpt.InitOrResetRPCInfoFunc(nil, facts.Peer)
 	ctx = rpcinfo.NewCtxWithRPCInfo(remote.WithServiceSearcher(ctx, s.opt.RemoteOpt.SvcSearcher), ri)
 	call := remote.NewUnaryCall(s.opt.NativeTransport)
@@ -173,7 +173,11 @@ func (n *nativeServer) handle(request remote.NativeServerRequest) {
 			err = kerrors.ErrPanic.WithCause(fmt.Errorf("native server request panic: %v", p))
 			rpcinfo.AsMutableRPCStats(ri.Stats()).SetPanicked(err)
 		}
-		err = call.CompleteServer(context.WithoutCancel(ctx), err)
+		completeCtx, releaseComplete := nativeCompleteContext(ctx)
+		err = call.CompleteServer(completeCtx, err)
+		if releaseComplete != nil {
+			releaseComplete()
+		}
 		if rx != nil {
 			err = errors.Join(err, rx.Release())
 		}
