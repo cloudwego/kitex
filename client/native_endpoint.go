@@ -44,20 +44,31 @@ func (kc *kClient) nativeEndpoint() (endpoint.Endpoint, error) {
 				err = rpcinfo.ClientPanicToErr(ctx, p, ri, false)
 			}
 			err = call.FinishClient(ctx, err)
-			if rx != nil {
-				if e := rx.Release(); err == nil {
-					err = e
+			reset, _ := ri.To().Tag(rpcinfo.ConnResetTag)
+			reuse := err == nil && ctx.Err() == nil && reset != "1"
+			if cleanup, ok := connection.(remote.NativeClientCleanup); ok && tx == nil && rx != nil {
+				bufferErr, connectionErr := cleanup.ReleaseWithBuffer(reuse, rx)
+				if err == nil {
+					err = bufferErr
 				}
-			}
-			if tx != nil {
-				if e := tx.Release(); err == nil {
-					err = e
+				if err == nil {
+					err = connectionErr
 				}
-			}
-			if connection != nil {
-				reset, _ := ri.To().Tag(rpcinfo.ConnResetTag)
-				if e := connection.Release(err == nil && ctx.Err() == nil && reset != "1"); err == nil {
-					err = e
+			} else {
+				if rx != nil {
+					if e := rx.Release(); err == nil {
+						err = e
+					}
+				}
+				if tx != nil {
+					if e := tx.Release(); err == nil {
+						err = e
+					}
+				}
+				if connection != nil {
+					if e := connection.Release(err == nil && ctx.Err() == nil && reset != "1"); err == nil {
+						err = e
+					}
 				}
 			}
 			for _, cancel := range cancels {

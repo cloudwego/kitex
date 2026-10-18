@@ -24,6 +24,12 @@ type NativeClientConnection interface {
 	Release(bool) error
 }
 
+// NativeClientCleanup submits the connection and RX lease releases together.
+// Errors remain separate because each resource has its own lifetime and retry state.
+type NativeClientCleanup interface {
+	ReleaseWithBuffer(bool, NativeBuffer) (bufferErr, connectionErr error)
+}
+
 type NativeClientTransport interface {
 	UnaryLifecycle
 	BuiltinMetaHandlers() []MetaHandler

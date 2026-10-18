@@ -352,3 +352,46 @@ func TestNativeTransportRejectsPerCallGoAddress(t *testing.T) {
 		}
 	}
 }
+
+type nativeCleanupTestTransport struct {
+	*nativeTestTransport
+	cleanupCalls             int
+	bufferErr, connectionErr error
+}
+
+func (n *nativeCleanupTestTransport) Connect(ctx context.Context, call *remote.UnaryCall) (remote.NativeClientConnection, remote.NativeIO, error) {
+	_, facts, err := n.nativeTestTransport.Connect(ctx, call)
+	return n, facts, err
+}
+func (n *nativeCleanupTestTransport) ReleaseWithBuffer(reuse bool, rx remote.NativeBuffer) (error, error) {
+	n.cleanupCalls++
+	if rx != nil {
+		rx.Release()
+	}
+	n.nativeTestTransport.Release(reuse && n.bufferErr == nil)
+	return n.bufferErr, n.connectionErr
+}
+func TestNativeTransportBatchesClientCleanupAndPreservesErrors(t *testing.T) {
+	bufferError, connectionError := errors.New("buffer cleanup failed"), errors.New("connection cleanup failed")
+	for _, scenario := range []struct {
+		name                           string
+		bufferErr, connectionErr, want error
+	}{
+		{"success", nil, nil, nil}, {"buffer", bufferError, nil, bufferError},
+		{"connection", nil, connectionError, connectionError}, {"both", bufferError, connectionError, bufferError},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			address, _ := startUnaryServer(t, nil)
+			bridge := &nativeCleanupTestTransport{nativeTestTransport: &nativeTestTransport{unaryHooks: &unaryHooks{}, address: address}, bufferErr: scenario.bufferErr, connectionErr: scenario.connectionErr}
+			t.Cleanup(func() { bridge.nativeTestTransport.Release(false) })
+			cli, err := testservice.NewClient("native.target", client.WithNativeTransport(bridge), client.WithTransportProtocol(transport.TTHeaderFramed), client.WithRPCTimeout(time.Second))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = cli.EchoPingPong(context.Background(), &kt.Request{Message: "cleanup"})
+			if !errors.Is(err, scenario.want) || bridge.cleanupCalls != 1 {
+				t.Fatalf("cleanup calls=%d err=%v want=%v", bridge.cleanupCalls, err, scenario.want)
+			}
+		})
+	}
+}
