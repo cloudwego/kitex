@@ -31,6 +31,15 @@ type NativeListener interface {
 	Close() error
 }
 
+type NativeConcurrentListener interface {
+	ConcurrentAccept() bool
+}
+
+type NativeServerRequestCleanup interface {
+	RetainFrameForCleanup() bool
+	ReleaseWithBuffer(bool, NativeBuffer) (bufferErr, requestErr error)
+}
+
 type NativeServerTransport interface {
 	UnaryLifecycle
 	BuiltinMetaHandlers() []MetaHandler

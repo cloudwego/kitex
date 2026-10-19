@@ -21,3 +21,7 @@ go vet ./server ./client ./pkg/rpcinfo ./pkg/remote ./pkg/remote/codec ./pkg/rem
 ```
 
 The public fixture tests use a Go TCP peer behind the bridge interface and poison their own RX storage. They prove adapter ordering and ownership, not native sockets. The Byted tagged ingress test uses a fresh ingress-enabled SO, a separate native server PID and an ordinary Go client; it is the native network acceptance path.
+
+A transport may implement `remote.NativeServerRequestCleanup`. When `RetainFrameForCleanup` is true, the server keeps RX through handler execution and response send, invokes CompleteIO, then calls `ReleaseWithBuffer` to release RX and request credit together. Buffer and request errors remain independent; the transport must disable reuse if RX release fails. This optional path trades longer RX retention for fewer owner wake cycles. Other requests keep the existing early RX release after Begin and metadata projection.
+
+A listener may implement `remote.NativeConcurrentListener` and return true from `ConcurrentAccept`. This promises concurrent Accept calls are safe: the server starts 64 request workers that accept and execute directly, preserving the existing request concurrency bound while avoiding a central accept-to-handler scheduling hop. Stop cancels accepts and waits for all workers, including retained business handlers. Other listeners retain one acceptor. Peer cancellation is detached after CompleteIO and before normal request release.

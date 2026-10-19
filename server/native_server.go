@@ -53,6 +53,27 @@ func (n *nativeServer) Start() chan error {
 }
 func (n *nativeServer) serve(listener remote.NativeListener) {
 	defer close(n.serveDone)
+	if concurrent, ok := listener.(remote.NativeConcurrentListener); ok && concurrent.ConcurrentAccept() {
+		var stopped sync.Once
+		for i := 0; i < 64; i++ {
+			n.jobs.Add(1)
+			go func() {
+				defer n.jobs.Done()
+				for {
+					request, err := listener.Accept(n.ctx)
+					if err != nil {
+						if n.ctx.Err() != nil {
+							err = nil
+						}
+						stopped.Do(func() { n.errCh <- err })
+						return
+					}
+					n.handle(request)
+				}
+			}()
+		}
+		return
+	}
 	slots := make(chan struct{}, 64)
 	for {
 		select {
@@ -164,6 +185,8 @@ func (n *nativeServer) handle(request remote.NativeServerRequest) {
 	ctx = metainfo.WithBackwardValuesToSend(ctx)
 	base := ctx
 	rx := request.Frame()
+	cleanup, paired := request.(remote.NativeServerRequestCleanup)
+	paired = paired && cleanup.RetainFrameForCleanup()
 	var tx remote.NativeBuffer
 	var err error
 	var cancels []context.CancelFunc
@@ -178,14 +201,23 @@ func (n *nativeServer) handle(request remote.NativeServerRequest) {
 		if releaseComplete != nil {
 			releaseComplete()
 		}
-		if rx != nil {
-			err = errors.Join(err, rx.Release())
-		}
+		var txErr error
 		if tx != nil {
-			err = errors.Join(err, tx.Release())
+			txErr = tx.Release()
 		}
 		reset, _ := ri.To().Tag(rpcinfo.ConnResetTag)
-		err = errors.Join(err, request.Release(err == nil && ctx.Err() == nil && reset != "1"))
+		reuse := err == nil && txErr == nil && ctx.Err() == nil && reset != "1"
+		stop()
+		if paired && rx != nil {
+			bufferErr, requestErr := cleanup.ReleaseWithBuffer(reuse, rx)
+			err = errors.Join(err, bufferErr, txErr, requestErr)
+		} else {
+			if rx != nil {
+				err = errors.Join(err, rx.Release())
+			}
+			err = errors.Join(err, txErr)
+			err = errors.Join(err, request.Release(reuse && err == nil))
+		}
 		traceErr := err
 		if traceErr == nil {
 			traceErr = call.Err
@@ -194,7 +226,6 @@ func (n *nativeServer) handle(request remote.NativeServerRequest) {
 		for _, f := range cancels {
 			f()
 		}
-		stop()
 		cancel()
 		remote.RecycleMessage(call.Request)
 		remote.RecycleMessage(call.Response)
@@ -278,8 +309,10 @@ func (n *nativeServer) handle(request remote.NativeServerRequest) {
 		err = budget()
 	}
 	if err == nil {
-		err = rx.Release()
-		rx = nil
+		if !paired {
+			err = rx.Release()
+			rx = nil
+		}
 	}
 	if err == nil {
 		ctx = context.WithValue(ctx, consts.CtxKeyMethod, ri.To().Method())

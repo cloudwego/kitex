@@ -239,6 +239,58 @@ type nativeFixtureRequest struct {
 	done     chan struct{}
 }
 
+type nativePeerCancellationContext struct {
+	context.Context
+	active atomic.Bool
+	done   chan struct{}
+}
+
+func (c *nativePeerCancellationContext) Done() <-chan struct{} { return c.done }
+func (c *nativePeerCancellationContext) AfterFunc(func()) func() bool {
+	c.active.Store(true)
+	return func() bool { return c.active.Swap(false) }
+}
+
+type nativePairedCleanupRequest struct {
+	*nativeFixtureRequest
+	paired *atomic.Int32
+	peer   *nativePeerCancellationContext
+}
+
+func (r *nativePairedCleanupRequest) RetainFrameForCleanup() bool { return true }
+func (r *nativePairedCleanupRequest) Context() context.Context    { return r.peer }
+
+func (r *nativePairedCleanupRequest) ReleaseWithBuffer(reuse bool, rx remote.NativeBuffer) (bufferErr, requestErr error) {
+	if r.peer.active.Load() {
+		return errors.New("peer cancellation is still attached during normal request release"), r.Release(false)
+	}
+	if r.listener.bridge.completes.Load() != 1 || len(rx.Bytes()) == 0 {
+		return errors.New("paired cleanup preceded IO governance or lost RX"), r.Release(false)
+	}
+	bufferErr = rx.Release()
+	requestErr = r.Release(reuse && bufferErr == nil)
+	r.paired.Add(1)
+	return
+}
+
+func TestNativeServerUsesPairedCleanupAfterIOGovernance(t *testing.T) {
+	var paired atomic.Int32
+	bridge := &nativeServerFixture{request: func(r *nativeFixtureRequest) remote.NativeServerRequest {
+		return &nativePairedCleanupRequest{nativeFixtureRequest: r, paired: &paired, peer: &nativePeerCancellationContext{Context: context.Background(), done: make(chan struct{})}}
+	}}
+	cli, _ := startNativeFixture(t, bridge, new(nativeFixtureEcho))
+	if _, err := cli.EchoPingPong(context.Background(), &kt.Request{Message: "paired-rx-finish"}); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(time.Second)
+	for paired.Load() == 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if paired.Load() != 1 || bridge.released.Load() != 1 {
+		t.Fatalf("paired cleanup not used exactly once: paired=%d released=%d", paired.Load(), bridge.released.Load())
+	}
+}
+
 func (r *nativeFixtureRequest) Context() context.Context   { return context.Background() }
 func (r *nativeFixtureRequest) Frame() remote.NativeBuffer { return r.frame }
 func (r *nativeFixtureRequest) Facts() remote.NativeIngress {
