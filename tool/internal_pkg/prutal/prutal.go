@@ -236,6 +236,10 @@ func (pg *PrutalGen) convertTypes(f *prutalgen.Proto) (ss []*generator.ServiceIn
 		si.ServiceTypeName = func() string { return si.ServiceName }
 		ss = append(ss, si)
 	}
+
+	// guarantee unique import aliases among the service package and its
+	// dependencies before rendering (kitex#1892)
+	generator.FixImportConflicts(ss)
 	return
 }
 
