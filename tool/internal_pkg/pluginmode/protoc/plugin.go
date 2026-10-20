@@ -98,6 +98,9 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 	pp.IDLName = util.IDLName(pp.Config.IDL)
 
 	ss := pp.convertTypes(file)
+	// guarantee unique import aliases among the service package and its
+	// dependencies before rendering (kitex#1892)
+	generator.FixImportConflicts(ss)
 	pp.Services = append(pp.Services, ss...)
 
 	if pp.Config.Use != "" {
