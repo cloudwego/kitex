@@ -41,129 +41,153 @@ type MuxConnConfig struct {
 
 var _ transPool = (*muxConnTransPool)(nil)
 
+var errMuxConnListClosed = errors.New("mux connection list is closed")
+
 type muxConnTransList struct {
 	L          sync.RWMutex
 	size       int
 	cursor     uint32
 	transports []*clientTransport
 	pool       *muxConnTransPool
+	// A reservation spans Get through CloseStream, including the interval before
+	// WriteStream registers the stream on its transport.
+	inUse      int32
+	lastActive time.Time
+	closed     bool
 }
 
 func newMuxConnTransList(size int, pool *muxConnTransPool) *muxConnTransList {
-	tl := new(muxConnTransList)
 	if size <= 0 {
 		size = runtime.GOMAXPROCS(0)
 	}
-	tl.size = size
-	tl.transports = make([]*clientTransport, size)
-	tl.pool = pool
-	return tl
-}
-
-func (tl *muxConnTransList) Close() {
-	tl.L.Lock()
-	for i, t := range tl.transports {
-		if t == nil {
-			continue
-		}
-		_ = t.Close(nil)
-		tl.transports[i] = nil
-	}
-	tl.L.Unlock()
+	return &muxConnTransList{size: size, transports: make([]*clientTransport, size), pool: pool}
 }
 
 func (tl *muxConnTransList) Get(network, addr string) (*clientTransport, error) {
-	// fast path
-	idx := atomic.AddUint32(&tl.cursor, 1) % uint32(tl.size)
 	tl.L.RLock()
-	trans := tl.transports[idx]
-	tl.L.RUnlock()
-	if trans != nil {
-		if trans.IsActive() {
-			return trans, nil
-		}
-		_ = trans.Close(nil)
+	if tl.closed {
+		tl.L.RUnlock()
+		return nil, errMuxConnListClosed
 	}
+	idx := atomic.AddUint32(&tl.cursor, 1) % uint32(tl.size)
+	atomic.AddInt32(&tl.inUse, 1)
+	trans := tl.transports[idx]
+	if trans != nil && trans.IsActive() {
+		tl.L.RUnlock()
+		return trans, nil
+	}
+	tl.L.RUnlock()
 
-	// slow path
+	// Keep the reservation while upgrading to the write lock so retirement
+	// cannot close a list between selection and transport acquisition.
 	tl.L.Lock()
+	if tl.closed {
+		atomic.AddInt32(&tl.inUse, -1)
+		tl.L.Unlock()
+		return nil, errMuxConnListClosed
+	}
 	trans = tl.transports[idx]
 	if trans != nil && trans.IsActive() {
-		// another goroutine already create the new transport
 		tl.L.Unlock()
 		return trans, nil
 	}
-	// it may create more than tl.size transport if multi client try to get transport concurrently
+	discard := trans
 	conn, err := dialer.DialConnection(network, addr, time.Second)
 	if err != nil {
+		atomic.AddInt32(&tl.inUse, -1)
+		tl.L.Unlock()
+		if discard != nil {
+			_ = discard.Close(nil)
+		}
 		return nil, err
 	}
-	trans = newClientTransport(conn, tl.pool)
+	trans = newClientTransport(conn, tl)
 	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
-		// peer close
 		_ = trans.Close(errTransport.newBuilder().withCause(errors.New("connection closed by peer")))
 		return nil
 	})
 	tl.transports[idx] = trans
 	tl.L.Unlock()
-
+	if discard != nil {
+		_ = discard.Close(nil)
+	}
 	return trans, nil
 }
 
+func (tl *muxConnTransList) Put(trans *clientTransport) {
+	tl.L.Lock()
+	atomic.AddInt32(&tl.inUse, -1)
+	tl.lastActive = time.Now()
+	tl.L.Unlock()
+	tl.pool.startCleaner(trans)
+}
+
+// retireIfIdle excludes both active streams and concurrent Get reservations.
+// A caller that already loaded this list must retry against the pool after retirement.
+func (tl *muxConnTransList) retireIfIdle(now time.Time, timeout time.Duration) ([]*clientTransport, bool) {
+	tl.L.Lock()
+	defer tl.L.Unlock()
+	if tl.closed || atomic.LoadInt32(&tl.inUse) != 0 || tl.lastActive.IsZero() || now.Sub(tl.lastActive) < timeout {
+		return nil, false
+	}
+	tl.closed = true
+	transports := tl.transports
+	tl.transports = nil
+	return transports, true
+}
+
 func newMuxConnTransPool(config MuxConnConfig) transPool {
-	t := new(muxConnTransPool)
-	t.config = config
-	return t
+	return &muxConnTransPool{config: config}
 }
 
 type muxConnTransPool struct {
 	config      MuxConnConfig
 	pool        sync.Map // addr:*muxConnTransList
-	activity    sync.Map // addr:lastActive
 	cleanerOnce int32
 }
 
 func (p *muxConnTransPool) Get(network, addr string) (trans *clientTransport, err error) {
-	v, ok := p.pool.Load(addr)
-	if !ok {
-		// multi concurrent Get should get the same TransList object
-		v, _ = p.pool.LoadOrStore(addr, newMuxConnTransList(p.config.PoolSize, p))
+	for {
+		v, ok := p.pool.Load(addr)
+		if !ok {
+			v, _ = p.pool.LoadOrStore(addr, newMuxConnTransList(p.config.PoolSize, p))
+		}
+		trans, err = v.(*muxConnTransList).Get(network, addr)
+		if err != errMuxConnListClosed {
+			return trans, err
+		}
 	}
-	return v.(*muxConnTransList).Get(network, addr)
 }
 
 func (p *muxConnTransPool) Put(trans *clientTransport) {
-	p.activity.Store(trans.conn.RemoteAddr().String(), time.Now())
+	trans.pool.(*muxConnTransList).Put(trans)
+}
 
+func (p *muxConnTransPool) cleanIdle(now time.Time) {
+	p.pool.Range(func(key, value interface{}) bool {
+		transports, retired := value.(*muxConnTransList).retireIfIdle(now, p.config.MaxIdleTimeout)
+		if !retired {
+			return true
+		}
+		p.pool.Delete(key)
+		// Do not hold the list lock while closing: transport cleanup can return streams.
+		for _, trans := range transports {
+			if trans != nil {
+				_ = trans.Close(nil)
+			}
+		}
+		return true
+	})
+}
+
+func (p *muxConnTransPool) startCleaner(trans *clientTransport) {
 	idleTimeout := p.config.MaxIdleTimeout
-	if idleTimeout == 0 {
+	if idleTimeout == 0 || !atomic.CompareAndSwapInt32(&p.cleanerOnce, 0, 1) {
 		return
 	}
-	if !atomic.CompareAndSwapInt32(&p.cleanerOnce, 0, 1) {
-		return
-	}
-	// start cleaning background goroutine
 	gofunc.RecoverGoFuncWithInfo(context.Background(), func() {
 		for {
-			now := time.Now()
-			count := 0
-			p.activity.Range(func(key, value interface{}) bool {
-				addr := key.(string)
-				count++
-				lastActive := value.(time.Time)
-				idleTime := now.Sub(lastActive)
-				if lastActive.IsZero() || idleTime < 0 || now.Sub(lastActive) < idleTimeout {
-					return true
-				}
-				// clean transport
-				v, _ := p.pool.Load(addr)
-				if v == nil {
-					return true
-				}
-				p.pool.Delete(addr)
-				p.activity.Delete(addr)
-				return true
-			})
+			p.cleanIdle(time.Now())
 			time.Sleep(idleTimeout)
 		}
 	}, gofunc.NewBasicInfo("", trans.Addr().String()))
