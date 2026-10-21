@@ -96,6 +96,7 @@ func (c clientTransHandler) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (
 	cs.setStreamTimeout(tm)
 
 	if err = trans.WriteStream(ctx, cs, intHeader, strHeader); err != nil {
+		cs.close(err, false, "", nil)
 		return nil, err
 	}
 
