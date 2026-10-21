@@ -260,6 +260,27 @@ func (s *benchmarkSizedNativeSource) AcquireTxSized(context.Context, int) (remot
 	return &s.buffer, nil
 }
 
+func TestNativeTxPrimarySizingDoesNotAllocateScratch(t *testing.T) {
+	message := nativeCapacityMessage(&kt.Request{Message: strings.Repeat("x", 1024)}, transport.TTHeaderFramed, remote.Call)
+	defer remote.RecycleMessage(message)
+	headers := remote.AccessHeaders(message.TransInfo())
+	if !headers.EnablePrimary(false) {
+		t.Fatal("primary metadata unavailable")
+	}
+	headers.SetInt(7, "value")
+	headers.SetString("meta", "final-response-value")
+	headers.SetString(ttheader.GDPRToken, "token")
+	source := new(benchmarkSizedNativeSource)
+	allocs := testing.AllocsPerRun(500, func() {
+		if _, err := remote.AcquireNativeTx(context.Background(), message, source); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if allocs != 0 {
+		t.Fatalf("primary TX sizing allocated scratch: %.2f allocations", allocs)
+	}
+}
+
 func BenchmarkNativeTxCapacity(b *testing.B) {
 	for _, size := range []int{1024, 16384, 131 << 10} {
 		for _, sized := range []bool{false, true} {

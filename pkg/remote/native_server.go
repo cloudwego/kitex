@@ -25,6 +25,11 @@ type NativeServerRequest interface {
 	Release(bool) error
 }
 
+type NativeServerRequestScope interface {
+	RequestContext() (context.Context, bool)
+	WithRequestDeadline(context.Context, time.Time) (context.Context, error)
+}
+
 type NativeListener interface {
 	Address() net.Addr
 	Accept(context.Context) (NativeServerRequest, error)
@@ -45,4 +50,10 @@ type NativeServerTransport interface {
 	BuiltinMetaHandlers() []MetaHandler
 	Listen(context.Context, net.Addr, NativeListenerOptions) (NativeListener, error)
 	ProjectIngress(base, decoded context.Context, call *UnaryCall) (context.Context, error)
+}
+
+type NativeServerDeferredMetadata interface {
+	DeferIngressMetadata() bool
+	PrepareIngress(*UnaryCall) error
+	ReadIngressMetadata(context.Context, *UnaryCall, []MetaHandler) (context.Context, error)
 }

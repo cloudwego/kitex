@@ -165,8 +165,18 @@ func (s *server) checkNativeOptions() error {
 func (n *nativeServer) handle(request remote.NativeServerRequest) {
 	s := n.server
 	facts := request.Facts()
-	ctx, cancel := context.WithCancel(n.ctx)
-	stop := nativeAfterCancel(request.Context(), cancel)
+	var ctx context.Context
+	var cancel context.CancelFunc
+	var stop func() bool
+	scope, scoped := request.(remote.NativeServerRequestScope)
+	if scoped {
+		ctx, scoped = scope.RequestContext()
+	}
+	if !scoped {
+		ctx, cancel = context.WithCancel(n.ctx)
+		stop = nativeAfterCancel(request.Context(), cancel)
+	}
+	scopeContext := ctx
 	ri := s.opt.RemoteOpt.InitOrResetRPCInfoFunc(nil, facts.Peer)
 	ctx = rpcinfo.NewCtxWithRPCInfo(remote.WithServiceSearcher(ctx, s.opt.RemoteOpt.SvcSearcher), ri)
 	call := remote.NewUnaryCall(s.opt.NativeTransport)
@@ -184,12 +194,15 @@ func (n *nativeServer) handle(request remote.NativeServerRequest) {
 	ctx = s.opt.TracerCtl.DoStart(ctx, ri)
 	ctx = metainfo.WithBackwardValuesToSend(ctx)
 	base := ctx
+	metadata, deferred := s.opt.NativeTransport.(remote.NativeServerDeferredMetadata)
+	deferred = deferred && metadata.DeferIngressMetadata()
 	rx := request.Frame()
 	cleanup, paired := request.(remote.NativeServerRequestCleanup)
 	paired = paired && cleanup.RetainFrameForCleanup()
 	var tx remote.NativeBuffer
 	var err error
 	var cancels []context.CancelFunc
+	var projectionStops []func()
 	limit, _ := ctx.Deadline()
 	defer func() {
 		if p := recover(); p != nil {
@@ -207,7 +220,12 @@ func (n *nativeServer) handle(request remote.NativeServerRequest) {
 		}
 		reset, _ := ri.To().Tag(rpcinfo.ConnResetTag)
 		reuse := err == nil && txErr == nil && ctx.Err() == nil && reset != "1"
-		stop()
+		if stop != nil {
+			stop()
+		}
+		for _, f := range projectionStops {
+			f()
+		}
 		if paired && rx != nil {
 			bufferErr, requestErr := cleanup.ReleaseWithBuffer(reuse, rx)
 			err = errors.Join(err, bufferErr, txErr, requestErr)
@@ -226,7 +244,9 @@ func (n *nativeServer) handle(request remote.NativeServerRequest) {
 		for _, f := range cancels {
 			f()
 		}
-		cancel()
+		if cancel != nil {
+			cancel()
+		}
 		remote.RecycleMessage(call.Request)
 		remote.RecycleMessage(call.Response)
 		call.Recycle()
@@ -243,6 +263,23 @@ func (n *nativeServer) handle(request remote.NativeServerRequest) {
 			}
 		}
 		if !limit.IsZero() {
+			if scoped {
+				deadlineContext := ctx
+				derived := remote.UnaryCallFromContext(ctx) == call
+				if !derived {
+					deadlineContext = scopeContext
+				}
+				nextCtx, deadlineErr := scope.WithRequestDeadline(deadlineContext, limit)
+				if deadlineErr != nil {
+					return kerrors.ErrRPCTimeout.WithCause(deadlineErr)
+				}
+				if nextCtx == nil {
+					return errors.New("native request scope returned a nil deadline context")
+				}
+				if derived {
+					ctx = nextCtx
+				}
+			}
 			if current, ok := ctx.Deadline(); !ok || limit.Before(current) {
 				var c context.CancelFunc
 				ctx, c = context.WithDeadline(ctx, limit)
@@ -277,10 +314,14 @@ func (n *nativeServer) handle(request remote.NativeServerRequest) {
 	}
 	if err == nil {
 		call.Response = remote.NewMessage(ri.Invocation().MethodInfo().NewResult(), ri, remote.Reply, remote.Server)
-		for _, h := range s.opt.MetaHandlers {
-			ctx, err = h.ReadMeta(ctx, call.Request)
-			if err != nil {
-				break
+		if deferred {
+			err = metadata.PrepareIngress(call)
+		} else {
+			for _, h := range s.opt.MetaHandlers {
+				ctx, err = h.ReadMeta(ctx, call.Request)
+				if err != nil {
+					break
+				}
 			}
 		}
 	}
@@ -300,7 +341,19 @@ func (n *nativeServer) handle(request remote.NativeServerRequest) {
 		cfg.SetTransportProtocol(protocol)
 		cfg.SetPayloadCodec(payload)
 		var projectionErr error
-		ctx, projectionErr = s.opt.NativeTransport.ProjectIngress(base, ctx, call)
+		decoded := ctx
+		if deferred {
+			ctx, projectionErr = metadata.ReadIngressMetadata(ctx, call, s.opt.MetaHandlers)
+		} else {
+			ctx, projectionErr = s.opt.NativeTransport.ProjectIngress(base, ctx, call)
+		}
+		if scoped && decoded.Done() != nil && decoded.Done() != ctx.Done() {
+			var stopProjection func()
+			var cancelProjection context.CancelFunc
+			ctx, stopProjection, cancelProjection = nativeProjectCancellation(ctx, decoded)
+			projectionStops = append(projectionStops, stopProjection)
+			cancels = append(cancels, cancelProjection)
+		}
 		if err == nil {
 			err = projectionErr
 		}

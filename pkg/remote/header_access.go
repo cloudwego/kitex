@@ -521,7 +521,11 @@ func (a HeaderAccess) DecodeTTHeader(ctx context.Context, in bufiox.Reader) (tth
 	var err error
 	if ti, ok := a.info.(*transInfo); ok && ti.primary && ti.store.intCount == 0 && ti.store.strCount == 0 {
 		ti.store.reset(ti.store.response)
-		p, err = ttheader.DecodeTo(ctx, in, ti)
+		if _, native := in.(*nativeByteBuffer); native {
+			p, err = ttheader.DecodeToOwned(ctx, in, ti)
+		} else {
+			p, err = ttheader.DecodeTo(ctx, in, ti)
+		}
 		if err != nil {
 			if ti.primary {
 				ti.store.reset(ti.store.response)

@@ -35,6 +35,17 @@ func (s *nativeHeaderSizer) WriteBinary(data []byte) (int, error) {
 func (s *nativeHeaderSizer) WrittenLen() int { return s.length }
 func (*nativeHeaderSizer) Flush() error      { return nil }
 
+func (a HeaderAccess) nativeTTHeaderSize(ctx context.Context) (int, error) {
+	if ti, ok := a.info.(*transInfo); ok && ti.primary {
+		s := ti.store
+		stringKind, intKind := s.kinds()
+		return ttheader.EncodedEntriesSize(ttheader.HeaderEntries{Entries: s.view.entries, IntCount: s.intCount, StrCount: s.strCount, GDPRIndex: s.gdprIndex, StringKind: stringKind, IntKind: intKind})
+	}
+	out := new(nativeHeaderSizer)
+	_, err := a.EncodeTTHeader(ctx, ttheader.EncodeParam{}, out)
+	return out.WrittenLen(), err
+}
+
 func AcquireNativeTx(ctx context.Context, message Message, source interface {
 	AcquireTx(context.Context) (NativeBuffer, error)
 }) (NativeBuffer, error) {
@@ -82,14 +93,14 @@ func AcquireNativeTx(ctx context.Context, message Message, source interface {
 		length += 4
 	}
 	if protocol&transport.TTHeader != 0 {
-		out := new(nativeHeaderSizer)
-		if _, err := AccessHeaders(message.TransInfo()).EncodeTTHeader(ctx, ttheader.EncodeParam{}, out); err != nil {
+		headerLength, err := AccessHeaders(message.TransInfo()).nativeTTHeaderSize(ctx)
+		if err != nil {
 			return nil, err
 		}
-		if length > maximum-out.WrittenLen() {
+		if length > maximum-headerLength {
 			return nil, errors.New("native TX capacity overflow")
 		}
-		length += out.WrittenLen()
+		length += headerLength
 	}
 	if uint64(length) > uint64(^uint32(0)) {
 		return nil, errors.New("native TX capacity exceeds wire length")

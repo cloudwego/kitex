@@ -104,6 +104,8 @@ type nativeServerFixture struct {
 	projectBase              bool
 	completed                chan nativeFixtureCompletion
 	request                  func(*nativeFixtureRequest) remote.NativeServerRequest
+	requestContext           context.Context
+	readContext              func(context.Context) context.Context
 }
 
 type nativeFixtureCompletion struct {
@@ -140,7 +142,8 @@ func (n *nativeServerFixture) ProjectIngress(base, decoded context.Context, _ *r
 	}
 	return decoded, nil
 }
-func (n *nativeServerFixture) Listen(_ context.Context, address net.Addr, _ remote.NativeListenerOptions) (remote.NativeListener, error) {
+func (n *nativeServerFixture) Listen(ctx context.Context, address net.Addr, _ remote.NativeListenerOptions) (remote.NativeListener, error) {
+	n.requestContext = ctx
 	ln, err := net.Listen(address.Network(), address.String())
 	if err != nil {
 		return nil, err
@@ -154,7 +157,11 @@ type nativeFixtureMeta struct{ server *nativeServerFixture }
 func (m nativeFixtureMeta) ReadMeta(ctx context.Context, _ remote.Message) (context.Context, error) {
 	m.server.reads.Add(1)
 	ctx = metainfo.WithValue(ctx, "forward-once", "kept")
-	return context.WithValue(ctx, nativeMetaKey{}, "read"), m.server.readErr
+	ctx = context.WithValue(ctx, nativeMetaKey{}, "read")
+	if m.server.readContext != nil {
+		ctx = m.server.readContext(ctx)
+	}
+	return ctx, m.server.readErr
 }
 func (nativeFixtureMeta) WriteMeta(ctx context.Context, _ remote.Message) (context.Context, error) {
 	return ctx, nil
@@ -377,7 +384,7 @@ func TestNativeServerDeniedRequestSkipsHandlerAndCompletes(t *testing.T) {
 	}
 }
 
-func startNativeFixture(t *testing.T, bridge *nativeServerFixture, handler kt.TestService, options ...server.Option) (testservice.Client, server.Server) {
+func startNativeFixture(t *testing.T, bridge remote.NativeServerTransport, handler kt.TestService, options ...server.Option) (testservice.Client, server.Server) {
 	t.Helper()
 	nativeFixtureDefaultCodec(t)
 	reg := &nativeFixtureRegistry{ready: make(chan net.Addr, 1)}
