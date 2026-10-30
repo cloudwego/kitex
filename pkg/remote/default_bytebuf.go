@@ -104,7 +104,9 @@ func (b *defaultByteBuffer) Next(n int) (buf []byte, err error) {
 		return nil, errors.New("unreadable buffer, cannot support Next")
 	}
 	buf, err = b.Peek(n)
-	b.readIdx += n
+	if err == nil {
+		b.readIdx += n
+	}
 	return buf, err
 }
 
