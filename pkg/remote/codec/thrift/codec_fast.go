@@ -36,10 +36,13 @@ func fastCodecAvailable(data interface{}) bool {
 	return ok
 }
 
-// encodeFastThrift encode with the FastCodec way
-func fastMarshal(out bufiox.Writer, methodName string, msgType remote.MessageType, seqID int32, msg thrift.FastCodec) error {
-	nw, _ := out.(remote.NocopyWrite)
-	// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
+// fastMarshal encodes with FastCodec.
+func fastMarshal(out bufiox.Writer, methodName string, msgType remote.MessageType, seqID int32, msg thrift.FastCodec, forceCopy bool) error {
+	// FastWriteNocopy copies string and binary fields into buf when its writer is nil.
+	var nw remote.NocopyWrite
+	if !forceCopy {
+		nw, _ = out.(remote.NocopyWrite)
+	}
 	msgBeginLen := thrift.Binary.MessageBeginLength(methodName)
 	buf, err := out.Malloc(msgBeginLen + msg.BLength())
 	if err != nil {
