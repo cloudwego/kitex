@@ -99,6 +99,7 @@ func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error)
 	}
 	kc := &kcFinalizerClient{kClient: &kClient{}}
 	kc.svcInfo = svcInfo
+	// 注意, 这个NewOptions可以插入种类丰富的配置, 实际上是执行了一堆的类似于middleware的函数
 	kc.opt = client.NewOptions(opts)
 	if err := kc.init(); err != nil {
 		_ = kc.Close()
@@ -154,6 +155,8 @@ func (kc *kClient) checkOptions() (err error) {
 
 func (kc *kClient) initCircuitBreaker() error {
 	if kc.opt.CBSuite != nil {
+		// Bus 是通知机制, 监听关心的消息, 然后进行回调
+		// events类似log, 记录关键事件
 		kc.opt.CBSuite.SetEventBusAndQueue(kc.opt.Bus, kc.opt.Events)
 	}
 	return nil
@@ -164,8 +167,14 @@ func (kc *kClient) initRetryer() error {
 		if kc.opt.UnaryOptions.RetryMethodPolicies == nil {
 			return nil
 		}
+		// RetryContainer负责retryer的选择, 比如调用有明确指定retryer则用指定的, 否则按自己维护的map 寻找对应方法名的retryer, 都没有可以找默认的
+		// 负责retry的管理, 类似于熔断的机制, 有个公共的retry 次数, 阻止短时间内的大量retry
+		// 还负责策略的生命周期, 比如初始化, 策略变更等.
 		kc.opt.InitRetryContainer()
 	}
+	// 内置3种retry策略, 失败retry. backup retry, 就是不等到失败再retry, 而是发起备份retry. mixed retry, 混合的场景
+	// 策略无法完全自定义, 但是可以部分控制retry的时机, 比如看见xx 错误再retry等
+	// 可以从远程下载配置到本地, 然后再更新本地
 	return kc.opt.UnaryOptions.RetryContainer.Init(kc.opt.UnaryOptions.RetryMethodPolicies, kc.opt.UnaryOptions.RetryWithResult)
 }
 
@@ -190,6 +199,8 @@ func (kc *kClient) initProxy() error {
 			FixedTargets: kc.opt.Targets,
 			RPCConfig:    kc.opt.Configs,
 		}
+		// 可以处理非常丰富的事情, 比如创建连接池, 保存配置, 后续的Resolver以及Balancer, Pool的赋值可以体现出proxy的影响范围
+		// 可以在后续调用proxy.ResolveProxyInstance 获取一个实例, 后续在newProxyMW可以调用
 		if err := kc.opt.Proxy.Configure(&cfg); err != nil {
 			return err
 		}
@@ -206,10 +217,32 @@ func (kc *kClient) initProxy() error {
 	return nil
 }
 
+/*
+这个连接池比较广义, 正常是tcp连接
+可以是uds连接
+连接复用有几种形式
+
+ 1. 同一个连接先后复用, A 发完, A 收到响应, 归还连接但不关闭; 获取归还的链接, B再发, B收到响应
+
+ 2. 多路复用. 同一个连接同时承载多个请求. 这个需要协议的支持, 对于一个字节流, 要能识别出一个请求的边界, 以及这个请求的归属.
+    多路复用对协议的要求:
+    a. 能够准确识别字节流的一段报文的边界[报文A][报文B]
+    b. 每个报文有id表示自身属于哪一个请求
+
+    多路复用对客户端服务端的要求:
+    a. 配套实现, 对于同一请求, 保证发送同id的报文, 不同请求发送不同id的报文. 服务端要能按id分别处理对应请求的报文
+
+    kitex实现可以参考 netpollmux, 但不再维护了. 所以先不关注
+    而grpc与ttheader streaming还有对应的多路复用实现
+
+还有一个问题需要弄清楚: 传输层与上层的关系是什么样的, 一个请求发送完毕后获得返回是怎么通知上层处理的
+*/
 func (kc *kClient) initConnPool() error {
 	pool := kc.opt.RemoteOpt.ConnPool
+	// client关闭回调, 清理连接池
 	kc.opt.CloseCallbacks = append(kc.opt.CloseCallbacks, pool.Close)
 
+	// debug用, 可以dump连接池信息
 	if df, ok := pool.(interface{ Dump() interface{} }); ok {
 		kc.opt.DebugService.RegisterProbeFunc(diagnosis.ConnPoolKey, df.Dump)
 	}
@@ -217,6 +250,7 @@ func (kc *kClient) initConnPool() error {
 		r.EnableReporter()
 	}
 
+	// 长连接监听实例信息
 	if long, ok := pool.(remote.LongConnPool); ok {
 		kc.opt.Bus.Watch(discovery.ChangeEventName, func(ev *event.Event) {
 			ch, ok := ev.Extra.(*discovery.Change)
@@ -308,6 +342,7 @@ func (kc *kClient) initMiddlewares(ctx context.Context) (mw middleware) {
 		if kc.opt.Resolver != nil { // customized service discovery
 			mw.mws = append(mw.mws, newResolveMWBuilder(kc.lbf)(ctx))
 		}
+		// 这个地方是调用proxy的地方
 		mw.mws = append(mw.mws, newProxyMW(kc.opt.Proxy))
 	}
 	mw.mws = append(mw.mws, newIOErrorHandleMW(kc.opt.ErrHandle))

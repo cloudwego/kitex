@@ -249,6 +249,8 @@ func NewOptions(opts []Option) *Options {
 	// Since Kitex v0.13.0, the default transport protocol has been changed to framed from buffered.
 	rpcinfo.AsMutableRPCConfig(o.Configs).SetTransportProtocol(transport.Framed)
 	o.UnaryOptions.opts = o
+	// 核心步骤, 执行外部传入的函数, 对options本身进行修改
+	// 可以在这里配置proxy, 让客户端固定连一个proxy
 	o.Apply(opts)
 
 	// initTraceController should be invoked before initRemoteOpt since TraceController would be injected to ConnPool
