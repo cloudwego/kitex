@@ -74,6 +74,16 @@ type longConn struct {
 	sync.RWMutex
 	deadline time.Time
 	address  string
+	id       uint64
+}
+
+// ConnID identifies this physical connection across pool borrows. Proxyless
+// lifecycle reporting uses it; ordinary pool users do not allocate an ID.
+func (c *longConn) ConnID() uint64 {
+	if c.id == 0 {
+		c.id = remote.NextConnID()
+	}
+	return c.id
 }
 
 // Close implements the net.Conn interface.

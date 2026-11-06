@@ -37,6 +37,10 @@ type transMetaHandler struct {
 
 // Write exec before encode
 func (h *transMetaHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (context.Context, error) {
+	if prepared, _ := sendMsg.Tags()[remote.MetaPrepared].(bool); prepared {
+		return ctx, nil
+	}
+
 	var err error
 	for _, hdlr := range h.mhs {
 		ctx, err = hdlr.WriteMeta(ctx, sendMsg)

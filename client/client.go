@@ -135,7 +135,7 @@ func (kc *kClient) init() (err error) {
 	mw := kc.initMiddlewares(ctx)
 	kc.initDebugService()
 	kc.richRemoteOption()
-	if err = kc.buildInvokeChain(mw); err != nil {
+	if err = kc.buildInvokeChain(ctx, mw); err != nil {
 		return err
 	}
 	if err = kc.warmingUp(); err != nil {
@@ -277,8 +277,9 @@ func (kc *kClient) initLBCache() error {
 
 type middleware struct {
 	// unary middleware
-	mws  []endpoint.Middleware      // wrap the mws at `context mw -> customized mws -> other mws`
-	uMws []endpoint.UnaryMiddleware // wrap the mws at `service cb mw -> xds router -> rpctimeout mw -> customized unary mws`
+	mws      []endpoint.Middleware      // wrap the mws at `context mw -> customized mws -> other mws`
+	uMws     []endpoint.UnaryMiddleware // service circuit breaker and XDS router
+	userUMws []endpoint.UnaryMiddleware // inside the call execution boundary
 
 	// streaming middleware
 	smws []endpoint.Middleware  // wrap the mws at `xds router -> context mw -> customized mws -> other mws`
@@ -318,9 +319,8 @@ func (kc *kClient) initMiddlewares(ctx context.Context) (mw middleware) {
 		// integrate xds if enabled
 		mw.uMws = append(mw.uMws, kc.opt.XDSRouterMiddleware.ToUnaryMiddleware())
 	}
-	mw.uMws = append(mw.uMws, rpcTimeoutMW(ctx))
 	kc.opt.UnaryOptions.InitMiddlewares(ctx)
-	mw.uMws = append(mw.uMws, kc.opt.UnaryOptions.UnaryMiddlewares...)
+	mw.userUMws = kc.opt.UnaryOptions.UnaryMiddlewares
 
 	// 3. stream middlewares
 	kc.opt.Streaming.InitMiddlewares(ctx)
@@ -476,22 +476,31 @@ func (kc *kClient) richRemoteOption() {
 	}
 }
 
-func (kc *kClient) buildInvokeChain(mw middleware) error {
-	innerHandlerEp, err := kc.invokeHandleEndpoint()
+func (kc *kClient) buildInvokeChain(ctx context.Context, mw middleware) error {
+	innerHandlerEp, handler, err := kc.invokeHandleEndpoint()
 	if err != nil {
 		return err
 	}
 	eps := endpoint.Chain(mw.mws...)(innerHandlerEp)
+	eps = endpoint.Endpoint(endpoint.UnaryChain(mw.userUMws...)(endpoint.UnaryEndpoint(eps)))
+	eps, err = kc.buildClientCall(ctx, remote.ClientCallUnary, handler, eps)
+	if err != nil {
+		return err
+	}
 
 	kc.eps = endpoint.UnaryChain(mw.uMws...)(func(ctx context.Context, req, resp interface{}) (err error) {
 		return eps(ctx, req, resp)
 	})
 
-	innerStreamingEp, err := kc.invokeStreamingEndpoint()
+	innerStreamingEp, streamHandler, err := kc.invokeStreamingEndpoint()
 	if err != nil {
 		return err
 	}
 	sEps := endpoint.Chain(mw.smws...)(innerStreamingEp)
+	sEps, err = kc.buildClientCall(ctx, remote.ClientCallStreaming, streamHandler, sEps)
+	if err != nil {
+		return err
+	}
 	kc.sEps = cep.StreamChain(mw.sMws...)(func(ctx context.Context) (st streaming.ClientStream, err error) {
 		resp := &streaming.Result{}
 		err = sEps(ctx, nil, resp)
@@ -503,10 +512,10 @@ func (kc *kClient) buildInvokeChain(mw middleware) error {
 	return nil
 }
 
-func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
+func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, remote.ClientTransHandler, error) {
 	transPipl, err := newCliTransHandler(kc.opt.RemoteOpt)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	return func(ctx context.Context, req, resp interface{}) (err error) {
 		var sendMsg remote.Message
@@ -543,7 +552,7 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		recvMsg = remote.NewMessage(resp, ri, remote.Reply, remote.Client)
 		err = cli.Recv(ctx, ri, recvMsg)
 		return err
-	}, nil
+	}, transPipl, nil
 }
 
 // Close is not concurrency safe.

@@ -48,3 +48,7 @@ require (
 	golang.org/x/arch v0.14.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 )
+
+replace github.com/cloudwego/gopkg => github.com/junliurs/cloudwego-gopkg v0.0.0-20261102103344-6e736f6767e7
+
+replace github.com/cloudwego/netpoll => github.com/junliurs/netpoll v0.7.4-0.20261106100711-74411650917e

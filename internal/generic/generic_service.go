@@ -87,7 +87,7 @@ func (g *Args) Read(ctx context.Context, method string, dataLen int, in bufiox.R
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
-	if rw, ok := g.inner.(thrift.MessageReader); ok {
+	if rw, ok := decoratedCodec(ctx, g.inner, g.base).(thrift.MessageReader); ok {
 		g.Method = method
 		var err error
 		g.Request, err = rw.Read(ctx, method, false, dataLen, in)
@@ -156,7 +156,7 @@ func (r *Result) Read(ctx context.Context, method string, dataLen int, in bufiox
 	if err, ok := r.inner.(error); ok {
 		return err
 	}
-	if w, ok := r.inner.(thrift.MessageReader); ok {
+	if w, ok := decoratedCodec(ctx, r.inner, nil).(thrift.MessageReader); ok {
 		var err error
 		r.Success, err = w.Read(ctx, method, true, dataLen, in)
 		return err

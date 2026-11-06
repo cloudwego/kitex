@@ -279,8 +279,9 @@ type timeoutContext struct {
 	dl time.Time
 	ch chan struct{}
 
-	mu  sync.Mutex
-	err error
+	mu        sync.Mutex
+	err       error // Protected by mu.
+	callbacks *timeoutAfterFunc
 }
 
 func newTimeoutContext(ctx context.Context, timeout time.Duration) *timeoutContext {
@@ -318,10 +319,68 @@ func (p *timeoutContext) Err() error {
 }
 
 func (p *timeoutContext) Cancel(err error) {
+	var callbacks *timeoutAfterFunc
 	p.mu.Lock()
 	if err != nil && p.err == nil {
 		p.err = err
 		close(p.ch)
+		callbacks, p.callbacks = p.callbacks, nil
+		for f := callbacks; f != nil; f = f.next {
+			f.pending = false
+		}
 	}
 	p.mu.Unlock()
+	for f := callbacks; f != nil; {
+		next, callback := f.next, f.callback
+		f.next, f.prev, f.callback = nil, nil, nil
+		go callback()
+		f = next
+	}
+}
+
+type timeoutAfterFunc struct {
+	parent     *timeoutContext
+	prev, next *timeoutAfterFunc
+	callback   func()
+	pending    bool // Protected by parent.mu; false once stopped or dispatched.
+}
+
+// AfterFunc implements the callback hook recognized by context.AfterFunc.
+// Registration and stop need no watcher goroutine. Cancellation still runs each
+// callback asynchronously, and a successful stop prevents it from starting.
+func (p *timeoutContext) AfterFunc(callback func()) func() bool {
+	f := &timeoutAfterFunc{parent: p}
+	p.mu.Lock()
+	if p.err != nil || p.Context.Err() != nil {
+		p.mu.Unlock()
+		go callback()
+		return f.stop
+	}
+	f.pending, f.callback, f.next = true, callback, p.callbacks
+	if f.next != nil {
+		f.next.prev = f
+	}
+	p.callbacks = f
+	p.mu.Unlock()
+	return f.stop
+}
+
+func (f *timeoutAfterFunc) stop() bool {
+	p := f.parent
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !f.pending {
+		return false
+	}
+	f.pending = false
+	if f.prev != nil {
+		f.prev.next = f.next
+	} else {
+		p.callbacks = f.next
+	}
+	if f.next != nil {
+		f.next.prev = f.prev
+	}
+	f.prev, f.next, f.callback = nil, nil, nil
+	return true
 }

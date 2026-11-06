@@ -96,8 +96,33 @@ func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote
 
 func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
 	var param ttheader.DecodeParam
-	if param, err = ttheader.Decode(ctx, in); err != nil {
+	tm := message.TransInfo()
+	ints, strs := tm.TransIntInfo(), tm.TransStrInfo()
+	reuse := len(ints) == 0 && len(strs) == 0
+	if reuse {
+		// Reuse the Message's empty maps. Roll back partial writes if either
+		// the wire decoder or the Header event rejects the message.
+		defer func() {
+			if err != nil {
+				for key := range ints {
+					delete(ints, key)
+				}
+				for key := range strs {
+					delete(strs, key)
+				}
+			}
+		}()
+		param, err = ttheader.DecodeInto(ctx, in, ints, strs)
+	} else {
+		param, err = ttheader.Decode(ctx, in)
+	}
+	if err != nil {
 		return perrors.NewProtocolError(err)
+	}
+	if h := remote.MessageEventHandlerFromContext(ctx); h != nil {
+		if err = h.OnMessageEvent(ctx, message, remote.MessageDecodeHeader, remote.WireInfo{SeqID: param.SeqID, ProtocolID: uint16(param.ProtocolID), Flags: uint16(param.Flags)}); err != nil {
+			return err
+		}
 	}
 	setFlags(param.Flags, message)
 	if err = SetOrCheckSeqID(param.SeqID, message); err != nil {
@@ -105,8 +130,12 @@ func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.
 		// some framework doesn't write correct seqID in TTheader, to ignore err only check it in payload
 		// print log to push the downstream framework to refine it.
 	}
-	message.TransInfo().PutTransIntInfo(param.IntInfo)
-	message.TransInfo().PutTransStrInfo(param.StrInfo)
+	if !reuse || ints == nil {
+		tm.PutTransIntInfo(param.IntInfo)
+	}
+	if !reuse || strs == nil {
+		tm.PutTransStrInfo(param.StrInfo)
+	}
 	fillBasicInfoOfTTHeader(message)
 	message.SetPayloadLen(param.PayloadLen)
 	return nil

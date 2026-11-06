@@ -182,6 +182,11 @@ func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.
 
 // Encode implements the remote.Codec interface, it does complete message encode include header and payload.
 func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
+	if remote.MessageEventHandlerFromContext(ctx) != nil {
+		if err := c.PrepareMessage(ctx, message); err != nil {
+			return err
+		}
+	}
 	return c.EncodeMetaAndPayload(ctx, message, out, c)
 }
 
@@ -217,20 +222,48 @@ func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, i
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("meshHeader read payload first 8 byte failed: %s", err.Error()))
 		}
 	}
-	return checkPayload(flagBuf, message, in, isTTHeader, c.MaxSize)
+	if err = checkPayload(flagBuf, message, in, isTTHeader, c.MaxSize); err != nil {
+		return err
+	}
+	if h := remote.MessageEventHandlerFromContext(ctx); h != nil {
+		framed := isThriftFramedBinary(flagBuf) || isProtobufKitex(flagBuf)
+		wire := remote.WireInfo{WithTTHeader: isTTHeader, Framed: framed}
+		if message.RPCInfo().Config().PayloadCodec() == serviceinfo.Thrift {
+			prefix := flagBuf
+			if framed {
+				prefix = flagBuf[Size32:]
+			}
+			wire.MessageType = binary.BigEndian.Uint32(prefix[:Size32]) & 0xff
+		}
+		if err = h.OnMessageEvent(ctx, message, remote.MessageDecodeMeta, wire); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // DecodePayload decode payload
-func (c *defaultCodec) DecodePayload(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
+func (c *defaultCodec) DecodePayload(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
+	if h := remote.MessageEventHandlerFromContext(ctx); h != nil {
+		if err := h.OnMessageEvent(ctx, message, remote.MessageDecodePayload, remote.WireInfo{}); err != nil {
+			return err
+		}
+		defer func() {
+			if eventErr := h.OnMessageEvent(ctx, message, remote.MessageDecodePayloadDone, remote.WireInfo{}); err == nil {
+				err = eventErr
+			}
+		}()
+	}
 	defer func() {
 		if ri := message.RPCInfo(); ri != nil {
 			if ms := rpcinfo.AsMutableRPCStats(ri.Stats()); ms != nil {
-				ms.SetRecvSize(uint64(in.ReadLen()))
+				ms.SetRecvSize(uint64(remote.ConsumedLen(in)))
 			}
 		}
 	}()
 
-	hasRead := in.ReadLen()
+	readLen := func() int { return remote.ConsumedLen(in) }
+	hasRead := readLen()
 	pCodec, err := remote.GetPayloadCodec(message)
 	if err != nil {
 		return err
@@ -240,7 +273,7 @@ func (c *defaultCodec) DecodePayload(ctx context.Context, message remote.Message
 	}
 	if message.PayloadLen() == 0 {
 		// if protocol is PurePayload, should set payload length after decoded
-		message.SetPayloadLen(in.ReadLen() - hasRead)
+		message.SetPayloadLen(readLen() - hasRead)
 	}
 	return nil
 }

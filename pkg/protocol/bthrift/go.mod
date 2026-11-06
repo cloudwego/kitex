@@ -8,4 +8,6 @@ require (
 	github.com/cloudwego/thriftgo v0.3.18
 )
 
-require github.com/bytedance/gopkg v0.1.1 // indirect
+require github.com/bytedance/gopkg v0.1.4 // indirect
+
+replace github.com/cloudwego/gopkg => github.com/junliurs/cloudwego-gopkg v0.0.0-20261105192813-e9461b4bc999

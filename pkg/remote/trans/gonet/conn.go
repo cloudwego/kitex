@@ -19,6 +19,7 @@ package gonet
 import (
 	"errors"
 	"net"
+	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/gopkg/bufiox"
@@ -39,9 +40,10 @@ type bufioxReadWriter interface {
 // FIXME: add proactive state check of long connection
 type cliConn struct {
 	net.Conn
-	r      *bufiox.DefaultReader
-	w      *bufiox.DefaultWriter
-	closed uint32 // 1: closed
+	r       *bufiox.DefaultReader
+	w       *bufiox.DefaultWriter
+	closed  uint32 // 1: closed
+	release sync.Once
 }
 
 func newCliConn(conn net.Conn) *cliConn {
@@ -65,8 +67,15 @@ func (c *cliConn) Read(b []byte) (int, error) {
 }
 
 func (c *cliConn) Close() error {
+	err := c.InterruptReadWrite()
+	// The IO owner calls Close after the read/write has exited. Cancellation
+	// only interrupts the socket; releasing bufiox concurrently with Read races.
+	c.release.Do(func() { c.r.Release(nil) })
+	return err
+}
+
+func (c *cliConn) InterruptReadWrite() error {
 	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
-		c.r.Release(nil)
 		return c.Conn.Close()
 	}
 	return errConnClosed
