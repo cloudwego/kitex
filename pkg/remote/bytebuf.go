@@ -141,3 +141,12 @@ func (p *ByteBufferIO) Read(b []byte) (n int, err error) {
 	copy(b, buf)
 	return
 }
+
+// ConsumedLen is an opt-in wire-size query; ByteBuffer.ReadLen keeps its old
+// implementation-specific contract. Readers without marks use their own count.
+func ConsumedLen(reader ByteBuffer) int {
+	if r, ok := reader.(interface{ ConsumedLen() int }); ok {
+		return r.ConsumedLen()
+	}
+	return reader.ReadLen()
+}

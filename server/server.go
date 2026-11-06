@@ -346,6 +346,13 @@ func (s *server) unaryOrStreamEndpoint(ctx context.Context) endpoint.Endpoint {
 
 func (s *server) invokeHandleEndpoint() endpoint.UnaryEndpoint {
 	return func(ctx context.Context, args, resp interface{}) (err error) {
+		business, enterErr := remote.BeginInvocation(ctx)
+		if enterErr != nil {
+			return enterErr
+		}
+		if business != nil {
+			defer func() { business.End(err) }()
+		}
 		ri := rpcinfo.GetRPCInfo(ctx)
 		ink := ri.Invocation()
 		methodName := ink.MethodName()

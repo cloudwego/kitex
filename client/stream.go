@@ -160,7 +160,7 @@ func (kc *kClient) StreamX(ctx context.Context, method string) (streaming.Client
 	return cs, err
 }
 
-func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
+func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, remote.ClientTransHandler, error) {
 	var handler remote.ClientTransHandler
 	var err error
 	if kc.opt.RemoteOpt.GRPCStreamingCliHandlerFactory != nil {
@@ -169,7 +169,7 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 		handler, err = kc.opt.RemoteOpt.CliHandlerFactory.NewTransHandler(kc.opt.RemoteOpt)
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// recvEP and sendEP are the endpoints for the new stream interface,
@@ -194,7 +194,7 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 		rresp.ClientStream = clientStream
 		rresp.Stream = clientStream.GetGRPCStream()
 		return
-	}, nil
+	}, handler, nil
 }
 
 const (
