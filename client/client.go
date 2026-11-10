@@ -235,7 +235,11 @@ func (kc *kClient) initProxy() error {
     kitex实现可以参考 netpollmux, 但不再维护了. 所以先不关注
     而grpc与ttheader streaming还有对应的多路复用实现
 
-还有一个问题需要弄清楚: 传输层与上层的关系是什么样的, 一个请求发送完毕后获得返回是怎么通知上层处理的
+有几个问题需要弄清楚:
+1. 传输层与上层的关系是什么样的, 一个请求发送完毕后获得返回是怎么通知上层处理的.
+  - 上层是调用Recv阻塞, 底层TODO
+    2. grpc/http2 在kitex里是怎么被使用的
+    TODO
 */
 func (kc *kClient) initConnPool() error {
 	pool := kc.opt.RemoteOpt.ConnPool
@@ -267,10 +271,25 @@ func (kc *kClient) initConnPool() error {
 	return nil
 }
 
+/*
+主要是绑定了回调.
+注意, 缓存是全局的, 多个client共享.
+里面主要注册了事件的回调函数. initLBCache主要是串起了各个组件
+1. 初始化的时候balancer, resolver的具体类型已经确定, 这里通过包装器使得可以调用不同种类的balancer, resolver
+
+2. LBCache.Refresh() 触发整个流程, 调用resolver获取最新实际, 进行Diff, 然后执行包装器的Rebalance函数.
+
+3. 包装器的Rebalance函数先执行onChange回调, 将Diff通知给其他感兴趣的组件, 然后调用balancer自身的Rebalance函数
+
+4. balancer自身的Rebalance函数 依照自身的实现进行实例选择的更新
+
+目的是不同的client A, B有可能调用相同的服务端, 在这种情况下, resolver等返回的信息共享是有相当大的价值的. 这一共享通过对balancerFactory的共享间接达到
+*/
 func (kc *kClient) initLBCache() error {
 	if kc.opt.Proxy != nil && kc.opt.Resolver == nil {
 		return nil
 	}
+	// 回调
 	onChange := discoveryEventHandler(discovery.ChangeEventName, kc.opt.Bus, kc.opt.Events)
 	onDelete := discoveryEventHandler(discovery.DeleteEventName, kc.opt.Bus, kc.opt.Events)
 	resolver := kc.opt.Resolver
