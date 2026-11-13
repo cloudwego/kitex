@@ -268,6 +268,7 @@ func (ti *transInfo) zero() {
 	ti.fresh = true
 	if ti.store != nil {
 		ti.store.reset(false)
+		ti.store.block.recycle()
 	}
 	for k := range ti.intInfo {
 		delete(ti.intInfo, k)

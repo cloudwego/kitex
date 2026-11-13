@@ -44,11 +44,13 @@ type headerStore struct {
 	trackNativeChanges bool
 	changedIndices     []int
 	changeView         HeaderView
+	block              headerBlock
 }
 
 var headerMetadataSlot = [29]uint8{2: 12, 3: 1, 4: 3, 5: 5, 6: 2, 7: 4, 8: 6, 9: 9, 10: 10, 11: 13, 14: 14, 16: 19, 19: 20, 20: 8, 21: 18, 24: 15, 25: 21, 26: 11, 28: 7}
 
 func (s *headerStore) reset(response bool) {
+	s.block.reset()
 	s.clearNativeChanges()
 	s.trackNativeChanges = false
 	for i := range s.view.entries {
@@ -147,6 +149,16 @@ func (s *headerStore) set(integer bool, id uint16, key, value string, deleted bo
 	if size > 64<<20 {
 		return false
 	}
+	slot := -1
+	if !integer {
+		slot = headerBlockStringSlot(key)
+	} else if id < headerBlockIntSlots {
+		slot = int(id)
+	}
+	offset, stored := s.block.append(e.Kind, e.ID, e.Op, e.Key, e.Value, slot)
+	if !stored {
+		return false
+	}
 	if found {
 		s.view.entries[index] = e
 	} else {
@@ -207,6 +219,9 @@ func (s *headerStore) set(integer bool, id uint16, key, value string, deleted bo
 			s.view.metadataIndex[slot-1] = uint32(index + 1)
 			if deleted {
 				s.view.metadataIndex[slot-1] = 0
+			}
+			if slot <= headerBlockMetadataFields {
+				s.block.setMetadata(int(slot-1), offset, len(e.Value))
 			}
 		}
 	}
