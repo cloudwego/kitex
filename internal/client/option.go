@@ -250,7 +250,7 @@ func NewOptions(opts []Option) *Options {
 	rpcinfo.AsMutableRPCConfig(o.Configs).SetTransportProtocol(transport.Framed)
 	o.UnaryOptions.opts = o
 	// 核心步骤, 执行外部传入的函数, 对options本身进行修改
-	// 可以在这里配置proxy, 让客户端固定连一个proxy
+	// 可以在这里配置proxy, 让客户端固定连一个proxy, 当proxy不为空的时候, 在后续initProxy的时候就会对proxy进行必要的初始化
 	o.Apply(opts)
 
 	// initTraceController should be invoked before initRemoteOpt since TraceController would be injected to ConnPool

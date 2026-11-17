@@ -272,8 +272,8 @@ func (kc *kClient) initConnPool() error {
 }
 
 /*
-主要是绑定了回调.
-注意, 缓存是全局的, 多个client共享.
+注意, 缓存是全局的, 可以多个client共享. 比如100个client用了同样的resolver, 服务发现返回的实例可以复用, 只需要请求一次.
+
 里面主要注册了事件的回调函数. initLBCache主要是串起了各个组件
 1. 初始化的时候balancer, resolver的具体类型已经确定, 这里通过包装器使得可以调用不同种类的balancer, resolver
 
@@ -344,9 +344,25 @@ type middleware struct {
 // For streaming:
 // service cb mw -> customized stream mws -> xds router -> context mw -> customized mws -> other mws
 
+/*
 // The reason why the xds router must be placed before the timeout middleware is that the timeout configuration is
 // obtained from the rds config, and the timeout middleware only takes effect in the unary scenario.
 // Therefore, in the streaming scenario, the xds router can be placed after the stream middleware.
+// xds就是控制面, https://www.cloudwego.io/docs/kitex/tutorials/advanced-feature/xds/
+// xds决定了请求应该去的集群, 控制面下发路由配置, 这里面是非常丰富的控制面与数据面的内容.
+// 控制面比如istio下发规则, 本地数据面解析. 在只有kitex的情况下可以kitex解析, 具体实现可以看: https://github.com/kitex-contrib/xds/blob/main/core/xdsresource/rds.go
+// 可以是根据metadata, header等信息匹配上了控制面的规则来决定这个流量的去向
+例如
+请求元数据 lane=gray
+
+	→ 本地 Router 命中 gray-route
+	→ 选中 gray 分组对应的 Cluster
+	→ Resolver 获取该 Cluster 的实例
+	→ Balancer 从实例中选择一个地址
+
+// 控制面获取的middleware可以改写上下文, 进而影响到其他通过上下文获取值的模块
+// 比如timeout获取后, 改写ctx里的rpcinfo, 进而影响后面的timeout
+*/
 func (kc *kClient) initMiddlewares(ctx context.Context) (mw middleware) {
 	// 1. universal middlewares
 	builderMWs := richMWsWithBuilder(ctx, kc.opt.MWBs)
@@ -511,6 +527,21 @@ func (kc *kClient) initDebugService() {
 	}
 }
 
+/*
+层次				关注内容
+上层 client			服务描述、context 中的透传信息、配置的 MetaHandler
+底层通信			消息、协议头、stream、收发处理链
+
+各种不同的handler会将上游关注的信息写入到底层通信的消息里
+例如 metainfoClientHandler
+
+下面是接口
+
+	type MetaHandler interface {
+	    WriteMeta(ctx context.Context, msg Message) (context.Context, error)
+	    ReadMeta(ctx context.Context, msg Message) (context.Context, error)
+	}
+*/
 func (kc *kClient) richRemoteOption() {
 	kc.opt.RemoteOpt.SvcInfo = kc.svcInfo
 	// for client trans info handler
