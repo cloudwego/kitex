@@ -275,6 +275,147 @@ func TestUnaryLifecycleNetwork(t *testing.T) {
 	}
 }
 
+func TestUnaryLifecycleNestedCalls(t *testing.T) {
+	for _, mode := range []struct {
+		name         string
+		serverNative bool
+		clientNative bool
+	}{
+		{"ingress_to_plain", true, false},
+		{"ingress_to_native", true, true},
+		{"plain_to_plain", false, false},
+	} {
+		for _, outcome := range []string{"success", "business_error", "canceled"} {
+			t.Run(mode.name+"/"+outcome, func(t *testing.T) {
+				var prepare, finish, begin, response, complete atomic.Int32
+				backend, _ := startUnaryServer(t, nil,
+					server.WithMetaHandler(&unaryMeta{read: func(msg remote.Message) error {
+						if msg.TransInfo().TransStrInfo()["phase"] != "metadata" {
+							return errors.New("nested metadata was lost")
+						}
+						return nil
+					}}),
+					server.WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
+						return func(ctx context.Context, req, resp any) error {
+							if outcome == "business_error" {
+								return errors.New("nested business error")
+							}
+							return next(ctx, req, resp)
+						}
+					}))
+				childState := new(int)
+				childHooks := &unaryHooks{
+					prepare: func(ctx context.Context, c *remote.UnaryCall) error {
+						prepare.Add(1)
+						c.State = childState
+						return nil
+					},
+					finish: func(ctx context.Context, c *remote.UnaryCall) error {
+						finish.Add(1)
+						if c.State != childState {
+							t.Error("nested client did not own its state")
+						}
+						return nil
+					},
+				}
+				type contextKey struct{}
+				value := new(int)
+				opts := []client.Option{client.WithHostPorts(backend), client.WithTransportProtocol(transport.TTHeaderFramed),
+					client.WithRPCTimeout(time.Second), client.WithMetaHandler(&unaryMeta{}),
+					client.WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
+						return func(ctx context.Context, req, resp any) error {
+							if remote.UnaryCallFromContext(ctx) != nil {
+								t.Error("client middleware inherited its parent unary call")
+							}
+							if ctx.Value(contextKey{}) != value {
+								t.Error("nested context value was lost")
+							}
+							if _, ok := ctx.Deadline(); !ok {
+								t.Error("nested deadline was lost")
+							}
+							return next(ctx, req, resp)
+						}
+					})}
+				var downstream testservice.Client
+				if mode.clientNative {
+					downstream = unaryClient(t, backend, childHooks, opts...)
+				} else {
+					var err error
+					downstream, err = testservice.NewClient("nested.plain", opts...)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				parentState := new(int)
+				completed := make(chan struct{}, 1)
+				parentHooks := &unaryHooks{
+					begin: func(ctx context.Context, c *remote.UnaryCall) error { begin.Add(1); c.State = parentState; return nil },
+					finish: func(ctx context.Context, c *remote.UnaryCall) error {
+						t.Error("server call was finished by nested client")
+						return errors.New("server call finished as client")
+					},
+					response: func(ctx context.Context, c *remote.UnaryCall) error { response.Add(1); return nil },
+					complete: func(ctx context.Context, c *remote.UnaryCall) error {
+						complete.Add(1)
+						completed <- struct{}{}
+						return nil
+					},
+				}
+				var serverHooks *unaryHooks
+				if mode.serverNative {
+					serverHooks = parentHooks
+				}
+				upstream, _ := startUnaryServer(t, serverHooks, server.WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
+					return func(ctx context.Context, req, resp any) error {
+						parent := remote.UnaryCallFromContext(ctx)
+						childCtx, cancel := context.WithTimeout(context.WithValue(ctx, contextKey{}, value), time.Second)
+						defer cancel()
+						if outcome == "canceled" {
+							cancel()
+						}
+						result, err := downstream.EchoPingPong(childCtx, &kt.Request{Message: "nested"})
+						if outcome == "success" && (err != nil || result == nil || result.Message != "echo:nested") {
+							t.Errorf("nested echo failed: result=%v err=%v", result, err)
+						}
+						if outcome != "success" && err == nil {
+							t.Error("nested error was swallowed")
+						}
+						if parent != nil && (parent.State != parentState || parent.Finished || remote.UnaryCallFromContext(ctx) != parent) {
+							t.Error("nested client changed its parent call")
+						}
+						return next(ctx, req, resp)
+					}
+				}))
+				caller, err := testservice.NewClient("nested.outer", client.WithHostPorts(upstream), client.WithTransportProtocol(transport.TTHeaderFramed), client.WithRPCTimeout(3*time.Second))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := caller.EchoPingPong(context.Background(), &kt.Request{Message: "outer"}); err != nil {
+					t.Fatal(err)
+				}
+				if mode.serverNative {
+					select {
+					case <-completed:
+					case <-time.After(time.Second):
+						t.Fatal("server completion missing")
+					}
+					if begin.Load() != 1 || response.Load() != 1 || complete.Load() != 1 {
+						t.Fatalf("server lifecycle: begin=%d response=%d complete=%d", begin.Load(), response.Load(), complete.Load())
+					}
+				} else if begin.Load()+response.Load()+complete.Load() != 0 {
+					t.Fatal("plain server ran native lifecycle")
+				}
+				if prepare.Load() != finish.Load() || (!mode.clientNative && prepare.Load() != 0) {
+					t.Fatalf("client lifecycle: prepare=%d finish=%d", prepare.Load(), finish.Load())
+				}
+				if mode.clientNative && outcome != "canceled" && (prepare.Load() != 1 || finish.Load() != 1) {
+					t.Fatalf("native client lifecycle missing: prepare=%d finish=%d", prepare.Load(), finish.Load())
+				}
+			})
+		}
+	}
+}
+
 func TestUnaryLifecycleReject(t *testing.T) {
 	var complete, finish atomic.Int32
 	rejected := errors.New("mesh ACL denied")

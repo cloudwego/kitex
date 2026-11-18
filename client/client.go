@@ -376,6 +376,9 @@ func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr rem
 func (kc *kClient) Call(ctx context.Context, method string, request, response interface{}) (err error) {
 	// merge backup context if no metainfo found in ctx
 	ctx = backup.RecoverCtxOnDemands(ctx, kc.opt.CtxBackupHandler)
+	if remote.UnaryCallFromContext(ctx) != nil {
+		ctx = remote.WithUnaryCall(ctx, nil)
+	}
 
 	validateForCall(ctx, kc.inited, kc.closed)
 	var ri rpcinfo.RPCInfo
