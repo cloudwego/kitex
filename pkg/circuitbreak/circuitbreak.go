@@ -100,15 +100,18 @@ func NewCircuitBreakerMW(control Control, panel circuitbreaker.Panel) endpoint.M
 func NewStreamCircuitBreakerMW(control Control, panel circuitbreaker.Panel) cep.StreamMiddleware {
 	return func(next cep.StreamEndpoint) cep.StreamEndpoint {
 		return func(ctx context.Context) (stream streaming.ClientStream, err error) {
+			// 由ri.From().ServiceName() / ri.To().ServiceName() / ri.To().Method() 拼接
 			key, enabled := control.GetKey(ctx, nil)
 			if !enabled {
 				return next(ctx)
 			}
 
+			// 获取当前熔断状态, 熔断状态由别的机制控制
 			if !panel.IsAllowed(key) {
 				return nil, control.DecorateError(ctx, nil, kerrors.ErrCircuitBreak)
 			}
 
+			// 调用下一个中间件
 			stream, err = next(ctx)
 			RecordStat(ctx, nil, nil, err, key, &control, panel)
 			return

@@ -432,15 +432,39 @@ func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr rem
 }
 
 // Call implements the Client interface .
+/*
+调用执行入口, 先前的步骤是
+业务：cli.EchoPingPong(ctx, req)
+    ↓
+生成代码：包装 Args / Result，调用 p.c.Call(...)
+    ↓
+kcFinalizerClient.Call()：转发调用
+    ↓
+kClient.Call()：组织本次 RPC
+
+
+*/
 func (kc *kClient) Call(ctx context.Context, method string, request, response interface{}) (err error) {
 	// merge backup context if no metainfo found in ctx
+	// If handler != nil, this func will try to merge metainfo
+	// and pre-defined key-values (through Options.BackupHanlder)
+	// from backup context into given context
+	/*
+	   可以一定程度按照自定义的方式去合并两个ctx.
+	   可以恢复透传信息.
+	*/
 	ctx = backup.RecoverCtxOnDemands(ctx, kc.opt.CtxBackupHandler)
 
 	validateForCall(ctx, kc.inited, kc.closed)
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions
+
+	/*
+		初始化rpcinfo 以及 callOpts, 详细见函数上的注释
+	*/
 	ctx, ri, callOpts = kc.initRPCInfo(ctx, method, 0, nil, false)
 
+	// 记录rpc开始, 并调用tracer的Start回调
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	var reportErr error
 	var recycleRI bool
@@ -463,6 +487,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	}()
 
 	callOptRetry := getCalloptRetryPolicy(callOpts)
+	// 重试可能由某次call 传入. 不一定是client的初始化传入. 所以仍然需要初始化重试容器. 重试容器的解释可以见client init过程
 	if kc.opt.UnaryOptions.RetryContainer == nil && callOptRetry != nil && callOptRetry.Enable {
 		// setup retry in callopt
 		kc.opt.InitRetryContainer()
@@ -477,6 +502,34 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 		err = kerrors.ErrNotUnaryMethod(kc.svcInfo.ServiceName, method)
 	} else if kc.opt.UnaryOptions.RetryContainer == nil {
 		// call without retry policy
+		// 执行middleware chain, 最终执行发送请求
+		/*
+			kc.eps(ctx, request, response)
+				↓
+			服务级熔断
+				↓
+			XDS 路由（配置启用时）
+				↓
+			RPC 超时控制
+				↓
+			用户配置的 Unary middleware
+				↓
+			context 中携带的 middleware
+				↓
+			用户配置的通用 middleware
+				↓
+			ACL 检查
+				↓
+			服务发现与负载均衡
+				↓
+			实例级熔断
+				↓
+			用户配置的实例级 middleware
+				↓
+			IO 错误处理 middleware
+				↓
+			实际传输逻辑  (invokeHandleEndpoint函数)
+		*/
 		err = kc.eps(ctx, request, response)
 		if err == nil {
 			recycleRI = true
@@ -588,6 +641,9 @@ func (kc *kClient) buildInvokeChain(mw middleware) error {
 	return nil
 }
 
+/*
+经过所有middleware后, 最后进入到这个函数, 这个函数负责传输数据
+*/
 func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 	transPipl, err := newCliTransHandler(kc.opt.RemoteOpt)
 	if err != nil {
@@ -683,6 +739,14 @@ func initTransportProtocol(svcInfo *serviceinfo.ServiceInfo, cfg rpcinfo.RPCConf
 	}
 }
 
+/*
+按配置执行
+主要做两件事
+1. 预热服务发现
+2. 预热连接池
+降低首批请求的延迟 vs. 增加初始化的时间
+可以这个函数的作用是一个tradeoff
+*/
 func (kc *kClient) warmingUp() error {
 	if kc.opt.WarmUpOption == nil {
 		return nil
@@ -849,6 +913,14 @@ func purifyProtocol(cfg rpcinfo.MutableRPCConfig, tp transport.Protocol, streamC
 	cfg.SetTransportProtocol(tp)
 }
 
+/*
+准备config, remoteinfo, ctx, 以及callOptions
+rpcinfo 包含caller信息; callee信息; 请求的metadata 比如请求序列号; config, 比如超时, 传输协议, 序列化类型, io buffer大小. 统计信息
+callOps 包含重试, 降级策略. 与rpcinfo 共用了config; 共用了callee信息;
+callOps 聚焦于本次调用
+问题: 这些信息是否会传给callee, 如果会的话是怎么传递的.
+有些传递的信息比如metainfo存在于ctx, 使用metaHandler进行传递.
+*/
 func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInfo *serviceinfo.ServiceInfo,
 	retryTimes int, firstRI rpcinfo.RPCInfo, streamCall bool,
 ) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
@@ -884,6 +956,7 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 		rpcStats.ImmutableView(),
 	)
 
+	// 初始化配置
 	inkSetter := ri.Invocation().(rpcinfo.InvocationSetter)
 	// set ServiceInfo to judge whether it's combine service in ttheader codec.
 	inkSetter.SetExtra(rpcinfo.InvocationServiceInfoKey, svcInfo)
@@ -915,7 +988,7 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 	if sopt.RecvTimeoutConfig.Timeout > 0 {
 		cfg.SetStreamRecvTimeoutConfig(sopt.RecvTimeoutConfig)
 	}
-
+	// 保存rpc info 到ctx
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 
 	if callOpts != nil {
