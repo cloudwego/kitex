@@ -49,6 +49,9 @@ type client struct {
 }
 
 // NewClient creates a new Client using the given params.
+/*
+取得链接, 供后续的send和recv使用
+*/
 func NewClient(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.TransHandler, opt *remote.ClientOption) (Client, error) {
 	cm := NewConnWrapper(opt.ConnPool)
 	var err error
@@ -86,6 +89,7 @@ func (c *client) init(handler remote.TransHandler, cm *ConnWrapper, conn net.Con
 
 // Send is blocked.
 func (c *client) Send(ctx context.Context, ri rpcinfo.RPCInfo, req remote.Message) (err error) {
+	// transHdlr 用户可以自定义, 默认在kitex/pkg/remote/trans/default_client_handler.go  用户可以自行配置
 	_, err = c.transHdlr.Write(ctx, c.conn, req)
 	if err != nil {
 		c.connManager.ReleaseConn(err, ri)

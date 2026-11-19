@@ -660,6 +660,7 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		}()
 		ri := rpcinfo.GetRPCInfo(ctx)
 
+		// 对应一次链接的client, 本身不会重试, 重试发生在更上层.
 		cli, err := remotecli.NewClient(ctx, ri, transPipl, kc.opt.RemoteOpt)
 		if err != nil {
 			return
@@ -673,6 +674,7 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 			sendMsg = remote.NewMessage(req, ri, remote.Call, remote.Client)
 		}
 
+		// 发送请求
 		if err = cli.Send(ctx, ri, sendMsg); err != nil {
 			return
 		}
@@ -682,6 +684,7 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		}
 
 		recvMsg = remote.NewMessage(resp, ri, remote.Reply, remote.Client)
+		// 接收返回
 		err = cli.Recv(ctx, ri, recvMsg)
 		return err
 	}, nil

@@ -46,6 +46,7 @@ type cliTransHandler struct {
 // Write implements the remote.ClientTransHandler interface.
 func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
 	var bufWriter remote.ByteBuffer
+	// record是先记录, 最终集中用trace的sdk上报
 	rpcinfo.Record(ctx, sendMsg.RPCInfo(), stats.WriteStart, nil)
 	defer func() {
 		t.ext.ReleaseBuffer(bufWriter, err)
@@ -53,6 +54,7 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	}()
 
 	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
+	// 默认codec 在 defaultCodec
 	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
 	if err != nil {
