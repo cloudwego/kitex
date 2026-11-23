@@ -303,6 +303,8 @@ func (r *rpcStats) Reset() {
 	}
 	atomic.StoreUint64(&r.recvSize, 0)
 	atomic.StoreUint64(&r.sendSize, 0)
+	atomic.StoreUint64(&r.lastSendSize, 0)
+	atomic.StoreUint64(&r.lastRecvSize, 0)
 	for i := range r.eventMap {
 		r.eventMap[i].state = eventUnset
 	}

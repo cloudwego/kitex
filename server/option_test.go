@@ -497,6 +497,38 @@ func NewRemoteMsgWithPayloadType(ct serviceinfo.PayloadCodec) remote.Message {
 	return remoteMsg
 }
 
+func TestGRPCSharedPoolOptions(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		opts        []Option
+		wantRPCInfo bool
+		wantBuffer  bool
+	}{
+		{name: "default"},
+		{name: "rpcinfo only", opts: []Option{WithGRPCSharedRPCInfoPool(true)}, wantRPCInfo: true},
+		{name: "receive buffers only", opts: []Option{WithGRPCSharedReceiveBufferPool(true)}, wantBuffer: true},
+		{
+			name:        "both",
+			opts:        []Option{WithGRPCSharedRPCInfoPool(true), WithGRPCSharedReceiveBufferPool(true)},
+			wantRPCInfo: true,
+			wantBuffer:  true,
+		},
+		{
+			name: "disabled",
+			opts: []Option{
+				WithGRPCSharedRPCInfoPool(true), WithGRPCSharedReceiveBufferPool(true),
+				WithGRPCSharedRPCInfoPool(false), WithGRPCSharedReceiveBufferPool(false),
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			opt := internal_server.NewOptions(tt.opts).RemoteOpt
+			test.Assert(t, opt.GRPCSharedRPCInfoPool == tt.wantRPCInfo, opt.GRPCSharedRPCInfoPool)
+			test.Assert(t, opt.GRPCCfg.SharedReceiveBufferPool == tt.wantBuffer, opt.GRPCCfg.SharedReceiveBufferPool)
+		})
+	}
+}
+
 func TestWithGRPCReuseWriteBuffer(t *testing.T) {
 	opts := internal_server.NewOptions([]internal_server.Option{})
 	test.Assert(t, !opts.RemoteOpt.GRPCCfg.ReuseWriteBufferConfig.Enable, opts.RemoteOpt.GRPCCfg.ReuseWriteBufferConfig)

@@ -45,6 +45,8 @@ type bufferPool struct {
 	pool sync.Pool
 }
 
+var sharedBufferPool = newBufferPool()
+
 func newBufferPool() *bufferPool {
 	return &bufferPool{
 		pool: sync.Pool{
@@ -53,6 +55,13 @@ func newBufferPool() *bufferPool {
 			},
 		},
 	}
+}
+
+func receiveBufferPool(shared bool) *bufferPool {
+	if shared {
+		return sharedBufferPool
+	}
+	return newBufferPool()
 }
 
 func (p *bufferPool) get() *bytes.Buffer {
@@ -620,6 +629,8 @@ type ServerConfig struct {
 	MaxHeaderListSize          *uint32
 	// ReuseWriteBufferConfig configures reusing write buffer for each connection.
 	ReuseWriteBufferConfig ReuseWriteBufferConfig
+	// SharedReceiveBufferPool shares receive buffers with other opted-in client and server transports.
+	SharedReceiveBufferPool bool
 }
 
 func DefaultServerConfig() *ServerConfig {
@@ -651,6 +662,8 @@ type ConnectOptions struct {
 	TraceController *rpcinfo.TraceController
 	// ReuseWriteBufferConfig configures reusing write buffer for each connection.
 	ReuseWriteBufferConfig ReuseWriteBufferConfig
+	// SharedReceiveBufferPool shares receive buffers with other opted-in client and server transports.
+	SharedReceiveBufferPool bool
 }
 
 // ClientConfig consists of all the helper configurations to establish a client transport.

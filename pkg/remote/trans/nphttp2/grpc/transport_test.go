@@ -787,6 +787,11 @@ func setUp(t *testing.T, port int, maxStreams uint32, ht hType) (*server, *http2
 
 func setUpWithOptions(t *testing.T, port int, serverConfig *ServerConfig, ht hType, copts ConnectOptions) (*server, *http2Client) {
 	server := setUpServerOnly(t, port, serverConfig, ht)
+	return server, setUpClient(t, server, copts)
+}
+
+func setUpClient(t *testing.T, server *server, copts ConnectOptions) *http2Client {
+	t.Helper()
 	conn, err := netpoll.NewDialer().DialTimeout("tcp", "localhost:"+server.port, time.Second)
 	if err != nil {
 		t.Fatalf("failed to dial connection: %v", err)
@@ -795,7 +800,7 @@ func setUpWithOptions(t *testing.T, port int, serverConfig *ServerConfig, ht hTy
 	if connErr != nil {
 		t.Fatalf("failed to create transport: %v", connErr)
 	}
-	return server, ct.(*http2Client)
+	return ct.(*http2Client)
 }
 
 func setUpWithNoPingServer(t *testing.T, copts ConnectOptions, connCh chan net.Conn, exitCh chan struct{}) *http2Client {

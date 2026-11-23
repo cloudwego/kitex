@@ -109,6 +109,9 @@ type ServerOption struct {
 
 	GRPCCfg *grpc.ServerConfig
 
+	// GRPCSharedRPCInfoPool shares RPCInfo across connections of one gRPC server transport handler.
+	GRPCSharedRPCInfoPool bool
+
 	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
 
 	// TTHeaderStreaming

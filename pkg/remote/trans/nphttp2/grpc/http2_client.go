@@ -196,7 +196,7 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		maxConcurrentStreams:  defaultMaxStreamsClient,
 		streamQuota:           defaultMaxStreamsClient,
 		streamsQuotaAvailable: make(chan struct{}, 1),
-		bufferPool:            newBufferPool(),
+		bufferPool:            receiveBufferPool(opts.SharedReceiveBufferPool),
 		traceCtl:              opts.TraceController,
 	}
 	t.controlBuf = newControlBuffer(t.ctx.Done())
