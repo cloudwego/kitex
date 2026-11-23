@@ -207,6 +207,7 @@ func (i *invocation) zero() {
 	i.serviceName = ""
 	i.methodName = ""
 	i.methodInfo = nil
+	i.streamingMode = serviceinfo.StreamingNone
 	if i.bizErr.Load() != nil {
 		i.bizErr.Store(nil)
 	}

@@ -65,6 +65,7 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 	return &svrTransHandler{
+		rpcInfoPool: new(sync.Pool),
 		opt:         opt,
 		svcSearcher: opt.SvcSearcher,
 		codec:       grpc.NewGRPCCodec(grpc.WithThriftCodec(opt.PayloadCodec)),
@@ -74,13 +75,19 @@ func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 
 var _ remote.ServerTransHandler = &svrTransHandler{}
 
+type rpcInfoPool interface {
+	Get() interface{}
+	Put(interface{})
+}
+
 type svrTransHandler struct {
 	opt         *remote.ServerOption
 	svcSearcher remote.ServiceSearcher
 	inkHdlFunc  endpoint.Endpoint
 	codec       remote.Codec
 
-	mu sync.Mutex
+	rpcInfoPool rpcInfoPool
+	mu          sync.Mutex
 	// maintain all active server transports
 	li *list.List
 }
@@ -149,13 +156,13 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans, conn net.Conn) {
 	var needRecycle bool
 	tr := svrTrans.tr
-	ri := svrTrans.pool.Get().(rpcinfo.RPCInfo)
+	ri, _ := t.rpcInfoPool.Get().(rpcinfo.RPCInfo)
+	ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
 	rCtx := rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
 	defer func() {
 		// reset rpcinfo for performance (PR #584)
 		if rpcinfo.PoolEnabled() && needRecycle {
-			ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
-			svrTrans.pool.Put(ri)
+			t.rpcInfoPool.Put(ri)
 		}
 	}()
 
@@ -348,7 +355,6 @@ const (
 
 type SvrTrans struct {
 	tr   grpcTransport.ServerTransport
-	pool *sync.Pool // value is rpcInfo
 	elem *list.Element
 	// num of active handlers
 	handlerNum int32
@@ -368,14 +374,7 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	if err != nil {
 		return nil, err
 	}
-	pool := &sync.Pool{
-		New: func() interface{} {
-			// init rpcinfo
-			ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
-			return ri
-		},
-	}
-	svrTrans := &SvrTrans{tr: tr, pool: pool}
+	svrTrans := &SvrTrans{tr: tr}
 	t.mu.Lock()
 	elem := t.li.PushBack(svrTrans)
 	t.mu.Unlock()

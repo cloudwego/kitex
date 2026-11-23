@@ -45,14 +45,16 @@ type bufferPool struct {
 	pool sync.Pool
 }
 
-func newBufferPool() *bufferPool {
-	return &bufferPool{
-		pool: sync.Pool{
-			New: func() interface{} {
-				return new(bytes.Buffer)
-			},
+var sharedBufferPool = &bufferPool{
+	pool: sync.Pool{
+		New: func() interface{} {
+			return new(bytes.Buffer)
 		},
-	}
+	},
+}
+
+func newBufferPool() *bufferPool {
+	return sharedBufferPool
 }
 
 func (p *bufferPool) get() *bytes.Buffer {

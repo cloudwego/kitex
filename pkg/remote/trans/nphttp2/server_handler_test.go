@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -422,18 +423,9 @@ func Test_RPCInfoReuse(t *testing.T) {
 				defer rpcinfo.EnablePool(true)
 			}
 
-			var poolPutCount int32
 			var capturedRPCInfo rpcinfo.RPCInfo
 
 			opt := newMockServerOption()
-			initFunc := opt.InitOrResetRPCInfoFunc
-			opt.InitOrResetRPCInfoFunc = func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-				if ri != nil {
-					atomic.AddInt32(&poolPutCount, 1)
-				}
-				return initFunc(ri, addr)
-			}
-
 			opt.SvcSearcher = mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
 				"Greeter": {
 					Methods: map[string]serviceinfo.MethodInfo{
@@ -470,12 +462,69 @@ func Test_RPCInfoReuse(t *testing.T) {
 			<-hdlFin
 			test.Assert(t, capturedRPCInfo != nil)
 			time.Sleep(time.Millisecond * 50) // Wait for defer to complete
-			putCount := atomic.LoadInt32(&poolPutCount)
+			pooled := handler.(*svrTransHandler).rpcInfoPool.Get()
 			if tc.expectReuse {
-				test.Assert(t, putCount == 1, putCount)
+				// sync.Pool may discard an entry. If retained, it must be
+				// the RPCInfo used by this request.
+				test.Assert(t, pooled == nil || pooled == capturedRPCInfo, pooled)
 			} else {
-				test.Assert(t, putCount == 0, putCount)
+				test.Assert(t, pooled == nil, pooled)
 			}
 		})
 	}
+}
+
+func TestRPCInfoSharedPoolRefreshesRemoteAddr(t *testing.T) {
+	opt := newMockServerOption()
+	reused := newMockRPCInfo(serviceinfo.StreamingNone)
+	staleAddr := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 27999}
+	from := rpcinfo.AsMutableEndpointInfo(reused.From())
+	test.Assert(t, from != nil)
+	from.SetAddress(staleAddr)
+
+	var initCalls, handled int
+	var currentAddr net.Addr
+	opt.InitOrResetRPCInfoFunc = func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+		initCalls++
+		test.Assert(t, ri == reused, ri)
+		test.Assert(t, addr.String() == currentAddr.String(), addr)
+		rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
+		return ri
+	}
+	opt.SvcSearcher = mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+		"Greeter": {
+			Methods: map[string]serviceinfo.MethodInfo{
+				"SayHello": serviceinfo.NewMethodInfo(nil,
+					func() interface{} { return nil },
+					func() interface{} { return nil }, false,
+					serviceinfo.WithStreamingMode(serviceinfo.StreamingNone)),
+			},
+		},
+	})
+	handler, err := NewSvrTransHandlerFactory().NewTransHandler(opt)
+	test.Assert(t, err == nil, err)
+	th := handler.(*svrTransHandler)
+	// Use New to provide a stale entry even if sync.Pool discards cached
+	// values, including under the race detector.
+	th.rpcInfoPool = &sync.Pool{New: func() interface{} { return reused }}
+	th.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) error {
+		handled++
+		ri := rpcinfo.GetRPCInfo(ctx)
+		test.Assert(t, ri == reused, ri)
+		test.Assert(t, ri.From().Address().String() == currentAddr.String(), ri.From().Address())
+		return nil
+	})
+
+	for _, addr := range []string{mockAddr0, mockAddr1} {
+		conn := newMockNpConn(addr)
+		conn.mockSettingFrame()
+		tr, err := newMockServerTransport(conn)
+		test.Assert(t, err == nil, err)
+		currentAddr = conn.RemoteAddr()
+		s := grpc.CreateStream(context.Background(), 1, func(int) {}, "/Greeter/SayHello")
+		th.handleFunc(s, &SvrTrans{tr: tr}, conn)
+		tr.Close()
+	}
+	test.Assert(t, initCalls == 2, initCalls)
+	test.Assert(t, handled == 2, handled)
 }
