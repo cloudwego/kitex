@@ -240,7 +240,7 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		kep:               kep,
 		idle:              time.Now(),
 		initialWindowSize: int32(iwz),
-		bufferPool:        newBufferPool(),
+		bufferPool:        receiveBufferPool(config.SharedReceiveBufferPool),
 	}
 	t.controlBuf = newControlBuffer(t.done)
 	if dynamicWindow {

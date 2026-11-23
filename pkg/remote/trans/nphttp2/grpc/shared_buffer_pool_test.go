@@ -18,9 +18,45 @@ package grpc
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 	"testing"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
+
+func TestReceiveBufferPoolScope(t *testing.T) {
+	privatePools := make(map[*bufferPool]bool)
+	check := func(pool *bufferPool, shared bool) {
+		t.Helper()
+		if shared {
+			test.Assert(t, pool == sharedBufferPool, "enabled transport must use the shared pool")
+			return
+		}
+		test.Assert(t, pool != nil && pool != sharedBufferPool && !privatePools[pool], "default transport must own its pool")
+		privatePools[pool] = true
+	}
+	for _, serverShared := range []bool{false, true} {
+		server := setUpServerOnly(t, 0, &ServerConfig{SharedReceiveBufferPool: serverShared}, suspended)
+		t.Cleanup(server.stop)
+		for _, clientShared := range []bool{false, true} {
+			client := setUpClient(t, server, ConnectOptions{SharedReceiveBufferPool: clientShared})
+			t.Cleanup(func() { client.Close(errSelfCloseForTest) })
+			check(client.bufferPool, clientShared)
+		}
+		waitWhileTrue(t, func() (bool, error) {
+			server.mu.Lock()
+			defer server.mu.Unlock()
+			if len(server.conns) != 2 {
+				return true, fmt.Errorf("waiting for both server transports, got %d", len(server.conns))
+			}
+			for conn := range server.conns {
+				check(conn.(*http2Server).bufferPool, serverShared)
+			}
+			return false, nil
+		})
+	}
+}
 
 func TestSharedBufferPoolConcurrentOwnership(t *testing.T) {
 	const connections = 32
@@ -29,7 +65,7 @@ func TestSharedBufferPoolConcurrentOwnership(t *testing.T) {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			pool := newBufferPool()
+			pool := receiveBufferPool(true)
 			payload := bytes.Repeat([]byte{byte(id)}, 4096)
 			for j := 0; j < 100; j++ {
 				b := pool.get()

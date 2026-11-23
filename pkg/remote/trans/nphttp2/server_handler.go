@@ -64,13 +64,16 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 }
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
-	return &svrTransHandler{
-		rpcInfoPool: new(sync.Pool),
+	h := &svrTransHandler{
 		opt:         opt,
 		svcSearcher: opt.SvcSearcher,
 		codec:       grpc.NewGRPCCodec(grpc.WithThriftCodec(opt.PayloadCodec)),
 		li:          list.New(),
-	}, nil
+	}
+	if opt.GRPCSharedRPCInfoPool {
+		h.sharedRPCInfoPool = new(sync.Pool)
+	}
+	return h, nil
 }
 
 var _ remote.ServerTransHandler = &svrTransHandler{}
@@ -86,8 +89,8 @@ type svrTransHandler struct {
 	inkHdlFunc  endpoint.Endpoint
 	codec       remote.Codec
 
-	rpcInfoPool rpcInfoPool
-	mu          sync.Mutex
+	sharedRPCInfoPool rpcInfoPool
+	mu                sync.Mutex
 	// maintain all active server transports
 	li *list.List
 }
@@ -156,13 +159,18 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans, conn net.Conn) {
 	var needRecycle bool
 	tr := svrTrans.tr
-	ri, _ := t.rpcInfoPool.Get().(rpcinfo.RPCInfo)
-	ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
+	ri, _ := svrTrans.pool.Get().(rpcinfo.RPCInfo)
+	if t.sharedRPCInfoPool != nil {
+		// A shared entry may have been returned by another connection.
+		ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
+	}
 	rCtx := rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
 	defer func() {
-		// reset rpcinfo for performance (PR #584)
 		if rpcinfo.PoolEnabled() && needRecycle {
-			t.rpcInfoPool.Put(ri)
+			if t.sharedRPCInfoPool == nil {
+				ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
+			}
+			svrTrans.pool.Put(ri)
 		}
 	}()
 
@@ -355,6 +363,7 @@ const (
 
 type SvrTrans struct {
 	tr   grpcTransport.ServerTransport
+	pool rpcInfoPool
 	elem *list.Element
 	// num of active handlers
 	handlerNum int32
@@ -374,7 +383,13 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	if err != nil {
 		return nil, err
 	}
-	svrTrans := &SvrTrans{tr: tr}
+	pool := t.sharedRPCInfoPool
+	if pool == nil {
+		pool = &sync.Pool{New: func() interface{} {
+			return t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
+		}}
+	}
+	svrTrans := &SvrTrans{tr: tr, pool: pool}
 	t.mu.Lock()
 	elem := t.li.PushBack(svrTrans)
 	t.mu.Unlock()

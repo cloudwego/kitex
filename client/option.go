@@ -548,6 +548,16 @@ func WithGRPCKeepaliveParams(kp grpc.ClientKeepalive) Option {
 	}}
 }
 
+// WithGRPCSharedReceiveBufferPool sets whether this client's gRPC connections
+// share a receive buffer pool with other clients and servers in the process
+// that enable this option. By default each connection has its own pool.
+func WithGRPCSharedReceiveBufferPool(enable bool) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCSharedReceiveBufferPool(%t)", enable))
+		o.GRPCConnectOpts.SharedReceiveBufferPool = enable
+	}}
+}
+
 // WithGRPCReuseWriteBuffer enables write buffer pooling to reduce idle connection memory.
 //
 // The config has two independent switches:

@@ -67,12 +67,12 @@ func (r *handoffResponse) WriteStatus(s *grpc.Stream, st *status.Status) error {
 	return nil
 }
 
+// CheckSharedRPCInfoHandoff checks that a completed request cannot mutate the next borrower.
 func CheckSharedRPCInfoHandoff(t *testing.T, reset func(rpcinfo.RPCInfo, net.Addr) rpcinfo.RPCInfo) {
 	t.Helper()
-	if !rpcinfo.PoolEnabled() {
-		t.Skip("requires RPCInfo pooling")
-	}
+	setRPCInfoPoolEnabled(t, true)
 	opt := newMockServerOption()
+	opt.GRPCSharedRPCInfoPool = true
 	opt.InitOrResetRPCInfoFunc = reset
 	unary := serviceinfo.NewMethodInfo(nil, nil, nil, false, serviceinfo.WithStreamingMode(serviceinfo.StreamingUnary))
 	opt.SvcSearcher = mockremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
@@ -117,27 +117,34 @@ func CheckSharedRPCInfoHandoff(t *testing.T, reset func(rpcinfo.RPCInfo, net.Add
 		}
 		return nil
 	})
-	call := func(method, addr string, transport grpc.ServerTransport) {
+	pool := new(handoffPool)
+	h.sharedRPCInfoPool = pool
+	prepareCall := func(method, addr string, response *handoffResponse) func() {
+		conn := newMockNpConn(addr)
+		tr := activateRPCInfoTestConn(t, h, conn)
+		response.ServerTransport = tr.tr
+		tr.tr = response
 		s := grpc.CreateStream(context.Background(), 1, func(int) {}, "/Greeter/"+method)
-		h.handleFunc(s, &SvrTrans{tr: transport}, newMockNpConn(addr))
+		return func() { h.handleFunc(s, tr, conn) }
 	}
-
 	var response handoffResponse
+	first := prepareCall("First", mockAddr0, &handoffResponse{})
+	second := prepareCall("Second", mockAddr1, &response)
 	secondDone := make(chan struct{})
 	secondStarted := false
-	h.rpcInfoPool = &handoffPool{afterFirstPut: func() {
+	pool.afterFirstPut = func() {
 		secondStarted = true
 		go func() {
 			defer close(secondDone)
-			call("Second", mockAddr1, &response)
+			second()
 		}()
 		// Let First finish its defer only after Second has written its state.
 		select {
 		case <-secondActive:
 		case <-secondDone: // Second exited before reaching its handler.
 		}
-	}}
-	call("First", mockAddr0, &handoffResponse{})
+	}
+	first()
 	close(firstReturned)
 	if !secondStarted {
 		t.Fatal("first request did not return its RPCInfo to the pool")

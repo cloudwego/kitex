@@ -755,6 +755,15 @@ func TestWithGRPCTLSConfig(t *testing.T) {
 	test.Assert(t, opts.GRPCConnectOpts != nil)
 }
 
+func TestWithGRPCSharedReceiveBufferPool(t *testing.T) {
+	opts := client.NewOptions(nil)
+	test.Assert(t, !opts.GRPCConnectOpts.SharedReceiveBufferPool)
+	opts = client.NewOptions([]Option{WithGRPCSharedReceiveBufferPool(true)})
+	test.Assert(t, opts.GRPCConnectOpts.SharedReceiveBufferPool)
+	opts = client.NewOptions([]Option{WithGRPCSharedReceiveBufferPool(true), WithGRPCSharedReceiveBufferPool(false)})
+	test.Assert(t, !opts.GRPCConnectOpts.SharedReceiveBufferPool)
+}
+
 func TestWithGRPCReuseWriteBuffer(t *testing.T) {
 	opts := client.NewOptions([]client.Option{})
 	test.Assert(t, !opts.GRPCConnectOpts.ReuseWriteBufferConfig.Enable, opts.GRPCConnectOpts)

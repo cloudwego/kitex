@@ -193,6 +193,7 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 		setter.SetPackageName("mock package")
 		setter.SetServiceName("mock service")
 		setter.SetMethodName("mock method")
+		setter.SetStreamingMode(serviceinfo.StreamingUnary)
 	}
 
 	mc := rpcinfo.AsMutableRPCConfig(ri.Config())
@@ -240,7 +241,14 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	test.Assert(t, ri.Stats().Error() != nil)
 	test.Assert(t, ri.Stats().Level() == stats.LevelDetailed)
 
-	// test reset
+	rpcStats.IncrRecvSize(6)
+	rpcStats.IncrSendSize(9)
+	test.Assert(t, ri.Stats().LastRecvSize() == 6)
+	test.Assert(t, ri.Stats().LastSendSize() == 9)
+	test.Assert(t, ri.Invocation().StreamingMode() == serviceinfo.StreamingUnary)
+
+	// Reuse this RPCInfo for a request from a different peer.
+	remoteAddr = utils.NewNetAddr("tcp", "next peer")
 	pOld := reflect.ValueOf(ri).Pointer()
 	ri = rpcInfoInitFunc(ri, conn.RemoteAddr())
 	pNew := reflect.ValueOf(ri).Pointer()
@@ -262,6 +270,7 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	test.Assert(t, ri.Invocation().PackageName() == "")
 	test.Assert(t, ri.Invocation().ServiceName() == "")
 	test.Assert(t, ri.Invocation().MethodName() == "")
+	test.Assert(t, ri.Invocation().StreamingMode() == serviceinfo.StreamingNone)
 
 	test.Assert(t, ri.Config().TransportProtocol() == transport.PurePayload)
 	test.Assert(t, ri.Config().ConnectTimeout() == 50*time.Millisecond)
@@ -272,6 +281,8 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 
 	test.Assert(t, ri.Stats().RecvSize() == 0)
 	test.Assert(t, ri.Stats().SendSize() == 0)
+	test.Assert(t, ri.Stats().LastRecvSize() == 0)
+	test.Assert(t, ri.Stats().LastSendSize() == 0)
 	_, panicked := ri.Stats().Panicked()
 	test.Assert(t, panicked == nil)
 	test.Assert(t, ri.Stats().Error() == nil)

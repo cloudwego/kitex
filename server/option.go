@@ -359,6 +359,26 @@ func WithGRPCUnknownServiceHandler(f func(ctx context.Context, methodName string
 	}}
 }
 
+// WithGRPCSharedRPCInfoPool sets whether this server's gRPC transport handler
+// pools RPCInfo across its connections. By default each connection has its own pool.
+// Only requests eligible for RPCInfo reuse are returned to the pool.
+func WithGRPCSharedRPCInfoPool(enable bool) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCSharedRPCInfoPool(%t)", enable))
+		o.RemoteOpt.GRPCSharedRPCInfoPool = enable
+	}}
+}
+
+// WithGRPCSharedReceiveBufferPool sets whether this server's gRPC connections
+// share a receive buffer pool with other clients and servers in the process
+// that enable this option. By default each connection has its own pool.
+func WithGRPCSharedReceiveBufferPool(enable bool) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCSharedReceiveBufferPool(%t)", enable))
+		o.RemoteOpt.GRPCCfg.SharedReceiveBufferPool = enable
+	}}
+}
+
 // WithGRPCReuseWriteBuffer enables write buffer pooling to reduce idle connection memory.
 //
 // The config has two independent switches:

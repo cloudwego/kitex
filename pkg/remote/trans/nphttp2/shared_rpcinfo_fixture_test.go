@@ -19,35 +19,22 @@ package nphttp2
 import (
 	"context"
 	"net"
-	"runtime"
-	"runtime/debug"
 	"testing"
 
 	mockremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-// Only the final status write reaches the mock transport.
-type discardRPCInfoTestStatus struct{ grpc.ServerTransport }
-
-func (discardRPCInfoTestStatus) WriteStatus(*grpc.Stream, *status.Status) error { return nil }
-
+// CheckPooledRPCInfoAtStreamStart checks the next borrower sees a clean invocation, stats and peer.
 func CheckPooledRPCInfoAtStreamStart(t *testing.T, reset func(rpcinfo.RPCInfo, net.Addr) rpcinfo.RPCInfo) {
 	t.Helper()
-	if !rpcinfo.PoolEnabled() {
-		t.Skip("requires RPCInfo pooling")
-	}
+	setRPCInfoPoolEnabled(t, true)
 	connA, connB := newMockNpConn(mockAddr0), newMockNpConn(mockAddr1)
-	// Keep both sequential calls on a single pool shard without an automatic GC between them.
-	oldProcs := runtime.GOMAXPROCS(1)
-	defer runtime.GOMAXPROCS(oldProcs)
-	oldGC := debug.SetGCPercent(-1)
-	defer debug.SetGCPercent(oldGC)
 	var previous rpcinfo.RPCInfo
 	opt := newMockServerOption()
+	opt.GRPCSharedRPCInfoPool = true
 	opt.InitOrResetRPCInfoFunc = reset
 	opt.SvcSearcher = mockremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
 		"Greeter": {Methods: map[string]serviceinfo.MethodInfo{
@@ -68,8 +55,7 @@ func CheckPooledRPCInfoAtStreamStart(t *testing.T, reset func(rpcinfo.RPCInfo, n
 				t.Fatal("first request did not run")
 			}
 			if ri != previous {
-				// sync.Pool is allowed to drop entries, including under -race.
-				t.Skip("the second connection did not reuse the first request's RPCInfo in this run")
+				t.Fatal("second connection did not borrow the first request's RPCInfo")
 			}
 			if got := ri.From().Address(); got == nil || got.String() != mockAddr1 {
 				t.Errorf("current stream peer = %v, want %s", got, mockAddr1)
@@ -90,6 +76,7 @@ func CheckPooledRPCInfoAtStreamStart(t *testing.T, reset func(rpcinfo.RPCInfo, n
 	if err != nil {
 		t.Fatal(err)
 	}
+	handler.sharedRPCInfoPool = new(handoffPool)
 	handler.SetInvokeHandleFunc(func(ctx context.Context, _, _ interface{}) error {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		if ri.Invocation().MethodName() == "Previous" {
@@ -105,10 +92,10 @@ func CheckPooledRPCInfoAtStreamStart(t *testing.T, reset func(rpcinfo.RPCInfo, n
 	})
 	for _, call := range []struct {
 		method string
-		conn   net.Conn
+		conn   *mockNetpollConn
 	}{{"Previous", connA}, {"Current", connB}} {
 		stream := grpc.CreateStream(context.Background(), 1, func(int) {}, "/Greeter/"+call.method)
-		handler.handleFunc(stream, &SvrTrans{tr: discardRPCInfoTestStatus{}}, call.conn)
+		handler.handleFunc(stream, activateRPCInfoTestConn(t, handler, call.conn), call.conn)
 	}
 	if !observedCurrent {
 		t.Fatal("current stream did not reach OnReadStream")

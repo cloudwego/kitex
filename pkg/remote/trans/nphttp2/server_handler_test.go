@@ -20,23 +20,20 @@ import (
 	"context"
 	"errors"
 	"net"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/mocks"
-	"github.com/cloudwego/kitex/pkg/consts"
-
 	"github.com/golang/mock/gomock"
 
+	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/mocks/netpoll"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
-	grpcTransport "github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
@@ -328,7 +325,7 @@ func TestSvrTransHandlerProtocolMatch(t *testing.T) {
 	// netpoll reader
 	// 1. success
 	reader := netpoll.NewMockReader(ctrl)
-	reader.EXPECT().Peek(prefaceReadAtMost).Times(1).Return(grpcTransport.ClientPreface, nil)
+	reader.EXPECT().Peek(prefaceReadAtMost).Times(1).Return(grpc.ClientPreface, nil)
 	conn := netpoll.NewMockConnection(ctrl)
 	conn.EXPECT().Reader().AnyTimes().Return(reader)
 	err := th.ProtocolMatch(context.Background(), conn)
@@ -416,115 +413,135 @@ func Test_RPCInfoReuse(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testcases {
-		t.Run(tc.desc, func(t *testing.T) {
-			if tc.disableReuse {
-				rpcinfo.EnablePool(false)
-				defer rpcinfo.EnablePool(true)
-			}
-
-			var capturedRPCInfo rpcinfo.RPCInfo
-
-			opt := newMockServerOption()
-			opt.SvcSearcher = mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
-				"Greeter": {
-					Methods: map[string]serviceinfo.MethodInfo{
-						"SayHello": serviceinfo.NewMethodInfo(func(ctx context.Context, handler, args, result interface{}) error {
-							return nil
-						}, func() interface{} { return nil }, func() interface{} { return nil }, false,
-							serviceinfo.WithStreamingMode(tc.mode),
-						),
-					},
-				},
-			})
-
-			handler, err := NewSvrTransHandlerFactory().NewTransHandler(opt)
-			test.Assert(t, err == nil, err)
-
-			hdlFin := make(chan struct{})
-			handler.(remote.InvokeHandleFuncSetter).SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) error {
-				capturedRPCInfo = rpcinfo.GetRPCInfo(ctx)
-				close(hdlFin)
-				return nil
-			})
-
-			npConn := newMockNpConn(mockAddr0)
-			npConn.mockSettingFrame()
-			npConn.mockMetaHeaderFrame()
-
-			ctx, err := handler.OnActive(newMockCtxWithRPCInfo(tc.mode), npConn)
-			test.Assert(t, err == nil, err)
-
-			go func() {
-				handler.OnRead(ctx, npConn)
-			}()
-
-			<-hdlFin
-			test.Assert(t, capturedRPCInfo != nil)
-			time.Sleep(time.Millisecond * 50) // Wait for defer to complete
-			pooled := handler.(*svrTransHandler).rpcInfoPool.Get()
-			if tc.expectReuse {
-				// sync.Pool may discard an entry. If retained, it must be
-				// the RPCInfo used by this request.
-				test.Assert(t, pooled == nil || pooled == capturedRPCInfo, pooled)
-			} else {
-				test.Assert(t, pooled == nil, pooled)
+	for _, scope := range []struct {
+		name   string
+		shared bool
+	}{{"per connection", false}, {"shared", true}} {
+		t.Run(scope.name, func(t *testing.T) {
+			for _, tc := range testcases {
+				t.Run(tc.desc, func(t *testing.T) {
+					setRPCInfoPoolEnabled(t, !tc.disableReuse)
+					opt := newMockServerOption()
+					opt.GRPCSharedRPCInfoPool = scope.shared
+					opt.InitOrResetRPCInfoFunc = func(ri rpcinfo.RPCInfo, _ net.Addr) rpcinfo.RPCInfo {
+						if ri == nil {
+							ri = newMockRPCInfo(serviceinfo.StreamingNone)
+						}
+						return ri
+					}
+					opt.SvcSearcher = mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+						"Greeter": {Methods: map[string]serviceinfo.MethodInfo{
+							"SayHello": serviceinfo.NewMethodInfo(nil, nil, nil, false, serviceinfo.WithStreamingMode(tc.mode)),
+						}},
+					})
+					h, err := newSvrTransHandler(opt)
+					test.Assert(t, err == nil, err)
+					var captured rpcinfo.RPCInfo
+					h.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) error {
+						captured = rpcinfo.GetRPCInfo(ctx)
+						return nil
+					})
+					conn := newMockNpConn(mockAddr0)
+					tr := activateRPCInfoTestConn(t, h, conn)
+					pool := &handoffPool{entry: tr.pool.Get()}
+					tr.pool = pool
+					s := grpc.CreateStream(context.Background(), 1, func(int) {}, "/Greeter/SayHello")
+					h.handleFunc(s, tr, conn)
+					test.Assert(t, captured != nil)
+					if tc.expectReuse {
+						test.Assert(t, pool.entry == captured, pool.entry)
+					} else {
+						test.Assert(t, pool.entry == nil, pool.entry)
+					}
+				})
 			}
 		})
 	}
 }
 
-func TestRPCInfoSharedPoolRefreshesRemoteAddr(t *testing.T) {
-	opt := newMockServerOption()
-	reused := newMockRPCInfo(serviceinfo.StreamingNone)
-	staleAddr := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 27999}
-	from := rpcinfo.AsMutableEndpointInfo(reused.From())
-	test.Assert(t, from != nil)
-	from.SetAddress(staleAddr)
+func setRPCInfoPoolEnabled(t *testing.T, enabled bool) {
+	t.Helper()
+	previous := rpcinfo.PoolEnabled()
+	rpcinfo.EnablePool(enabled)
+	t.Cleanup(func() { rpcinfo.EnablePool(previous) })
+}
 
-	var initCalls, handled int
-	var currentAddr net.Addr
-	opt.InitOrResetRPCInfoFunc = func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-		initCalls++
-		test.Assert(t, ri == reused, ri)
-		test.Assert(t, addr.String() == currentAddr.String(), addr)
-		rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
-		return ri
-	}
-	opt.SvcSearcher = mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
-		"Greeter": {
-			Methods: map[string]serviceinfo.MethodInfo{
-				"SayHello": serviceinfo.NewMethodInfo(nil,
-					func() interface{} { return nil },
-					func() interface{} { return nil }, false,
-					serviceinfo.WithStreamingMode(serviceinfo.StreamingNone)),
-			},
-		},
-	})
-	handler, err := NewSvrTransHandlerFactory().NewTransHandler(opt)
+func activateRPCInfoTestConn(t *testing.T, h *svrTransHandler, conn *mockNetpollConn) *SvrTrans {
+	t.Helper()
+	conn.mockSettingFrame()
+	ctx, err := h.OnActive(context.Background(), conn)
 	test.Assert(t, err == nil, err)
-	th := handler.(*svrTransHandler)
-	// Use New to provide a stale entry even if sync.Pool discards cached
-	// values, including under the race detector.
-	th.rpcInfoPool = &sync.Pool{New: func() interface{} { return reused }}
-	th.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) error {
-		handled++
-		ri := rpcinfo.GetRPCInfo(ctx)
-		test.Assert(t, ri == reused, ri)
-		test.Assert(t, ri.From().Address().String() == currentAddr.String(), ri.From().Address())
-		return nil
-	})
+	t.Cleanup(func() { h.OnInactive(ctx, conn) })
+	return ctx.Value(ctxKeySvrTransport).(*SvrTrans)
+}
 
-	for _, addr := range []string{mockAddr0, mockAddr1} {
-		conn := newMockNpConn(addr)
-		conn.mockSettingFrame()
-		tr, err := newMockServerTransport(conn)
+func TestRPCInfoPoolScope(t *testing.T) {
+	newHandler := func(shared bool) *svrTransHandler {
+		opt := newMockServerOption()
+		opt.GRPCSharedRPCInfoPool = shared
+		h, err := newSvrTransHandler(opt)
 		test.Assert(t, err == nil, err)
-		currentAddr = conn.RemoteAddr()
-		s := grpc.CreateStream(context.Background(), 1, func(int) {}, "/Greeter/SayHello")
-		th.handleFunc(s, &SvrTrans{tr: tr}, conn)
-		tr.Close()
+		return h
 	}
-	test.Assert(t, initCalls == 2, initCalls)
-	test.Assert(t, handled == 2, handled)
+	defaultHandler := newHandler(false)
+	sharedHandler := newHandler(true)
+	otherSharedHandler := newHandler(true)
+	first := activateRPCInfoTestConn(t, defaultHandler, newMockNpConn(mockAddr0)).pool
+	second := activateRPCInfoTestConn(t, defaultHandler, newMockNpConn(mockAddr1)).pool
+	shared := activateRPCInfoTestConn(t, sharedHandler, newMockNpConn(mockAddr0)).pool
+	other := activateRPCInfoTestConn(t, otherSharedHandler, newMockNpConn(mockAddr0)).pool
+	test.Assert(t, first != nil && second != nil && shared != nil && other != nil)
+	test.Assert(t, first != second)
+	test.Assert(t, shared == activateRPCInfoTestConn(t, sharedHandler, newMockNpConn(mockAddr1)).pool)
+	test.Assert(t, shared != first && shared != second && shared != other)
+}
+
+func TestRPCInfoPoolResetTiming(t *testing.T) {
+	setRPCInfoPoolEnabled(t, true)
+	for _, tc := range []struct {
+		name   string
+		shared bool
+		want   []string
+	}{
+		{"per connection", false, []string{"init", "handle", "reset", "handle", "reset"}},
+		{"shared", true, []string{"init", "handle", "reset", "handle"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var sequence []string
+			opt := newMockServerOption()
+			opt.GRPCSharedRPCInfoPool = tc.shared
+			opt.InitOrResetRPCInfoFunc = func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+				if ri == nil {
+					sequence = append(sequence, "init")
+					ri = newMockRPCInfo(serviceinfo.StreamingNone)
+				} else {
+					sequence = append(sequence, "reset")
+				}
+				ri.Invocation().(rpcinfo.InvocationSetter).SetExtra("initialized", true)
+				return ri
+			}
+			opt.SvcSearcher = mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+				"Greeter": {Methods: map[string]serviceinfo.MethodInfo{
+					"SayHello": serviceinfo.NewMethodInfo(nil, nil, nil, false, serviceinfo.WithStreamingMode(serviceinfo.StreamingUnary)),
+				}},
+			})
+			h, err := newSvrTransHandler(opt)
+			test.Assert(t, err == nil, err)
+			h.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) error {
+				test.Assert(t, rpcinfo.GetRPCInfo(ctx).Invocation().Extra("initialized") == true)
+				sequence = append(sequence, "handle")
+				return nil
+			})
+			conn := newMockNpConn(mockAddr0)
+			tr := activateRPCInfoTestConn(t, h, conn)
+			// Exercise the transport's actual empty pool once; retain its first return
+			// deterministically so the second request always exercises the reuse path.
+			tr.pool = &handoffPool{entry: tr.pool.Get()}
+			for _, id := range []uint32{1, 3} {
+				s := grpc.CreateStream(context.Background(), id, func(int) {}, "/Greeter/SayHello")
+				h.handleFunc(s, tr, conn)
+			}
+			test.DeepEqual(t, sequence, tc.want)
+		})
+	}
 }
