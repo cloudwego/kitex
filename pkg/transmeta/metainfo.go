@@ -67,9 +67,14 @@ func (mi *metainfoClientHandler) OnReadStream(ctx context.Context) (context.Cont
 
 func (mi *metainfoClientHandler) WriteMeta(ctx context.Context, sendMsg remote.Message) (context.Context, error) {
 	if metainfo.HasMetaInfo(ctx) {
-		kvs := make(map[string]string)
-		metainfo.SaveMetaInfoToMap(ctx, kvs)
-		sendMsg.TransInfo().PutTransStrInfo(kvs)
+		// write into the pooled map of the message to avoid a new map for each request
+		if kvs := sendMsg.TransInfo().TransStrInfo(); kvs != nil {
+			metainfo.SaveMetaInfoToMap(ctx, kvs)
+		} else {
+			kvs = make(map[string]string)
+			metainfo.SaveMetaInfoToMap(ctx, kvs)
+			sendMsg.TransInfo().PutTransStrInfo(kvs)
+		}
 	}
 	return ctx, nil
 }
