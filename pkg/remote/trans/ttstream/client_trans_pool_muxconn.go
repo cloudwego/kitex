@@ -87,10 +87,10 @@ func (tl *muxConnTransList) Get(network, addr string) (*clientTransport, error) 
 
 	// slow path
 	tl.L.Lock()
+	defer tl.L.Unlock()
 	trans = tl.transports[idx]
 	if trans != nil && trans.IsActive() {
 		// another goroutine already create the new transport
-		tl.L.Unlock()
 		return trans, nil
 	}
 	// it may create more than tl.size transport if multi client try to get transport concurrently
@@ -105,7 +105,6 @@ func (tl *muxConnTransList) Get(network, addr string) (*clientTransport, error) 
 		return nil
 	})
 	tl.transports[idx] = trans
-	tl.L.Unlock()
 
 	return trans, nil
 }
