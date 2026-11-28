@@ -412,25 +412,7 @@ func writeInt64(ctx context.Context, val interface{}, out *thrift.BufferWriter, 
 func writeJSONNumber(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	jn := val.(json.Number)
 	switch t.Type {
-	case descriptor.I08:
-		i, err := jn.Int64()
-		if err != nil {
-			return err
-		}
-		return writeInt8(ctx, int8(i), out, t, opt)
-	case descriptor.I16:
-		i, err := jn.Int64()
-		if err != nil {
-			return err
-		}
-		return writeInt16(ctx, int16(i), out, t, opt)
-	case descriptor.I32:
-		i, err := jn.Int64()
-		if err != nil {
-			return err
-		}
-		return writeInt32(ctx, int32(i), out, t, opt)
-	case descriptor.I64:
+	case descriptor.I08, descriptor.I16, descriptor.I32, descriptor.I64:
 		i, err := jn.Int64()
 		if err != nil {
 			return err
