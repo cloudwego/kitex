@@ -367,6 +367,42 @@ func Test_writeJSONNumber(t *testing.T) {
 	}
 }
 
+func Test_writeJSONNumberRange(t *testing.T) {
+	tests := []struct {
+		name    string
+		typeID  descriptor.Type
+		value   string
+		wantErr bool
+	}{
+		{"i8 minimum", descriptor.I08, "-128", false},
+		{"i8 maximum", descriptor.I08, "127", false},
+		{"i8 zero", descriptor.I08, "0", false},
+		{"i8 underflow", descriptor.I08, "-129", true},
+		{"i8 overflow", descriptor.I08, "128", true},
+		{"i16 minimum", descriptor.I16, "-32768", false},
+		{"i16 maximum", descriptor.I16, "32767", false},
+		{"i16 zero", descriptor.I16, "0", false},
+		{"i16 underflow", descriptor.I16, "-32769", true},
+		{"i16 overflow", descriptor.I16, "32768", true},
+		{"i32 minimum", descriptor.I32, "-2147483648", false},
+		{"i32 maximum", descriptor.I32, "2147483647", false},
+		{"i32 zero", descriptor.I32, "0", false},
+		{"i32 underflow", descriptor.I32, "-2147483649", true},
+		{"i32 overflow", descriptor.I32, "2147483648", true},
+		{"i64 overflow", descriptor.I64, "9223372036854775808", true},
+		{"fractional integer", descriptor.I08, "1.5", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := writeJSONNumber(context.Background(), json.Number(tt.value), getBufferWriter(nil),
+				&descriptor.TypeDescriptor{Type: tt.typeID}, nil)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeJSONNumber(%s, %s) error = %v, wantErr %v", tt.value, tt.typeID, err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func Test_writeJSONFloat64(t *testing.T) {
 	type args struct {
 		val interface{}
